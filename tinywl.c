@@ -78,7 +78,7 @@ struct tinywl_output {
 struct tinywl_view {
 	struct wl_list link;
 	struct tinywl_server *server;
-	struct wlr_xdg_surface *xdg_surface;
+	struct wlr_xdg_toplevel *xdg_toplevel;
 	struct wlr_scene_node *scene_node;
 	struct wl_listener map;
 	struct wl_listener unmap;
@@ -117,7 +117,8 @@ static void focus_view(struct tinywl_view *view, struct wlr_surface *surface) {
 		 */
 		struct wlr_xdg_surface *previous = wlr_xdg_surface_from_wlr_surface(
 					seat->keyboard_state.focused_surface);
-		wlr_xdg_toplevel_set_activated(previous, false);
+		assert(previous->role == WLR_XDG_SURFACE_ROLE_TOPLEVEL);
+		wlr_xdg_toplevel_set_activated(previous->toplevel, false);
 	}
 	struct wlr_keyboard *keyboard = wlr_seat_get_keyboard(seat);
 	/* Move the view to the front */
@@ -125,13 +126,13 @@ static void focus_view(struct tinywl_view *view, struct wlr_surface *surface) {
 	wl_list_remove(&view->link);
 	wl_list_insert(&server->views, &view->link);
 	/* Activate the new surface */
-	wlr_xdg_toplevel_set_activated(view->xdg_surface, true);
+	wlr_xdg_toplevel_set_activated(view->xdg_toplevel, true);
 	/*
 	 * Tell the seat to have the keyboard enter this surface. wlroots will keep
 	 * track of this and automatically send key events to the appropriate
 	 * clients without additional work on your part.
 	 */
-	wlr_seat_keyboard_notify_enter(seat, view->xdg_surface->surface,
+	wlr_seat_keyboard_notify_enter(seat, view->xdg_toplevel->base->surface,
 		keyboard->keycodes, keyboard->num_keycodes, &keyboard->modifiers);
 }
 
@@ -172,7 +173,7 @@ static bool handle_keybinding(struct tinywl_server *server, xkb_keysym_t sym) {
 		}
 		struct tinywl_view *next_view = wl_container_of(
 			server->views.prev, next_view, link);
-		focus_view(next_view, next_view->xdg_surface->surface);
+		focus_view(next_view, next_view->xdg_toplevel->base->surface);
 		break;
 	default:
 		return false;
@@ -381,14 +382,14 @@ static void process_cursor_resize(struct tinywl_server *server, uint32_t time) {
 	}
 
 	struct wlr_box geo_box;
-	wlr_xdg_surface_get_geometry(view->xdg_surface, &geo_box);
+	wlr_xdg_surface_get_geometry(view->xdg_toplevel->base, &geo_box);
 	view->x = new_left - geo_box.x;
 	view->y = new_top - geo_box.y;
 	wlr_scene_node_set_position(view->scene_node, view->x, view->y);
 
 	int new_width = new_right - new_left;
 	int new_height = new_bottom - new_top;
-	wlr_xdg_toplevel_set_size(view->xdg_surface, new_width, new_height);
+	wlr_xdg_toplevel_set_size(view->xdg_toplevel, new_width, new_height);
 }
 
 static void process_cursor_motion(struct tinywl_server *server, uint32_t time) {
@@ -581,7 +582,7 @@ static void xdg_toplevel_map(struct wl_listener *listener, void *data) {
 
 	wl_list_insert(&view->server->views, &view->link);
 
-	focus_view(view, view->xdg_surface->surface);
+	focus_view(view, view->xdg_toplevel->base->surface);
 }
 
 static void xdg_toplevel_unmap(struct wl_listener *listener, void *data) {
@@ -612,7 +613,7 @@ static void begin_interactive(struct tinywl_view *view,
 	struct tinywl_server *server = view->server;
 	struct wlr_surface *focused_surface =
 		server->seat->pointer_state.focused_surface;
-	if (view->xdg_surface->surface !=
+	if (view->xdg_toplevel->base->surface !=
 			wlr_surface_get_root_surface(focused_surface)) {
 		/* Deny move/resize requests from unfocused clients. */
 		return;
@@ -625,7 +626,7 @@ static void begin_interactive(struct tinywl_view *view,
 		server->grab_y = server->cursor->y - view->y;
 	} else {
 		struct wlr_box geo_box;
-		wlr_xdg_surface_get_geometry(view->xdg_surface, &geo_box);
+		wlr_xdg_surface_get_geometry(view->xdg_toplevel->base, &geo_box);
 
 		double border_x = (view->x + geo_box.x) +
 			((edges & WLR_EDGE_RIGHT) ? geo_box.width : 0);
@@ -691,9 +692,9 @@ static void server_new_xdg_surface(struct wl_listener *listener, void *data) {
 	struct tinywl_view *view =
 		calloc(1, sizeof(struct tinywl_view));
 	view->server = server;
-	view->xdg_surface = xdg_surface;
+	view->xdg_toplevel = xdg_surface->toplevel;
 	view->scene_node = wlr_scene_xdg_surface_create(
-			&view->server->scene->node, view->xdg_surface);
+			&view->server->scene->node, view->xdg_toplevel->base);
 	view->scene_node->data = view;
 	xdg_surface->data = view->scene_node;
 

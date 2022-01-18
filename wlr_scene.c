@@ -130,6 +130,7 @@ void wlr_scene_node_destroy(struct wlr_scene_node *node) {
 		break;
 	case WLR_SCENE_NODE_BUFFER:;
 		struct wlr_scene_buffer *scene_buffer = scene_buffer_from_node(node);
+		wl_list_remove(&scene_buffer->pending_link);
 		wlr_texture_destroy(scene_buffer->texture);
 		wlr_buffer_unlock(scene_buffer->buffer);
 		free(scene_buffer);
@@ -145,6 +146,7 @@ struct wlr_scene *wlr_scene_create(void) {
 	scene_node_init(&scene->node, WLR_SCENE_NODE_ROOT, NULL);
 	wl_list_init(&scene->outputs);
 	wl_list_init(&scene->presentation_destroy.link);
+	wl_list_init(&scene->pending_buffers);
 	return scene;
 }
 
@@ -359,6 +361,9 @@ struct wlr_scene_buffer *wlr_scene_buffer_create(struct wlr_scene_node *parent,
 	scene_buffer->buffer = wlr_buffer_lock(buffer);
 
 	scene_node_damage_whole(&scene_buffer->node);
+
+	struct wlr_scene *scene = scene_node_get_root(parent);
+	wl_list_insert(&scene->pending_buffers, &scene_buffer->pending_link);
 
 	return scene_buffer;
 }
@@ -1111,6 +1116,15 @@ bool wlr_scene_output_commit(struct wlr_scene_output *scene_output) {
 		pixman_region32_fini(&damage);
 		wlr_output_rollback(output);
 		return true;
+	}
+
+	// Try to import new buffers as textures
+	struct wlr_scene_buffer *scene_buffer, *scene_buffer_tmp;
+	wl_list_for_each_safe(scene_buffer, scene_buffer_tmp,
+			&scene_output->scene->pending_buffers, pending_link) {
+		scene_buffer_get_texture(scene_buffer, renderer);
+		wl_list_remove(&scene_buffer->pending_link);
+		wl_list_init(&scene_buffer->pending_link);
 	}
 
 	wlr_renderer_begin(renderer, output->width, output->height);

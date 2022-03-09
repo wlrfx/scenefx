@@ -188,7 +188,7 @@ static void keyboard_handle_key(
 	struct tinywl_keyboard *keyboard =
 		wl_container_of(listener, keyboard, key);
 	struct tinywl_server *server = keyboard->server;
-	struct wlr_event_keyboard_key *event = data;
+	struct wlr_keyboard_key_event *event = data;
 	struct wlr_seat *seat = server->seat;
 
 	/* Translate libinput keycode -> xkbcommon */

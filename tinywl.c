@@ -136,8 +136,10 @@ static void focus_view(struct tinywl_view *view, struct wlr_surface *surface) {
 	 * track of this and automatically send key events to the appropriate
 	 * clients without additional work on your part.
 	 */
-	wlr_seat_keyboard_notify_enter(seat, view->xdg_toplevel->base->surface,
-		keyboard->keycodes, keyboard->num_keycodes, &keyboard->modifiers);
+	if (keyboard != NULL) {
+		wlr_seat_keyboard_notify_enter(seat, view->xdg_toplevel->base->surface,
+			keyboard->keycodes, keyboard->num_keycodes, &keyboard->modifiers);
+	}
 }
 
 static void keyboard_handle_modifiers(

@@ -91,7 +91,7 @@ struct tinywl_view {
 struct tinywl_keyboard {
 	struct wl_list link;
 	struct tinywl_server *server;
-	struct wlr_input_device *device;
+	struct wlr_keyboard *wlr_keyboard;
 
 	struct wl_listener modifiers;
 	struct wl_listener key;
@@ -149,10 +149,10 @@ static void keyboard_handle_modifiers(
 	 * same seat. You can swap out the underlying wlr_keyboard like this and
 	 * wlr_seat handles this transparently.
 	 */
-	wlr_seat_set_keyboard(keyboard->server->seat, keyboard->device);
+	wlr_seat_set_keyboard(keyboard->server->seat, keyboard->wlr_keyboard);
 	/* Send modifiers to the client. */
 	wlr_seat_keyboard_notify_modifiers(keyboard->server->seat,
-		&keyboard->device->keyboard->modifiers);
+		&keyboard->wlr_keyboard->modifiers);
 }
 
 static bool handle_keybinding(struct tinywl_server *server, xkb_keysym_t sym) {
@@ -196,10 +196,10 @@ static void keyboard_handle_key(
 	/* Get a list of keysyms based on the keymap for this keyboard */
 	const xkb_keysym_t *syms;
 	int nsyms = xkb_state_key_get_syms(
-			keyboard->device->keyboard->xkb_state, keycode, &syms);
+			keyboard->wlr_keyboard->xkb_state, keycode, &syms);
 
 	bool handled = false;
-	uint32_t modifiers = wlr_keyboard_get_modifiers(keyboard->device->keyboard);
+	uint32_t modifiers = wlr_keyboard_get_modifiers(keyboard->wlr_keyboard);
 	if ((modifiers & WLR_MODIFIER_ALT) &&
 			event->state == WL_KEYBOARD_KEY_STATE_PRESSED) {
 		/* If alt is held down and this button was _pressed_, we attempt to
@@ -211,7 +211,7 @@ static void keyboard_handle_key(
 
 	if (!handled) {
 		/* Otherwise, we pass it along to the client. */
-		wlr_seat_set_keyboard(seat, keyboard->device);
+		wlr_seat_set_keyboard(seat, keyboard->wlr_keyboard);
 		wlr_seat_keyboard_notify_key(seat, event->time_msec,
 			event->keycode, event->state);
 	}
@@ -236,7 +236,7 @@ static void server_new_keyboard(struct tinywl_server *server,
 	struct tinywl_keyboard *keyboard =
 		calloc(1, sizeof(struct tinywl_keyboard));
 	keyboard->server = server;
-	keyboard->device = device;
+	keyboard->wlr_keyboard = device->keyboard;
 
 	/* We need to prepare an XKB keymap and assign it to the keyboard. This
 	 * assumes the defaults (e.g. layout = "us"). */
@@ -257,7 +257,7 @@ static void server_new_keyboard(struct tinywl_server *server,
 	keyboard->destroy.notify = keyboard_handle_destroy;
 	wl_signal_add(&device->events.destroy, &keyboard->destroy);
 
-	wlr_seat_set_keyboard(server->seat, device);
+	wlr_seat_set_keyboard(server->seat, keyboard->wlr_keyboard);
 
 	/* And add the keyboard to our list of keyboards */
 	wl_list_insert(&server->keyboards, &keyboard->link);

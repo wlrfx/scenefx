@@ -29,7 +29,7 @@ static struct wlr_scene_rect *scene_rect_from_node(
 	return (struct wlr_scene_rect *)node;
 }
 
-static struct wlr_scene_buffer *scene_buffer_from_node(
+struct wlr_scene_buffer *wlr_scene_buffer_from_node(
 		struct wlr_scene_node *node) {
 	assert(node->type == WLR_SCENE_NODE_BUFFER);
 	return (struct wlr_scene_buffer *)node;
@@ -106,7 +106,7 @@ void wlr_scene_node_destroy(struct wlr_scene_node *node) {
 		wl_list_remove(&scene_surface->surface_destroy.link);
 		break;
 	case WLR_SCENE_NODE_BUFFER:;
-		struct wlr_scene_buffer *scene_buffer = scene_buffer_from_node(node);
+		struct wlr_scene_buffer *scene_buffer = wlr_scene_buffer_from_node(node);
 
 		uint64_t active = scene_buffer->active_outputs;
 		if (active) {
@@ -260,7 +260,7 @@ static void _scene_node_update_outputs(
 		scene_surface_update_outputs(scene_surface, lx, ly, scene);
 	} else if (node->type == WLR_SCENE_NODE_BUFFER) {
 		struct wlr_scene_buffer *scene_buffer =
-			scene_buffer_from_node(node);
+			wlr_scene_buffer_from_node(node);
 		scene_buffer_update_outputs(scene_buffer, lx, ly, scene);
 	}
 
@@ -597,7 +597,7 @@ static void scene_node_get_size(struct wlr_scene_node *node,
 		*height = scene_rect->height;
 		break;
 	case WLR_SCENE_NODE_BUFFER:;
-		struct wlr_scene_buffer *scene_buffer = scene_buffer_from_node(node);
+		struct wlr_scene_buffer *scene_buffer = wlr_scene_buffer_from_node(node);
 		if (scene_buffer->dst_width > 0 && scene_buffer->dst_height > 0) {
 			*width = scene_buffer->dst_width;
 			*height = scene_buffer->dst_height;
@@ -844,7 +844,7 @@ struct wlr_scene_node *wlr_scene_node_at(struct wlr_scene_node *node,
 		intersects = lx >= 0 && lx < width && ly >= 0 && ly < height;
 		break;
 	case WLR_SCENE_NODE_BUFFER:;
-		struct wlr_scene_buffer *scene_buffer = scene_buffer_from_node(node);
+		struct wlr_scene_buffer *scene_buffer = wlr_scene_buffer_from_node(node);
 
 		if (scene_buffer->point_accepts_input) {
 			intersects = scene_buffer->point_accepts_input(scene_buffer, lx, ly);
@@ -1002,7 +1002,7 @@ static void render_node_iterator(struct wlr_scene_node *node,
 			output->transform_matrix);
 		break;
 	case WLR_SCENE_NODE_BUFFER:;
-		struct wlr_scene_buffer *scene_buffer = scene_buffer_from_node(node);
+		struct wlr_scene_buffer *scene_buffer = wlr_scene_buffer_from_node(node);
 		if (!scene_buffer->buffer) {
 			return;
 		}
@@ -1143,7 +1143,7 @@ static void scene_node_remove_output(struct wlr_scene_node *node,
 		wlr_surface_send_leave(scene_surface->surface, output->output);
 	} else if (node->type == WLR_SCENE_NODE_BUFFER) {
 		struct wlr_scene_buffer *scene_buffer =
-			scene_buffer_from_node(node);
+			wlr_scene_buffer_from_node(node);
 		uint64_t mask = 1ull << output->index;
 		if (scene_buffer->active_outputs & mask) {
 			scene_buffer->active_outputs &= ~mask;
@@ -1252,7 +1252,7 @@ static bool scene_output_scanout(struct wlr_scene_output *scene_output) {
 		buffer = &scene_surface->surface->buffer->base;
 		break;
 	case WLR_SCENE_NODE_BUFFER:;
-		struct wlr_scene_buffer *scene_buffer = scene_buffer_from_node(node);
+		struct wlr_scene_buffer *scene_buffer = wlr_scene_buffer_from_node(node);
 		if (scene_buffer->buffer == NULL ||
 				!wlr_fbox_empty(&scene_buffer->src_box) ||
 				scene_buffer->transform != output->transform) {
@@ -1284,7 +1284,7 @@ static bool scene_output_scanout(struct wlr_scene_output *scene_output) {
 
 	if (node->type == WLR_SCENE_NODE_BUFFER) {
 		struct wlr_scene_buffer *scene_buffer =
-			scene_buffer_from_node(node);
+			wlr_scene_buffer_from_node(node);
 		wlr_signal_emit_safe(&scene_buffer->events.output_present, scene_output);
 	}
 
@@ -1379,7 +1379,7 @@ static void scene_node_send_frame_done(struct wlr_scene_node *node,
 
 	if (node->type == WLR_SCENE_NODE_BUFFER) {
 		struct wlr_scene_buffer *scene_buffer =
-			scene_buffer_from_node(node);
+			wlr_scene_buffer_from_node(node);
 
 		if (scene_buffer->primary_output == scene_output) {
 			wlr_scene_buffer_send_frame_done(scene_buffer, now);

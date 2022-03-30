@@ -43,5 +43,3 @@ Notable omissions from TinyWL:
 - Optional protocols, e.g. screen capture, primary selection, virtual
   keyboard, etc. Most of these are plug-and-play with wlroots, but they're
   omitted for brevity.
-- Damage tracking, which tracks which parts of the screen are changing and
-  minimizes redraws accordingly.

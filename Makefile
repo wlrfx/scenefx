@@ -12,11 +12,7 @@ xdg-shell-protocol.h:
 	$(WAYLAND_SCANNER) server-header \
 		$(WAYLAND_PROTOCOLS)/stable/xdg-shell/xdg-shell.xml $@
 
-xdg-shell-protocol.c: xdg-shell-protocol.h
-	$(WAYLAND_SCANNER) private-code \
-		$(WAYLAND_PROTOCOLS)/stable/xdg-shell/xdg-shell.xml $@
-
-tinywl: tinywl.c xdg-shell-protocol.h xdg-shell-protocol.c
+tinywl: tinywl.c xdg-shell-protocol.h
 	$(CC) $(CFLAGS) \
 		-g -Werror -I. \
 		-DWLR_USE_UNSTABLE \

@@ -48,27 +48,20 @@ struct wlr_scene *scene_node_get_root(struct wlr_scene_node *node) {
 	return (struct wlr_scene *)tree;
 }
 
-static void scene_node_state_init(struct wlr_scene_node_state *state) {
-	memset(state, 0, sizeof(*state));
-	wl_list_init(&state->children);
-	wl_list_init(&state->link);
-	state->enabled = true;
-}
-
-static void scene_node_state_finish(struct wlr_scene_node_state *state) {
-	wl_list_remove(&state->link);
-}
-
 static void scene_node_init(struct wlr_scene_node *node,
 		enum wlr_scene_node_type type, struct wlr_scene_tree *parent) {
 	memset(node, 0, sizeof(*node));
 	node->type = type;
 	node->parent = parent;
-	scene_node_state_init(&node->state);
+	node->enabled = true;
+
+	wl_list_init(&node->children);
+	wl_list_init(&node->link);
+
 	wl_signal_init(&node->events.destroy);
 
 	if (parent != NULL) {
-		wl_list_insert(parent->node.state.children.prev, &node->state.link);
+		wl_list_insert(parent->node.children.prev, &node->link);
 	}
 
 	wlr_addon_set_init(&node->addons);
@@ -137,13 +130,12 @@ void wlr_scene_node_destroy(struct wlr_scene_node *node) {
 	}
 
 	struct wlr_scene_node *child, *child_tmp;
-	wl_list_for_each_safe(child, child_tmp,
-			&node->state.children, state.link) {
+	wl_list_for_each_safe(child, child_tmp, &node->children, link) {
 		wlr_scene_node_destroy(child);
 	}
 
 	wlr_addon_set_finish(&node->addons);
-	scene_node_state_finish(&node->state);
+	wl_list_remove(&node->link);
 	free(node);
 }
 
@@ -250,9 +242,9 @@ static void _scene_node_update_outputs(
 	}
 
 	struct wlr_scene_node *child;
-	wl_list_for_each(child, &node->state.children, state.link) {
-		_scene_node_update_outputs(child, lx + child->state.x,
-			ly + child->state.y, scene);
+	wl_list_for_each(child, &node->children, link) {
+		_scene_node_update_outputs(child, lx + child->x,
+			ly + child->y, scene);
 	}
 }
 
@@ -527,14 +519,14 @@ static void scale_box(struct wlr_box *box, float scale) {
 
 static void _scene_node_damage_whole(struct wlr_scene_node *node,
 		struct wlr_scene *scene, int lx, int ly) {
-	if (!node->state.enabled) {
+	if (!node->enabled) {
 		return;
 	}
 
 	struct wlr_scene_node *child;
-	wl_list_for_each(child, &node->state.children, state.link) {
+	wl_list_for_each(child, &node->children, link) {
 		_scene_node_damage_whole(child, scene,
-			lx + child->state.x, ly + child->state.y);
+			lx + child->x, ly + child->y);
 	}
 
 	int width, height;
@@ -570,24 +562,24 @@ static void scene_node_damage_whole(struct wlr_scene_node *node) {
 }
 
 void wlr_scene_node_set_enabled(struct wlr_scene_node *node, bool enabled) {
-	if (node->state.enabled == enabled) {
+	if (node->enabled == enabled) {
 		return;
 	}
 
 	// One of these damage_whole() calls will short-circuit and be a no-op
 	scene_node_damage_whole(node);
-	node->state.enabled = enabled;
+	node->enabled = enabled;
 	scene_node_damage_whole(node);
 }
 
 void wlr_scene_node_set_position(struct wlr_scene_node *node, int x, int y) {
-	if (node->state.x == x && node->state.y == y) {
+	if (node->x == x && node->y == y) {
 		return;
 	}
 
 	scene_node_damage_whole(node);
-	node->state.x = x;
-	node->state.y = y;
+	node->x = x;
+	node->y = y;
 	scene_node_damage_whole(node);
 
 	scene_node_update_outputs(node);
@@ -598,12 +590,12 @@ void wlr_scene_node_place_above(struct wlr_scene_node *node,
 	assert(node != sibling);
 	assert(node->parent == sibling->parent);
 
-	if (node->state.link.prev == &sibling->state.link) {
+	if (node->link.prev == &sibling->link) {
 		return;
 	}
 
-	wl_list_remove(&node->state.link);
-	wl_list_insert(&sibling->state.link, &node->state.link);
+	wl_list_remove(&node->link);
+	wl_list_insert(&sibling->link, &node->link);
 
 	scene_node_damage_whole(node);
 	scene_node_damage_whole(sibling);
@@ -614,12 +606,12 @@ void wlr_scene_node_place_below(struct wlr_scene_node *node,
 	assert(node != sibling);
 	assert(node->parent == sibling->parent);
 
-	if (node->state.link.next == &sibling->state.link) {
+	if (node->link.next == &sibling->link) {
 		return;
 	}
 
-	wl_list_remove(&node->state.link);
-	wl_list_insert(sibling->state.link.prev, &node->state.link);
+	wl_list_remove(&node->link);
+	wl_list_insert(sibling->link.prev, &node->link);
 
 	scene_node_damage_whole(node);
 	scene_node_damage_whole(sibling);
@@ -627,7 +619,7 @@ void wlr_scene_node_place_below(struct wlr_scene_node *node,
 
 void wlr_scene_node_raise_to_top(struct wlr_scene_node *node) {
 	struct wlr_scene_node *current_top = wl_container_of(
-		node->parent->node.state.children.prev, current_top, state.link);
+		node->parent->node.children.prev, current_top, link);
 	if (node == current_top) {
 		return;
 	}
@@ -636,7 +628,7 @@ void wlr_scene_node_raise_to_top(struct wlr_scene_node *node) {
 
 void wlr_scene_node_lower_to_bottom(struct wlr_scene_node *node) {
 	struct wlr_scene_node *current_bottom = wl_container_of(
-		node->parent->node.state.children.next, current_bottom, state.link);
+		node->parent->node.children.next, current_bottom, link);
 	if (node == current_bottom) {
 		return;
 	}
@@ -659,9 +651,9 @@ void wlr_scene_node_reparent(struct wlr_scene_node *node,
 
 	scene_node_damage_whole(node);
 
-	wl_list_remove(&node->state.link);
+	wl_list_remove(&node->link);
 	node->parent = new_parent;
-	wl_list_insert(new_parent->node.state.children.prev, &node->state.link);
+	wl_list_insert(new_parent->node.children.prev, &node->link);
 
 	scene_node_damage_whole(node);
 
@@ -675,9 +667,9 @@ bool wlr_scene_node_coords(struct wlr_scene_node *node,
 	int lx = 0, ly = 0;
 	bool enabled = true;
 	while (true) {
-		lx += node->state.x;
-		ly += node->state.y;
-		enabled = enabled && node->state.enabled;
+		lx += node->x;
+		ly += node->y;
+		enabled = enabled && node->enabled;
 		if (node->parent == NULL) {
 			break;
 		}
@@ -693,12 +685,12 @@ bool wlr_scene_node_coords(struct wlr_scene_node *node,
 static void scene_node_for_each_scene_buffer(struct wlr_scene_node *node,
 		int lx, int ly, wlr_scene_buffer_iterator_func_t user_iterator,
 		void *user_data) {
-	if (!node->state.enabled) {
+	if (!node->enabled) {
 		return;
 	}
 
-	lx += node->state.x;
-	ly += node->state.y;
+	lx += node->x;
+	ly += node->y;
 
 	if (node->type == WLR_SCENE_NODE_BUFFER) {
 		struct wlr_scene_buffer *scene_buffer = wlr_scene_buffer_from_node(node);
@@ -706,7 +698,7 @@ static void scene_node_for_each_scene_buffer(struct wlr_scene_node *node,
 	}
 
 	struct wlr_scene_node *child;
-	wl_list_for_each(child, &node->state.children, state.link) {
+	wl_list_for_each(child, &node->children, link) {
 		scene_node_for_each_scene_buffer(child, lx, ly, user_iterator, user_data);
 	}
 }
@@ -718,16 +710,16 @@ void wlr_scene_node_for_each_buffer(struct wlr_scene_node *node,
 
 struct wlr_scene_node *wlr_scene_node_at(struct wlr_scene_node *node,
 		double lx, double ly, double *nx, double *ny) {
-	if (!node->state.enabled) {
+	if (!node->enabled) {
 		return NULL;
 	}
 
 	// TODO: optimize by storing a bounding box in each node?
-	lx -= node->state.x;
-	ly -= node->state.y;
+	lx -= node->x;
+	ly -= node->y;
 
 	struct wlr_scene_node *child;
-	wl_list_for_each_reverse(child, &node->state.children, state.link) {
+	wl_list_for_each_reverse(child, &node->children, link) {
 		struct wlr_scene_node *node =
 			wlr_scene_node_at(child, lx, ly, nx, ny);
 		if (node != NULL) {
@@ -901,17 +893,17 @@ static void render_node_iterator(struct wlr_scene_node *node,
 static void scene_node_for_each_node(struct wlr_scene_node *node,
 		int lx, int ly, wlr_scene_node_iterator_func_t user_iterator,
 		void *user_data) {
-	if (!node->state.enabled) {
+	if (!node->enabled) {
 		return;
 	}
 
-	lx += node->state.x;
-	ly += node->state.y;
+	lx += node->x;
+	ly += node->y;
 
 	user_iterator(node, lx, ly, user_data);
 
 	struct wlr_scene_node *child;
-	wl_list_for_each(child, &node->state.children, state.link) {
+	wl_list_for_each(child, &node->children, link) {
 		scene_node_for_each_node(child, lx, ly, user_iterator, user_data);
 	}
 }
@@ -1021,7 +1013,7 @@ static void scene_node_remove_output(struct wlr_scene_node *node,
 	}
 
 	struct wlr_scene_node *child;
-	wl_list_for_each(child, &node->state.children, state.link) {
+	wl_list_for_each(child, &node->children, link) {
 		scene_node_remove_output(child, output);
 	}
 }
@@ -1300,7 +1292,7 @@ bool wlr_scene_output_commit(struct wlr_scene_output *scene_output) {
 
 static void scene_node_send_frame_done(struct wlr_scene_node *node,
 		struct wlr_scene_output *scene_output, struct timespec *now) {
-	if (!node->state.enabled) {
+	if (!node->enabled) {
 		return;
 	}
 
@@ -1314,7 +1306,7 @@ static void scene_node_send_frame_done(struct wlr_scene_node *node,
 	}
 
 	struct wlr_scene_node *child;
-	wl_list_for_each(child, &node->state.children, state.link) {
+	wl_list_for_each(child, &node->children, link) {
 		scene_node_send_frame_done(child, scene_output, now);
 	}
 }
@@ -1328,12 +1320,12 @@ void wlr_scene_output_send_frame_done(struct wlr_scene_output *scene_output,
 static void scene_output_for_each_scene_buffer(const struct wlr_box *output_box,
 		struct wlr_scene_node *node, int lx, int ly,
 		wlr_scene_buffer_iterator_func_t user_iterator, void *user_data) {
-	if (!node->state.enabled) {
+	if (!node->enabled) {
 		return;
 	}
 
-	lx += node->state.x;
-	ly += node->state.y;
+	lx += node->x;
+	ly += node->y;
 
 	if (node->type == WLR_SCENE_NODE_BUFFER) {
 		struct wlr_box node_box = { .x = lx, .y = ly };
@@ -1348,7 +1340,7 @@ static void scene_output_for_each_scene_buffer(const struct wlr_box *output_box,
 	}
 
 	struct wlr_scene_node *child;
-	wl_list_for_each(child, &node->state.children, state.link) {
+	wl_list_for_each(child, &node->children, link) {
 		scene_output_for_each_scene_buffer(output_box, child, lx, ly,
 			user_iterator, user_data);
 	}

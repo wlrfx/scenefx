@@ -945,31 +945,6 @@ static void scene_node_for_each_node(struct wlr_scene_node *node,
 	}
 }
 
-void wlr_scene_render_output(struct wlr_scene *scene, struct wlr_output *output,
-		int lx, int ly, pixman_region32_t *damage) {
-	pixman_region32_t full_region;
-	pixman_region32_init_rect(&full_region, 0, 0, output->width, output->height);
-	if (damage == NULL) {
-		damage = &full_region;
-	}
-
-	struct wlr_renderer *renderer = output->renderer;
-	assert(renderer);
-
-	if (output->enabled && pixman_region32_not_empty(damage)) {
-		struct render_data data = {
-			.output = output,
-			.damage = damage,
-			.presentation = scene->presentation,
-		};
-		scene_node_for_each_node(&scene->node, -lx, -ly,
-			render_node_iterator, &data);
-		wlr_renderer_scissor(renderer, NULL);
-	}
-
-	pixman_region32_fini(&full_region);
-}
-
 static void scene_handle_presentation_destroy(struct wl_listener *listener,
 		void *data) {
 	struct wlr_scene *scene =
@@ -1254,8 +1229,15 @@ bool wlr_scene_output_commit(struct wlr_scene_output *scene_output) {
 		wlr_renderer_clear(renderer, (float[4]){ 0.0, 0.0, 0.0, 1.0 });
 	}
 
-	wlr_scene_render_output(scene_output->scene, output,
-		scene_output->x, scene_output->y, &damage);
+	struct render_data data = {
+		.output = output,
+		.damage = &damage,
+		.presentation = scene_output->scene->presentation,
+	};
+	scene_node_for_each_node(&scene_output->scene->node,
+		-scene_output->x, -scene_output->y,
+		render_node_iterator, &data);
+	wlr_renderer_scissor(renderer, NULL);
 	wlr_output_render_software_cursors(output, &damage);
 
 	wlr_renderer_end(renderer);

@@ -85,6 +85,8 @@ struct tinywl_view {
 	struct wl_listener destroy;
 	struct wl_listener request_move;
 	struct wl_listener request_resize;
+	struct wl_listener request_maximize;
+	struct wl_listener request_fullscreen;
 	int x, y;
 };
 
@@ -619,6 +621,8 @@ static void xdg_toplevel_destroy(struct wl_listener *listener, void *data) {
 	wl_list_remove(&view->destroy.link);
 	wl_list_remove(&view->request_move.link);
 	wl_list_remove(&view->request_resize.link);
+	wl_list_remove(&view->request_maximize.link);
+	wl_list_remove(&view->request_fullscreen.link);
 
 	free(view);
 }
@@ -684,6 +688,26 @@ static void xdg_toplevel_request_resize(
 	begin_interactive(view, TINYWL_CURSOR_RESIZE, event->edges);
 }
 
+static void xdg_toplevel_request_maximize(
+		struct wl_listener *listener, void *data) {
+	/* This event is raised when a client would like to maximize itself,
+	 * typically because the user clicked on the maximize button on
+	 * client-side decorations. tinywl doesn't support maximization, but
+	 * to conform to xdg-shell protocol we still must send a configure.
+	 * wlr_xdg_surface_schedule_configure() is used to send an empty reply. */
+	struct tinywl_view *view =
+		wl_container_of(listener, view, request_maximize);
+	wlr_xdg_surface_schedule_configure(view->xdg_toplevel->base);
+}
+
+static void xdg_toplevel_request_fullscreen(
+		struct wl_listener *listener, void *data) {
+	/* Just as with request_maximize, we must send a configure here. */
+	struct tinywl_view *view =
+		wl_container_of(listener, view, request_fullscreen);
+	wlr_xdg_surface_schedule_configure(view->xdg_toplevel->base);
+}
+
 static void server_new_xdg_surface(struct wl_listener *listener, void *data) {
 	/* This event is raised when wlr_xdg_shell receives a new xdg surface from a
 	 * client, either a toplevel (application window) or popup. */
@@ -730,6 +754,12 @@ static void server_new_xdg_surface(struct wl_listener *listener, void *data) {
 	wl_signal_add(&toplevel->events.request_move, &view->request_move);
 	view->request_resize.notify = xdg_toplevel_request_resize;
 	wl_signal_add(&toplevel->events.request_resize, &view->request_resize);
+	view->request_maximize.notify = xdg_toplevel_request_maximize;
+	wl_signal_add(&toplevel->events.request_maximize,
+		&view->request_maximize);
+	view->request_fullscreen.notify = xdg_toplevel_request_fullscreen;
+	wl_signal_add(&toplevel->events.request_fullscreen,
+		&view->request_fullscreen);
 }
 
 int main(int argc, char *argv[]) {

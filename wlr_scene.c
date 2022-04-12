@@ -785,8 +785,8 @@ bool wlr_scene_node_coords(struct wlr_scene_node *node,
 	return enabled;
 }
 
-static void scene_node_for_each_surface(struct wlr_scene_node *node,
-		int lx, int ly, wlr_surface_iterator_func_t user_iterator,
+static void scene_node_for_each_scene_buffer(struct wlr_scene_node *node,
+		int lx, int ly, wlr_scene_buffer_iterator_func_t user_iterator,
 		void *user_data) {
 	if (!node->state.enabled) {
 		return;
@@ -795,20 +795,20 @@ static void scene_node_for_each_surface(struct wlr_scene_node *node,
 	lx += node->state.x;
 	ly += node->state.y;
 
-	if (node->type == WLR_SCENE_NODE_SURFACE) {
-		struct wlr_scene_surface *scene_surface = wlr_scene_surface_from_node(node);
-		user_iterator(scene_surface->surface, lx, ly, user_data);
+	if (node->type == WLR_SCENE_NODE_BUFFER) {
+		struct wlr_scene_buffer *scene_buffer = wlr_scene_buffer_from_node(node);
+		user_iterator(scene_buffer, lx, ly, user_data);
 	}
 
 	struct wlr_scene_node *child;
 	wl_list_for_each(child, &node->state.children, state.link) {
-		scene_node_for_each_surface(child, lx, ly, user_iterator, user_data);
+		scene_node_for_each_scene_buffer(child, lx, ly, user_iterator, user_data);
 	}
 }
 
-void wlr_scene_node_for_each_surface(struct wlr_scene_node *node,
-		wlr_surface_iterator_func_t user_iterator, void *user_data) {
-	scene_node_for_each_surface(node, 0, 0, user_iterator, user_data);
+void wlr_scene_node_for_each_buffer(struct wlr_scene_node *node,
+		wlr_scene_buffer_iterator_func_t user_iterator, void *user_data) {
+	scene_node_for_each_scene_buffer(node, 0, 0, user_iterator, user_data);
 }
 
 struct wlr_scene_node *wlr_scene_node_at(struct wlr_scene_node *node,
@@ -1399,9 +1399,9 @@ void wlr_scene_output_send_frame_done(struct wlr_scene_output *scene_output,
 		scene_output, now);
 }
 
-static void scene_output_for_each_surface(const struct wlr_box *output_box,
+static void scene_output_for_each_scene_buffer(const struct wlr_box *output_box,
 		struct wlr_scene_node *node, int lx, int ly,
-		wlr_surface_iterator_func_t user_iterator, void *user_data) {
+		wlr_scene_buffer_iterator_func_t user_iterator, void *user_data) {
 	if (!node->state.enabled) {
 		return;
 	}
@@ -1409,30 +1409,30 @@ static void scene_output_for_each_surface(const struct wlr_box *output_box,
 	lx += node->state.x;
 	ly += node->state.y;
 
-	if (node->type == WLR_SCENE_NODE_SURFACE) {
+	if (node->type == WLR_SCENE_NODE_BUFFER) {
 		struct wlr_box node_box = { .x = lx, .y = ly };
 		scene_node_get_size(node, &node_box.width, &node_box.height);
 
 		struct wlr_box intersection;
 		if (wlr_box_intersection(&intersection, output_box, &node_box)) {
-			struct wlr_scene_surface *scene_surface =
-				wlr_scene_surface_from_node(node);
-			user_iterator(scene_surface->surface, lx, ly, user_data);
+			struct wlr_scene_buffer *scene_buffer =
+				wlr_scene_buffer_from_node(node);
+			user_iterator(scene_buffer, lx, ly, user_data);
 		}
 	}
 
 	struct wlr_scene_node *child;
 	wl_list_for_each(child, &node->state.children, state.link) {
-		scene_output_for_each_surface(output_box, child, lx, ly,
+		scene_output_for_each_scene_buffer(output_box, child, lx, ly,
 			user_iterator, user_data);
 	}
 }
 
-void wlr_scene_output_for_each_surface(struct wlr_scene_output *scene_output,
-		wlr_surface_iterator_func_t iterator, void *user_data) {
+void wlr_scene_output_for_each_buffer(struct wlr_scene_output *scene_output,
+		wlr_scene_buffer_iterator_func_t iterator, void *user_data) {
 	struct wlr_box box = { .x = scene_output->x, .y = scene_output->y };
 	wlr_output_effective_resolution(scene_output->output,
 		&box.width, &box.height);
-	scene_output_for_each_surface(&box, &scene_output->scene->node, 0, 0,
+	scene_output_for_each_scene_buffer(&box, &scene_output->scene->node, 0, 0,
 		iterator, user_data);
 }

@@ -982,11 +982,11 @@ static void scene_output_send_leave_iterator(struct wlr_surface *surface,
 }
 
 void wlr_scene_output_destroy(struct wlr_scene_output *scene_output) {
-	wlr_addon_finish(&scene_output->addon);
-	wl_list_remove(&scene_output->link);
-
 	wlr_scene_output_for_each_surface(scene_output,
 		scene_output_send_leave_iterator, scene_output->output);
+
+	wlr_addon_finish(&scene_output->addon);
+	wl_list_remove(&scene_output->link);
 
 	free(scene_output);
 }

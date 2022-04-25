@@ -218,6 +218,9 @@ static void scene_buffer_update_outputs(
 	struct wlr_box buffer_box = { .x = lx, .y = ly };
 	scene_node_get_size(&scene_buffer->node, &buffer_box.width, &buffer_box.height);
 
+	int largest_overlap = 0;
+	scene_buffer->primary_output = NULL;
+
 	struct wlr_scene_output *scene_output;
 	wl_list_for_each(scene_output, &scene->outputs, link) {
 		struct wlr_box output_box = {
@@ -230,6 +233,14 @@ static void scene_buffer_update_outputs(
 		struct wlr_box intersection;
 		bool intersects = wlr_box_intersection(&intersection, &buffer_box, &output_box);
 		bool intersects_before = scene_buffer->active_outputs & (1ull << scene_output->index);
+
+		if (intersects) {
+			int overlap = intersection.width * intersection.height;
+			if (overlap > largest_overlap) {
+				largest_overlap = overlap;
+				scene_buffer->primary_output = scene_output;
+			}
+		}
 
 		if (intersects && !intersects_before) {
 			scene_buffer->active_outputs |= 1ull << scene_output->index;

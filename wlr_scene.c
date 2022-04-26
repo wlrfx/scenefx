@@ -48,6 +48,7 @@ static struct wlr_scene *scene_node_get_root(struct wlr_scene_node *node) {
 }
 
 static void scene_node_state_init(struct wlr_scene_node_state *state) {
+	memset(state, 0, sizeof(*state));
 	wl_list_init(&state->children);
 	wl_list_init(&state->link);
 	state->enabled = true;
@@ -61,6 +62,7 @@ static void scene_node_init(struct wlr_scene_node *node,
 		enum wlr_scene_node_type type, struct wlr_scene_node *parent) {
 	assert(type == WLR_SCENE_NODE_ROOT || parent != NULL);
 
+	memset(node, 0, sizeof(*node));
 	node->type = type;
 	node->parent = parent;
 	scene_node_state_init(&node->state);

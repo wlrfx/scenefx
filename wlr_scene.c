@@ -411,6 +411,7 @@ struct wlr_scene_buffer *wlr_scene_buffer_create(struct wlr_scene_node *parent,
 	wl_signal_init(&scene_buffer->events.output_enter);
 	wl_signal_init(&scene_buffer->events.output_leave);
 	wl_signal_init(&scene_buffer->events.output_present);
+	wl_signal_init(&scene_buffer->events.frame_done);
 
 	scene_node_damage_whole(&scene_buffer->node);
 
@@ -484,6 +485,11 @@ void wlr_scene_buffer_set_transform(struct wlr_scene_buffer *scene_buffer,
 	scene_node_damage_whole(&scene_buffer->node);
 
 	scene_node_update_outputs(&scene_buffer->node);
+}
+
+void wlr_scene_buffer_send_frame_done(struct wlr_scene_buffer *scene_buffer,
+		struct timespec *now) {
+	wlr_signal_emit_safe(&scene_buffer->events.frame_done, now);
 }
 
 static struct wlr_texture *scene_buffer_get_texture(
@@ -1280,8 +1286,8 @@ bool wlr_scene_output_commit(struct wlr_scene_output *scene_output) {
 	return wlr_output_commit(output);
 }
 
-static void scene_output_send_frame_done_iterator(struct wlr_scene_node *node,
-		struct wlr_output *output, struct timespec *now) {
+static void scene_node_send_frame_done(struct wlr_scene_node *node,
+		struct wlr_scene_output *scene_output, struct timespec *now) {
 	if (!node->state.enabled) {
 		return;
 	}
@@ -1289,21 +1295,30 @@ static void scene_output_send_frame_done_iterator(struct wlr_scene_node *node,
 	if (node->type == WLR_SCENE_NODE_SURFACE) {
 		struct wlr_scene_surface *scene_surface =
 			wlr_scene_surface_from_node(node);
-		if (scene_surface->primary_output == output) {
+		if (scene_surface->primary_output == scene_output->output) {
 			wlr_surface_send_frame_done(scene_surface->surface, now);
+		}
+	}
+
+	if (node->type == WLR_SCENE_NODE_BUFFER) {
+		struct wlr_scene_buffer *scene_buffer =
+			scene_buffer_from_node(node);
+
+		if (scene_buffer->primary_output == scene_output) {
+			wlr_scene_buffer_send_frame_done(scene_buffer, now);
 		}
 	}
 
 	struct wlr_scene_node *child;
 	wl_list_for_each(child, &node->state.children, state.link) {
-		scene_output_send_frame_done_iterator(child, output, now);
+		scene_node_send_frame_done(child, scene_output, now);
 	}
 }
 
 void wlr_scene_output_send_frame_done(struct wlr_scene_output *scene_output,
 		struct timespec *now) {
-	scene_output_send_frame_done_iterator(&scene_output->scene->node,
-		scene_output->output, now);
+	scene_node_send_frame_done(&scene_output->scene->node,
+		scene_output, now);
 }
 
 static void scene_output_for_each_surface(const struct wlr_box *output_box,

@@ -341,10 +341,17 @@ static struct tinywl_view *desktop_view_at(
 	 * surface in the surface tree of a tinywl_view. */
 	struct wlr_scene_node *node = wlr_scene_node_at(
 		&server->scene->node, lx, ly, sx, sy);
-	if (node == NULL || node->type != WLR_SCENE_NODE_SURFACE) {
+	if (node == NULL || node->type != WLR_SCENE_NODE_BUFFER) {
 		return NULL;
 	}
-	*surface = wlr_scene_surface_from_node(node)->surface;
+	struct wlr_scene_buffer *scene_buffer = wlr_scene_buffer_from_node(node);
+	struct wlr_scene_surface *scene_surface =
+		wlr_scene_surface_from_buffer(scene_buffer);
+	if (!scene_surface) {
+		return NULL;
+	}
+
+	*surface = scene_surface->surface;
 	/* Find the node corresponding to the tinywl_view at the root of this
 	 * surface tree, it is the only one for which we set the data field. */
 	while (node != NULL && node->data == NULL) {

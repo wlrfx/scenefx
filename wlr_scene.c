@@ -399,6 +399,7 @@ struct wlr_scene_buffer *wlr_scene_buffer_create(struct wlr_scene_node *parent,
 
 	wl_signal_init(&scene_buffer->events.output_enter);
 	wl_signal_init(&scene_buffer->events.output_leave);
+	wl_signal_init(&scene_buffer->events.output_present);
 
 	scene_node_damage_whole(&scene_buffer->node);
 
@@ -847,7 +848,7 @@ static void render_texture(struct wlr_output *output,
 }
 
 struct render_data {
-	struct wlr_output *output;
+	struct wlr_scene_output *scene_output;
 	pixman_region32_t *damage;
 
 	// May be NULL
@@ -857,7 +858,8 @@ struct render_data {
 static void render_node_iterator(struct wlr_scene_node *node,
 		int x, int y, void *_data) {
 	struct render_data *data = _data;
-	struct wlr_output *output = data->output;
+	struct wlr_scene_output *scene_output = data->scene_output;
+	struct wlr_output *output = scene_output->output;
 	pixman_region32_t *output_damage = data->damage;
 
 	struct wlr_box dst_box = {
@@ -923,6 +925,8 @@ static void render_node_iterator(struct wlr_scene_node *node,
 
 		render_texture(output, output_damage, texture, &scene_buffer->src_box,
 			&dst_box, matrix);
+
+		wlr_signal_emit_safe(&scene_buffer->events.output_present, scene_output);
 		break;
 	}
 }
@@ -1184,6 +1188,12 @@ static bool scene_output_scanout(struct wlr_scene_output *scene_output) {
 		}
 	}
 
+	if (node->type == WLR_SCENE_NODE_BUFFER) {
+		struct wlr_scene_buffer *scene_buffer =
+			scene_buffer_from_node(node);
+		wlr_signal_emit_safe(&scene_buffer->events.output_present, scene_output);
+	}
+
 	return wlr_output_commit(output);
 }
 
@@ -1230,7 +1240,7 @@ bool wlr_scene_output_commit(struct wlr_scene_output *scene_output) {
 	}
 
 	struct render_data data = {
-		.output = output,
+		.scene_output = scene_output,
 		.damage = &damage,
 		.presentation = scene_output->scene->presentation,
 	};

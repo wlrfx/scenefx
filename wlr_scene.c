@@ -367,6 +367,27 @@ struct wlr_scene_buffer *wlr_scene_buffer_create(struct wlr_scene_node *parent,
 	return scene_buffer;
 }
 
+void wlr_scene_buffer_set_buffer(struct wlr_scene_buffer *scene_buffer,
+		struct wlr_buffer *buffer)  {
+	if (buffer == scene_buffer->buffer) {
+		return;
+	}
+
+	scene_node_damage_whole(&scene_buffer->node);
+
+	wlr_texture_destroy(scene_buffer->texture);
+	scene_buffer->texture = NULL;
+	wlr_buffer_unlock(scene_buffer->buffer);
+
+	if (buffer) {
+		scene_buffer->buffer = wlr_buffer_lock(buffer);
+	} else {
+		scene_buffer->buffer = NULL;
+	}
+
+	scene_node_damage_whole(&scene_buffer->node);
+}
+
 void wlr_scene_buffer_set_source_box(struct wlr_scene_buffer *scene_buffer,
 		const struct wlr_fbox *box) {
 	struct wlr_fbox *cur = &scene_buffer->src_box;

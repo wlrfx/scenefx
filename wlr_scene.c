@@ -642,7 +642,9 @@ void wlr_scene_buffer_set_transform(struct wlr_scene_buffer *scene_buffer,
 
 void wlr_scene_buffer_send_frame_done(struct wlr_scene_buffer *scene_buffer,
 		struct timespec *now) {
-	wlr_signal_emit_safe(&scene_buffer->events.frame_done, now);
+	if (pixman_region32_not_empty(&scene_buffer->node.visible)) {
+		wlr_signal_emit_safe(&scene_buffer->events.frame_done, now);
+	}
 }
 
 static struct wlr_texture *scene_buffer_get_texture(

@@ -67,6 +67,8 @@ static void scene_node_init(struct wlr_scene_node *node,
 	if (parent != NULL) {
 		wl_list_insert(parent->state.children.prev, &node->state.link);
 	}
+
+	wlr_addon_set_init(&node->addons);
 }
 
 static void scene_node_damage_whole(struct wlr_scene_node *node);
@@ -133,6 +135,7 @@ void wlr_scene_node_destroy(struct wlr_scene_node *node) {
 		wlr_scene_node_destroy(child);
 	}
 
+	wlr_addon_set_finish(&node->addons);
 	scene_node_state_finish(&node->state);
 	free(node);
 }

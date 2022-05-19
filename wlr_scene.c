@@ -358,7 +358,9 @@ struct wlr_scene_buffer *wlr_scene_buffer_create(struct wlr_scene_node *parent,
 	}
 	scene_node_init(&scene_buffer->node, WLR_SCENE_NODE_BUFFER, parent);
 
-	scene_buffer->buffer = wlr_buffer_lock(buffer);
+	if (buffer) {
+		scene_buffer->buffer = wlr_buffer_lock(buffer);
+	}
 
 	scene_node_damage_whole(&scene_buffer->node);
 
@@ -447,7 +449,7 @@ static void scene_node_get_size(struct wlr_scene_node *node,
 		if (scene_buffer->dst_width > 0 && scene_buffer->dst_height > 0) {
 			*width = scene_buffer->dst_width;
 			*height = scene_buffer->dst_height;
-		} else {
+		} else if (scene_buffer->buffer) {
 			if (scene_buffer->transform & WL_OUTPUT_TRANSFORM_90) {
 				*height = scene_buffer->buffer->width;
 				*width = scene_buffer->buffer->height;
@@ -838,6 +840,9 @@ static void render_node_iterator(struct wlr_scene_node *node,
 		break;
 	case WLR_SCENE_NODE_BUFFER:;
 		struct wlr_scene_buffer *scene_buffer = scene_buffer_from_node(node);
+		if (!scene_buffer->buffer) {
+			return;
+		}
 
 		struct wlr_renderer *renderer = output->renderer;
 		texture = scene_buffer_get_texture(scene_buffer, renderer);

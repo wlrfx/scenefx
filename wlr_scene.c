@@ -420,27 +420,94 @@ struct wlr_scene_buffer *wlr_scene_buffer_create(struct wlr_scene_node *parent,
 	return scene_buffer;
 }
 
-void wlr_scene_buffer_set_buffer(struct wlr_scene_buffer *scene_buffer,
-		struct wlr_buffer *buffer)  {
-	if (buffer == scene_buffer->buffer) {
+void wlr_scene_buffer_set_buffer_with_damage(struct wlr_scene_buffer *scene_buffer,
+		struct wlr_buffer *buffer, pixman_region32_t *damage) {
+	// specifying a region for a NULL buffer doesn't make sense. We need to know
+	// about the buffer to scale the buffer local coordinates down to scene
+	// coordinates. 
+	assert(buffer || !damage);
+
+	if (buffer != scene_buffer->buffer) {
+		if (!damage) {
+			scene_node_damage_whole(&scene_buffer->node);
+		}
+
+		wlr_texture_destroy(scene_buffer->texture);
+		scene_buffer->texture = NULL;
+		wlr_buffer_unlock(scene_buffer->buffer);
+
+		if (buffer) {
+			scene_buffer->buffer = wlr_buffer_lock(buffer);
+		} else {
+			scene_buffer->buffer = NULL;
+		}
+
+		scene_node_update_outputs(&scene_buffer->node);
+
+		if (!damage) {
+			scene_node_damage_whole(&scene_buffer->node);
+		}
+	}
+
+	if (!damage) {
 		return;
 	}
 
-	scene_node_damage_whole(&scene_buffer->node);
-
-	wlr_texture_destroy(scene_buffer->texture);
-	scene_buffer->texture = NULL;
-	wlr_buffer_unlock(scene_buffer->buffer);
-
-	if (buffer) {
-		scene_buffer->buffer = wlr_buffer_lock(buffer);
-	} else {
-		scene_buffer->buffer = NULL;
+	int lx, ly;
+	if (!wlr_scene_node_coords(&scene_buffer->node, &lx, &ly)) {
+		return;
 	}
 
-	scene_node_damage_whole(&scene_buffer->node);
+	struct wlr_fbox box = scene_buffer->src_box;
+	if (wlr_fbox_empty(&box)) {
+		box.x = 0;
+		box.y = 0;
 
-	scene_node_update_outputs(&scene_buffer->node);
+		if (scene_buffer->transform & WL_OUTPUT_TRANSFORM_90) {
+			box.width = buffer->height;
+			box.height = buffer->width;
+		} else {
+			box.width = buffer->width;
+			box.height = buffer->height;
+		}
+	}
+
+	double scale_x, scale_y;
+	if (scene_buffer->dst_width || scene_buffer->dst_height) {
+		scale_x = scene_buffer->dst_width / box.width;
+		scale_y = scene_buffer->dst_height / box.height;
+	} else {
+		scale_x = buffer->width / box.width;
+		scale_y = buffer->height / box.height;
+	}
+
+	pixman_region32_t trans_damage;
+	pixman_region32_init(&trans_damage);
+	wlr_region_transform(&trans_damage, damage,
+		scene_buffer->transform, buffer->width, buffer->height);
+	pixman_region32_intersect_rect(&trans_damage, &trans_damage,
+		box.x, box.y, box.width, box.height);
+
+	struct wlr_scene *scene = scene_node_get_root(&scene_buffer->node);
+	struct wlr_scene_output *scene_output;
+	wl_list_for_each(scene_output, &scene->outputs, link) {
+		float output_scale = scene_output->output->scale;
+		pixman_region32_t output_damage;
+		pixman_region32_init(&output_damage);
+		wlr_region_scale_xy(&output_damage, &trans_damage,
+			output_scale * scale_x, output_scale * scale_y);
+		pixman_region32_translate(&output_damage,
+			(lx - scene_output->x) * output_scale, (ly - scene_output->y) * output_scale);
+		wlr_output_damage_add(scene_output->damage, &output_damage);
+		pixman_region32_fini(&output_damage);
+	}
+
+	pixman_region32_fini(&trans_damage);
+}
+
+void wlr_scene_buffer_set_buffer(struct wlr_scene_buffer *scene_buffer,
+		struct wlr_buffer *buffer)  {
+	wlr_scene_buffer_set_buffer_with_damage(scene_buffer, buffer, NULL);
 }
 
 void wlr_scene_buffer_set_source_box(struct wlr_scene_buffer *scene_buffer,

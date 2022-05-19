@@ -10,6 +10,7 @@
 #include <wlr/types/wlr_scene.h>
 #include <wlr/util/log.h>
 #include <wlr/util/region.h>
+#include "types/wlr_scene.h"
 #include "util/signal.h"
 
 static struct wlr_scene *scene_root_from_node(struct wlr_scene_node *node) {
@@ -35,7 +36,7 @@ struct wlr_scene_buffer *wlr_scene_buffer_from_node(
 	return (struct wlr_scene_buffer *)node;
 }
 
-static struct wlr_scene *scene_node_get_root(struct wlr_scene_node *node) {
+struct wlr_scene *scene_node_get_root(struct wlr_scene_node *node) {
 	while (node->parent != NULL) {
 		node = node->parent;
 	}

@@ -470,6 +470,8 @@ void wlr_scene_buffer_set_transform(struct wlr_scene_buffer *scene_buffer,
 	scene_node_damage_whole(&scene_buffer->node);
 	scene_buffer->transform = transform;
 	scene_node_damage_whole(&scene_buffer->node);
+
+	scene_node_update_outputs(&scene_buffer->node);
 }
 
 static struct wlr_texture *scene_buffer_get_texture(
@@ -996,6 +998,24 @@ static const struct wlr_addon_interface output_addon_impl = {
 	.destroy = scene_output_handle_destroy,
 };
 
+static void scene_output_handle_commit(struct wl_listener *listener, void *data) {
+	struct wlr_scene_output *scene_output = wl_container_of(listener,
+		scene_output, output_commit);
+	struct wlr_output_event_commit *event = data;
+
+	if (event->committed & (WLR_OUTPUT_STATE_MODE |
+			WLR_OUTPUT_STATE_TRANSFORM |
+			WLR_OUTPUT_STATE_SCALE)) {
+		scene_node_update_outputs(&scene_output->scene->node);
+	}
+}
+
+static void scene_output_handle_mode(struct wl_listener *listener, void *data) {
+	struct wlr_scene_output *scene_output = wl_container_of(listener,
+		scene_output, output_mode);
+	scene_node_update_outputs(&scene_output->scene->node);
+}
+
 struct wlr_scene_output *wlr_scene_output_create(struct wlr_scene *scene,
 		struct wlr_output *output) {
 	struct wlr_scene_output *scene_output = calloc(1, sizeof(*scene_output));
@@ -1030,7 +1050,14 @@ struct wlr_scene_output *wlr_scene_output_create(struct wlr_scene *scene,
 	assert(scene_output->index < 64);
 	wl_list_insert(prev_output_link, &scene_output->link);
 
+	scene_output->output_commit.notify = scene_output_handle_commit;
+	wl_signal_add(&output->events.commit, &scene_output->output_commit);
+
+	scene_output->output_mode.notify = scene_output_handle_mode;
+	wl_signal_add(&output->events.mode, &scene_output->output_mode);
+
 	wlr_output_damage_add_whole(scene_output->damage);
+	scene_node_update_outputs(&scene->node);
 
 	return scene_output;
 }
@@ -1062,6 +1089,8 @@ void wlr_scene_output_destroy(struct wlr_scene_output *scene_output) {
 
 	wlr_addon_finish(&scene_output->addon);
 	wl_list_remove(&scene_output->link);
+	wl_list_remove(&scene_output->output_commit.link);
+	wl_list_remove(&scene_output->output_mode.link);
 
 	free(scene_output);
 }

@@ -771,11 +771,21 @@ struct wlr_scene_node *wlr_scene_node_at(struct wlr_scene_node *node,
 		struct wlr_scene_surface *scene_surface = wlr_scene_surface_from_node(node);
 		intersects = wlr_surface_point_accepts_input(scene_surface->surface, lx, ly);
 		break;
-	case WLR_SCENE_NODE_RECT:
-	case WLR_SCENE_NODE_BUFFER:;
+	case WLR_SCENE_NODE_RECT:;
 		int width, height;
 		scene_node_get_size(node, &width, &height);
 		intersects = lx >= 0 && lx < width && ly >= 0 && ly < height;
+		break;
+	case WLR_SCENE_NODE_BUFFER:;
+		struct wlr_scene_buffer *scene_buffer = scene_buffer_from_node(node);
+
+		if (scene_buffer->point_accepts_input) {
+			intersects = scene_buffer->point_accepts_input(scene_buffer, lx, ly);
+		} else {
+			int width, height;
+			scene_node_get_size(node, &width, &height);
+			intersects = lx >= 0 && lx < width && ly >= 0 && ly < height;
+		}
 		break;
 	}
 

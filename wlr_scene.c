@@ -130,6 +130,23 @@ struct wlr_scene *wlr_scene_create(void) {
 	scene_node_init(&scene->node, WLR_SCENE_NODE_ROOT, NULL);
 	wl_list_init(&scene->outputs);
 	wl_list_init(&scene->presentation_destroy.link);
+
+	char *debug_damage = getenv("WLR_SCENE_DEBUG_DAMAGE");
+	if (debug_damage) {
+		wlr_log(WLR_INFO, "Loading WLR_SCENE_DEBUG_DAMAGE option: %s", debug_damage);
+	}
+
+	if (!debug_damage || strcmp(debug_damage, "none") == 0) {
+		scene->debug_damage_option = WLR_SCENE_DEBUG_DAMAGE_NONE;
+	} else if (strcmp(debug_damage, "rerender") == 0) {
+		scene->debug_damage_option = WLR_SCENE_DEBUG_DAMAGE_RERENDER;
+	} else if (strcmp(debug_damage, "highlight") == 0) {
+		scene->debug_damage_option = WLR_SCENE_DEBUG_DAMAGE_HIGHLIGHT;
+	} else {
+		wlr_log(WLR_ERROR, "Unknown WLR_SCENE_DEBUG_DAMAGE option: %s", debug_damage);
+		scene->debug_damage_option = WLR_SCENE_DEBUG_DAMAGE_NONE;
+	}
+
 	return scene;
 }
 

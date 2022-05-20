@@ -59,6 +59,8 @@ static void set_buffer_with_surface_state(struct wlr_scene_buffer *scene_buffer,
 		struct wlr_surface *surface) {
 	struct wlr_surface_state *state = &surface->current;
 
+	wlr_scene_buffer_set_opaque_region(scene_buffer, &surface->opaque_region);
+
 	struct wlr_fbox src_box;
 	wlr_surface_get_buffer_source_box(surface, &src_box);
 	wlr_scene_buffer_set_source_box(scene_buffer, &src_box);

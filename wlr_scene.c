@@ -1104,6 +1104,8 @@ static bool scene_output_scanout(struct wlr_scene_output *scene_output) {
 
 bool wlr_scene_output_commit(struct wlr_scene_output *scene_output) {
 	struct wlr_output *output = scene_output->output;
+	enum wlr_scene_debug_damage_option debug_damage =
+		scene_output->scene->debug_damage_option;
 
 	struct wlr_renderer *renderer = output->renderer;
 	assert(renderer != NULL);
@@ -1118,6 +1120,10 @@ bool wlr_scene_output_commit(struct wlr_scene_output *scene_output) {
 	scene_output->prev_scanout = scanout;
 	if (scanout) {
 		return true;
+	}
+
+	if (debug_damage == WLR_SCENE_DEBUG_DAMAGE_RERENDER) {
+		wlr_output_damage_add_whole(scene_output->damage);
 	}
 
 	bool needs_frame;

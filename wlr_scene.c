@@ -969,6 +969,10 @@ static void scene_node_remove_output(struct wlr_scene_node *node,
 }
 
 void wlr_scene_output_destroy(struct wlr_scene_output *scene_output) {
+	if (scene_output == NULL) {
+		return;
+	}
+
 	scene_node_remove_output(&scene_output->scene->node, scene_output);
 
 	wlr_addon_finish(&scene_output->addon);

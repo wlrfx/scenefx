@@ -801,8 +801,8 @@ static void render_texture(struct wlr_output *output,
 
 	struct wlr_fbox default_src_box = {0};
 	if (wlr_fbox_empty(src_box)) {
-		default_src_box.width = dst_box->width;
-		default_src_box.height = dst_box->height;
+		default_src_box.width = texture->width;
+		default_src_box.height = texture->height;
 		src_box = &default_src_box;
 	}
 

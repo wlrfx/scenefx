@@ -18,21 +18,21 @@ static void scene_layer_surface_handle_layer_surface_destroy(
 		struct wl_listener *listener, void *data) {
 	struct wlr_scene_layer_surface_v1 *scene_layer_surface =
 		wl_container_of(listener, scene_layer_surface, layer_surface_destroy);
-	wlr_scene_node_destroy(scene_layer_surface->node);
+	wlr_scene_node_destroy(&scene_layer_surface->tree->node);
 }
 
 static void scene_layer_surface_handle_layer_surface_map(
 		struct wl_listener *listener, void *data) {
 	struct wlr_scene_layer_surface_v1 *scene_layer_surface =
 		wl_container_of(listener, scene_layer_surface, layer_surface_map);
-	wlr_scene_node_set_enabled(scene_layer_surface->node, true);
+	wlr_scene_node_set_enabled(&scene_layer_surface->tree->node, true);
 }
 
 static void scene_layer_surface_handle_layer_surface_unmap(
 		struct wl_listener *listener, void *data) {
 	struct wlr_scene_layer_surface_v1 *scene_layer_surface =
 		wl_container_of(listener, scene_layer_surface, layer_surface_unmap);
-	wlr_scene_node_set_enabled(scene_layer_surface->node, false);
+	wlr_scene_node_set_enabled(&scene_layer_surface->tree->node, false);
 }
 
 static void layer_surface_exclusive_zone(
@@ -122,7 +122,7 @@ void wlr_scene_layer_surface_v1_configure(
 		box.y = bounds.y + bounds.height/2 - box.height/2;
 	}
 
-	wlr_scene_node_set_position(scene_layer_surface->node, box.x, box.y);
+	wlr_scene_node_set_position(&scene_layer_surface->tree->node, box.x, box.y);
 	wlr_layer_surface_v1_configure(layer_surface, box.width, box.height);
 
 	if (state->exclusive_zone > 0) {
@@ -131,7 +131,7 @@ void wlr_scene_layer_surface_v1_configure(
 }
 
 struct wlr_scene_layer_surface_v1 *wlr_scene_layer_surface_v1_create(
-		struct wlr_scene_node *parent,
+		struct wlr_scene_tree *parent,
 		struct wlr_layer_surface_v1 *layer_surface) {
 	struct wlr_scene_layer_surface_v1 *scene_layer_surface =
 		calloc(1, sizeof(*scene_layer_surface));
@@ -141,24 +141,23 @@ struct wlr_scene_layer_surface_v1 *wlr_scene_layer_surface_v1_create(
 
 	scene_layer_surface->layer_surface = layer_surface;
 
-	struct wlr_scene_tree *tree = wlr_scene_tree_create(parent);
-	if (tree == NULL) {
+	scene_layer_surface->tree = wlr_scene_tree_create(parent);
+	if (scene_layer_surface->tree == NULL) {
 		free(scene_layer_surface);
 		return NULL;
 	}
-	scene_layer_surface->node = &tree->node;
 
-	struct wlr_scene_node *surface_node = wlr_scene_subsurface_tree_create(
-		scene_layer_surface->node, layer_surface->surface);
-	if (surface_node == NULL) {
-		wlr_scene_node_destroy(scene_layer_surface->node);
+	struct wlr_scene_tree *surface_tree = wlr_scene_subsurface_tree_create(
+		scene_layer_surface->tree, layer_surface->surface);
+	if (surface_tree == NULL) {
+		wlr_scene_node_destroy(&scene_layer_surface->tree->node);
 		free(scene_layer_surface);
 		return NULL;
 	}
 
 	scene_layer_surface->tree_destroy.notify =
 		scene_layer_surface_handle_tree_destroy;
-	wl_signal_add(&scene_layer_surface->node->events.destroy,
+	wl_signal_add(&scene_layer_surface->tree->node.events.destroy,
 		&scene_layer_surface->tree_destroy);
 
 	scene_layer_surface->layer_surface_destroy.notify =
@@ -176,7 +175,7 @@ struct wlr_scene_layer_surface_v1 *wlr_scene_layer_surface_v1_create(
 	wl_signal_add(&layer_surface->events.unmap,
 		&scene_layer_surface->layer_surface_unmap);
 
-	wlr_scene_node_set_enabled(scene_layer_surface->node,
+	wlr_scene_node_set_enabled(&scene_layer_surface->tree->node,
 		layer_surface->mapped);
 
 	return scene_layer_surface;

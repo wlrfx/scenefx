@@ -17,6 +17,11 @@
 
 #define HIGHLIGHT_DAMAGE_FADEOUT_TIME 250
 
+static struct wlr_scene_tree *scene_tree_from_node(struct wlr_scene_node *node) {
+	assert(node->type == WLR_SCENE_NODE_TREE);
+	return (struct wlr_scene_tree *)node;
+}
+
 static struct wlr_scene_rect *scene_rect_from_node(
 		struct wlr_scene_node *node) {
 	assert(node->type == WLR_SCENE_NODE_RECT);
@@ -30,10 +35,17 @@ struct wlr_scene_buffer *wlr_scene_buffer_from_node(
 }
 
 struct wlr_scene *scene_node_get_root(struct wlr_scene_node *node) {
-	while (node->parent != NULL) {
-		node = node->parent;
+	struct wlr_scene_tree *tree;
+	if (node->type == WLR_SCENE_NODE_TREE) {
+		tree = scene_tree_from_node(node);
+	} else {
+		tree = node->parent;
 	}
-	return (struct wlr_scene *)node;
+
+	while (tree->node.parent != NULL) {
+		tree = tree->node.parent;
+	}
+	return (struct wlr_scene *)tree;
 }
 
 static void scene_node_state_init(struct wlr_scene_node_state *state) {
@@ -48,7 +60,7 @@ static void scene_node_state_finish(struct wlr_scene_node_state *state) {
 }
 
 static void scene_node_init(struct wlr_scene_node *node,
-		enum wlr_scene_node_type type, struct wlr_scene_node *parent) {
+		enum wlr_scene_node_type type, struct wlr_scene_tree *parent) {
 	memset(node, 0, sizeof(*node));
 	node->type = type;
 	node->parent = parent;
@@ -56,7 +68,7 @@ static void scene_node_init(struct wlr_scene_node *node,
 	wl_signal_init(&node->events.destroy);
 
 	if (parent != NULL) {
-		wl_list_insert(parent->state.children.prev, &node->state.link);
+		wl_list_insert(parent->node.state.children.prev, &node->state.link);
 	}
 
 	wlr_addon_set_init(&node->addons);
@@ -136,7 +148,7 @@ void wlr_scene_node_destroy(struct wlr_scene_node *node) {
 }
 
 static void scene_tree_init(struct wlr_scene_tree *tree,
-		struct wlr_scene_node *parent) {
+		struct wlr_scene_tree *parent) {
 	memset(tree, 0, sizeof(*tree));
 	scene_node_init(&tree->node, WLR_SCENE_NODE_TREE, parent);
 }
@@ -172,7 +184,7 @@ struct wlr_scene *wlr_scene_create(void) {
 	return scene;
 }
 
-struct wlr_scene_tree *wlr_scene_tree_create(struct wlr_scene_node *parent) {
+struct wlr_scene_tree *wlr_scene_tree_create(struct wlr_scene_tree *parent) {
 	assert(parent);
 
 	struct wlr_scene_tree *tree = calloc(1, sizeof(struct wlr_scene_tree));
@@ -251,7 +263,7 @@ static void scene_node_update_outputs(struct wlr_scene_node *node) {
 	_scene_node_update_outputs(node, lx, ly, scene);
 }
 
-struct wlr_scene_rect *wlr_scene_rect_create(struct wlr_scene_node *parent,
+struct wlr_scene_rect *wlr_scene_rect_create(struct wlr_scene_tree *parent,
 		int width, int height, const float color[static 4]) {
 	struct wlr_scene_rect *scene_rect =
 		calloc(1, sizeof(struct wlr_scene_rect));
@@ -290,7 +302,7 @@ void wlr_scene_rect_set_color(struct wlr_scene_rect *rect, const float color[sta
 	scene_node_damage_whole(&rect->node);
 }
 
-struct wlr_scene_buffer *wlr_scene_buffer_create(struct wlr_scene_node *parent,
+struct wlr_scene_buffer *wlr_scene_buffer_create(struct wlr_scene_tree *parent,
 		struct wlr_buffer *buffer) {
 	struct wlr_scene_buffer *scene_buffer = calloc(1, sizeof(*scene_buffer));
 	if (scene_buffer == NULL) {
@@ -615,7 +627,7 @@ void wlr_scene_node_place_below(struct wlr_scene_node *node,
 
 void wlr_scene_node_raise_to_top(struct wlr_scene_node *node) {
 	struct wlr_scene_node *current_top = wl_container_of(
-		node->parent->state.children.prev, current_top, state.link);
+		node->parent->node.state.children.prev, current_top, state.link);
 	if (node == current_top) {
 		return;
 	}
@@ -624,7 +636,7 @@ void wlr_scene_node_raise_to_top(struct wlr_scene_node *node) {
 
 void wlr_scene_node_lower_to_bottom(struct wlr_scene_node *node) {
 	struct wlr_scene_node *current_bottom = wl_container_of(
-		node->parent->state.children.next, current_bottom, state.link);
+		node->parent->node.state.children.next, current_bottom, state.link);
 	if (node == current_bottom) {
 		return;
 	}
@@ -632,7 +644,7 @@ void wlr_scene_node_lower_to_bottom(struct wlr_scene_node *node) {
 }
 
 void wlr_scene_node_reparent(struct wlr_scene_node *node,
-		struct wlr_scene_node *new_parent) {
+		struct wlr_scene_tree *new_parent) {
 	assert(new_parent != NULL);
 
 	if (node->parent == new_parent) {
@@ -640,16 +652,16 @@ void wlr_scene_node_reparent(struct wlr_scene_node *node,
 	}
 
 	/* Ensure that a node cannot become its own ancestor */
-	for (struct wlr_scene_node *ancestor = new_parent; ancestor != NULL;
-			ancestor = ancestor->parent) {
-		assert(ancestor != node);
+	for (struct wlr_scene_tree *ancestor = new_parent; ancestor != NULL;
+			ancestor = ancestor->node.parent) {
+		assert(&ancestor->node != node);
 	}
 
 	scene_node_damage_whole(node);
 
 	wl_list_remove(&node->state.link);
 	node->parent = new_parent;
-	wl_list_insert(new_parent->state.children.prev, &node->state.link);
+	wl_list_insert(new_parent->node.state.children.prev, &node->state.link);
 
 	scene_node_damage_whole(node);
 
@@ -658,13 +670,19 @@ void wlr_scene_node_reparent(struct wlr_scene_node *node,
 
 bool wlr_scene_node_coords(struct wlr_scene_node *node,
 		int *lx_ptr, int *ly_ptr) {
+	assert(node);
+
 	int lx = 0, ly = 0;
 	bool enabled = true;
-	while (node != NULL) {
+	while (true) {
 		lx += node->state.x;
 		ly += node->state.y;
 		enabled = enabled && node->state.enabled;
-		node = node->parent;
+		if (node->parent == NULL) {
+			break;
+		}
+
+		node = &node->parent->node;
 	}
 
 	*lx_ptr = lx;

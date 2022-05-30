@@ -5,7 +5,7 @@
 struct wlr_scene_xdg_surface {
 	struct wlr_scene_tree *tree;
 	struct wlr_xdg_surface *xdg_surface;
-	struct wlr_scene_node *surface_node;
+	struct wlr_scene_tree *surface_tree;
 
 	struct wl_listener tree_destroy;
 	struct wl_listener xdg_surface_destroy;
@@ -54,7 +54,7 @@ static void scene_xdg_surface_update_position(
 
 	struct wlr_box geo = {0};
 	wlr_xdg_surface_get_geometry(xdg_surface, &geo);
-	wlr_scene_node_set_position(scene_xdg_surface->surface_node,
+	wlr_scene_node_set_position(&scene_xdg_surface->surface_tree->node,
 		-geo.x, -geo.y);
 
 	if (xdg_surface->role == WLR_XDG_SURFACE_ROLE_POPUP) {
@@ -71,8 +71,8 @@ static void scene_xdg_surface_handle_xdg_surface_commit(struct wl_listener *list
 	scene_xdg_surface_update_position(scene_xdg_surface);
 }
 
-struct wlr_scene_node *wlr_scene_xdg_surface_create(
-		struct wlr_scene_node *parent, struct wlr_xdg_surface *xdg_surface) {
+struct wlr_scene_tree *wlr_scene_xdg_surface_create(
+		struct wlr_scene_tree *parent, struct wlr_xdg_surface *xdg_surface) {
 	struct wlr_scene_xdg_surface *scene_xdg_surface =
 		calloc(1, sizeof(*scene_xdg_surface));
 	if (scene_xdg_surface == NULL) {
@@ -87,9 +87,9 @@ struct wlr_scene_node *wlr_scene_xdg_surface_create(
 		return NULL;
 	}
 
-	scene_xdg_surface->surface_node = wlr_scene_subsurface_tree_create(
-		&scene_xdg_surface->tree->node, xdg_surface->surface);
-	if (scene_xdg_surface->surface_node == NULL) {
+	scene_xdg_surface->surface_tree = wlr_scene_subsurface_tree_create(
+		scene_xdg_surface->tree, xdg_surface->surface);
+	if (scene_xdg_surface->surface_tree == NULL) {
 		wlr_scene_node_destroy(&scene_xdg_surface->tree->node);
 		free(scene_xdg_surface);
 		return NULL;
@@ -120,5 +120,5 @@ struct wlr_scene_node *wlr_scene_xdg_surface_create(
 	wlr_scene_node_set_enabled(&scene_xdg_surface->tree->node, xdg_surface->mapped);
 	scene_xdg_surface_update_position(scene_xdg_surface);
 
-	return &scene_xdg_surface->tree->node;
+	return scene_xdg_surface->tree;
 }

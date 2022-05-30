@@ -135,7 +135,7 @@ struct wlr_scene_surface *wlr_scene_surface_from_buffer(
 	return surface;
 }
 
-struct wlr_scene_surface *wlr_scene_surface_create(struct wlr_scene_node *parent,
+struct wlr_scene_surface *wlr_scene_surface_create(struct wlr_scene_tree *parent,
 		struct wlr_surface *wlr_surface) {
 	struct wlr_scene_surface *surface = calloc(1, sizeof(*surface));
 	if (surface == NULL) {

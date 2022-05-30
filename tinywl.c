@@ -340,7 +340,7 @@ static struct tinywl_view *desktop_view_at(
 	 * we only care about surface nodes as we are specifically looking for a
 	 * surface in the surface tree of a tinywl_view. */
 	struct wlr_scene_node *node = wlr_scene_node_at(
-		&server->scene->node, lx, ly, sx, sy);
+		&server->scene->tree.node, lx, ly, sx, sy);
 	if (node == NULL || node->type != WLR_SCENE_NODE_BUFFER) {
 		return NULL;
 	}
@@ -760,7 +760,7 @@ static void server_new_xdg_surface(struct wl_listener *listener, void *data) {
 	view->server = server;
 	view->xdg_toplevel = xdg_surface->toplevel;
 	view->scene_node = wlr_scene_xdg_surface_create(
-			&view->server->scene->node, view->xdg_toplevel->base);
+			&view->server->scene->tree.node, view->xdg_toplevel->base);
 	view->scene_node->data = view;
 	xdg_surface->data = view->scene_node;
 

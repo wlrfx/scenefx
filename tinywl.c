@@ -80,7 +80,7 @@ struct tinywl_view {
 	struct wl_list link;
 	struct tinywl_server *server;
 	struct wlr_xdg_toplevel *xdg_toplevel;
-	struct wlr_scene_node *scene_node;
+	struct wlr_scene_tree *scene_tree;
 	struct wl_listener map;
 	struct wl_listener unmap;
 	struct wl_listener destroy;
@@ -126,7 +126,7 @@ static void focus_view(struct tinywl_view *view, struct wlr_surface *surface) {
 	}
 	struct wlr_keyboard *keyboard = wlr_seat_get_keyboard(seat);
 	/* Move the view to the front */
-	wlr_scene_node_raise_to_top(view->scene_node);
+	wlr_scene_node_raise_to_top(&view->scene_tree->node);
 	wl_list_remove(&view->link);
 	wl_list_insert(&server->views, &view->link);
 	/* Activate the new surface */
@@ -354,10 +354,11 @@ static struct tinywl_view *desktop_view_at(
 	*surface = scene_surface->surface;
 	/* Find the node corresponding to the tinywl_view at the root of this
 	 * surface tree, it is the only one for which we set the data field. */
-	while (node != NULL && node->data == NULL) {
-		node = node->parent;
+	struct wlr_scene_tree *tree = node->parent;
+	while (tree != NULL && tree->node.data == NULL) {
+		tree = tree->node.parent;
 	}
-	return node->data;
+	return tree->node.data;
 }
 
 static void process_cursor_move(struct tinywl_server *server, uint32_t time) {
@@ -365,7 +366,7 @@ static void process_cursor_move(struct tinywl_server *server, uint32_t time) {
 	struct tinywl_view *view = server->grabbed_view;
 	view->x = server->cursor->x - server->grab_x;
 	view->y = server->cursor->y - server->grab_y;
-	wlr_scene_node_set_position(view->scene_node, view->x, view->y);
+	wlr_scene_node_set_position(&view->scene_tree->node, view->x, view->y);
 }
 
 static void process_cursor_resize(struct tinywl_server *server, uint32_t time) {
@@ -414,7 +415,7 @@ static void process_cursor_resize(struct tinywl_server *server, uint32_t time) {
 	wlr_xdg_surface_get_geometry(view->xdg_toplevel->base, &geo_box);
 	view->x = new_left - geo_box.x;
 	view->y = new_top - geo_box.y;
-	wlr_scene_node_set_position(view->scene_node, view->x, view->y);
+	wlr_scene_node_set_position(&view->scene_tree->node, view->x, view->y);
 
 	int new_width = new_right - new_left;
 	int new_height = new_bottom - new_top;
@@ -747,9 +748,9 @@ static void server_new_xdg_surface(struct wl_listener *listener, void *data) {
 	if (xdg_surface->role == WLR_XDG_SURFACE_ROLE_POPUP) {
 		struct wlr_xdg_surface *parent = wlr_xdg_surface_from_wlr_surface(
 			xdg_surface->popup->parent);
-		struct wlr_scene_node *parent_node = parent->data;
+		struct wlr_scene_tree *parent_tree = parent->data;
 		xdg_surface->data = wlr_scene_xdg_surface_create(
-			parent_node, xdg_surface);
+			parent_tree, xdg_surface);
 		return;
 	}
 	assert(xdg_surface->role == WLR_XDG_SURFACE_ROLE_TOPLEVEL);
@@ -759,10 +760,10 @@ static void server_new_xdg_surface(struct wl_listener *listener, void *data) {
 		calloc(1, sizeof(struct tinywl_view));
 	view->server = server;
 	view->xdg_toplevel = xdg_surface->toplevel;
-	view->scene_node = wlr_scene_xdg_surface_create(
-			&view->server->scene->tree.node, view->xdg_toplevel->base);
-	view->scene_node->data = view;
-	xdg_surface->data = view->scene_node;
+	view->scene_tree = wlr_scene_xdg_surface_create(
+			&view->server->scene->tree, view->xdg_toplevel->base);
+	view->scene_tree->node.data = view;
+	xdg_surface->data = view->scene_tree;
 
 	/* Listen to the various events it can emit */
 	view->map.notify = xdg_toplevel_map;

@@ -17,11 +17,6 @@
 
 #define HIGHLIGHT_DAMAGE_FADEOUT_TIME 250
 
-static struct wlr_scene *scene_root_from_node(struct wlr_scene_node *node) {
-	assert(node->type == WLR_SCENE_NODE_ROOT);
-	return (struct wlr_scene *)node;
-}
-
 static struct wlr_scene_rect *scene_rect_from_node(
 		struct wlr_scene_node *node) {
 	assert(node->type == WLR_SCENE_NODE_RECT);
@@ -38,7 +33,7 @@ struct wlr_scene *scene_node_get_root(struct wlr_scene_node *node) {
 	while (node->parent != NULL) {
 		node = node->parent;
 	}
-	return scene_root_from_node(node);
+	return (struct wlr_scene *)node;
 }
 
 static void scene_node_state_init(struct wlr_scene_node_state *state) {
@@ -54,8 +49,6 @@ static void scene_node_state_finish(struct wlr_scene_node_state *state) {
 
 static void scene_node_init(struct wlr_scene_node *node,
 		enum wlr_scene_node_type type, struct wlr_scene_node *parent) {
-	assert(type == WLR_SCENE_NODE_ROOT || parent != NULL);
-
 	memset(node, 0, sizeof(*node));
 	node->type = type;
 	node->parent = parent;
@@ -96,26 +89,12 @@ void wlr_scene_node_destroy(struct wlr_scene_node *node) {
 	wlr_signal_emit_safe(&node->events.destroy, NULL);
 
 	struct wlr_scene *scene = scene_node_get_root(node);
-	struct wlr_scene_output *scene_output;
-	switch (node->type) {
-	case WLR_SCENE_NODE_ROOT:;
-		struct wlr_scene_output *scene_output_tmp;
-		wl_list_for_each_safe(scene_output, scene_output_tmp, &scene->outputs, link) {
-			wlr_scene_output_destroy(scene_output);
-		}
-
-		struct highlight_region *damage, *tmp_damage;
-		wl_list_for_each_safe(damage, tmp_damage, &scene->damage_highlight_regions, link) {
-			highlight_region_destroy(damage);
-		}
-
-		wl_list_remove(&scene->presentation_destroy.link);
-		break;
-	case WLR_SCENE_NODE_BUFFER:;
+	if (node->type == WLR_SCENE_NODE_BUFFER) {
 		struct wlr_scene_buffer *scene_buffer = wlr_scene_buffer_from_node(node);
 
 		uint64_t active = scene_buffer->active_outputs;
 		if (active) {
+			struct wlr_scene_output *scene_output;
 			wl_list_for_each(scene_output, &scene->outputs, link) {
 				if (active & (1ull << scene_output->index)) {
 					wlr_signal_emit_safe(&scene_buffer->events.output_leave,
@@ -126,10 +105,23 @@ void wlr_scene_node_destroy(struct wlr_scene_node *node) {
 
 		wlr_texture_destroy(scene_buffer->texture);
 		wlr_buffer_unlock(scene_buffer->buffer);
-		break;
-	case WLR_SCENE_NODE_TREE:
-	case WLR_SCENE_NODE_RECT:
-		break;
+	} else if (node->type == WLR_SCENE_NODE_TREE) {
+		if (node == &scene->tree.node) {
+			assert(!node->parent);
+			struct wlr_scene_output *scene_output, *scene_output_tmp;
+			wl_list_for_each_safe(scene_output, scene_output_tmp, &scene->outputs, link) {
+				wlr_scene_output_destroy(scene_output);
+			}
+
+			struct highlight_region *damage, *tmp_damage;
+			wl_list_for_each_safe(damage, tmp_damage, &scene->damage_highlight_regions, link) {
+				highlight_region_destroy(damage);
+			}
+
+			wl_list_remove(&scene->presentation_destroy.link);
+		} else {
+			assert(node->parent);
+		}
 	}
 
 	struct wlr_scene_node *child, *child_tmp;
@@ -143,12 +135,20 @@ void wlr_scene_node_destroy(struct wlr_scene_node *node) {
 	free(node);
 }
 
+static void scene_tree_init(struct wlr_scene_tree *tree,
+		struct wlr_scene_node *parent) {
+	memset(tree, 0, sizeof(*tree));
+	scene_node_init(&tree->node, WLR_SCENE_NODE_TREE, parent);
+}
+
 struct wlr_scene *wlr_scene_create(void) {
 	struct wlr_scene *scene = calloc(1, sizeof(struct wlr_scene));
 	if (scene == NULL) {
 		return NULL;
 	}
-	scene_node_init(&scene->node, WLR_SCENE_NODE_ROOT, NULL);
+
+	scene_tree_init(&scene->tree, NULL);
+
 	wl_list_init(&scene->outputs);
 	wl_list_init(&scene->presentation_destroy.link);
 	wl_list_init(&scene->damage_highlight_regions);
@@ -173,12 +173,14 @@ struct wlr_scene *wlr_scene_create(void) {
 }
 
 struct wlr_scene_tree *wlr_scene_tree_create(struct wlr_scene_node *parent) {
+	assert(parent);
+
 	struct wlr_scene_tree *tree = calloc(1, sizeof(struct wlr_scene_tree));
 	if (tree == NULL) {
 		return NULL;
 	}
-	scene_node_init(&tree->node, WLR_SCENE_NODE_TREE, parent);
 
+	scene_tree_init(tree, parent);
 	return tree;
 }
 
@@ -256,6 +258,7 @@ struct wlr_scene_rect *wlr_scene_rect_create(struct wlr_scene_node *parent,
 	if (scene_rect == NULL) {
 		return NULL;
 	}
+	assert(parent);
 	scene_node_init(&scene_rect->node, WLR_SCENE_NODE_RECT, parent);
 
 	scene_rect->width = width;
@@ -293,6 +296,7 @@ struct wlr_scene_buffer *wlr_scene_buffer_create(struct wlr_scene_node *parent,
 	if (scene_buffer == NULL) {
 		return NULL;
 	}
+	assert(parent);
 	scene_node_init(&scene_buffer->node, WLR_SCENE_NODE_BUFFER, parent);
 
 	if (buffer) {
@@ -473,7 +477,6 @@ static void scene_node_get_size(struct wlr_scene_node *node,
 	*height = 0;
 
 	switch (node->type) {
-	case WLR_SCENE_NODE_ROOT:
 	case WLR_SCENE_NODE_TREE:
 		return;
 	case WLR_SCENE_NODE_RECT:;
@@ -630,7 +633,7 @@ void wlr_scene_node_lower_to_bottom(struct wlr_scene_node *node) {
 
 void wlr_scene_node_reparent(struct wlr_scene_node *node,
 		struct wlr_scene_node *new_parent) {
-	assert(node->type != WLR_SCENE_NODE_ROOT && new_parent != NULL);
+	assert(new_parent != NULL);
 
 	if (node->parent == new_parent) {
 		return;
@@ -716,7 +719,6 @@ struct wlr_scene_node *wlr_scene_node_at(struct wlr_scene_node *node,
 
 	bool intersects = false;
 	switch (node->type) {
-	case WLR_SCENE_NODE_ROOT:
 	case WLR_SCENE_NODE_TREE:
 		break;
 	case WLR_SCENE_NODE_RECT:;
@@ -845,7 +847,6 @@ static void render_node_iterator(struct wlr_scene_node *node,
 	float matrix[9];
 	enum wl_output_transform transform;
 	switch (node->type) {
-	case WLR_SCENE_NODE_ROOT:
 	case WLR_SCENE_NODE_TREE:
 		/* Root or tree node has nothing to render itself */
 		break;
@@ -933,14 +934,14 @@ static void scene_output_handle_commit(struct wl_listener *listener, void *data)
 	if (event->committed & (WLR_OUTPUT_STATE_MODE |
 			WLR_OUTPUT_STATE_TRANSFORM |
 			WLR_OUTPUT_STATE_SCALE)) {
-		scene_node_update_outputs(&scene_output->scene->node);
+		scene_node_update_outputs(&scene_output->scene->tree.node);
 	}
 }
 
 static void scene_output_handle_mode(struct wl_listener *listener, void *data) {
 	struct wlr_scene_output *scene_output = wl_container_of(listener,
 		scene_output, output_mode);
-	scene_node_update_outputs(&scene_output->scene->node);
+	scene_node_update_outputs(&scene_output->scene->tree.node);
 }
 
 struct wlr_scene_output *wlr_scene_output_create(struct wlr_scene *scene,
@@ -984,7 +985,7 @@ struct wlr_scene_output *wlr_scene_output_create(struct wlr_scene *scene,
 	wl_signal_add(&output->events.mode, &scene_output->output_mode);
 
 	wlr_output_damage_add_whole(scene_output->damage);
-	scene_node_update_outputs(&scene->node);
+	scene_node_update_outputs(&scene->tree.node);
 
 	return scene_output;
 }
@@ -1012,7 +1013,7 @@ void wlr_scene_output_destroy(struct wlr_scene_output *scene_output) {
 		return;
 	}
 
-	scene_node_remove_output(&scene_output->scene->node, scene_output);
+	scene_node_remove_output(&scene_output->scene->tree.node, scene_output);
 
 	wlr_addon_finish(&scene_output->addon);
 	wl_list_remove(&scene_output->link);
@@ -1044,7 +1045,7 @@ void wlr_scene_output_set_position(struct wlr_scene_output *scene_output,
 	scene_output->y = ly;
 	wlr_output_damage_add_whole(scene_output->damage);
 
-	scene_node_update_outputs(&scene_output->scene->node);
+	scene_node_update_outputs(&scene_output->scene->tree.node);
 }
 
 struct check_scanout_data {
@@ -1094,7 +1095,7 @@ static bool scene_output_scanout(struct wlr_scene_output *scene_output) {
 	struct check_scanout_data check_scanout_data = {
 		.viewport_box = viewport_box,
 	};
-	scene_node_for_each_node(&scene_output->scene->node, 0, 0,
+	scene_node_for_each_node(&scene_output->scene->tree.node, 0, 0,
 		check_scanout_iterator, &check_scanout_data);
 	if (check_scanout_data.n != 1 || check_scanout_data.node == NULL) {
 		return false;
@@ -1222,7 +1223,7 @@ bool wlr_scene_output_commit(struct wlr_scene_output *scene_output) {
 		.scene_output = scene_output,
 		.damage = &damage,
 	};
-	scene_node_for_each_node(&scene_output->scene->node,
+	scene_node_for_each_node(&scene_output->scene->tree.node,
 		-scene_output->x, -scene_output->y,
 		render_node_iterator, &data);
 	wlr_renderer_scissor(renderer, NULL);
@@ -1302,7 +1303,7 @@ static void scene_node_send_frame_done(struct wlr_scene_node *node,
 
 void wlr_scene_output_send_frame_done(struct wlr_scene_output *scene_output,
 		struct timespec *now) {
-	scene_node_send_frame_done(&scene_output->scene->node,
+	scene_node_send_frame_done(&scene_output->scene->tree.node,
 		scene_output, now);
 }
 
@@ -1340,6 +1341,6 @@ void wlr_scene_output_for_each_buffer(struct wlr_scene_output *scene_output,
 	struct wlr_box box = { .x = scene_output->x, .y = scene_output->y };
 	wlr_output_effective_resolution(scene_output->output,
 		&box.width, &box.height);
-	scene_output_for_each_scene_buffer(&box, &scene_output->scene->node, 0, 0,
+	scene_output_for_each_scene_buffer(&box, &scene_output->scene->tree.node, 0, 0,
 		iterator, user_data);
 }

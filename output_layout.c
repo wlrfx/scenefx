@@ -99,7 +99,7 @@ bool wlr_scene_attach_output_layout(struct wlr_scene *scene,
 	wl_signal_add(&output_layout->events.add, &sol->layout_add);
 
 	sol->scene_destroy.notify = scene_output_layout_handle_scene_destroy;
-	wl_signal_add(&scene->node.events.destroy, &sol->scene_destroy);
+	wl_signal_add(&scene->tree.node.events.destroy, &sol->scene_destroy);
 
 	return true;
 }

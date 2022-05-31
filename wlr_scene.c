@@ -999,6 +999,8 @@ struct wlr_scene_output *wlr_scene_output_create(struct wlr_scene *scene,
 	assert(scene_output->index < 64);
 	wl_list_insert(prev_output_link, &scene_output->link);
 
+	wl_signal_init(&scene_output->events.destroy);
+
 	scene_output->output_commit.notify = scene_output_handle_commit;
 	wl_signal_add(&output->events.commit, &scene_output->output_commit);
 
@@ -1034,6 +1036,8 @@ void wlr_scene_output_destroy(struct wlr_scene_output *scene_output) {
 	if (scene_output == NULL) {
 		return;
 	}
+
+	wlr_signal_emit_safe(&scene_output->events.destroy, NULL);
 
 	scene_node_remove_output(&scene_output->scene->tree.node, scene_output);
 

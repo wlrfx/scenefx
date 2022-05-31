@@ -72,12 +72,8 @@ static void scene_output_layout_handle_layout_change(
 	}
 }
 
-static void scene_output_layout_handle_layout_add(
-		struct wl_listener *listener, void *data) {
-	struct wlr_scene_output_layout *sol =
-		wl_container_of(listener, sol, layout_add);
-	struct wlr_output_layout_output *lo = data;
-
+static void scene_output_layout_add(struct wlr_scene_output_layout *sol,
+		struct wlr_output_layout_output *lo) {
 	struct wlr_scene_output_layout_output *solo = calloc(1, sizeof(*solo));
 	if (solo == NULL) {
 		return;
@@ -103,6 +99,15 @@ static void scene_output_layout_handle_layout_add(
 	wl_list_insert(&sol->outputs, &solo->link);
 
 	wlr_scene_output_set_position(solo->scene_output, lo->x, lo->y);
+}
+
+static void scene_output_layout_handle_layout_add(
+		struct wl_listener *listener, void *data) {
+	struct wlr_scene_output_layout *sol =
+		wl_container_of(listener, sol, layout_add);
+	struct wlr_output_layout_output *lo = data;
+
+	scene_output_layout_add(sol, lo);
 }
 
 static void scene_output_layout_handle_layout_destroy(
@@ -142,6 +147,11 @@ bool wlr_scene_attach_output_layout(struct wlr_scene *scene,
 
 	sol->scene_destroy.notify = scene_output_layout_handle_scene_destroy;
 	wl_signal_add(&scene->tree.node.events.destroy, &sol->scene_destroy);
+
+	struct wlr_output_layout_output *lo;
+	wl_list_for_each(lo, &output_layout->outputs, link) {
+		scene_output_layout_add(sol, lo);
+	}
 
 	return true;
 }

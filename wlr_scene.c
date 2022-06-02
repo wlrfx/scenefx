@@ -205,6 +205,14 @@ static void scene_buffer_update_outputs(
 	int largest_overlap = 0;
 	scene_buffer->primary_output = NULL;
 
+	uint64_t active_outputs = 0;
+
+	// let's update the outputs in two steps:
+	//  - the primary outputs
+	//  - the enter/leave signals
+	// This ensures that the enter/leave signals can rely on the primary output
+	// to have a reasonable value. Otherwise, they may get a value that's in
+	// the middle of a calculation.
 	struct wlr_scene_output *scene_output;
 	wl_list_for_each(scene_output, &scene->outputs, link) {
 		struct wlr_box output_box = {
@@ -216,7 +224,6 @@ static void scene_buffer_update_outputs(
 
 		struct wlr_box intersection;
 		bool intersects = wlr_box_intersection(&intersection, &buffer_box, &output_box);
-		bool intersects_before = scene_buffer->active_outputs & (1ull << scene_output->index);
 
 		if (intersects) {
 			int overlap = intersection.width * intersection.height;
@@ -224,13 +231,22 @@ static void scene_buffer_update_outputs(
 				largest_overlap = overlap;
 				scene_buffer->primary_output = scene_output;
 			}
+
+			active_outputs |= 1ull << scene_output->index;
 		}
+	}
+
+	uint64_t old_active = scene_buffer->active_outputs;
+	scene_buffer->active_outputs = active_outputs;
+
+	wl_list_for_each(scene_output, &scene->outputs, link) {
+		uint64_t mask = 1ull << scene_output->index;
+		bool intersects = active_outputs & mask;
+		bool intersects_before = old_active & mask;
 
 		if (intersects && !intersects_before) {
-			scene_buffer->active_outputs |= 1ull << scene_output->index;
 			wlr_signal_emit_safe(&scene_buffer->events.output_enter, scene_output);
 		} else if (!intersects && intersects_before) {
-			scene_buffer->active_outputs &= ~(1ull << scene_output->index);
 			wlr_signal_emit_safe(&scene_buffer->events.output_leave, scene_output);
 		}
 	}

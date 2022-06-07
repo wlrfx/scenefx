@@ -26,10 +26,10 @@ struct wlr_scene_output_layout_output {
 
 static void scene_output_layout_output_destroy(
 		struct wlr_scene_output_layout_output *solo) {
-	wlr_scene_output_destroy(solo->scene_output);
 	wl_list_remove(&solo->layout_output_destroy.link);
 	wl_list_remove(&solo->scene_output_destroy.link);
 	wl_list_remove(&solo->link);
+	wlr_scene_output_destroy(solo->scene_output);
 	free(solo);
 }
 

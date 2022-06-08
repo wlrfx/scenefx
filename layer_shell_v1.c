@@ -94,7 +94,7 @@ void wlr_scene_layer_surface_v1_configure(
 	if (box.width == 0) {
 		box.x = bounds.x + state->margin.left;
 		box.width = bounds.width -
-			state->margin.left + state->margin.right;
+			(state->margin.left + state->margin.right);
 	} else if (state->anchor & ZWLR_LAYER_SURFACE_V1_ANCHOR_LEFT &&
 			state->anchor & ZWLR_LAYER_SURFACE_V1_ANCHOR_RIGHT) {
 		box.x = bounds.x + bounds.width/2 -box.width/2;
@@ -110,7 +110,7 @@ void wlr_scene_layer_surface_v1_configure(
 	if (box.height == 0) {
 		box.y = bounds.y + state->margin.top;
 		box.height = bounds.height -
-			state->margin.top + state->margin.bottom;
+			(state->margin.top + state->margin.bottom);
 	} else if (state->anchor & ZWLR_LAYER_SURFACE_V1_ANCHOR_TOP &&
 			state->anchor & ZWLR_LAYER_SURFACE_V1_ANCHOR_BOTTOM) {
 		box.y = bounds.y + bounds.height/2 - box.height/2;

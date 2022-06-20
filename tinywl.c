@@ -238,10 +238,12 @@ static void keyboard_handle_destroy(struct wl_listener *listener, void *data) {
 
 static void server_new_keyboard(struct tinywl_server *server,
 		struct wlr_input_device *device) {
+	struct wlr_keyboard *wlr_keyboard = wlr_keyboard_from_input_device(device);
+
 	struct tinywl_keyboard *keyboard =
 		calloc(1, sizeof(struct tinywl_keyboard));
 	keyboard->server = server;
-	keyboard->wlr_keyboard = device->keyboard;
+	keyboard->wlr_keyboard = wlr_keyboard;
 
 	/* We need to prepare an XKB keymap and assign it to the keyboard. This
 	 * assumes the defaults (e.g. layout = "us"). */
@@ -249,16 +251,16 @@ static void server_new_keyboard(struct tinywl_server *server,
 	struct xkb_keymap *keymap = xkb_keymap_new_from_names(context, NULL,
 		XKB_KEYMAP_COMPILE_NO_FLAGS);
 
-	wlr_keyboard_set_keymap(device->keyboard, keymap);
+	wlr_keyboard_set_keymap(wlr_keyboard, keymap);
 	xkb_keymap_unref(keymap);
 	xkb_context_unref(context);
-	wlr_keyboard_set_repeat_info(device->keyboard, 25, 600);
+	wlr_keyboard_set_repeat_info(wlr_keyboard, 25, 600);
 
 	/* Here we set up listeners for keyboard events. */
 	keyboard->modifiers.notify = keyboard_handle_modifiers;
-	wl_signal_add(&device->keyboard->events.modifiers, &keyboard->modifiers);
+	wl_signal_add(&wlr_keyboard->events.modifiers, &keyboard->modifiers);
 	keyboard->key.notify = keyboard_handle_key;
-	wl_signal_add(&device->keyboard->events.key, &keyboard->key);
+	wl_signal_add(&wlr_keyboard->events.key, &keyboard->key);
 	keyboard->destroy.notify = keyboard_handle_destroy;
 	wl_signal_add(&device->events.destroy, &keyboard->destroy);
 

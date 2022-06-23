@@ -818,12 +818,21 @@ int main(int argc, char *argv[]) {
 	 * backend based on the current environment, such as opening an X11 window
 	 * if an X11 server is running. */
 	server.backend = wlr_backend_autocreate(server.wl_display);
+	if (server.backend == NULL) {
+		wlr_log(WLR_ERROR, "failed to create wlr_backend");
+		return 1;
+	}
 
 	/* Autocreates a renderer, either Pixman, GLES2 or Vulkan for us. The user
 	 * can also specify a renderer using the WLR_RENDERER env var.
 	 * The renderer is responsible for defining the various pixel formats it
 	 * supports for shared memory, this configures that for clients. */
 	server.renderer = wlr_renderer_autocreate(server.backend);
+	if (server.renderer == NULL) {
+		wlr_log(WLR_ERROR, "failed to create wlr_renderer");
+		return 1;
+	}
+
 	wlr_renderer_init_wl_display(server.renderer, server.wl_display);
 
 	/* Autocreates an allocator for us.
@@ -832,6 +841,10 @@ int main(int argc, char *argv[]) {
 	 * screen */
 	 server.allocator = wlr_allocator_autocreate(server.backend,
 		server.renderer);
+	if (server.allocator == NULL) {
+		wlr_log(WLR_ERROR, "failed to create wlr_allocator");
+		return 1;
+	}
 
 	/* This creates some hands-off wlroots interfaces. The compositor is
 	 * necessary for clients to allocate surfaces, the subcompositor allows to

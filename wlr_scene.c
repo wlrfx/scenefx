@@ -79,12 +79,12 @@ void wlr_scene_node_destroy(struct wlr_scene_node *node) {
 		return;
 	}
 
-	scene_node_damage_whole(node);
-
 	// We want to call the destroy listeners before we do anything else
 	// in case the destroy signal would like to remove children before they
 	// are recursively destroyed.
 	wlr_signal_emit_safe(&node->events.destroy, NULL);
+
+	wlr_scene_node_set_enabled(node, false);
 
 	struct wlr_scene *scene = scene_node_get_root(node);
 	if (node->type == WLR_SCENE_NODE_BUFFER) {

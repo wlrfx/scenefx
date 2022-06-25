@@ -932,28 +932,21 @@ static void scissor_output(struct wlr_output *output, pixman_box32_t *rect) {
 }
 
 static void render_rect(struct wlr_output *output,
-		pixman_region32_t *output_damage, const float color[static 4],
+		pixman_region32_t *damage, const float color[static 4],
 		const struct wlr_box *box, const float matrix[static 9]) {
 	struct wlr_renderer *renderer = output->renderer;
 	assert(renderer);
 
-	pixman_region32_t damage;
-	pixman_region32_init(&damage);
-	pixman_region32_init_rect(&damage, box->x, box->y, box->width, box->height);
-	pixman_region32_intersect(&damage, &damage, output_damage);
-
 	int nrects;
-	pixman_box32_t *rects = pixman_region32_rectangles(&damage, &nrects);
+	pixman_box32_t *rects = pixman_region32_rectangles(damage, &nrects);
 	for (int i = 0; i < nrects; ++i) {
 		scissor_output(output, &rects[i]);
 		wlr_render_rect(renderer, box, color, matrix);
 	}
-
-	pixman_region32_fini(&damage);
 }
 
 static void render_texture(struct wlr_output *output,
-		pixman_region32_t *output_damage, struct wlr_texture *texture,
+		pixman_region32_t *damage, struct wlr_texture *texture,
 		const struct wlr_fbox *src_box, const struct wlr_box *dst_box,
 		const float matrix[static 9]) {
 	struct wlr_renderer *renderer = output->renderer;
@@ -966,20 +959,12 @@ static void render_texture(struct wlr_output *output,
 		src_box = &default_src_box;
 	}
 
-	pixman_region32_t damage;
-	pixman_region32_init(&damage);
-	pixman_region32_init_rect(&damage, dst_box->x, dst_box->y,
-		dst_box->width, dst_box->height);
-	pixman_region32_intersect(&damage, &damage, output_damage);
-
 	int nrects;
-	pixman_box32_t *rects = pixman_region32_rectangles(&damage, &nrects);
+	pixman_box32_t *rects = pixman_region32_rectangles(damage, &nrects);
 	for (int i = 0; i < nrects; ++i) {
 		scissor_output(output, &rects[i]);
 		wlr_render_subtexture_with_matrix(renderer, texture, src_box, matrix, 1.0);
 	}
-
-	pixman_region32_fini(&damage);
 }
 
 struct render_data {
@@ -992,7 +977,17 @@ static void render_node_iterator(struct wlr_scene_node *node,
 	struct render_data *data = _data;
 	struct wlr_scene_output *scene_output = data->scene_output;
 	struct wlr_output *output = scene_output->output;
-	pixman_region32_t *output_damage = data->damage;
+
+	pixman_region32_t render_region;
+	pixman_region32_init(&render_region);
+	pixman_region32_copy(&render_region, &node->visible);
+	pixman_region32_translate(&render_region, -scene_output->x, -scene_output->y);
+	wlr_region_scale(&render_region, &render_region, output->scale);
+	pixman_region32_intersect(&render_region, &render_region, data->damage);
+	if (!pixman_region32_not_empty(&render_region)) {
+		pixman_region32_fini(&render_region);
+		return;
+	}
 
 	struct wlr_box dst_box = {
 		.x = x,
@@ -1011,7 +1006,7 @@ static void render_node_iterator(struct wlr_scene_node *node,
 	case WLR_SCENE_NODE_RECT:;
 		struct wlr_scene_rect *scene_rect = scene_rect_from_node(node);
 
-		render_rect(output, output_damage, scene_rect->color, &dst_box,
+		render_rect(output, &render_region, scene_rect->color, &dst_box,
 			output->transform_matrix);
 		break;
 	case WLR_SCENE_NODE_BUFFER:;
@@ -1030,12 +1025,14 @@ static void render_node_iterator(struct wlr_scene_node *node,
 		wlr_matrix_project_box(matrix, &dst_box, transform, 0.0,
 			output->transform_matrix);
 
-		render_texture(output, output_damage, texture, &scene_buffer->src_box,
+		render_texture(output, &render_region, texture, &scene_buffer->src_box,
 			&dst_box, matrix);
 
 		wlr_signal_emit_safe(&scene_buffer->events.output_present, scene_output);
 		break;
 	}
+
+	pixman_region32_fini(&render_region);
 }
 
 static void scene_node_for_each_node(struct wlr_scene_node *node,

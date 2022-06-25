@@ -58,6 +58,7 @@ static void scene_node_init(struct wlr_scene_node *node,
 	wl_list_init(&node->link);
 
 	wl_signal_init(&node->events.destroy);
+	pixman_region32_init(&node->visible);
 
 	if (parent != NULL) {
 		wl_list_insert(parent->children.prev, &node->link);
@@ -127,6 +128,7 @@ void wlr_scene_node_destroy(struct wlr_scene_node *node) {
 
 	wlr_addon_set_finish(&node->addons);
 	wl_list_remove(&node->link);
+	pixman_region32_fini(&node->visible);
 	free(node);
 }
 
@@ -609,6 +611,9 @@ static void _scene_node_damage_whole(struct wlr_scene_node *node,
 
 	int width, height;
 	scene_node_get_size(node, &width, &height);
+
+	pixman_region32_fini(&node->visible);
+	pixman_region32_init_rect(&node->visible, lx, ly, width, height);
 
 	struct wlr_scene_output *scene_output;
 	wl_list_for_each(scene_output, &scene->outputs, link) {

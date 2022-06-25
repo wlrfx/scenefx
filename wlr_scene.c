@@ -247,6 +247,18 @@ struct scene_update_data {
 	struct wl_list *outputs;
 };
 
+static uint32_t region_area(pixman_region32_t *region) {
+	uint32_t area = 0;
+
+	int nrects;
+	pixman_box32_t *rects = pixman_region32_rectangles(region, &nrects);
+	for (int i = 0; i < nrects; ++i) {
+		area += (rects[i].x2 - rects[i].x1) * (rects[i].y2 - rects[i].y1);
+	}
+
+	return area;
+}
+
 static void scene_damage_outputs(struct wlr_scene *scene, pixman_region32_t *damage) {
 	if (!pixman_region32_not_empty(damage)) {
 		return;
@@ -276,10 +288,6 @@ static void update_node_update_outputs(struct wlr_scene_node *node,
 
 	struct wlr_scene_buffer *scene_buffer = wlr_scene_buffer_from_node(node);
 
-	struct wlr_box buffer_box;
-	wlr_scene_node_coords(node, &buffer_box.x, &buffer_box.y);
-	scene_node_get_size(node, &buffer_box.width, &buffer_box.height);
-
 	int largest_overlap = 0;
 	scene_buffer->primary_output = NULL;
 
@@ -304,11 +312,13 @@ static void update_node_update_outputs(struct wlr_scene_node *node,
 		wlr_output_effective_resolution(scene_output->output,
 			&output_box.width, &output_box.height);
 
-		struct wlr_box intersection;
-		bool intersects = wlr_box_intersection(&intersection, &buffer_box, &output_box);
+		pixman_region32_t intersection;
+		pixman_region32_init(&intersection);
+		pixman_region32_intersect_rect(&intersection, &node->visible,
+			output_box.x, output_box.y, output_box.width, output_box.height);
 
-		if (intersects) {
-			int overlap = intersection.width * intersection.height;
+		if (pixman_region32_not_empty(&intersection)) {
+			int overlap = region_area(&intersection);
 			if (overlap > largest_overlap) {
 				largest_overlap = overlap;
 				scene_buffer->primary_output = scene_output;
@@ -316,6 +326,8 @@ static void update_node_update_outputs(struct wlr_scene_node *node,
 
 			active_outputs |= 1ull << scene_output->index;
 		}
+		
+		pixman_region32_fini(&intersection);
 	}
 
 	uint64_t old_active = scene_buffer->active_outputs;

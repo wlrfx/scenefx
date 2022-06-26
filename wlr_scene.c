@@ -103,6 +103,7 @@ void wlr_scene_node_destroy(struct wlr_scene_node *node) {
 
 		wlr_texture_destroy(scene_buffer->texture);
 		wlr_buffer_unlock(scene_buffer->buffer);
+		pixman_region32_fini(&scene_buffer->opaque_region);
 	} else if (node->type == WLR_SCENE_NODE_TREE) {
 		struct wlr_scene_tree *scene_tree = scene_tree_from_node(node);
 
@@ -502,6 +503,7 @@ struct wlr_scene_buffer *wlr_scene_buffer_create(struct wlr_scene_tree *parent,
 	wl_signal_init(&scene_buffer->events.output_leave);
 	wl_signal_init(&scene_buffer->events.output_present);
 	wl_signal_init(&scene_buffer->events.frame_done);
+	pixman_region32_init(&scene_buffer->opaque_region);
 
 	scene_node_update(&scene_buffer->node, NULL);
 
@@ -601,6 +603,16 @@ void wlr_scene_buffer_set_buffer_with_damage(struct wlr_scene_buffer *scene_buff
 void wlr_scene_buffer_set_buffer(struct wlr_scene_buffer *scene_buffer,
 		struct wlr_buffer *buffer)  {
 	wlr_scene_buffer_set_buffer_with_damage(scene_buffer, buffer, NULL);
+}
+
+void wlr_scene_buffer_set_opaque_region(struct wlr_scene_buffer *scene_buffer,
+		pixman_region32_t *region) {
+	if (pixman_region32_equal(&scene_buffer->opaque_region, region)) {
+		return;
+	}
+
+	pixman_region32_copy(&scene_buffer->opaque_region, region);
+	scene_node_update(&scene_buffer->node, NULL);
 }
 
 void wlr_scene_buffer_set_source_box(struct wlr_scene_buffer *scene_buffer,

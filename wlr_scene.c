@@ -1230,7 +1230,7 @@ bool wlr_scene_output_commit(struct wlr_scene_output *scene_output) {
 				pixman_region32_init(&current_damage->region);
 				pixman_region32_copy(&current_damage->region,
 					&scene_output->damage_ring.current);
-				memcpy(&current_damage->when, &now, sizeof(now));
+				current_damage->when = now;
 				wl_list_insert(regions, &current_damage->link);
 			}
 		}

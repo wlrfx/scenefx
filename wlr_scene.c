@@ -74,12 +74,6 @@ struct highlight_region {
 	struct wl_list link;
 };
 
-static void highlight_region_destroy(struct highlight_region *damage) {
-	wl_list_remove(&damage->link);
-	pixman_region32_fini(&damage->region);
-	free(damage);
-}
-
 void wlr_scene_node_destroy(struct wlr_scene_node *node) {
 	if (node == NULL) {
 		return;
@@ -119,11 +113,6 @@ void wlr_scene_node_destroy(struct wlr_scene_node *node) {
 				wlr_scene_output_destroy(scene_output);
 			}
 
-			struct highlight_region *damage, *tmp_damage;
-			wl_list_for_each_safe(damage, tmp_damage, &scene->damage_highlight_regions, link) {
-				highlight_region_destroy(damage);
-			}
-
 			wl_list_remove(&scene->presentation_destroy.link);
 		} else {
 			assert(node->parent);
@@ -158,7 +147,6 @@ struct wlr_scene *wlr_scene_create(void) {
 
 	wl_list_init(&scene->outputs);
 	wl_list_init(&scene->presentation_destroy.link);
-	wl_list_init(&scene->damage_highlight_regions);
 
 	char *debug_damage = getenv("WLR_SCENE_DEBUG_DAMAGE");
 	if (debug_damage) {
@@ -1028,6 +1016,7 @@ struct wlr_scene_output *wlr_scene_output_create(struct wlr_scene *scene,
 	wlr_addon_init(&scene_output->addon, &output->addons, scene, &output_addon_impl);
 
 	wlr_damage_ring_init(&scene_output->damage_ring);
+	wl_list_init(&scene_output->damage_highlight_regions);
 
 	int prev_output_index = -1;
 	struct wl_list *prev_output_link = &scene->outputs;
@@ -1065,6 +1054,12 @@ struct wlr_scene_output *wlr_scene_output_create(struct wlr_scene *scene,
 	return scene_output;
 }
 
+static void highlight_region_destroy(struct highlight_region *damage) {
+	wl_list_remove(&damage->link);
+	pixman_region32_fini(&damage->region);
+	free(damage);
+}
+
 void wlr_scene_output_destroy(struct wlr_scene_output *scene_output) {
 	if (scene_output == NULL) {
 		return;
@@ -1073,6 +1068,11 @@ void wlr_scene_output_destroy(struct wlr_scene_output *scene_output) {
 	wlr_signal_emit_safe(&scene_output->events.destroy, NULL);
 
 	scene_node_update_outputs(&scene_output->scene->tree.node, scene_output);
+
+	struct highlight_region *damage, *tmp_damage;
+	wl_list_for_each_safe(damage, tmp_damage, &scene_output->damage_highlight_regions, link) {
+		highlight_region_destroy(damage);
+	}
 
 	wlr_addon_finish(&scene_output->addon);
 	wlr_damage_ring_finish(&scene_output->damage_ring);
@@ -1219,7 +1219,7 @@ bool wlr_scene_output_commit(struct wlr_scene_output *scene_output) {
 
 	struct timespec now;
 	if (debug_damage == WLR_SCENE_DEBUG_DAMAGE_HIGHLIGHT) {
-		struct wl_list *regions = &scene_output->scene->damage_highlight_regions;
+		struct wl_list *regions = &scene_output->damage_highlight_regions;
 		clock_gettime(CLOCK_MONOTONIC, &now);
 
 		// add the current frame's damage if there is damage
@@ -1292,7 +1292,7 @@ bool wlr_scene_output_commit(struct wlr_scene_output *scene_output) {
 
 	if (debug_damage == WLR_SCENE_DEBUG_DAMAGE_HIGHLIGHT) {
 		struct highlight_region *damage;
-		wl_list_for_each(damage, &scene_output->scene->damage_highlight_regions, link) {
+		wl_list_for_each(damage, &scene_output->damage_highlight_regions, link) {
 			struct timespec time_diff;
 			timespec_sub(&time_diff, &now, &damage->when);
 			int64_t time_diff_ms = timespec_to_msec(&time_diff);
@@ -1340,7 +1340,7 @@ bool wlr_scene_output_commit(struct wlr_scene_output *scene_output) {
 	}
 
 	if (debug_damage == WLR_SCENE_DEBUG_DAMAGE_HIGHLIGHT &&
-			!wl_list_empty(&scene_output->scene->damage_highlight_regions)) {
+			!wl_list_empty(&scene_output->damage_highlight_regions)) {
 		wlr_output_schedule_frame(scene_output->output);
 	}
 

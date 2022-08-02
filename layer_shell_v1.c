@@ -125,7 +125,7 @@ void wlr_scene_layer_surface_v1_configure(
 	wlr_scene_node_set_position(&scene_layer_surface->tree->node, box.x, box.y);
 	wlr_layer_surface_v1_configure(layer_surface, box.width, box.height);
 
-	if (state->exclusive_zone > 0) {
+	if (layer_surface->mapped && state->exclusive_zone > 0) {
 		layer_surface_exclusive_zone(state, usable_area);
 	}
 }

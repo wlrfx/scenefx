@@ -164,6 +164,20 @@ struct wlr_scene *wlr_scene_create(void) {
 		scene->debug_damage_option = WLR_SCENE_DEBUG_DAMAGE_NONE;
 	}
 
+	char *disable_direct_scanout = getenv("WLR_SCENE_DISABLE_DIRECT_SCANOUT");
+	if (disable_direct_scanout) {
+		wlr_log(WLR_INFO, "Loading WLR_SCENE_DISABLE_DIRECT_SCANOUT option: %s", disable_direct_scanout);
+	}
+
+	if (!disable_direct_scanout || strcmp(disable_direct_scanout, "0") == 0) {
+		scene->direct_scanout = true;
+	} else if (strcmp(disable_direct_scanout, "1") == 0) {
+		scene->direct_scanout = false;
+	} else {
+		wlr_log(WLR_ERROR, "Unknown WLR_SCENE_DISABLE_DIRECT_SCANOUT option: %s", disable_direct_scanout);
+		scene->direct_scanout = true;
+	}
+
 	return scene;
 }
 
@@ -1140,6 +1154,10 @@ static void check_scanout_iterator(struct wlr_scene_node *node,
 }
 
 static bool scene_output_scanout(struct wlr_scene_output *scene_output) {
+	if (!scene_output->scene->direct_scanout) {
+		return false;
+	}
+
 	if (scene_output->scene->debug_damage_option ==
 			WLR_SCENE_DEBUG_DAMAGE_HIGHLIGHT) {
 		// We don't want to enter direct scan out if we have highlight regions

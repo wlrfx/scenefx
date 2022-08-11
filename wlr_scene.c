@@ -195,6 +195,50 @@ struct wlr_scene_tree *wlr_scene_tree_create(struct wlr_scene_tree *parent) {
 
 static void scene_node_get_size(struct wlr_scene_node *node, int *lx, int *ly);
 
+typedef bool (*scene_node_box_iterator_func_t)(struct wlr_scene_node *node,
+	int sx, int sy, void *data);
+
+static bool _scene_nodes_in_box(struct wlr_scene_node *node, struct wlr_box *box, 
+		scene_node_box_iterator_func_t iterator, void *user_data, int lx, int ly) {
+	if (!node->enabled) {
+		return false;
+	}
+
+	switch (node->type) {
+	case WLR_SCENE_NODE_TREE:;
+		struct wlr_scene_tree *scene_tree = scene_tree_from_node(node);
+		struct wlr_scene_node *child;
+		wl_list_for_each_reverse(child, &scene_tree->children, link) {
+			if (_scene_nodes_in_box(child, box, iterator, user_data, lx + child->x, ly + child->y)) {
+				return true;
+			}
+		}
+		break;
+	case WLR_SCENE_NODE_RECT:
+	case WLR_SCENE_NODE_BUFFER:;
+		struct wlr_box node_box = { .x = lx, .y = ly };
+		scene_node_get_size(node, &node_box.width, &node_box.height);
+		bool intersects;
+
+		intersects = wlr_box_intersection(&node_box, &node_box, box);
+
+		if (intersects && iterator(node, lx, ly, user_data)) {
+			return true;
+		}
+		break;
+	}
+
+	return false;
+}
+
+static bool scene_nodes_in_box(struct wlr_scene_node *node, struct wlr_box *box, 
+		scene_node_box_iterator_func_t iterator, void *user_data) {
+	int x, y;
+	wlr_scene_node_coords(node, &x, &y);
+
+	return _scene_nodes_in_box(node, box, iterator, user_data, x, y);
+}
+
 // This function must be called whenever the coordinates/dimensions of a scene
 // buffer or scene output change. It is not necessary to call when a scene
 // buffer's node is enabled/disabled or obscured by other nodes.
@@ -745,55 +789,56 @@ void wlr_scene_node_for_each_buffer(struct wlr_scene_node *node,
 	scene_node_for_each_scene_buffer(node, 0, 0, user_iterator, user_data);
 }
 
-struct wlr_scene_node *wlr_scene_node_at(struct wlr_scene_node *node,
-		double lx, double ly, double *nx, double *ny) {
-	if (!node->enabled) {
-		return NULL;
-	}
+struct node_at_data {
+	double lx, ly;
+	double rx, ry;
+	struct wlr_scene_node *node;
+};
 
-	// TODO: optimize by storing a bounding box in each node?
-	lx -= node->x;
-	ly -= node->y;
+static bool scene_node_at_iterator(struct wlr_scene_node *node,
+		int lx, int ly, void *data) {
+	struct node_at_data *at_data = data;
 
-	bool intersects = false;
-	switch (node->type) {
-	case WLR_SCENE_NODE_TREE:;
-		struct wlr_scene_tree *scene_tree = scene_tree_from_node(node);
-		struct wlr_scene_node *child;
-		wl_list_for_each_reverse(child, &scene_tree->children, link) {
-			struct wlr_scene_node *node =
-				wlr_scene_node_at(child, lx, ly, nx, ny);
-			if (node != NULL) {
-				return node;
-			}
-		}
-		break;
-	case WLR_SCENE_NODE_RECT:;
-		int width, height;
-		scene_node_get_size(node, &width, &height);
-		intersects = lx >= 0 && lx < width && ly >= 0 && ly < height;
-		break;
-	case WLR_SCENE_NODE_BUFFER:;
+	double rx = at_data->lx - lx;
+	double ry = at_data->ly - ly;
+
+	if (node->type == WLR_SCENE_NODE_BUFFER) {
 		struct wlr_scene_buffer *scene_buffer = wlr_scene_buffer_from_node(node);
 
-		if (scene_buffer->point_accepts_input) {
-			intersects = scene_buffer->point_accepts_input(scene_buffer, lx, ly);
-		} else {
-			int width, height;
-			scene_node_get_size(node, &width, &height);
-			intersects = lx >= 0 && lx < width && ly >= 0 && ly < height;
+		if (scene_buffer->point_accepts_input &&
+				!scene_buffer->point_accepts_input(scene_buffer, rx, ry)) {
+			return false;
 		}
-		break;
 	}
 
-	if (intersects) {
-		if (nx != NULL) {
-			*nx = lx;
+	at_data->rx = rx;
+	at_data->ry = ry;
+	at_data->node = node;
+	return true;
+}
+
+struct wlr_scene_node *wlr_scene_node_at(struct wlr_scene_node *node,
+		double lx, double ly, double *nx, double *ny) {
+	struct wlr_box box = {
+		.x = floor(lx),
+		.y = floor(ly),
+		.width = 1,
+		.height = 1
+	};
+
+	struct node_at_data data = {
+		.lx = lx,
+		.ly = ly
+	};
+
+	if (scene_nodes_in_box(node, &box, scene_node_at_iterator, &data)) {
+		if (nx) {
+			*nx = data.rx;
 		}
-		if (ny != NULL) {
-			*ny = ly;
+		if (ny) {
+			*ny = data.ry;
 		}
-		return node;
+		return data.node;
 	}
 
 	return NULL;

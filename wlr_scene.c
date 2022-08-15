@@ -686,7 +686,7 @@ void wlr_scene_buffer_set_source_box(struct wlr_scene_buffer *scene_buffer,
 		const struct wlr_fbox *box) {
 	struct wlr_fbox *cur = &scene_buffer->src_box;
 	if ((wlr_fbox_empty(box) && wlr_fbox_empty(cur)) ||
-			(box != NULL && memcmp(cur, box, sizeof(*box)) == 0)) {
+			(box != NULL && wlr_fbox_equal(cur, box))) {
 		return;
 	}
 
@@ -1417,7 +1417,7 @@ static bool scene_node_try_direct_scanout(struct wlr_scene_node *node,
 	}
 
 	if (!wlr_fbox_empty(&buffer->src_box) &&
-			memcmp(&buffer->src_box, &default_box, sizeof(default_box)) != 0) {
+			!wlr_fbox_equal(&buffer->src_box, &default_box)) {
 		return false;
 	}
 

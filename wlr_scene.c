@@ -1429,10 +1429,7 @@ static bool scene_node_try_direct_scanout(struct wlr_scene_node *node,
 	wlr_scene_node_coords(node, &node_box.x, &node_box.y);
 	scene_node_get_size(node, &node_box.width, &node_box.height);
 
-	if (node_box.x != box->x ||
-			node_box.y != box->y ||
-			node_box.width != box->width ||
-			node_box.height != box->height) {
+	if (!wlr_box_equal(box, &node_box)) {
 		return false;
 	}
 

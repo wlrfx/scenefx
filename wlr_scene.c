@@ -1322,6 +1322,7 @@ static bool scene_node_invisible(struct wlr_scene_node *node) {
 struct render_list_constructor_data {
 	struct wlr_box box;
 	struct wl_array *render_list;
+	bool calculate_visibility;
 };
 
 static bool construct_render_list_iterator(struct wlr_scene_node *node,
@@ -1335,7 +1336,7 @@ static bool construct_render_list_iterator(struct wlr_scene_node *node,
 	// while rendering, the background should always be black.
 	// If we see a black rect, we can ignore rendering everything under the rect
 	// and even the rect itself.
-	if (node->type == WLR_SCENE_NODE_RECT) {
+	if (node->type == WLR_SCENE_NODE_RECT && data->calculate_visibility) {
 		struct wlr_scene_rect *rect = scene_rect_from_node(node);
 		float *black = (float[4]){ 0.f, 0.f, 0.f, 1.f };
 
@@ -1430,6 +1431,7 @@ bool wlr_scene_output_commit(struct wlr_scene_output *scene_output) {
 	struct render_list_constructor_data list_con = {
 		.box = { .x = scene_output->x, .y = scene_output->y },
 		.render_list = &scene_output->render_list,
+		.calculate_visibility = scene_output->scene->calculate_visibility,
 	};
 	wlr_output_effective_resolution(output,
 		&list_con.box.width, &list_con.box.height);

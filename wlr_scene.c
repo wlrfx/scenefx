@@ -1349,7 +1349,7 @@ static bool construct_render_list_iterator(struct wlr_scene_node *node,
 	// and even the rect itself.
 	if (node->type == WLR_SCENE_NODE_RECT) {
 		struct wlr_scene_rect *rect = scene_rect_from_node(node);
-		float *black = (float[4]){ 1.f, 1.f, 1.f, 1.f };
+		float *black = (float[4]){ 0.f, 0.f, 0.f, 1.f };
 
 		if (memcmp(rect->color, black, sizeof(float) * 4) == 0) {
 			return false;

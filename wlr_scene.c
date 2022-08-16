@@ -234,11 +234,9 @@ static bool _scene_nodes_in_box(struct wlr_scene_node *node, struct wlr_box *box
 	case WLR_SCENE_NODE_BUFFER:;
 		struct wlr_box node_box = { .x = lx, .y = ly };
 		scene_node_get_size(node, &node_box.width, &node_box.height);
-		bool intersects;
 
-		intersects = wlr_box_intersection(&node_box, &node_box, box);
-
-		if (intersects && iterator(node, lx, ly, user_data)) {
+		if (wlr_box_intersection(&node_box, &node_box, box) &&
+				iterator(node, lx, ly, user_data)) {
 			return true;
 		}
 		break;

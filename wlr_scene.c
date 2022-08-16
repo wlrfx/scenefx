@@ -398,15 +398,13 @@ static bool scene_node_update_iterator(struct wlr_scene_node *node,
 	struct wlr_box box = { .x = lx, .y = ly };
 	scene_node_get_size(node, &box.width, &box.height);
 
+	pixman_region32_subtract(&node->visible, &node->visible, data->update_region);
+	pixman_region32_union(&node->visible, &node->visible, data->visible);
+	pixman_region32_intersect_rect(&node->visible, &node->visible,
+		lx, ly, box.width, box.height);
+
 	if (data->calculate_visibility) {
-		pixman_region32_subtract(&node->visible, &node->visible, data->update_region);
-		pixman_region32_union(&node->visible, &node->visible, data->visible);
-		pixman_region32_intersect_rect(&node->visible, &node->visible,
-			lx, ly, box.width, box.height);
 		scene_node_cull_hidden(node, lx, ly, data->visible);
-	} else {
-		pixman_region32_fini(&node->visible);
-		pixman_region32_init_rect(&node->visible, lx, ly, box.width, box.height);
 	}
 
 	update_node_update_outputs(node, data->outputs, NULL);

@@ -13,10 +13,10 @@
 #include <wlr/util/region.h>
 #include "types/wlr_buffer.h"
 #include "types/wlr_scene.h"
+#include "util/array.h"
 #include "util/time.h"
 
 #define HIGHLIGHT_DAMAGE_FADEOUT_TIME 250
-#define RENDER_LIST_MIN_ALLOCATION 8
 
 static struct wlr_scene_tree *scene_tree_from_node(struct wlr_scene_node *node) {
 	assert(node->type == WLR_SCENE_NODE_TREE);
@@ -1276,7 +1276,7 @@ void wlr_scene_output_destroy(struct wlr_scene_output *scene_output) {
 	wl_list_remove(&scene_output->output_damage.link);
 	wl_list_remove(&scene_output->output_needs_frame.link);
 
-	free(scene_output->render_list.data);
+	wl_array_release(&scene_output->render_list);
 	free(scene_output);
 }
 
@@ -1321,18 +1321,9 @@ static bool scene_node_invisible(struct wlr_scene_node *node) {
 	return false;
 }
 
-static size_t max(size_t fst, size_t snd) {
-	if (fst > snd) {
-		return fst;
-	} else {
-		return snd;
-	}
-}
-
 struct render_list_constructor_data {
 	struct wlr_box box;
-	struct wlr_scene_output_render_list *render_list;
-	size_t size;
+	struct wl_array *render_list;
 };
 
 static bool construct_render_list_iterator(struct wlr_scene_node *node,
@@ -1367,22 +1358,11 @@ static bool construct_render_list_iterator(struct wlr_scene_node *node,
 
 	pixman_region32_fini(&intersection);
 
-	if (data->size == data->render_list->capacity) {
-		size_t alloc_size =
-			max(data->render_list->capacity * 2, RENDER_LIST_MIN_ALLOCATION);
-		void *alloc = realloc(data->render_list->data, alloc_size
-			* sizeof(struct wlr_scene_node *));
-
-		if (alloc) {
-			data->render_list->data = alloc;
-			data->render_list->capacity = alloc_size;
-		}
+	struct wlr_scene_node **entry = wl_array_add(data->render_list,
+		sizeof(struct wlr_scene_node *));
+	if (entry) {
+		*entry = node;
 	}
-
-	if (data->size < data->render_list->capacity) {
-		data->render_list->data[data->size++] = node;
-	}
-
 	return false;
 }
 
@@ -1441,21 +1421,6 @@ static bool scene_node_try_direct_scanout(struct wlr_scene_node *node,
 	return wlr_output_commit(output);
 }
 
-static void compact_render_list(struct wlr_scene_output_render_list *list, size_t size) {
-	assert(size <= list->capacity);
-
-	size_t alloc_size = max(RENDER_LIST_MIN_ALLOCATION, size);
-	if (alloc_size == list->capacity) {
-		return;
-	}
-
-	void *alloc = realloc(list->data, alloc_size * sizeof(struct wlr_scene_node *));
-	if (alloc) {
-		list->data = alloc;
-		list->capacity = alloc_size;
-	}
-}
-
 bool wlr_scene_output_commit(struct wlr_scene_output *scene_output) {
 	struct wlr_output *output = scene_output->output;
 	enum wlr_scene_debug_damage_option debug_damage =
@@ -1467,20 +1432,23 @@ bool wlr_scene_output_commit(struct wlr_scene_output *scene_output) {
 	struct render_list_constructor_data list_con = {
 		.box = { .x = scene_output->x, .y = scene_output->y },
 		.render_list = &scene_output->render_list,
-		.size = 0,
 	};
 	wlr_output_effective_resolution(output,
 		&list_con.box.width, &list_con.box.height);
 
+	list_con.render_list->size = 0;
 	scene_nodes_in_box(&scene_output->scene->tree.node, &list_con.box,
 		construct_render_list_iterator, &list_con);
-	compact_render_list(list_con.render_list, list_con.size);
+	array_realloc(list_con.render_list, list_con.render_list->size);
+
+	int list_len = list_con.render_list->size / sizeof(struct wlr_scene_node *);
+	struct wlr_scene_node **list_data = list_con.render_list->data;
 
 	// if there is only one thing to render let's see if that thing can be
 	// directly scanned out
 	bool scanout = false;
-	if (list_con.size == 1) {
-		struct wlr_scene_node *node = list_con.render_list->data[0];
+	if (list_len == 1) {
+		struct wlr_scene_node *node = list_data[0];
 		scanout = scene_node_try_direct_scanout(node, scene_output, &list_con.box);
 	}
 
@@ -1493,7 +1461,7 @@ bool wlr_scene_output_commit(struct wlr_scene_output *scene_output) {
 	}
 
 	if (scanout) {
-		struct wlr_scene_node *node = list_con.render_list->data[0];
+		struct wlr_scene_node *node = list_data[0];
 
 		assert(node->type == WLR_SCENE_NODE_BUFFER);
 		struct wlr_scene_buffer *buffer = wlr_scene_buffer_from_node(node);
@@ -1569,11 +1537,11 @@ bool wlr_scene_output_commit(struct wlr_scene_output *scene_output) {
 		wlr_renderer_clear(renderer, (float[4]){ 0.0, 0.0, 0.0, 1.0 });
 	}
 
-	for (int i = list_con.size - 1; i >= 0; i--) {
-		struct wlr_scene_node *node = list_con.render_list->data[i];
+	for (int i = list_len - 1; i >= 0; i--) {
+		struct wlr_scene_node *node = list_data[i];
 		scene_node_render(node, scene_output, &damage);
 	}
-	
+
 	wlr_renderer_scissor(renderer, NULL);
 
 	if (debug_damage == WLR_SCENE_DEBUG_DAMAGE_HIGHLIGHT) {

@@ -13,7 +13,6 @@
 #include <wlr/util/region.h>
 #include "types/wlr_buffer.h"
 #include "types/wlr_scene.h"
-#include "util/signal.h"
 #include "util/time.h"
 
 #define HIGHLIGHT_DAMAGE_FADEOUT_TIME 250
@@ -83,7 +82,7 @@ void wlr_scene_node_destroy(struct wlr_scene_node *node) {
 	// We want to call the destroy listeners before we do anything else
 	// in case the destroy signal would like to remove children before they
 	// are recursively destroyed.
-	wlr_signal_emit_safe(&node->events.destroy, NULL);
+	wl_signal_emit_mutable(&node->events.destroy, NULL);
 
 	wlr_scene_node_set_enabled(node, false);
 
@@ -96,7 +95,7 @@ void wlr_scene_node_destroy(struct wlr_scene_node *node) {
 			struct wlr_scene_output *scene_output;
 			wl_list_for_each(scene_output, &scene->outputs, link) {
 				if (active & (1ull << scene_output->index)) {
-					wlr_signal_emit_safe(&scene_buffer->events.output_leave,
+					wl_signal_emit_mutable(&scene_buffer->events.output_leave,
 						scene_output);
 				}
 			}
@@ -385,9 +384,9 @@ static void update_node_update_outputs(struct wlr_scene_node *node,
 		bool intersects_before = old_active & mask;
 
 		if (intersects && !intersects_before) {
-			wlr_signal_emit_safe(&scene_buffer->events.output_enter, scene_output);
+			wl_signal_emit_mutable(&scene_buffer->events.output_enter, scene_output);
 		} else if (!intersects && intersects_before) {
-			wlr_signal_emit_safe(&scene_buffer->events.output_leave, scene_output);
+			wl_signal_emit_mutable(&scene_buffer->events.output_leave, scene_output);
 		}
 	}
 }
@@ -723,7 +722,7 @@ void wlr_scene_buffer_set_transform(struct wlr_scene_buffer *scene_buffer,
 void wlr_scene_buffer_send_frame_done(struct wlr_scene_buffer *scene_buffer,
 		struct timespec *now) {
 	if (pixman_region32_not_empty(&scene_buffer->node.visible)) {
-		wlr_signal_emit_safe(&scene_buffer->events.frame_done, now);
+		wl_signal_emit_mutable(&scene_buffer->events.frame_done, now);
 	}
 }
 
@@ -1106,7 +1105,7 @@ static void scene_node_render(struct wlr_scene_node *node,
 		render_texture(output, &render_region, texture, &scene_buffer->src_box,
 			&dst_box, matrix);
 
-		wlr_signal_emit_safe(&scene_buffer->events.output_present, scene_output);
+		wl_signal_emit_mutable(&scene_buffer->events.output_present, scene_output);
 		break;
 	}
 
@@ -1259,7 +1258,7 @@ void wlr_scene_output_destroy(struct wlr_scene_output *scene_output) {
 		return;
 	}
 
-	wlr_signal_emit_safe(&scene_output->events.destroy, NULL);
+	wl_signal_emit_mutable(&scene_output->events.destroy, NULL);
 
 	scene_node_output_update(&scene_output->scene->tree.node,
 		&scene_output->scene->outputs, scene_output);
@@ -1498,7 +1497,7 @@ bool wlr_scene_output_commit(struct wlr_scene_output *scene_output) {
 
 		assert(node->type == WLR_SCENE_NODE_BUFFER);
 		struct wlr_scene_buffer *buffer = wlr_scene_buffer_from_node(node);
-		wlr_signal_emit_safe(&buffer->events.output_present, scene_output);
+		wl_signal_emit_mutable(&buffer->events.output_present, scene_output);
 		return true;
 	}
 

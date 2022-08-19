@@ -14,6 +14,7 @@
 #include "types/wlr_buffer.h"
 #include "types/wlr_scene.h"
 #include "util/array.h"
+#include "util/env.h"
 #include "util/time.h"
 
 #define HIGHLIGHT_DAMAGE_FADEOUT_TIME 250
@@ -150,49 +151,16 @@ struct wlr_scene *wlr_scene_create(void) {
 	wl_list_init(&scene->outputs);
 	wl_list_init(&scene->presentation_destroy.link);
 
-	char *debug_damage = getenv("WLR_SCENE_DEBUG_DAMAGE");
-	if (debug_damage) {
-		wlr_log(WLR_INFO, "Loading WLR_SCENE_DEBUG_DAMAGE option: %s", debug_damage);
-	}
+	const char *debug_damage_options[] = {
+		"none",
+		"rerender",
+		"highlight",
+		NULL
+	};
 
-	if (!debug_damage || strcmp(debug_damage, "none") == 0) {
-		scene->debug_damage_option = WLR_SCENE_DEBUG_DAMAGE_NONE;
-	} else if (strcmp(debug_damage, "rerender") == 0) {
-		scene->debug_damage_option = WLR_SCENE_DEBUG_DAMAGE_RERENDER;
-	} else if (strcmp(debug_damage, "highlight") == 0) {
-		scene->debug_damage_option = WLR_SCENE_DEBUG_DAMAGE_HIGHLIGHT;
-	} else {
-		wlr_log(WLR_ERROR, "Unknown WLR_SCENE_DEBUG_DAMAGE option: %s", debug_damage);
-		scene->debug_damage_option = WLR_SCENE_DEBUG_DAMAGE_NONE;
-	}
-
-	char *disable_direct_scanout = getenv("WLR_SCENE_DISABLE_DIRECT_SCANOUT");
-	if (disable_direct_scanout) {
-		wlr_log(WLR_INFO, "Loading WLR_SCENE_DISABLE_DIRECT_SCANOUT option: %s", disable_direct_scanout);
-	}
-
-	if (!disable_direct_scanout || strcmp(disable_direct_scanout, "0") == 0) {
-		scene->direct_scanout = true;
-	} else if (strcmp(disable_direct_scanout, "1") == 0) {
-		scene->direct_scanout = false;
-	} else {
-		wlr_log(WLR_ERROR, "Unknown WLR_SCENE_DISABLE_DIRECT_SCANOUT option: %s", disable_direct_scanout);
-		scene->direct_scanout = true;
-	}
-
-	char *visibility_disabled = getenv("WLR_SCENE_DISABLE_VISIBILITY");
-	if (visibility_disabled) {
-		wlr_log(WLR_INFO, "Loading WLR_SCENE_DISABLE_VISIBILITY option: %s", visibility_disabled);
-	}
-
-	if (!visibility_disabled || strcmp(visibility_disabled, "0") == 0) {
-		scene->calculate_visibility = true;
-	} else if (strcmp(visibility_disabled, "1") == 0) {
-		scene->calculate_visibility = false;
-	} else {
-		wlr_log(WLR_ERROR, "Unknown WLR_SCENE_DISABLE_VISIBILITY option: %s", visibility_disabled);
-		scene->calculate_visibility = true;
-	}
+	scene->debug_damage_option = env_parse_switch("WLR_SCENE_DEBUG_DAMAGE", debug_damage_options);
+	scene->direct_scanout = !env_parse_bool("WLR_SCENE_DISABLE_DIRECT_SCANOUT");
+	scene->calculate_visibility = !env_parse_bool("WLR_SCENE_DISABLE_VISIBILITY");
 
 	return scene;
 }

@@ -1530,12 +1530,28 @@ bool wlr_scene_output_commit(struct wlr_scene_output *scene_output) {
 
 	wlr_renderer_begin(renderer, output->width, output->height);
 
+	pixman_region32_t background;
+	pixman_region32_copy(&background, &damage);
+
+	// Cull areas of the background that are occluded by opaque regions of
+	// scene nodes above. Those scene nodes will just render atop having us
+	// never see the background.
+	if (scene_output->scene->calculate_visibility) {
+		for (int i = list_len - 1; i >= 0; i--) {
+			struct wlr_scene_node *node = list_data[i];
+			int x, y;
+			wlr_scene_node_coords(node, &x, &y);
+			scene_node_cull_hidden(node, x, y, &background);
+		}
+	}
+
 	int nrects;
-	pixman_box32_t *rects = pixman_region32_rectangles(&damage, &nrects);
+	pixman_box32_t *rects = pixman_region32_rectangles(&background, &nrects);
 	for (int i = 0; i < nrects; ++i) {
 		scissor_output(output, &rects[i]);
 		wlr_renderer_clear(renderer, (float[4]){ 0.0, 0.0, 0.0, 1.0 });
 	}
+	pixman_region32_fini(&background);
 
 	for (int i = list_len - 1; i >= 0; i--) {
 		struct wlr_scene_node *node = list_data[i];

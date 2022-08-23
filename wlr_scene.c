@@ -1272,10 +1272,9 @@ static bool scene_node_invisible(struct wlr_scene_node *node) {
 	if (node->type == WLR_SCENE_NODE_TREE) {
 		return true;
 	} else if (node->type == WLR_SCENE_NODE_RECT) {
-		float *clear = (float[4]){ 0.f, 0.f, 0.f, 0.f };
 		struct wlr_scene_rect *rect = scene_rect_from_node(node);
 
-		return memcmp(rect->color, clear, sizeof(float) * 4) == 0;
+		return rect->color[3] == 0.f;
 	} else if (node->type == WLR_SCENE_NODE_BUFFER) {
 		struct wlr_scene_buffer *buffer = wlr_scene_buffer_from_node(node);
 

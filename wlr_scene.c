@@ -221,8 +221,8 @@ static bool scene_nodes_in_box(struct wlr_scene_node *node, struct wlr_box *box,
 	return _scene_nodes_in_box(node, box, iterator, user_data, x, y);
 }
 
-static void scene_node_cull_hidden(struct wlr_scene_node *node, int x, int y,
-		pixman_region32_t *visible) {
+static void scene_node_opaque_region(struct wlr_scene_node *node, int x, int y,
+		pixman_region32_t *opaque) {
 	if (node->type == WLR_SCENE_NODE_RECT) {
 		struct wlr_scene_rect *scene_rect = scene_rect_from_node(node);
 		if (scene_rect->color[3] != 1) {
@@ -236,19 +236,16 @@ static void scene_node_cull_hidden(struct wlr_scene_node *node, int x, int y,
 		}
 
 		if (!buffer_is_opaque(scene_buffer->buffer)) {
-			pixman_region32_translate(visible, -x, -y);
-			pixman_region32_subtract(visible, visible, &scene_buffer->opaque_region);
-			pixman_region32_translate(visible, x, y);
+			pixman_region32_copy(opaque, &scene_buffer->opaque_region);
+			pixman_region32_translate(opaque, x, y);
 			return;
 		}
 	}
 
 	int width, height;
 	scene_node_get_size(node, &width, &height);
-	pixman_region32_t opaque;
-	pixman_region32_init_rect(&opaque, x, y, width, height);
-	pixman_region32_subtract(visible, visible, &opaque);
-	pixman_region32_fini(&opaque);
+	pixman_region32_fini(opaque);
+	pixman_region32_init_rect(opaque, x, y, width, height);
 }
 
 struct scene_update_data {
@@ -370,7 +367,11 @@ static bool scene_node_update_iterator(struct wlr_scene_node *node,
 		lx, ly, box.width, box.height);
 
 	if (data->calculate_visibility) {
-		scene_node_cull_hidden(node, lx, ly, data->visible);
+		pixman_region32_t opaque;
+		pixman_region32_init(&opaque);
+		scene_node_opaque_region(node, lx, ly, &opaque);
+		pixman_region32_subtract(data->visible, data->visible, &opaque);
+		pixman_region32_fini(&opaque);
 	}
 
 	update_node_update_outputs(node, data->outputs, NULL);
@@ -1507,7 +1508,20 @@ bool wlr_scene_output_commit(struct wlr_scene_output *scene_output) {
 			struct wlr_scene_node *node = list_data[i];
 			int x, y;
 			wlr_scene_node_coords(node, &x, &y);
-			scene_node_cull_hidden(node, x, y, &background);
+
+			// We must only cull opaque regions that are visible by the node.
+			// The node's visibility will have the knowledge of a black rect
+			// that may have been omitted from the render list via the black
+			// rect optimization. In order to ensure we don't cull background
+			// rendering in that black rect region, consider the node's visibility.
+			pixman_region32_t opaque;
+			pixman_region32_init(&opaque);
+			scene_node_opaque_region(node, x, y, &opaque);
+			pixman_region32_intersect(&opaque, &opaque, &node->visible);
+
+			wlr_region_scale(&opaque, &opaque, scene_output->output->scale);
+			pixman_region32_subtract(&background, &background, &opaque);
+			pixman_region32_fini(&opaque);
 		}
 	}
 

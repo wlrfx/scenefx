@@ -1058,7 +1058,7 @@ static void scene_node_render(struct wlr_scene_node *node,
 		struct wlr_renderer *renderer = output->renderer;
 		texture = scene_buffer_get_texture(scene_buffer, renderer);
 		if (texture == NULL) {
-			return;
+			break;
 		}
 
 		transform = wlr_output_transform_invert(scene_buffer->transform);

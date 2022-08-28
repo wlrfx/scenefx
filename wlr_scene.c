@@ -1043,7 +1043,7 @@ static void scene_node_render(struct wlr_scene_node *node,
 	enum wl_output_transform transform;
 	switch (node->type) {
 	case WLR_SCENE_NODE_TREE:
-		/* Root or tree node has nothing to render itself */
+		assert(false);
 		break;
 	case WLR_SCENE_NODE_RECT:;
 		struct wlr_scene_rect *scene_rect = scene_rect_from_node(node);
@@ -1053,9 +1053,7 @@ static void scene_node_render(struct wlr_scene_node *node,
 		break;
 	case WLR_SCENE_NODE_BUFFER:;
 		struct wlr_scene_buffer *scene_buffer = wlr_scene_buffer_from_node(node);
-		if (!scene_buffer->buffer) {
-			return;
-		}
+		assert(scene_buffer->buffer);
 
 		struct wlr_renderer *renderer = output->renderer;
 		texture = scene_buffer_get_texture(scene_buffer, renderer);

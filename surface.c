@@ -84,10 +84,11 @@ static void handle_scene_surface_surface_commit(
 
 	set_buffer_with_surface_state(scene_buffer, surface->surface);
 
-	// Even if the surface hasn't submitted damage, schedule a new frame if
-	// the client has requested a wl_surface.frame callback. Check if the node
-	// is visible. If not, the client will never receive a frame_done event
-	// anyway so it doesn't make sense to schedule here.
+	// If the surface has requested a frame done event, honour that. The
+	// frame_callback_list will be populated in this case. We should only
+	// schedule the frame however if the node is enabled and there is an
+	// output intersecting, otherwise the frame done events would never reach
+	// the surface anyway.
 	int lx, ly;
 	bool enabled = wlr_scene_node_coords(&scene_buffer->node, &lx, &ly);
 

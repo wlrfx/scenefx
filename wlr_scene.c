@@ -1517,6 +1517,7 @@ bool wlr_scene_output_commit(struct wlr_scene_output *scene_output) {
 			scene_node_opaque_region(node, x, y, &opaque);
 			pixman_region32_intersect(&opaque, &opaque, &node->visible);
 
+			pixman_region32_translate(&opaque, -scene_output->x, -scene_output->y);
 			wlr_region_scale(&opaque, &opaque, scene_output->output->scale);
 			pixman_region32_subtract(&background, &background, &opaque);
 			pixman_region32_fini(&opaque);

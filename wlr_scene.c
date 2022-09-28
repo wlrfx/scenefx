@@ -296,7 +296,7 @@ static void update_node_update_outputs(struct wlr_scene_node *node,
 
 	struct wlr_scene_buffer *scene_buffer = wlr_scene_buffer_from_node(node);
 
-	int largest_overlap = 0;
+	uint32_t largest_overlap = 0;
 	scene_buffer->primary_output = NULL;
 
 	uint64_t active_outputs = 0;
@@ -326,8 +326,8 @@ static void update_node_update_outputs(struct wlr_scene_node *node,
 			output_box.x, output_box.y, output_box.width, output_box.height);
 
 		if (pixman_region32_not_empty(&intersection)) {
-			int overlap = region_area(&intersection);
-			if (overlap > largest_overlap) {
+			uint32_t overlap = region_area(&intersection);
+			if (overlap >= largest_overlap) {
 				largest_overlap = overlap;
 				scene_buffer->primary_output = scene_output;
 			}
@@ -352,6 +352,10 @@ static void update_node_update_outputs(struct wlr_scene_node *node,
 			wl_signal_emit_mutable(&scene_buffer->events.output_leave, scene_output);
 		}
 	}
+
+	// if there are active outputs on this node, we should always have a primary
+	// output
+	assert(!scene_buffer->active_outputs || scene_buffer->primary_output);
 }
 
 static bool scene_node_update_iterator(struct wlr_scene_node *node,

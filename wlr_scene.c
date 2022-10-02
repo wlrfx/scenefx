@@ -313,6 +313,10 @@ static void update_node_update_outputs(struct wlr_scene_node *node,
 			continue;
 		}
 
+		if (!scene_output->output->enabled) {
+			continue;
+		}
+
 		struct wlr_box output_box = {
 			.x = scene_output->x,
 			.y = scene_output->y,
@@ -1154,7 +1158,8 @@ static void scene_output_handle_commit(struct wl_listener *listener, void *data)
 
 	if (event->committed & (WLR_OUTPUT_STATE_MODE |
 			WLR_OUTPUT_STATE_TRANSFORM |
-			WLR_OUTPUT_STATE_SCALE)) {
+			WLR_OUTPUT_STATE_SCALE |
+			WLR_OUTPUT_STATE_ENABLED)) {
 		scene_output_update_geometry(scene_output);
 	}
 }

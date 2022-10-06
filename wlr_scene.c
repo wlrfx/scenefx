@@ -625,6 +625,7 @@ void wlr_scene_buffer_set_buffer_with_damage(struct wlr_scene_buffer *scene_buff
 		scene_buffer->transform, buffer->width, buffer->height);
 	pixman_region32_intersect_rect(&trans_damage, &trans_damage,
 		box.x, box.y, box.width, box.height);
+	pixman_region32_translate(&trans_damage, -box.x, -box.y);
 
 	struct wlr_scene *scene = scene_node_get_root(&scene_buffer->node);
 	struct wlr_scene_output *scene_output;

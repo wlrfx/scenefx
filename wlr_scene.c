@@ -552,29 +552,44 @@ void wlr_scene_buffer_set_buffer_with_damage(struct wlr_scene_buffer *scene_buff
 	// coordinates. 
 	assert(buffer || !damage);
 
-	if (buffer != scene_buffer->buffer) {
-		wlr_texture_destroy(scene_buffer->texture);
-		scene_buffer->texture = NULL;
-		wlr_buffer_unlock(scene_buffer->buffer);
-
-		if (buffer) {
-			scene_buffer->buffer = wlr_buffer_lock(buffer);
-		} else {
-			scene_buffer->buffer = NULL;
-		}
-
-		if (!damage) {
-			scene_node_update(&scene_buffer->node, NULL);
-		}
+	if (buffer == scene_buffer->buffer) {
+		return;
 	}
 
-	if (!damage) {
+	bool update = false;
+	wlr_buffer_unlock(scene_buffer->buffer);
+
+	if (buffer) {
+		// if this node used to not be mapped or its previous displayed
+		// buffer region will be different from what the new buffer would
+		// produce we need to update the node.
+		update = !scene_buffer->buffer ||
+			(scene_buffer->dst_width == 0 && scene_buffer->dst_height == 0 &&
+				(scene_buffer->buffer->width != buffer->width ||
+				scene_buffer->buffer->height != buffer->height));
+
+		scene_buffer->buffer = wlr_buffer_lock(buffer);
+	} else {
+		update = true;
+		scene_buffer->buffer = NULL;
+	}
+
+	if (update) {
+		scene_node_update(&scene_buffer->node, NULL);
+		// updating the node will already damage the whole node for us. Return
+		// early to not damage again
 		return;
 	}
 
 	int lx, ly;
 	if (!wlr_scene_node_coords(&scene_buffer->node, &lx, &ly)) {
 		return;
+	}
+
+	pixman_region32_t fallback_damage;
+	pixman_region32_init_rect(&fallback_damage, 0, 0, buffer->width, buffer->height);
+	if (!damage) {
+		damage = &fallback_damage;
 	}
 
 	struct wlr_fbox box = scene_buffer->src_box;
@@ -633,6 +648,7 @@ void wlr_scene_buffer_set_buffer_with_damage(struct wlr_scene_buffer *scene_buff
 	}
 
 	pixman_region32_fini(&trans_damage);
+	pixman_region32_fini(&fallback_damage);
 }
 
 void wlr_scene_buffer_set_buffer(struct wlr_scene_buffer *scene_buffer,

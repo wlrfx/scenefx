@@ -21,19 +21,22 @@
 
 static struct wlr_scene_tree *scene_tree_from_node(struct wlr_scene_node *node) {
 	assert(node->type == WLR_SCENE_NODE_TREE);
-	return (struct wlr_scene_tree *)node;
+	struct wlr_scene_tree *tree = wl_container_of(node, tree, node);
+	return tree;
 }
 
 static struct wlr_scene_rect *scene_rect_from_node(
 		struct wlr_scene_node *node) {
 	assert(node->type == WLR_SCENE_NODE_RECT);
-	return (struct wlr_scene_rect *)node;
+	struct wlr_scene_rect *rect = wl_container_of(node, rect, node);
+	return rect;
 }
 
 struct wlr_scene_buffer *wlr_scene_buffer_from_node(
 		struct wlr_scene_node *node) {
 	assert(node->type == WLR_SCENE_NODE_BUFFER);
-	return (struct wlr_scene_buffer *)node;
+	struct wlr_scene_buffer *buffer = wl_container_of(node, buffer, node);
+	return buffer;
 }
 
 struct wlr_scene *scene_node_get_root(struct wlr_scene_node *node) {

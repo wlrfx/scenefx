@@ -566,6 +566,9 @@ void wlr_scene_buffer_set_buffer_with_damage(struct wlr_scene_buffer *scene_buff
 	bool update = false;
 	wlr_buffer_unlock(scene_buffer->buffer);
 
+	wlr_texture_destroy(scene_buffer->texture);
+	scene_buffer->texture = NULL;
+
 	if (buffer) {
 		// if this node used to not be mapped or its previous displayed
 		// buffer region will be different from what the new buffer would

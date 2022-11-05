@@ -613,15 +613,12 @@ void wlr_scene_buffer_set_buffer_with_damage(struct wlr_scene_buffer *scene_buff
 	if (wlr_fbox_empty(&box)) {
 		box.x = 0;
 		box.y = 0;
-
-		if (scene_buffer->transform & WL_OUTPUT_TRANSFORM_90) {
-			box.width = buffer->height;
-			box.height = buffer->width;
-		} else {
-			box.width = buffer->width;
-			box.height = buffer->height;
-		}
+		box.width = buffer->width;
+		box.height = buffer->height;
 	}
+
+	wlr_fbox_transform(&box, &box, scene_buffer->transform,
+		buffer->width, buffer->height);
 
 	double scale_x, scale_y;
 	if (scene_buffer->dst_width || scene_buffer->dst_height) {

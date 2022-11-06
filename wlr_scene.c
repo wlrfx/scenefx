@@ -620,7 +620,7 @@ void wlr_scene_buffer_set_buffer_with_damage(struct wlr_scene_buffer *scene_buff
 	wlr_fbox_transform(&box, &box, scene_buffer->transform,
 		buffer->width, buffer->height);
 
-	double scale_x, scale_y;
+	float scale_x, scale_y;
 	if (scene_buffer->dst_width || scene_buffer->dst_height) {
 		scale_x = scene_buffer->dst_width / box.width;
 		scale_y = scene_buffer->dst_height / box.height;
@@ -641,10 +641,24 @@ void wlr_scene_buffer_set_buffer_with_damage(struct wlr_scene_buffer *scene_buff
 	struct wlr_scene_output *scene_output;
 	wl_list_for_each(scene_output, &scene->outputs, link) {
 		float output_scale = scene_output->output->scale;
+		float output_scale_x = output_scale * scale_x;
+		float output_scale_y = output_scale * scale_y;
 		pixman_region32_t output_damage;
 		pixman_region32_init(&output_damage);
 		wlr_region_scale_xy(&output_damage, &trans_damage,
-			output_scale * scale_x, output_scale * scale_y);
+			output_scale_x, output_scale_y);
+
+		// One buffer pixel will match (output_scale_x)x(output_scale_y) output
+		// pixels. If max(output_scale_x, output_scale_y) is bigger than 1,
+		// the result will be blurry, and with linear filtering, will bleed into
+		// adjacent (output_scale_x / 2) pixels on X axis and (output_scale_y / 2)
+		// pixels on Y axis. To fix this, the damage region is expanded by largest
+		// distance of the two.
+		float bigger_scale = fmaxf(output_scale_x, output_scale_y);
+		if (bigger_scale > 1.0f) {
+			wlr_region_expand(&output_damage, &output_damage,
+				ceilf(bigger_scale / 2.0f));
+		}
 
 		pixman_region32_t cull_region;
 		pixman_region32_init(&cull_region);
@@ -652,11 +666,6 @@ void wlr_scene_buffer_set_buffer_with_damage(struct wlr_scene_buffer *scene_buff
 		pixman_region32_translate(&cull_region, -lx * output_scale, -ly * output_scale);
 		pixman_region32_intersect(&output_damage, &output_damage, &cull_region);
 		pixman_region32_fini(&cull_region);
-
-		// if we are using fractional scaling add a 1px margin.
-		if (floor(output_scale) != output_scale) {
-			wlr_region_expand(&output_damage, &output_damage, 1);
-		}
 
 		pixman_region32_translate(&output_damage,
 			(lx - scene_output->x) * output_scale,

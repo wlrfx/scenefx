@@ -363,6 +363,12 @@ static struct tinywl_view *desktop_view_at(
 	return tree->node.data;
 }
 
+static void reset_cursor_mode(struct tinywl_server *server) {
+	/* Reset the cursor mode to passthrough. */
+	server->cursor_mode = TINYWL_CURSOR_PASSTHROUGH;
+	server->grabbed_view = NULL;
+}
+
 static void process_cursor_move(struct tinywl_server *server, uint32_t time) {
 	/* Move the grabbed view to the new position. */
 	struct tinywl_view *view = server->grabbed_view;
@@ -515,7 +521,7 @@ static void server_cursor_button(struct wl_listener *listener, void *data) {
 			server->cursor->x, server->cursor->y, &surface, &sx, &sy);
 	if (event->state == WLR_BUTTON_RELEASED) {
 		/* If you released any buttons, we exit interactive move/resize mode. */
-		server->cursor_mode = TINYWL_CURSOR_PASSTHROUGH;
+		reset_cursor_mode(server);
 	} else {
 		/* Focus that client if the button was _pressed_ */
 		focus_view(view, surface);
@@ -635,6 +641,11 @@ static void xdg_toplevel_map(struct wl_listener *listener, void *data) {
 static void xdg_toplevel_unmap(struct wl_listener *listener, void *data) {
 	/* Called when the surface is unmapped, and should no longer be shown. */
 	struct tinywl_view *view = wl_container_of(listener, view, unmap);
+
+	/* Reset the cursor mode if the grabbed view was unmapped. */
+	if (view == view->server->grabbed_view) {
+		reset_cursor_mode(view->server);
+	}
 
 	wl_list_remove(&view->link);
 }

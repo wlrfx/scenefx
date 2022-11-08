@@ -87,6 +87,7 @@ void wlr_scene_node_destroy(struct wlr_scene_node *node) {
 	// in case the destroy signal would like to remove children before they
 	// are recursively destroyed.
 	wl_signal_emit_mutable(&node->events.destroy, NULL);
+	wlr_addon_set_finish(&node->addons);
 
 	wlr_scene_node_set_enabled(node, false);
 
@@ -130,7 +131,6 @@ void wlr_scene_node_destroy(struct wlr_scene_node *node) {
 		}
 	}
 
-	wlr_addon_set_finish(&node->addons);
 	wl_list_remove(&node->link);
 	pixman_region32_fini(&node->visible);
 	free(node);

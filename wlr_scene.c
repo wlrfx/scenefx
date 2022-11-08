@@ -185,7 +185,7 @@ static void scene_node_get_size(struct wlr_scene_node *node, int *lx, int *ly);
 typedef bool (*scene_node_box_iterator_func_t)(struct wlr_scene_node *node,
 	int sx, int sy, void *data);
 
-static bool _scene_nodes_in_box(struct wlr_scene_node *node, struct wlr_box *box, 
+static bool _scene_nodes_in_box(struct wlr_scene_node *node, struct wlr_box *box,
 		scene_node_box_iterator_func_t iterator, void *user_data, int lx, int ly) {
 	if (!node->enabled) {
 		return false;
@@ -216,7 +216,7 @@ static bool _scene_nodes_in_box(struct wlr_scene_node *node, struct wlr_box *box
 	return false;
 }
 
-static bool scene_nodes_in_box(struct wlr_scene_node *node, struct wlr_box *box, 
+static bool scene_nodes_in_box(struct wlr_scene_node *node, struct wlr_box *box,
 		scene_node_box_iterator_func_t iterator, void *user_data) {
 	int x, y;
 	wlr_scene_node_coords(node, &x, &y);
@@ -348,7 +348,7 @@ static void update_node_update_outputs(struct wlr_scene_node *node,
 
 			active_outputs |= 1ull << scene_output->index;
 		}
-		
+
 		pixman_region32_fini(&intersection);
 	}
 
@@ -563,7 +563,7 @@ void wlr_scene_buffer_set_buffer_with_damage(struct wlr_scene_buffer *scene_buff
 		struct wlr_buffer *buffer, pixman_region32_t *damage) {
 	// specifying a region for a NULL buffer doesn't make sense. We need to know
 	// about the buffer to scale the buffer local coordinates down to scene
-	// coordinates. 
+	// coordinates.
 	assert(buffer || !damage);
 
 	if (buffer == scene_buffer->buffer) {

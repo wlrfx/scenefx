@@ -566,10 +566,6 @@ void wlr_scene_buffer_set_buffer_with_damage(struct wlr_scene_buffer *scene_buff
 	// coordinates.
 	assert(buffer || !damage);
 
-	if (buffer == scene_buffer->buffer) {
-		return;
-	}
-
 	bool update = false;
 	wlr_buffer_unlock(scene_buffer->buffer);
 

@@ -65,7 +65,7 @@ static void layer_surface_exclusive_zone(
 	case ZWLR_LAYER_SURFACE_V1_ANCHOR_RIGHT:
 	case (ZWLR_LAYER_SURFACE_V1_ANCHOR_TOP |
 			ZWLR_LAYER_SURFACE_V1_ANCHOR_BOTTOM |
-			ZWLR_LAYER_SURFACE_V1_ANCHOR_RIGHT): // Anchor right
+			ZWLR_LAYER_SURFACE_V1_ANCHOR_RIGHT):
 		// Anchor right
 		usable_area->width -= state->exclusive_zone + state->margin.right;
 		break;

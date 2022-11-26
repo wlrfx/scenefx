@@ -39,6 +39,7 @@ static void layer_surface_exclusive_zone(
 		struct wlr_layer_surface_v1_state *state,
 		struct wlr_box *usable_area) {
 	switch (state->anchor) {
+	case ZWLR_LAYER_SURFACE_V1_ANCHOR_TOP:
 	case (ZWLR_LAYER_SURFACE_V1_ANCHOR_TOP |
 			ZWLR_LAYER_SURFACE_V1_ANCHOR_LEFT |
 			ZWLR_LAYER_SURFACE_V1_ANCHOR_RIGHT):
@@ -46,12 +47,14 @@ static void layer_surface_exclusive_zone(
 		usable_area->y += state->exclusive_zone + state->margin.top;
 		usable_area->height -= state->exclusive_zone + state->margin.top;
 		break;
+	case ZWLR_LAYER_SURFACE_V1_ANCHOR_BOTTOM:
 	case (ZWLR_LAYER_SURFACE_V1_ANCHOR_BOTTOM |
 			ZWLR_LAYER_SURFACE_V1_ANCHOR_LEFT |
 			ZWLR_LAYER_SURFACE_V1_ANCHOR_RIGHT):
 		// Anchor bottom
 		usable_area->height -= state->exclusive_zone + state->margin.bottom;
 		break;
+	case ZWLR_LAYER_SURFACE_V1_ANCHOR_LEFT:
 	case (ZWLR_LAYER_SURFACE_V1_ANCHOR_TOP |
 			ZWLR_LAYER_SURFACE_V1_ANCHOR_BOTTOM |
 			ZWLR_LAYER_SURFACE_V1_ANCHOR_LEFT):
@@ -59,6 +62,7 @@ static void layer_surface_exclusive_zone(
 		usable_area->x += state->exclusive_zone + state->margin.left;
 		usable_area->width -= state->exclusive_zone + state->margin.left;
 		break;
+	case ZWLR_LAYER_SURFACE_V1_ANCHOR_RIGHT:
 	case (ZWLR_LAYER_SURFACE_V1_ANCHOR_TOP |
 			ZWLR_LAYER_SURFACE_V1_ANCHOR_BOTTOM |
 			ZWLR_LAYER_SURFACE_V1_ANCHOR_RIGHT): // Anchor right

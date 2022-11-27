@@ -665,7 +665,8 @@ void wlr_scene_buffer_set_buffer_with_damage(struct wlr_scene_buffer *scene_buff
 
 		pixman_region32_t cull_region;
 		pixman_region32_init(&cull_region);
-		wlr_region_scale(&cull_region, &scene_buffer->node.visible, output_scale);
+		pixman_region32_copy(&cull_region, &scene_buffer->node.visible);
+		scale_output_damage(&cull_region, output_scale);
 		pixman_region32_translate(&cull_region, -lx * output_scale, -ly * output_scale);
 		pixman_region32_intersect(&output_damage, &output_damage, &cull_region);
 		pixman_region32_fini(&cull_region);

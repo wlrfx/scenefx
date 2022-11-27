@@ -644,17 +644,24 @@ void wlr_scene_buffer_set_buffer_with_damage(struct wlr_scene_buffer *scene_buff
 		wlr_region_scale_xy(&output_damage, &trans_damage,
 			output_scale_x, output_scale_y);
 
-		// One buffer pixel will match (output_scale_x)x(output_scale_y) output
-		// pixels. If max(output_scale_x, output_scale_y) is bigger than 1,
-		// the result will be blurry, and with linear filtering, will bleed into
-		// adjacent (output_scale_x / 2) pixels on X axis and (output_scale_y / 2)
-		// pixels on Y axis. To fix this, the damage region is expanded by largest
-		// distance of the two.
-		float bigger_scale = fmaxf(output_scale_x, output_scale_y);
-		if (bigger_scale > 1.0f) {
-			wlr_region_expand(&output_damage, &output_damage,
-				ceilf(bigger_scale / 2.0f));
-		}
+		// One output pixel will match (buffer_scale_x)x(buffer_scale_y) buffer pixels.
+		// If the buffer is upscaled on the given axis (output_scale_* > 1.0,
+		// buffer_scale_* < 1.0), its contents will bleed into adjacent
+		// (ceil(output_scale_* / 2)) output pixels because of linear filtering.
+		// Additionally, if the buffer is downscaled (output_scale_* < 1.0,
+		// buffer_scale_* > 1.0), and one output pixel matches a non-integer number of
+		// buffer pixels, its contents will bleed into neighboring output pixels.
+		// Handle both cases by computing buffer_scale_{x,y} and checking if they are
+		// integer numbers; ceilf() is used to ensure that the distance is at least 1.
+		float buffer_scale_x = 1.0f / output_scale_x;
+		float buffer_scale_y = 1.0f / output_scale_y;
+		int dist_x = floor(buffer_scale_x) != buffer_scale_x ?
+			(int)ceilf(output_scale_x / 2.0f) : 0;
+		int dist_y = floor(buffer_scale_y) != buffer_scale_y ?
+			(int)ceilf(output_scale_y / 2.0f) : 0;
+		// TODO: expand with per-axis distances
+		wlr_region_expand(&output_damage, &output_damage,
+			dist_x >= dist_y ? dist_x : dist_y);
 
 		pixman_region32_t cull_region;
 		pixman_region32_init(&cull_region);

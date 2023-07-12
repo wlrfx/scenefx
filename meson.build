@@ -21,6 +21,7 @@ little_endian = target_machine.endian() == 'little'
 big_endian = target_machine.endian() == 'big'
 
 add_project_arguments([
+	'-O3',
 	'-DWLR_USE_UNSTABLE',
 	'-DWLR_LITTLE_ENDIAN=@0@'.format(little_endian.to_int()),
 	'-DWLR_BIG_ENDIAN=@0@'.format(big_endian.to_int()),
@@ -85,20 +86,6 @@ else
 	)
 endif
 
-features = {
-	'drm-backend': false,
-	'x11-backend': false,
-	'libinput-backend': false,
-	'xwayland': false,
-	'gles2-renderer': false,
-	'vulkan-renderer': false,
-	'gbm-allocator': false,
-}
-internal_features = {
-	'xcb-errors': false,
-	'egl': false,
-}
-
 wayland_project_options = ['tests=false', 'documentation=false']
 wayland_server = dependency('wayland-server',
 	version: '>=1.21',
@@ -108,7 +95,7 @@ wayland_server = dependency('wayland-server',
 
 wlroots_options = [ 'examples=false' ]
 wlroots = dependency('wlroots',
-	version: '0.16.2',
+	version: '>=0.16.2',
 	fallback: 'wayland',
 	default_options: wlroots_options,
 )
@@ -140,8 +127,8 @@ pixman = dependency('pixman-1')
 math = cc.find_library('m')
 rt = cc.find_library('rt')
 
-wlr_files = []
-wlr_deps = [
+scenefx_files = []
+scenefx_deps = [
 	wlroots,
 	wayland_server,
 	drm,
@@ -160,40 +147,25 @@ subdir('util')
 
 subdir('include')
 
-foreach name, have : internal_features
-	add_project_arguments(
-		'-DHAS_@0@=@1@'.format(name.underscorify().to_upper(), have.to_int()),
-		language: 'c',
-	)
-endforeach
-
 scenefx_inc = include_directories('include')
 proto_inc = include_directories('protocol')
 
 lib_scenefx = library(
-	meson.project_name(), wlr_files,
+	meson.project_name(), scenefx_files,
 	soversion: soversion.to_string(),
-	dependencies: wlr_deps,
+	dependencies: scenefx_deps,
 	include_directories:  [ scenefx_inc, proto_inc ],
 	install: true,
 )
 
 
-wlr_vars = {}
-foreach name, have : features
-	wlr_vars += { 'have_' + name.underscorify(): have.to_string() }
-endforeach
-
 scenefx = declare_dependency(
 	link_with: lib_scenefx,
-	dependencies: wlr_deps,
+	dependencies: scenefx_deps,
 	include_directories: scenefx_inc,
-	variables: wlr_vars,
 )
 
 meson.override_dependency('scenefx', scenefx)
-
-summary(features + internal_features, bool_yn: true)
 
 if get_option('examples')
 	# TODO:	subdir('examples')
@@ -206,5 +178,4 @@ pkgconfig.generate(lib_scenefx,
 	filebase: meson.project_name(),
 	name: meson.project_name(),
 	description: 'Wlroots effects library',
-	variables: wlr_vars,
 )

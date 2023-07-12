@@ -1,4 +1,4 @@
-wlr_files += files(
+scenefx_files += files(
 	'scene/subsurface_tree.c',
 	'scene/surface.c',
 	'scene/wlr_scene.c',

@@ -106,6 +106,13 @@ wayland_server = dependency('wayland-server',
 	default_options: wayland_project_options,
 )
 
+wlroots_options = [ 'examples=false' ]
+wlroots = dependency('wlroots',
+	version: '0.16.2',
+	fallback: 'wayland',
+	default_options: wlroots_options,
+)
+
 drm = dependency('libdrm',
 	version: '>=2.4.113',
 	fallback: 'libdrm',
@@ -135,6 +142,7 @@ rt = cc.find_library('rt')
 
 wlr_files = []
 wlr_deps = [
+	wlroots,
 	wayland_server,
 	drm,
 	xkbcommon,
@@ -145,6 +153,7 @@ wlr_deps = [
 ]
 
 subdir('protocol')
+subdir('render')
 
 subdir('types')
 subdir('util')
@@ -158,13 +167,31 @@ foreach name, have : internal_features
 	)
 endforeach
 
-symbols_file = 'wlroots.syms'
-symbols_flag = '-Wl,--version-script,@0@/@1@'.format(meson.current_source_dir(), symbols_file)
+scenefx_inc = include_directories('include')
+proto_inc = include_directories('protocol')
+
+lib_scenefx = library(
+	meson.project_name(), wlr_files,
+	soversion: soversion.to_string(),
+	dependencies: wlr_deps,
+	include_directories:  [ scenefx_inc, proto_inc ],
+	install: true,
+)
+
 
 wlr_vars = {}
 foreach name, have : features
 	wlr_vars += { 'have_' + name.underscorify(): have.to_string() }
 endforeach
+
+scenefx = declare_dependency(
+	link_with: lib_scenefx,
+	dependencies: wlr_deps,
+	include_directories: scenefx_inc,
+	variables: wlr_vars,
+)
+
+meson.override_dependency('scenefx', scenefx)
 
 summary(features + internal_features, bool_yn: true)
 
@@ -172,3 +199,12 @@ if get_option('examples')
 	# TODO:	subdir('examples')
 	subdir('tinywl')
 endif
+
+pkgconfig = import('pkgconfig')
+pkgconfig.generate(lib_scenefx,
+	version: meson.project_version(),
+	filebase: meson.project_name(),
+	name: meson.project_name(),
+	description: 'Wlroots effects library',
+	variables: wlr_vars,
+)

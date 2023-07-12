@@ -19,33 +19,29 @@
         };
 
       targetSystems = [ "aarch64-linux" "x86_64-linux" ];
-    in
-    {
+    in {
       devShells = nixpkgs.lib.genAttrs targetSystems (system:
-        let
-          pkgs = pkgsFor system;
-        in
-        {
+        let pkgs = pkgsFor system;
+        in {
           default = pkgs.mkShell {
             name = "scenefx-shell";
-            depsBuildBuild = with pkgs; [ pkg-config ];
-            inputsFrom = [ pkgs.wlroots_0_16 ];
-
             nativeBuildInputs = with pkgs; [
               cmake
               meson
               ninja
-              pkg-config
-              wayland-scanner
               scdoc
-              hwdata
-            ];
+              pkg-config
 
-#            shellHook = with pkgs; ''(
-#              mkdir -p "$PWD/subprojects"
-#              cd "$PWD/subprojects"
-#              cp -R --no-preserve=mode,ownership ${wlroots_0_16.src} wlroots
-#            )'';
+              wayland
+              wayland-scanner
+              wayland-protocols
+              wlroots_0_16
+              hwdata
+              udev
+              pixman
+              libxkbcommon
+              libdrm
+            ];
           };
         });
     };

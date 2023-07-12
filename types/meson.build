@@ -5,4 +5,5 @@ wlr_files += files(
 	'scene/output_layout.c',
 	'scene/xdg_shell.c',
 	'scene/layer_shell_v1.c',
+	'buffer/buffer.c',
 )

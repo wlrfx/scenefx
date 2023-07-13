@@ -1,7 +1,7 @@
 #include "wlr/util/log.h"
-#include "fx_renderer/fx_framebuffer.h"
-#include "fx_renderer/fx_stencilbuffer.h"
-#include "fx_renderer/fx_texture.h"
+#include "render/fx_renderer/fx_framebuffer.h"
+#include "render/fx_renderer/fx_stencilbuffer.h"
+#include "render/fx_renderer/fx_texture.h"
 
 struct fx_framebuffer fx_framebuffer_create(void) {
 	return (struct fx_framebuffer) {

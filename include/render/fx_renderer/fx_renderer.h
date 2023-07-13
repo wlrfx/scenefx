@@ -6,8 +6,8 @@
 #include <stdbool.h>
 #include <wlr/render/egl.h>
 
-#include "fx_renderer/fx_framebuffer.h"
-#include "fx_renderer/fx_texture.h"
+#include "render/fx_renderer/fx_framebuffer.h"
+#include "render/fx_renderer/fx_texture.h"
 #include "wlr/util/box.h"
 
 enum corner_location { TOP_LEFT, TOP_RIGHT, BOTTOM_RIGHT, BOTTOM_LEFT, ALL, NONE };

@@ -1,7 +1,7 @@
 #include <assert.h>
 #include <wlr/render/gles2.h>
 
-#include "fx_renderer/fx_stencilbuffer.h"
+#include "render/fx_renderer/fx_stencilbuffer.h"
 
 struct fx_stencilbuffer fx_stencilbuffer_create(void) {
 	return (struct fx_stencilbuffer) {

@@ -11,8 +11,8 @@
 #include <wlr/types/wlr_scene.h>
 #include <wlr/util/log.h>
 #include <wlr/util/region.h>
-#include "fx_renderer/fx_renderer.h"
-#include "fx_renderer/fx_texture.h"
+#include "render/fx_renderer/fx_renderer.h"
+#include "render/fx_renderer/fx_texture.h"
 #include "types/wlr_buffer.h"
 #include "types/wlr_scene.h"
 #include "util/array.h"

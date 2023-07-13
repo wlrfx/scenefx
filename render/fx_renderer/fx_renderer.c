@@ -14,9 +14,9 @@
 #include <wlr/util/box.h>
 
 #include "wlr/util/log.h"
-#include "fx_renderer/fx_framebuffer.h"
-#include "fx_renderer/fx_renderer.h"
-#include "fx_renderer/matrix.h"
+#include "render/fx_renderer/fx_framebuffer.h"
+#include "render/fx_renderer/fx_renderer.h"
+#include "render/fx_renderer/matrix.h"
 // #include "sway/server.h"
 
 // shaders

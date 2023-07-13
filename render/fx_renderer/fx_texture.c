@@ -1,7 +1,7 @@
 #include <assert.h>
 #include <wlr/render/gles2.h>
 
-#include "fx_renderer/fx_texture.h"
+#include "render/fx_renderer/fx_texture.h"
 
 struct fx_texture fx_texture_create(void) {
 	return (struct fx_texture) {

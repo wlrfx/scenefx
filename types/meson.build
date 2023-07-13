@@ -7,14 +7,3 @@ wlr_files += files(
 	'scene/layer_shell_v1.c',
 	'buffer/buffer.c',
 )
-
-# Fx Renderer
-wlr_files += files(
-	'fx_renderer/matrix.c',
-	'fx_renderer/fx_texture.c',
-	'fx_renderer/fx_stencilbuffer.c',
-	'fx_renderer/fx_renderer.c',
-	'fx_renderer/fx_framebuffer.c',
-)
-
-subdir('fx_renderer/shaders')

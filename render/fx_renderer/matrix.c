@@ -2,7 +2,7 @@
 #include <string.h>
 #include <wlr/types/wlr_output.h>
 
-#include "fx_renderer/matrix.h"
+#include "render/fx_renderer/matrix.h"
 
 static const float transforms[][9] = {
 	[WL_OUTPUT_TRANSFORM_NORMAL] = {

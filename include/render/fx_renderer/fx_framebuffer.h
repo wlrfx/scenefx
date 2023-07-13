@@ -5,8 +5,8 @@
 #include <stdbool.h>
 #include <wlr/types/wlr_output.h>
 
-#include "fx_renderer/fx_stencilbuffer.h"
-#include "fx_renderer/fx_texture.h"
+#include "render/fx_renderer/fx_stencilbuffer.h"
+#include "render/fx_renderer/fx_texture.h"
 
 struct fx_framebuffer {
 	GLuint fb;

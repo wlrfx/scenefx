@@ -767,6 +767,7 @@ static struct fx_texture scene_buffer_get_texture(
 
 	struct wlr_texture *texture =
 		wlr_texture_from_buffer(renderer, scene_buffer->buffer);
+	scene_buffer->texture = texture;
 	return fx_texture_from_wlr_texture(texture);
 }
 
@@ -1598,7 +1599,7 @@ bool wlr_scene_output_commit(struct wlr_scene_output *scene_output) {
 			wlr_output_transform_invert(output->transform),
 			monitor_box.width, monitor_box.height);
 
-	fx_renderer_begin(renderer, monitor_box.width, monitor_box.height);
+	fx_renderer_begin(renderer, output, monitor_box.width, monitor_box.height);
 
 	pixman_region32_t background;
 	pixman_region32_init(&background);
@@ -1644,7 +1645,7 @@ bool wlr_scene_output_commit(struct wlr_scene_output *scene_output) {
 	pixman_box32_t *rects = pixman_region32_rectangles(&background, &nrects);
 	for (int i = 0; i < nrects; ++i) {
 		scissor_output(output, &rects[i]);
-		// TODO: Remove later, only used for better contrast
+		// TODO: Change color later, only used for better contrast
 		fx_renderer_clear((float[4]){ 1.0, 1.0, 1.0, 1.0 });
 	}
 	pixman_region32_fini(&background);

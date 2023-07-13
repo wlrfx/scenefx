@@ -409,19 +409,14 @@ void fx_renderer_fini(struct fx_renderer *renderer) {
 	fx_framebuffer_release(&renderer->effects_buffer_swapped);
 }
 
-void fx_renderer_begin(struct fx_renderer *renderer, int width, int height) {
+void fx_renderer_begin(struct fx_renderer *renderer, struct wlr_output *output,
+		int width, int height) {
 	glViewport(0, 0, width, height);
 	renderer->viewport_width = width;
 	renderer->viewport_height = height;
 
 	// Store the wlr framebuffer
-	GLint wlr_fb = -1;
-	glGetIntegerv(GL_FRAMEBUFFER_BINDING, &wlr_fb);
-	if (wlr_fb < 0) {
-		wlr_log(WLR_ERROR, "Failed to get wlr framebuffer!");
-		abort();
-	}
-	renderer->wlr_buffer.fb = wlr_fb;
+	renderer->wlr_buffer.fb = wlr_gles2_renderer_get_current_fbo(output->renderer);
 
 	// Create the framebuffers
 	fx_framebuffer_update(&renderer->main_buffer, width, height);
@@ -508,7 +503,7 @@ bool fx_render_subtexture_with_matrix(struct fx_renderer *renderer, struct fx_te
 
 	glUseProgram(shader->program);
 
-	float* dim_color = deco_data.dim_color;
+	float *dim_color = deco_data.dim_color;
 
 	glUniformMatrix3fv(shader->proj, 1, GL_FALSE, gl_matrix);
 	glUniform1i(shader->tex, 0);

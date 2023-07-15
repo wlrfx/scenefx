@@ -37,42 +37,6 @@ struct decoration_data {
 	bool shadow;
 };
 
-struct blur_shader {
-	GLuint program;
-	GLint proj;
-	GLint tex;
-	GLint pos_attrib;
-	GLint tex_attrib;
-	GLint radius;
-	GLint halfpixel;
-};
-
-struct box_shadow_shader {
-	GLuint program;
-	GLint proj;
-	GLint color;
-	GLint pos_attrib;
-	GLint position;
-	GLint size;
-	GLint blur_sigma;
-	GLint corner_radius;
-};
-
-struct corner_shader {
-	GLuint program;
-	GLint proj;
-	GLint color;
-	GLint pos_attrib;
-	GLint is_top_left;
-	GLint is_top_right;
-	GLint is_bottom_left;
-	GLint is_bottom_right;
-	GLint position;
-	GLint radius;
-	GLint half_size;
-	GLint half_thickness;
-};
-
 struct quad_shader {
 	GLuint program;
 	GLint proj;
@@ -86,16 +50,6 @@ struct rounded_quad_shader {
 	GLint color;
 	GLint pos_attrib;
 	GLint size;
-	GLint position;
-	GLint radius;
-};
-
-struct stencil_mask_shader {
-	GLuint program;
-	GLint proj;
-	GLint color;
-	GLint pos_attrib;
-	GLint half_size;
 	GLint position;
 	GLint radius;
 };
@@ -125,12 +79,6 @@ struct fx_renderer {
 
 	struct fx_framebuffer wlr_buffer; // Just the framebuffer used by wlroots
 	struct fx_framebuffer main_buffer; // The main FB used for rendering
-	struct fx_framebuffer blur_buffer; // Contains the blurred background for tiled windows
-	// Blur swaps between the two effects buffers everytime it scales the image
-	struct fx_framebuffer effects_buffer; // Buffer used for effects
-	struct fx_framebuffer effects_buffer_swapped; // Swap buffer used for effects
-
-	bool blur_buffer_dirty;
 
 	struct {
 		bool OES_egl_image_external;
@@ -141,17 +89,12 @@ struct fx_renderer {
 	} procs;
 
 	struct {
-		struct box_shadow_shader box_shadow;
-		struct blur_shader blur1;
-		struct blur_shader blur2;
-		struct corner_shader corner;
 		struct quad_shader quad;
 		struct rounded_quad_shader rounded_quad;
 		struct rounded_quad_shader rounded_tl_quad;
 		struct rounded_quad_shader rounded_tr_quad;
 		struct rounded_quad_shader rounded_bl_quad;
 		struct rounded_quad_shader rounded_br_quad;
-		struct stencil_mask_shader stencil_mask;
 		struct tex_shader tex_rgba;
 		struct tex_shader tex_rgbx;
 		struct tex_shader tex_ext;
@@ -184,17 +127,5 @@ void fx_render_rect(struct fx_renderer *renderer, const struct wlr_box *box,
 void fx_render_rounded_rect(struct fx_renderer *renderer, const struct wlr_box *box,
 		const float color[static 4], const float matrix[static 9], int radius,
 		enum corner_location corner_location);
-
-void fx_render_border_corner(struct fx_renderer *renderer, const struct wlr_box *box,
-		const float color[static 4], const float matrix[static 9],
-		enum corner_location corner_location, int radius, int border_thickness);
-
-void fx_render_box_shadow(struct fx_renderer *renderer, const struct wlr_box *box,
-		const float color[static 4], const float matrix[static 9], int radius,
-		float blur_sigma);
-
-void fx_render_blur(struct fx_renderer *renderer, const float matrix[static 9],
-		struct fx_framebuffer **buffer, struct blur_shader *shader, const struct wlr_box *box,
-		int blur_radius);
 
 #endif

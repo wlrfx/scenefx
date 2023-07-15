@@ -8,6 +8,7 @@
 
 #include "render/fx_renderer/fx_framebuffer.h"
 #include "render/fx_renderer/fx_texture.h"
+#include "types/decoration_data.h"
 #include "wlr/util/box.h"
 
 enum corner_location { TOP_LEFT, TOP_RIGHT, BOTTOM_RIGHT, BOTTOM_LEFT, ALL, NONE };
@@ -24,17 +25,6 @@ enum fx_rounded_quad_shader_source {
 	SHADER_SOURCE_QUAD_ROUND_TOP_RIGHT = 3,
 	SHADER_SOURCE_QUAD_ROUND_BOTTOM_RIGHT = 4,
 	SHADER_SOURCE_QUAD_ROUND_BOTTOM_LEFT = 5,
-};
-
-struct decoration_data {
-	float alpha;
-	float saturation;
-	int corner_radius;
-	float dim;
-	float *dim_color;
-	bool has_titlebar;
-	bool blur;
-	bool shadow;
 };
 
 struct blur_shader {
@@ -157,8 +147,6 @@ struct fx_renderer {
 		struct tex_shader tex_ext;
 	} shaders;
 };
-
-struct decoration_data get_undecorated_decoration_data(void);
 
 struct fx_renderer *fx_renderer_create(struct wlr_egl *egl);
 

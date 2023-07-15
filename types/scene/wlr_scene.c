@@ -2,6 +2,7 @@
 #include <assert.h>
 #include <stdlib.h>
 #include <string.h>
+#include <types/decoration_data.h>
 #include <wlr/backend.h>
 #include <wlr/render/gles2.h>
 #include <wlr/types/wlr_compositor.h>
@@ -9,6 +10,7 @@
 #include <wlr/types/wlr_matrix.h>
 #include <wlr/types/wlr_presentation_time.h>
 #include <wlr/types/wlr_scene.h>
+#include <wlr/types/wlr_subcompositor.h>
 #include <wlr/util/log.h>
 #include <wlr/util/region.h>
 #include "render/fx_renderer/fx_renderer.h"
@@ -1085,7 +1087,8 @@ static void render_whole_output(struct fx_renderer *renderer, struct wlr_output 
 	float matrix[9];
 	wlr_matrix_project_box(matrix, &monitor_box, transform, 0.0, output->transform_matrix);
 
-	render_texture(renderer, output, output_damage, texture, NULL, &monitor_box, matrix, get_undecorated_decoration_data());
+	render_texture(renderer, output, output_damage, texture, NULL, &monitor_box,
+			matrix, decoration_data_get_undecorated());
 }
 
 static void scene_node_render(struct fx_renderer *fx_renderer, struct wlr_scene_node *node,
@@ -1139,7 +1142,18 @@ static void scene_node_render(struct fx_renderer *fx_renderer, struct wlr_scene_
 		wlr_matrix_project_box(matrix, &dst_box, transform, 0.0,
 			output->transform_matrix);
 
-		struct decoration_data deco_data = get_undecorated_decoration_data();
+		struct wlr_scene_surface * scene_surface
+			= wlr_scene_surface_from_buffer(scene_buffer);
+		bool is_subsurface = wlr_surface_is_subsurface(scene_surface->surface);
+
+		struct decoration_data deco_data = decoration_data_get_undecorated();
+		if (!is_subsurface) {
+			struct decoration_data *_deco_data;
+			if ((_deco_data = wlr_scene_node_decoration_data_get(scene_buffer))) {
+				memcpy(&deco_data, _deco_data, sizeof(struct decoration_data));
+			}
+		}
+
 		render_texture(fx_renderer, output, &render_region, &texture, &scene_buffer->src_box,
 			&dst_box, matrix, deco_data);
 
@@ -1647,7 +1661,7 @@ bool wlr_scene_output_commit(struct wlr_scene_output *scene_output) {
 	for (int i = 0; i < nrects; ++i) {
 		scissor_output(output, &rects[i]);
 		// TODO: Change color later, only used for better contrast
-		fx_renderer_clear((float[4]){ 1.0, 1.0, 1.0, 1.0 });
+		fx_renderer_clear((float[4]){ 0.0, 0.0, 0.0, 1.0 });
 	}
 	pixman_region32_fini(&background);
 

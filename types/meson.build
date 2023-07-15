@@ -7,3 +7,8 @@ wlr_files += files(
 	'scene/layer_shell_v1.c',
 	'buffer/buffer.c',
 )
+
+# Fx files
+wlr_files += files(
+	'decoration_data.c'
+)

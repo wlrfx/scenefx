@@ -5,8 +5,10 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <time.h>
+#include <types/decoration_data.h>
 #include <unistd.h>
 #include <wayland-server-core.h>
+#include <wayland-util.h>
 #include <wlr/backend.h>
 #include <wlr/render/allocator.h>
 #include <wlr/render/wlr_renderer.h>
@@ -778,6 +780,11 @@ static void server_new_xdg_surface(struct wl_listener *listener, void *data) {
 			&view->server->scene->tree, view->xdg_toplevel->base);
 	view->scene_tree->node.data = view;
 	xdg_surface->data = view->scene_tree;
+
+	/* Set the scene_nodes decoration_data */
+	struct decoration_data deco_data = decoration_data_get_undecorated();
+	deco_data.corner_radius = 20;
+	wlr_scene_node_decoration_data_init(&view->scene_tree->node, deco_data);
 
 	/* Listen to the various events it can emit */
 	view->map.notify = xdg_toplevel_map;

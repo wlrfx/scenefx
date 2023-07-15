@@ -38,22 +38,6 @@ static const GLfloat verts[] = {
 	0, 1, // bottom left
 };
 
-static float default_dim_color[] = {0.0f, 0.0f, 0.0f, 1.0f};
-
-struct decoration_data get_undecorated_decoration_data(void) {
-	return (struct decoration_data) {
-		.alpha = 1.0f,
-		.dim = 0.0f,
-		// TODO: change to config variable?
-		.dim_color = default_dim_color,
-		.corner_radius = 12,
-		.saturation = 1.0f,
-		.has_titlebar = false,
-		.blur = false,
-		.shadow = false,
-	};
-}
-
 static GLuint compile_shader(GLuint type, const GLchar *src) {
 	GLuint shader = glCreateShader(type);
 	glShaderSource(shader, 1, &src, NULL);

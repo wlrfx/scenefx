@@ -784,7 +784,7 @@ static void server_new_xdg_surface(struct wl_listener *listener, void *data) {
 	/* Set the scene_nodes decoration_data */
 	struct decoration_data deco_data = decoration_data_get_undecorated();
 	deco_data.corner_radius = 20;
-	wlr_scene_node_decoration_data_init(&view->scene_tree->node, deco_data);
+	wlr_scene_tree_decoration_data_init(&view->scene_tree->node, deco_data);
 
 	/* Listen to the various events it can emit */
 	view->map.notify = xdg_toplevel_map;

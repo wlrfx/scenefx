@@ -31,10 +31,10 @@ struct decoration_data {
 
 struct decoration_data decoration_data_get_undecorated(void);
 
-void wlr_scene_node_decoration_data_init(struct wlr_scene_node *scene_node,
+void wlr_scene_tree_decoration_data_init(struct wlr_scene_node *scene_node,
 		struct decoration_data decoration_data);
 
-struct decoration_data *wlr_scene_node_decoration_data_get(
-		struct wlr_scene_buffer *scene_buffer);
+struct decoration_data *wlr_scene_tree_decoration_data_get(
+		struct wlr_scene_tree *scene_tree);
 
 #endif

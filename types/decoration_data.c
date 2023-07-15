@@ -27,7 +27,7 @@ static const struct wlr_addon_interface decoration_data_addon_impl = {
 	.destroy = decoration_data_handle_destroy,
 };
 
-void wlr_scene_node_decoration_data_init(struct wlr_scene_node *scene_node,
+void wlr_scene_tree_decoration_data_init(struct wlr_scene_node *scene_node,
 		struct decoration_data decoration_data) {
 	if (!scene_node) {
 		wlr_log(WLR_ERROR, "wlr_scene_node is NULL, cannot add decoration_data");
@@ -41,17 +41,12 @@ void wlr_scene_node_decoration_data_init(struct wlr_scene_node *scene_node,
 			&decoration_data_addon_impl);
 }
 
-struct decoration_data *wlr_scene_node_decoration_data_get(
-		struct wlr_scene_buffer *scene_buffer) {
+struct decoration_data *wlr_scene_tree_decoration_data_get(
+		struct wlr_scene_tree *scene_tree) {
 	/* Get the client tree */
-	struct wlr_scene_node *node = &scene_buffer->node;
-	// TODO: Better way of getting the client tree?
-	assert(node->parent);
-	assert(node->parent->node.parent);
-	node = &node->parent->node.parent->node;
-
-	struct wlr_addon *addon = wlr_addon_find(&node->addons, node,
-			&decoration_data_addon_impl);
+	struct wlr_scene_node *node = &scene_tree->node;
+	struct wlr_addon *addon = wlr_addon_find(&node->addons,
+			scene_tree, &decoration_data_addon_impl);
 	if (!addon) {
 		return NULL;
 	}

@@ -3,6 +3,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <types/decoration_data.h>
+#include <types/subsurface_tree.h>
 #include <wlr/backend.h>
 #include <wlr/render/gles2.h>
 #include <wlr/types/wlr_compositor.h>
@@ -28,6 +29,18 @@ static struct wlr_box get_monitor_box(struct wlr_output *output) {
 	wlr_output_transformed_resolution(output, &width, &height);
 	struct wlr_box monitor_box = { 0, 0, width, height };
 	return monitor_box;
+}
+
+/* TODO: Rename */
+static struct wlr_scene_tree *client_node_from_scene_buffer(
+		struct wlr_scene_buffer *buffer) {
+	struct wlr_scene_tree *tree = buffer->node.parent;
+	struct wlr_scene_subsurface_tree *subsurface_tree =
+		wl_container_of(tree, subsurface_tree, tree);
+	if (!subsurface_tree) {
+		return NULL;
+	}
+	return tree->node.parent;
 }
 
 static struct wlr_scene_tree *scene_tree_from_node(struct wlr_scene_node *node) {
@@ -1148,8 +1161,10 @@ static void scene_node_render(struct fx_renderer *fx_renderer, struct wlr_scene_
 
 		struct decoration_data deco_data = decoration_data_get_undecorated();
 		if (!is_subsurface) {
+			struct wlr_scene_tree *_client_tree;
 			struct decoration_data *_deco_data;
-			if ((_deco_data = wlr_scene_node_decoration_data_get(scene_buffer))) {
+			if ((_client_tree = client_node_from_scene_buffer(scene_buffer)) &&
+				(_deco_data = wlr_scene_tree_decoration_data_get(_client_tree))) {
 				memcpy(&deco_data, _deco_data, sizeof(struct decoration_data));
 			}
 		}

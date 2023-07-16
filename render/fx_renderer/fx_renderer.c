@@ -12,17 +12,14 @@
 #include <wlr/render/gles2.h>
 #include <wlr/types/wlr_matrix.h>
 #include <wlr/util/box.h>
-#include "wlr/util/log.h"
+#include <wlr/util/log.h>
 
-#include "wlr/util/log.h"
-#include "render/fx_renderer/fx_framebuffer.h"
 #include "render/fx_renderer/fx_renderer.h"
 #include "render/fx_renderer/matrix.h"
 
 // shaders
 #include "common_vert_src.h"
 #include "quad_frag_src.h"
-#include "quad_round_frag_src.h"
 #include "tex_frag_src.h"
 
 static const GLfloat verts[] = {
@@ -31,22 +28,6 @@ static const GLfloat verts[] = {
 	1, 1, // bottom right
 	0, 1, // bottom left
 };
-
-static float default_dim_color[] = {0.0f, 0.0f, 0.0f, 1.0f};
-
-struct decoration_data get_undecorated_decoration_data(void) {
-	return (struct decoration_data) {
-		.alpha = 1.0f,
-		.dim = 0.0f,
-		// TODO: change to config variable?
-		.dim_color = default_dim_color,
-		.corner_radius = 12,
-		.saturation = 1.0f,
-		.has_titlebar = false,
-		.blur = false,
-		.shadow = false,
-	};
-}
 
 static GLuint compile_shader(GLuint type, const GLchar *src) {
 	GLuint shader = glCreateShader(type);
@@ -115,28 +96,6 @@ static bool link_quad_program(struct quad_shader *shader) {
 	return true;
 }
 
-static bool link_rounded_quad_program(struct rounded_quad_shader *shader,
-		enum fx_rounded_quad_shader_source source) {
-	GLchar quad_src[2048];
-	snprintf(quad_src, sizeof(quad_src),
-		"#define SOURCE %d\n%s", source, quad_round_frag_src);
-
-	GLuint prog;
-	shader->program = prog = link_program(quad_src);
-	if (!shader->program) {
-		return false;
-	}
-
-	shader->proj = glGetUniformLocation(prog, "proj");
-	shader->color = glGetUniformLocation(prog, "color");
-	shader->pos_attrib = glGetAttribLocation(prog, "pos");
-	shader->size = glGetUniformLocation(prog, "size");
-	shader->position = glGetUniformLocation(prog, "position");
-	shader->radius = glGetUniformLocation(prog, "radius");
-
-	return true;
-}
-
 static bool link_tex_program(struct tex_shader *shader,
 		enum fx_tex_shader_source source) {
 	GLchar frag_src[2048];
@@ -152,15 +111,11 @@ static bool link_tex_program(struct tex_shader *shader,
 	shader->proj = glGetUniformLocation(prog, "proj");
 	shader->tex = glGetUniformLocation(prog, "tex");
 	shader->alpha = glGetUniformLocation(prog, "alpha");
-	shader->dim = glGetUniformLocation(prog, "dim");
-	shader->dim_color = glGetUniformLocation(prog, "dim_color");
 	shader->pos_attrib = glGetAttribLocation(prog, "pos");
 	shader->tex_attrib = glGetAttribLocation(prog, "texcoord");
 	shader->size = glGetUniformLocation(prog, "size");
 	shader->position = glGetUniformLocation(prog, "position");
 	shader->radius = glGetUniformLocation(prog, "radius");
-	shader->saturation = glGetUniformLocation(prog, "saturation");
-	shader->has_titlebar = glGetUniformLocation(prog, "has_titlebar");
 
 	return true;
 }
@@ -215,7 +170,7 @@ struct fx_renderer *fx_renderer_create(struct wlr_egl *egl) {
 		return NULL;
 	}
 
-	wlr_log(WLR_INFO, "Creating swayfx GLES2 renderer");
+	wlr_log(WLR_INFO, "Creating scenefx GLES2 renderer");
 	wlr_log(WLR_INFO, "Using %s", glGetString(GL_VERSION));
 	wlr_log(WLR_INFO, "GL vendor: %s", glGetString(GL_VENDOR));
 	wlr_log(WLR_INFO, "GL renderer: %s", glGetString(GL_RENDERER));
@@ -230,27 +185,6 @@ struct fx_renderer *fx_renderer_create(struct wlr_egl *egl) {
 
 	// quad fragment shader
 	if (!link_quad_program(&renderer->shaders.quad)) {
-		goto error;
-	}
-	// rounded quad fragment shaders
-	if (!link_rounded_quad_program(&renderer->shaders.rounded_quad,
-			SHADER_SOURCE_QUAD_ROUND)) {
-		goto error;
-	}
-	if (!link_rounded_quad_program(&renderer->shaders.rounded_tl_quad,
-			SHADER_SOURCE_QUAD_ROUND_TOP_LEFT)) {
-		goto error;
-	}
-	if (!link_rounded_quad_program(&renderer->shaders.rounded_tr_quad,
-			SHADER_SOURCE_QUAD_ROUND_TOP_RIGHT)) {
-		goto error;
-	}
-	if (!link_rounded_quad_program(&renderer->shaders.rounded_bl_quad,
-			SHADER_SOURCE_QUAD_ROUND_BOTTOM_LEFT)) {
-		goto error;
-	}
-	if (!link_rounded_quad_program(&renderer->shaders.rounded_br_quad,
-			SHADER_SOURCE_QUAD_ROUND_BOTTOM_RIGHT)) {
 		goto error;
 	}
 	// fragment shaders
@@ -275,11 +209,6 @@ struct fx_renderer *fx_renderer_create(struct wlr_egl *egl) {
 
 error:
 	glDeleteProgram(renderer->shaders.quad.program);
-	glDeleteProgram(renderer->shaders.rounded_quad.program);
-	glDeleteProgram(renderer->shaders.rounded_bl_quad.program);
-	glDeleteProgram(renderer->shaders.rounded_br_quad.program);
-	glDeleteProgram(renderer->shaders.rounded_tl_quad.program);
-	glDeleteProgram(renderer->shaders.rounded_tr_quad.program);
 	glDeleteProgram(renderer->shaders.tex_rgba.program);
 	glDeleteProgram(renderer->shaders.tex_rgbx.program);
 	glDeleteProgram(renderer->shaders.tex_ext.program);
@@ -297,24 +226,11 @@ error:
 }
 
 void fx_renderer_fini(struct fx_renderer *renderer) {
-	fx_framebuffer_release(&renderer->main_buffer);
+	// NO OP
 }
 
-void fx_renderer_begin(struct fx_renderer *renderer, struct wlr_output *output,
-		int width, int height) {
-	glViewport(0, 0, width, height);
-	renderer->viewport_width = width;
-	renderer->viewport_height = height;
-
-	// Store the wlr framebuffer
-	renderer->wlr_buffer.fb = wlr_gles2_renderer_get_current_fbo(output->renderer);
-
-	// Create the framebuffers
-	fx_framebuffer_update(&renderer->main_buffer, width, height);
-
-	// Add a stencil buffer to the main buffer & bind the main buffer
-	fx_framebuffer_bind(&renderer->main_buffer);
-	fx_framebuffer_add_stencil_buffer(&renderer->main_buffer, width, height);
+void fx_renderer_begin(struct fx_renderer *renderer, struct wlr_output *output) {
+	glViewport(0, 0, output->width, output->height);
 
 	// refresh projection matrix
 	matrix_projection(renderer->projection, width, height,
@@ -341,15 +257,19 @@ void fx_renderer_scissor(struct wlr_box *box) {
 	}
 }
 
-bool fx_render_subtexture_with_matrix(struct fx_renderer *renderer, struct fx_texture *fx_texture,
+bool fx_render_subtexture_with_matrix(struct fx_renderer *renderer, struct wlr_texture *wlr_texture,
 		const struct wlr_fbox *src_box, const struct wlr_box *dst_box, const float matrix[static 9],
 		struct decoration_data deco_data) {
 
+	assert(wlr_texture_is_gles2(wlr_texture));
+	struct wlr_gles2_texture_attribs texture_attrs;
+	wlr_gles2_texture_get_attribs(wlr_texture, &texture_attrs);
+
 	struct tex_shader *shader = NULL;
 
-	switch (fx_texture->target) {
+	switch (texture_attrs.target) {
 	case GL_TEXTURE_2D:
-		if (fx_texture->has_alpha) {
+		if (texture_attrs.has_alpha) {
 			shader = &renderer->shaders.tex_rgba;
 		} else {
 			shader = &renderer->shaders.tex_rgbx;
@@ -377,7 +297,7 @@ bool fx_render_subtexture_with_matrix(struct fx_renderer *renderer, struct fx_te
 	wlr_matrix_transpose(gl_matrix, gl_matrix);
 
 	// if there's no opacity or rounded corners we don't need to blend
-	if (!fx_texture->has_alpha && deco_data.alpha == 1.0 && !deco_data.corner_radius) {
+	if (!texture_attrs.has_alpha && deco_data.alpha == 1.0 && !deco_data.corner_radius) {
 		glDisable(GL_BLEND);
 	} else {
 		glEnable(GL_BLEND);
@@ -386,9 +306,9 @@ bool fx_render_subtexture_with_matrix(struct fx_renderer *renderer, struct fx_te
 	glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
 
 	glActiveTexture(GL_TEXTURE0);
-	glBindTexture(fx_texture->target, fx_texture->id);
+	glBindTexture(texture_attrs.target, texture_attrs.tex);
 
-	glTexParameteri(fx_texture->target, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+	glTexParameteri(texture_attrs.target, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
 
 	glUseProgram(shader->program);
 
@@ -399,16 +319,12 @@ bool fx_render_subtexture_with_matrix(struct fx_renderer *renderer, struct fx_te
 	glUniform2f(shader->size, dst_box->width, dst_box->height);
 	glUniform2f(shader->position, dst_box->x, dst_box->y);
 	glUniform1f(shader->alpha, deco_data.alpha);
-	glUniform1f(shader->dim, deco_data.dim);
-	glUniform4f(shader->dim_color, dim_color[0], dim_color[1], dim_color[2], dim_color[3]);
-	glUniform1f(shader->has_titlebar, deco_data.has_titlebar);
-	glUniform1f(shader->saturation, deco_data.saturation);
 	glUniform1f(shader->radius, deco_data.corner_radius);
 
-	const GLfloat x1 = src_box->x / fx_texture->width;
-	const GLfloat y1 = src_box->y / fx_texture->height;
-	const GLfloat x2 = (src_box->x + src_box->width) / fx_texture->width;
-	const GLfloat y2 = (src_box->y + src_box->height) / fx_texture->height;
+	const GLfloat x1 = src_box->x / wlr_texture->width;
+	const GLfloat y1 = src_box->y / wlr_texture->height;
+	const GLfloat x2 = (src_box->x + src_box->width) / wlr_texture->width;
+	const GLfloat y2 = (src_box->y + src_box->height) / wlr_texture->height;
 	const GLfloat texcoord[] = {
 		x2, y1, // top right
 		x1, y1, // top left
@@ -427,12 +343,12 @@ bool fx_render_subtexture_with_matrix(struct fx_renderer *renderer, struct fx_te
 	glDisableVertexAttribArray(shader->pos_attrib);
 	glDisableVertexAttribArray(shader->tex_attrib);
 
-	glBindTexture(fx_texture->target, 0);
+	glBindTexture(texture_attrs.target, 0);
 
 	return true;
 }
 
-bool fx_render_texture_with_matrix(struct fx_renderer *renderer, struct fx_texture *texture,
+bool fx_render_texture_with_matrix(struct fx_renderer *renderer, struct wlr_texture *texture,
 		const struct wlr_box *dst_box, const float matrix[static 9],
 		struct decoration_data deco_data) {
 	struct wlr_fbox src_box = {
@@ -482,65 +398,4 @@ void fx_render_rect(struct fx_renderer *renderer, const struct wlr_box *box,
 	glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
 
 	glDisableVertexAttribArray(shader.pos_attrib);
-}
-
-void fx_render_rounded_rect(struct fx_renderer *renderer, const struct wlr_box *box,
-		const float color[static 4], const float matrix[static 9], int radius,
-		enum corner_location corner_location) {
-	if (box->width == 0 || box->height == 0) {
-		return;
-	}
-	assert(box->width > 0 && box->height > 0);
-
-	struct rounded_quad_shader *shader = NULL;
-
-	switch (corner_location) {
-		case ALL:
-			shader = &renderer->shaders.rounded_quad;
-			break;
-		case TOP_LEFT:
-			shader = &renderer->shaders.rounded_tl_quad;
-			break;
-		case TOP_RIGHT:
-			shader = &renderer->shaders.rounded_tr_quad;
-			break;
-		case BOTTOM_LEFT:
-			shader = &renderer->shaders.rounded_bl_quad;
-			break;
-		case BOTTOM_RIGHT:
-			shader = &renderer->shaders.rounded_br_quad;
-			break;
-		default:
-			wlr_log(WLR_ERROR, "Invalid Corner Location. Aborting render");
-			abort();
-	}
-
-	float gl_matrix[9];
-	wlr_matrix_multiply(gl_matrix, renderer->projection, matrix);
-
-	// TODO: investigate why matrix is flipped prior to this cmd
-	// wlr_matrix_multiply(gl_matrix, flip_180, gl_matrix);
-
-	wlr_matrix_transpose(gl_matrix, gl_matrix);
-
-	glEnable(GL_BLEND);
-
-	glUseProgram(shader->program);
-
-	glUniformMatrix3fv(shader->proj, 1, GL_FALSE, gl_matrix);
-	glUniform4f(shader->color, color[0], color[1], color[2], color[3]);
-
-	// rounded corners
-	glUniform2f(shader->size, box->width, box->height);
-	glUniform2f(shader->position, box->x, box->y);
-	glUniform1f(shader->radius, radius);
-
-	glVertexAttribPointer(shader->pos_attrib, 2, GL_FLOAT, GL_FALSE,
-			0, verts);
-
-	glEnableVertexAttribArray(shader->pos_attrib);
-
-	glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
-
-	glDisableVertexAttribArray(shader->pos_attrib);
 }

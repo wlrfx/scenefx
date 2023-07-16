@@ -150,6 +150,7 @@ struct wlr_scene_buffer {
 
 	// private state
 
+	struct decoration_data deco_data;
 	uint64_t active_outputs;
 	struct wlr_texture *texture;
 	struct wlr_fbox src_box;
@@ -252,6 +253,13 @@ bool wlr_scene_node_coords(struct wlr_scene_node *node, int *lx, int *ly);
  */
 void wlr_scene_node_for_each_buffer(struct wlr_scene_node *node,
 	wlr_scene_buffer_iterator_func_t iterator, void *user_data);
+/**
+ * Call `iterator` on each buffer in the scene-graph, with the buffer's
+ * position in layout coordinates (even if it's not enabled). The function is
+ * called from root to leaves (in rendering order).
+ */
+void wlr_scene_node_for_all_buffers(struct wlr_scene_node *node,
+		wlr_scene_buffer_iterator_func_t user_iterator, void *user_data);
 /**
  * Find the topmost node in this scene-graph that contains the point at the
  * given layout-local coordinates. (For surface nodes, this means accepting
@@ -372,6 +380,18 @@ void wlr_scene_buffer_set_dest_size(struct wlr_scene_buffer *scene_buffer,
  */
 void wlr_scene_buffer_set_transform(struct wlr_scene_buffer *scene_buffer,
 	enum wl_output_transform transform);
+
+/**
+* Sets the opacity of this buffer
+*/
+void wlr_scene_buffer_set_opacity(struct wlr_scene_buffer *scene_buffer,
+	float opacity);
+
+/**
+* Sets the corner radius of this buffer
+*/
+void wlr_scene_buffer_set_corner_radius(struct wlr_scene_buffer *scene_buffer,
+		int radii);
 
 /**
  * Calls the buffer's frame_done signal.

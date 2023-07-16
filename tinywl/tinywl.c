@@ -749,6 +749,14 @@ static void xdg_toplevel_request_fullscreen(
 	wlr_xdg_surface_schedule_configure(view->xdg_toplevel->base);
 }
 
+static void wlr_scene_buffer_set_decoration_data_iter(
+		struct wlr_scene_buffer *buffer, int sx, int sy, void *user_data) {
+	struct wlr_scene_surface * scene_surface = wlr_scene_surface_from_buffer(buffer);
+	if (!wlr_surface_is_subsurface(scene_surface->surface)) {
+		wlr_scene_buffer_set_corner_radius(buffer, 20);
+	}
+}
+
 static void server_new_xdg_surface(struct wl_listener *listener, void *data) {
 	/* This event is raised when wlr_xdg_shell receives a new xdg surface from a
 	 * client, either a toplevel (application window) or popup. */
@@ -782,9 +790,8 @@ static void server_new_xdg_surface(struct wl_listener *listener, void *data) {
 	xdg_surface->data = view->scene_tree;
 
 	/* Set the scene_nodes decoration_data */
-	struct decoration_data deco_data = decoration_data_get_undecorated();
-	deco_data.corner_radius = 20;
-	wlr_scene_tree_decoration_data_init(&view->scene_tree->node, deco_data);
+	wlr_scene_node_for_all_buffers(&view->scene_tree->node,
+			wlr_scene_buffer_set_decoration_data_iter, NULL);
 
 	/* Listen to the various events it can emit */
 	view->map.notify = xdg_toplevel_map;

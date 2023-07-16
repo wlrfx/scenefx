@@ -2,8 +2,6 @@
 #include <assert.h>
 #include <stdlib.h>
 #include <string.h>
-#include <types/decoration_data.h>
-#include <types/subsurface_tree.h>
 #include <wlr/backend.h>
 #include <wlr/render/gles2.h>
 #include <wlr/types/wlr_compositor.h>
@@ -16,6 +14,7 @@
 #include <wlr/util/region.h>
 #include "render/fx_renderer/fx_renderer.h"
 #include "render/fx_renderer/fx_texture.h"
+#include "types/decoration_data.h"
 #include "types/wlr_buffer.h"
 #include "types/wlr_scene.h"
 #include "util/array.h"
@@ -29,18 +28,6 @@ static struct wlr_box get_monitor_box(struct wlr_output *output) {
 	wlr_output_transformed_resolution(output, &width, &height);
 	struct wlr_box monitor_box = { 0, 0, width, height };
 	return monitor_box;
-}
-
-/* TODO: Rename */
-static struct wlr_scene_tree *client_node_from_scene_buffer(
-		struct wlr_scene_buffer *buffer) {
-	struct wlr_scene_tree *tree = buffer->node.parent;
-	struct wlr_scene_subsurface_tree *subsurface_tree =
-		wl_container_of(tree, subsurface_tree, tree);
-	if (!subsurface_tree) {
-		return NULL;
-	}
-	return tree->node.parent;
 }
 
 static struct wlr_scene_tree *scene_tree_from_node(struct wlr_scene_node *node) {
@@ -259,6 +246,10 @@ static void scene_node_opaque_region(struct wlr_scene_node *node, int x, int y,
 		struct wlr_scene_buffer *scene_buffer = wlr_scene_buffer_from_node(node);
 
 		if (!scene_buffer->buffer) {
+			return;
+		}
+
+		if (scene_buffer->deco_data.alpha != 1) {
 			return;
 		}
 
@@ -578,6 +569,8 @@ struct wlr_scene_buffer *wlr_scene_buffer_create(struct wlr_scene_tree *parent,
 	wl_signal_init(&scene_buffer->events.frame_done);
 	pixman_region32_init(&scene_buffer->opaque_region);
 
+	scene_buffer->deco_data = decoration_data_get_undecorated();
+
 	scene_node_update(&scene_buffer->node, NULL);
 
 	return scene_buffer;
@@ -768,6 +761,26 @@ void wlr_scene_buffer_send_frame_done(struct wlr_scene_buffer *scene_buffer,
 	}
 }
 
+void wlr_scene_buffer_set_opacity(struct wlr_scene_buffer *scene_buffer,
+		float opacity) {
+	if (scene_buffer->deco_data.alpha == opacity) {
+		return;
+	}
+
+	scene_buffer->deco_data.alpha = opacity;
+	scene_node_update(&scene_buffer->node, NULL);
+}
+
+void wlr_scene_buffer_set_corner_radius(struct wlr_scene_buffer *scene_buffer,
+		int radii) {
+	if (scene_buffer->deco_data.corner_radius == radii) {
+		return;
+	}
+
+	scene_buffer->deco_data.corner_radius = radii;
+	scene_node_update(&scene_buffer->node, NULL);
+}
+
 static struct fx_texture scene_buffer_get_texture(
 		struct wlr_scene_buffer *scene_buffer, struct wlr_renderer *renderer) {
 	struct wlr_client_buffer *client_buffer =
@@ -952,8 +965,8 @@ bool wlr_scene_node_coords(struct wlr_scene_node *node,
 
 static void scene_node_for_each_scene_buffer(struct wlr_scene_node *node,
 		int lx, int ly, wlr_scene_buffer_iterator_func_t user_iterator,
-		void *user_data) {
-	if (!node->enabled) {
+		bool enabled, void *user_data) {
+	if (enabled && !node->enabled) {
 		return;
 	}
 
@@ -967,14 +980,20 @@ static void scene_node_for_each_scene_buffer(struct wlr_scene_node *node,
 		struct wlr_scene_tree *scene_tree = scene_tree_from_node(node);
 		struct wlr_scene_node *child;
 		wl_list_for_each(child, &scene_tree->children, link) {
-			scene_node_for_each_scene_buffer(child, lx, ly, user_iterator, user_data);
+			scene_node_for_each_scene_buffer(child, lx, ly, user_iterator,
+					enabled, user_data);
 		}
 	}
 }
 
 void wlr_scene_node_for_each_buffer(struct wlr_scene_node *node,
 		wlr_scene_buffer_iterator_func_t user_iterator, void *user_data) {
-	scene_node_for_each_scene_buffer(node, 0, 0, user_iterator, user_data);
+	scene_node_for_each_scene_buffer(node, 0, 0, user_iterator, true, user_data);
+}
+
+void wlr_scene_node_for_all_buffers(struct wlr_scene_node *node,
+		wlr_scene_buffer_iterator_func_t user_iterator, void *user_data) {
+	scene_node_for_each_scene_buffer(node, 0, 0, user_iterator, false, user_data);
 }
 
 struct node_at_data {
@@ -1155,22 +1174,8 @@ static void scene_node_render(struct fx_renderer *fx_renderer, struct wlr_scene_
 		wlr_matrix_project_box(matrix, &dst_box, transform, 0.0,
 			output->transform_matrix);
 
-		struct wlr_scene_surface * scene_surface
-			= wlr_scene_surface_from_buffer(scene_buffer);
-		bool is_subsurface = wlr_surface_is_subsurface(scene_surface->surface);
-
-		struct decoration_data deco_data = decoration_data_get_undecorated();
-		if (!is_subsurface) {
-			struct wlr_scene_tree *_client_tree;
-			struct decoration_data *_deco_data;
-			if ((_client_tree = client_node_from_scene_buffer(scene_buffer)) &&
-				(_deco_data = wlr_scene_tree_decoration_data_get(_client_tree))) {
-				memcpy(&deco_data, _deco_data, sizeof(struct decoration_data));
-			}
-		}
-
 		render_texture(fx_renderer, output, &render_region, &texture, &scene_buffer->src_box,
-			&dst_box, matrix, deco_data);
+			&dst_box, matrix, scene_buffer->deco_data);
 
 		wl_signal_emit_mutable(&scene_buffer->events.output_present, scene_output);
 		break;
@@ -1675,7 +1680,6 @@ bool wlr_scene_output_commit(struct wlr_scene_output *scene_output) {
 	pixman_box32_t *rects = pixman_region32_rectangles(&background, &nrects);
 	for (int i = 0; i < nrects; ++i) {
 		scissor_output(output, &rects[i]);
-		// TODO: Change color later, only used for better contrast
 		fx_renderer_clear((float[4]){ 0.0, 0.0, 0.0, 1.0 });
 	}
 	pixman_region32_fini(&background);

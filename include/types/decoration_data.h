@@ -3,7 +3,6 @@
 
 #include <stdbool.h>
 #include <wlr/util/addon.h>
-#include <wlr/types/wlr_scene.h>
 
 static float default_shadow_color[] = {0.0f, 0.0f, 0.0f, 0.5f};
 static float default_dim_color[] = {0.0f, 0.0f, 0.0f, 1.0f};
@@ -25,16 +24,8 @@ struct decoration_data {
 	// TODO: Remove shadow bool and add multiple fields (maybe even it's own
 	// struct?)
 	bool shadow;
-
-	struct wlr_addon addon;
 };
 
 struct decoration_data decoration_data_get_undecorated(void);
-
-void wlr_scene_tree_decoration_data_init(struct wlr_scene_node *scene_node,
-		struct decoration_data decoration_data);
-
-struct decoration_data *wlr_scene_tree_decoration_data_get(
-		struct wlr_scene_tree *scene_tree);
 
 #endif

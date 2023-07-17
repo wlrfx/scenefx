@@ -25,23 +25,22 @@
         in {
           default = pkgs.mkShell {
             name = "scenefx-shell";
+
+            inputsFrom = [ pkgs.wlroots_0_16 ];
+
             nativeBuildInputs = with pkgs; [
               cmake
               meson
               ninja
               scdoc
               pkg-config
-
-              wayland
-              wayland-scanner
-              wayland-protocols
-              wlroots_0_16
-              hwdata
-              udev
-              pixman
-              libxkbcommon
-              libdrm
             ];
+
+            shellHook = with pkgs; ''(
+              mkdir -p "$PWD/subprojects"
+              cd "$PWD/subprojects"
+              cp -R --no-preserve=mode,ownership ${wlroots_0_16.src} wlroots
+            )'';
           };
         });
     };

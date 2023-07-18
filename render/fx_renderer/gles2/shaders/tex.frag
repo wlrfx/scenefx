@@ -34,8 +34,7 @@ vec4 sample_texture() {
 }
 
 void main() {
-	vec4 color = sample_texture();
-
+	gl_FragColor = sample_texture() * alpha;
 	vec2 corner_distance = min(gl_FragCoord.xy - position, size + position - gl_FragCoord.xy);
 	if (max(corner_distance.x, corner_distance.y) < radius) {
 		float d = radius - distance(corner_distance, vec2(radius));

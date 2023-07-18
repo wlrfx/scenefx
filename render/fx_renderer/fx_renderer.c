@@ -344,17 +344,6 @@ bool fx_render_subtexture_with_matrix(struct fx_renderer *renderer, struct wlr_t
 	return true;
 }
 
-bool fx_render_texture_with_matrix(struct fx_renderer *renderer, struct wlr_texture *texture,
-		const struct wlr_box *dst_box, const float matrix[static 9]) {
-	struct wlr_fbox src_box = {
-		.x = 0,
-		.y = 0,
-		.width = texture->width,
-		.height = texture->height,
-	};
-	return fx_render_subtexture_with_matrix(renderer, texture, &src_box, dst_box, matrix);
-}
-
 void fx_render_rect(struct fx_renderer *renderer, const struct wlr_box *box,
 		const float color[static 4], const float projection[static 9]) {
 	if (box->width == 0 || box->height == 0) {

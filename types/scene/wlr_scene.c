@@ -1042,7 +1042,7 @@ static void render_rect(struct fx_renderer *fx_renderer, struct wlr_output *outp
 static void render_texture(struct fx_renderer *fx_renderer, struct wlr_output *output,
 		pixman_region32_t *damage, struct wlr_texture *texture,
 		const struct wlr_fbox *src_box, const struct wlr_box *dst_box,
-		const float matrix[static 9], struct decoration_data deco_data) {
+		const float matrix[static 9]) {
 	assert(fx_renderer);
 
 	struct wlr_fbox default_src_box = {0};
@@ -1065,7 +1065,7 @@ static void render_texture(struct fx_renderer *fx_renderer, struct wlr_output *o
 		scissor_output(output, &rects[i]);
 
 		fx_render_subtexture_with_matrix(fx_renderer, texture, src_box,
-				&transformed_box, matrix, deco_data);
+				&transformed_box, matrix);
 	}
 }
 
@@ -1096,7 +1096,7 @@ static void scene_node_render(struct fx_renderer *fx_renderer, struct wlr_scene_
 	scene_node_get_size(node, &dst_box.width, &dst_box.height);
 	scale_box(&dst_box, output->scale);
 
-	struct wlr_texture texture;
+	struct wlr_texture *texture;
 	float matrix[9];
 	enum wl_output_transform transform;
 	switch (node->type) {
@@ -1120,9 +1120,8 @@ static void scene_node_render(struct fx_renderer *fx_renderer, struct wlr_scene_
 		wlr_matrix_project_box(matrix, &dst_box, transform, 0.0,
 			output->transform_matrix);
 
-		struct decoration_data deco_data = get_undecorated_decoration_data();
-		render_texture(fx_renderer, output, &render_region, &texture, &scene_buffer->src_box,
-			&dst_box, matrix, deco_data);
+		render_texture(fx_renderer, output, &render_region, texture, &scene_buffer->src_box,
+			&dst_box, matrix);
 
 		wl_signal_emit_mutable(&scene_buffer->events.output_present, scene_output);
 		break;
@@ -1576,7 +1575,7 @@ bool wlr_scene_output_commit(struct wlr_scene_output *scene_output) {
 		return true;
 	}
 
-	fx_renderer_begin(renderer, output);
+	fx_renderer_begin(renderer, output->width, output->height);
 
 	pixman_region32_t background;
 	pixman_region32_init(&background);

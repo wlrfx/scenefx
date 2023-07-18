@@ -161,8 +161,6 @@ struct fx_renderer *fx_renderer_create(struct wlr_egl *egl) {
 		return NULL;
 	}
 
-	renderer->main_buffer = fx_framebuffer_create();
-
 	// get extensions
 	const char *exts_str = (const char *)glGetString(GL_EXTENSIONS);
 	if (exts_str == NULL) {
@@ -229,17 +227,14 @@ void fx_renderer_fini(struct fx_renderer *renderer) {
 	// NO OP
 }
 
-void fx_renderer_begin(struct fx_renderer *renderer, struct wlr_output *output) {
-	glViewport(0, 0, output->width, output->height);
+void fx_renderer_begin(struct fx_renderer *renderer, int width, int height) {
+	glViewport(0, 0, width, height);
 
 	// refresh projection matrix
 	matrix_projection(renderer->projection, width, height,
 		WL_OUTPUT_TRANSFORM_FLIPPED_180);
 
 	glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
-
-	// Bind to our main framebuffer
-	fx_framebuffer_bind(&renderer->main_buffer);
 }
 
 void fx_renderer_clear(const float color[static 4]) {
@@ -258,8 +253,7 @@ void fx_renderer_scissor(struct wlr_box *box) {
 }
 
 bool fx_render_subtexture_with_matrix(struct fx_renderer *renderer, struct wlr_texture *wlr_texture,
-		const struct wlr_fbox *src_box, const struct wlr_box *dst_box, const float matrix[static 9],
-		struct decoration_data deco_data) {
+		const struct wlr_fbox *src_box, const struct wlr_box *dst_box, const float matrix[static 9]) {
 
 	assert(wlr_texture_is_gles2(wlr_texture));
 	struct wlr_gles2_texture_attribs texture_attrs;
@@ -296,8 +290,12 @@ bool fx_render_subtexture_with_matrix(struct fx_renderer *renderer, struct wlr_t
 	// to GL_FALSE
 	wlr_matrix_transpose(gl_matrix, gl_matrix);
 
+	// TODO: accept me as params!
+	float alpha = 1.0;
+	int corner_radius = 0;
+
 	// if there's no opacity or rounded corners we don't need to blend
-	if (!texture_attrs.has_alpha && deco_data.alpha == 1.0 && !deco_data.corner_radius) {
+	if (!texture_attrs.has_alpha && alpha == 1.0 && !corner_radius) {
 		glDisable(GL_BLEND);
 	} else {
 		glEnable(GL_BLEND);
@@ -312,14 +310,12 @@ bool fx_render_subtexture_with_matrix(struct fx_renderer *renderer, struct wlr_t
 
 	glUseProgram(shader->program);
 
-	float *dim_color = deco_data.dim_color;
-
 	glUniformMatrix3fv(shader->proj, 1, GL_FALSE, gl_matrix);
 	glUniform1i(shader->tex, 0);
 	glUniform2f(shader->size, dst_box->width, dst_box->height);
 	glUniform2f(shader->position, dst_box->x, dst_box->y);
-	glUniform1f(shader->alpha, deco_data.alpha);
-	glUniform1f(shader->radius, deco_data.corner_radius);
+	glUniform1f(shader->alpha, alpha);
+	glUniform1f(shader->radius, corner_radius);
 
 	const GLfloat x1 = src_box->x / wlr_texture->width;
 	const GLfloat y1 = src_box->y / wlr_texture->height;
@@ -349,16 +345,14 @@ bool fx_render_subtexture_with_matrix(struct fx_renderer *renderer, struct wlr_t
 }
 
 bool fx_render_texture_with_matrix(struct fx_renderer *renderer, struct wlr_texture *texture,
-		const struct wlr_box *dst_box, const float matrix[static 9],
-		struct decoration_data deco_data) {
+		const struct wlr_box *dst_box, const float matrix[static 9]) {
 	struct wlr_fbox src_box = {
 		.x = 0,
 		.y = 0,
 		.width = texture->width,
 		.height = texture->height,
 	};
-	return fx_render_subtexture_with_matrix(renderer, texture, &src_box,
-			dst_box, matrix, deco_data);
+	return fx_render_subtexture_with_matrix(renderer, texture, &src_box, dst_box, matrix);
 }
 
 void fx_render_rect(struct fx_renderer *renderer, const struct wlr_box *box,

@@ -1601,8 +1601,7 @@ bool wlr_scene_output_commit(struct wlr_scene_output *scene_output) {
 	pixman_box32_t *rects = pixman_region32_rectangles(&background, &nrects);
 	for (int i = 0; i < nrects; ++i) {
 		scissor_output(output, &rects[i]);
-		// TODO: Change color later, only used for better contrast
-		fx_renderer_clear((float[4]){ 1.0, 1.0, 1.0, 1.0 });
+		fx_renderer_clear((float[4]){ 0.0, 0.0, 0.0, 1.0 });
 	}
 	pixman_region32_fini(&background);
 

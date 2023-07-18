@@ -147,14 +147,44 @@ static void load_gl_proc(void *proc_ptr, const char *name) {
 	*(void **)proc_ptr = proc;
 }
 
+static void fx_renderer_handle_destroy(struct wlr_addon *addon) {
+	struct fx_renderer *renderer =
+		wl_container_of(addon, renderer, addon);
+	fx_renderer_fini(renderer);
+	free(renderer);
+}
+static const struct wlr_addon_interface fx_renderer_addon_impl = {
+	.name = "fx_renderer",
+	.destroy = fx_renderer_handle_destroy,
+};
+
+void fx_renderer_init_addon(struct wlr_egl *egl, struct wlr_addon_set *addons,
+		const void * owner) {
+	struct fx_renderer *renderer = fx_renderer_create(egl);
+	if (!renderer) {
+		wlr_log(WLR_ERROR, "Failed to create fx_renderer");
+		abort();
+	}
+	wlr_addon_init(&renderer->addon, addons, owner, &fx_renderer_addon_impl);
+}
+
+struct fx_renderer *fx_renderer_addon_find(struct wlr_addon_set *addons,
+		const void * owner) {
+	struct wlr_addon *addon =
+		wlr_addon_find(addons, owner, &fx_renderer_addon_impl);
+	if (addon == NULL) {
+		return NULL;
+	}
+	struct fx_renderer *renderer = wl_container_of(addon, renderer, addon);
+	return renderer;
+}
+
 struct fx_renderer *fx_renderer_create(struct wlr_egl *egl) {
 	struct fx_renderer *renderer = calloc(1, sizeof(struct fx_renderer));
 	if (renderer == NULL) {
 		return NULL;
 	}
 
-	// TODO: wlr_egl_make_current or eglMakeCurrent?
-	// TODO: assert instead of conditional statement?
 	if (!eglMakeCurrent(wlr_egl_get_display(egl), EGL_NO_SURFACE, EGL_NO_SURFACE,
 			wlr_egl_get_context(egl))) {
 		wlr_log(WLR_ERROR, "GLES2 RENDERER: Could not make EGL current");

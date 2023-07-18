@@ -55,6 +55,12 @@ struct fx_renderer {
 	} shaders;
 };
 
+void fx_renderer_init_addon(struct wlr_egl *egl, struct wlr_addon_set *addons,
+		const void * owner);
+
+struct fx_renderer *fx_renderer_addon_find(struct wlr_addon_set *addons,
+		const void * owner);
+
 struct fx_renderer *fx_renderer_create(struct wlr_egl *egl);
 
 void fx_renderer_fini(struct fx_renderer *renderer);

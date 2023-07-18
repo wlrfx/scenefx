@@ -1159,17 +1159,6 @@ static const struct wlr_addon_interface output_addon_impl = {
 };
 
 
-static void fx_renderer_handle_destroy(struct wlr_addon *addon) {
-	struct fx_renderer *renderer =
-		wl_container_of(addon, renderer, addon);
-	fx_renderer_fini(renderer);
-	free(renderer);
-}
-static const struct wlr_addon_interface fx_renderer_addon_impl = {
-	.name = "fx_renderer",
-	.destroy = fx_renderer_handle_destroy,
-};
-
 static void scene_node_output_update(struct wlr_scene_node *node,
 		struct wl_list *outputs, struct wlr_scene_output *ignore) {
 	if (node->type == WLR_SCENE_NODE_TREE) {
@@ -1241,12 +1230,7 @@ struct wlr_scene_output *wlr_scene_output_create(struct wlr_scene *scene,
 
 	// Init FX Renderer
 	struct wlr_egl *egl = wlr_gles2_renderer_get_egl(output->renderer);
-	struct fx_renderer *renderer = fx_renderer_create(egl);
-	if (!renderer) {
-		wlr_log(WLR_ERROR, "Failed to create fx_renderer");
-		abort();
-	}
-	wlr_addon_init(&renderer->addon, &output->addons, scene, &fx_renderer_addon_impl);
+	fx_renderer_init_addon(egl, &output->addons, scene);
 
 	wlr_damage_ring_init(&scene_output->damage_ring);
 	wl_list_init(&scene_output->damage_highlight_regions);
@@ -1467,12 +1451,8 @@ bool wlr_scene_output_commit(struct wlr_scene_output *scene_output) {
 		scene_output->scene->debug_damage_option;
 
 	// Find the fx_renderer addon
-	struct wlr_addon *addon =
-		wlr_addon_find(&output->addons, scene_output->scene, &fx_renderer_addon_impl);
-	if (addon == NULL) {
-		return NULL;
-	}
-	struct fx_renderer *renderer = wl_container_of(addon, renderer, addon);
+	struct fx_renderer *renderer =
+		fx_renderer_addon_find(&output->addons, scene_output->scene);
 	assert(renderer != NULL);
 
 	struct render_list_constructor_data list_con = {

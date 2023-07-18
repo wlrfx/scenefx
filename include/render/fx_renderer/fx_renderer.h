@@ -7,18 +7,12 @@
 #include <wlr/render/egl.h>
 #include <wlr/render/wlr_texture.h>
 #include <wlr/util/addon.h>
-
-#include "wlr/util/box.h"
+#include <wlr/util/box.h>
 
 enum fx_tex_shader_source {
 	SHADER_SOURCE_TEXTURE_RGBA = 1,
 	SHADER_SOURCE_TEXTURE_RGBX = 2,
 	SHADER_SOURCE_TEXTURE_EXTERNAL = 3,
-};
-
-struct decoration_data {
-	float alpha;
-	int corner_radius;
 };
 
 struct quad_shader {

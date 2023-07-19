@@ -7,7 +7,6 @@ endif
 
 wlr_files += files(
 	'matrix.c',
-	'fx_texture.c',
 	'fx_renderer.c',
 )
 
@@ -20,3 +19,4 @@ if 'gles2' in renderers or 'auto' in renderers
 	endif
 	subdir('gles2')
 endif
+

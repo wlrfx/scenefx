@@ -12,24 +12,15 @@
 #include <wlr/render/gles2.h>
 #include <wlr/types/wlr_matrix.h>
 #include <wlr/util/box.h>
+#include <wlr/util/log.h>
 
-#include "wlr/util/log.h"
-#include "render/fx_renderer/fx_framebuffer.h"
 #include "render/fx_renderer/fx_renderer.h"
 #include "render/fx_renderer/matrix.h"
-// #include "sway/server.h"
 
 // shaders
-#include "blur1_frag_src.h"
-#include "blur2_frag_src.h"
-#include "box_shadow_frag_src.h"
 #include "common_vert_src.h"
-#include "corner_frag_src.h"
 #include "quad_frag_src.h"
-#include "quad_round_frag_src.h"
-#include "stencil_mask_frag_src.h"
 #include "tex_frag_src.h"
-#include "wlr/util/log.h"
 
 static const GLfloat verts[] = {
 	1, 0, // top right
@@ -91,60 +82,6 @@ error:
 	return 0;
 }
 
-static bool link_blur_program(struct blur_shader *shader, const char *shader_program) {
-	GLuint prog;
-	shader->program = prog = link_program(shader_program);
-	if (!shader->program) {
-		return false;
-	}
-	shader->proj = glGetUniformLocation(prog, "proj");
-	shader->tex = glGetUniformLocation(prog, "tex");
-	shader->pos_attrib = glGetAttribLocation(prog, "pos");
-	shader->tex_attrib = glGetAttribLocation(prog, "texcoord");
-	shader->radius = glGetUniformLocation(prog, "radius");
-	shader->halfpixel = glGetUniformLocation(prog, "halfpixel");
-
-	return true;
-}
-
-static bool link_box_shadow_program(struct box_shadow_shader *shader) {
-	GLuint prog;
-	shader->program = prog = link_program(box_shadow_frag_src);
-	if (!shader->program) {
-		return false;
-	}
-	shader->proj = glGetUniformLocation(prog, "proj");
-	shader->color = glGetUniformLocation(prog, "color");
-	shader->pos_attrib = glGetAttribLocation(prog, "pos");
-	shader->position = glGetUniformLocation(prog, "position");
-	shader->size = glGetUniformLocation(prog, "size");
-	shader->blur_sigma = glGetUniformLocation(prog, "blur_sigma");
-	shader->corner_radius = glGetUniformLocation(prog, "corner_radius");
-
-	return true;
-}
-
-static bool link_corner_program(struct corner_shader *shader) {
-	GLuint prog;
-	shader->program = prog = link_program(corner_frag_src);
-	if (!shader->program) {
-		return false;
-	}
-	shader->proj = glGetUniformLocation(prog, "proj");
-	shader->color = glGetUniformLocation(prog, "color");
-	shader->pos_attrib = glGetAttribLocation(prog, "pos");
-	shader->position = glGetUniformLocation(prog, "position");
-	shader->half_size = glGetUniformLocation(prog, "half_size");
-	shader->half_thickness = glGetUniformLocation(prog, "half_thickness");
-	shader->radius = glGetUniformLocation(prog, "radius");
-	shader->is_top_left = glGetUniformLocation(prog, "is_top_left");
-	shader->is_top_right = glGetUniformLocation(prog, "is_top_right");
-	shader->is_bottom_left = glGetUniformLocation(prog, "is_bottom_left");
-	shader->is_bottom_right = glGetUniformLocation(prog, "is_bottom_right");
-
-	return true;
-}
-
 static bool link_quad_program(struct quad_shader *shader) {
 	GLuint prog;
 	shader->program = prog = link_program(quad_frag_src);
@@ -155,45 +92,6 @@ static bool link_quad_program(struct quad_shader *shader) {
 	shader->proj = glGetUniformLocation(prog, "proj");
 	shader->color = glGetUniformLocation(prog, "color");
 	shader->pos_attrib = glGetAttribLocation(prog, "pos");
-
-	return true;
-}
-
-static bool link_rounded_quad_program(struct rounded_quad_shader *shader,
-		enum fx_rounded_quad_shader_source source) {
-	GLchar quad_src[2048];
-	snprintf(quad_src, sizeof(quad_src),
-		"#define SOURCE %d\n%s", source, quad_round_frag_src);
-
-	GLuint prog;
-	shader->program = prog = link_program(quad_src);
-	if (!shader->program) {
-		return false;
-	}
-
-	shader->proj = glGetUniformLocation(prog, "proj");
-	shader->color = glGetUniformLocation(prog, "color");
-	shader->pos_attrib = glGetAttribLocation(prog, "pos");
-	shader->size = glGetUniformLocation(prog, "size");
-	shader->position = glGetUniformLocation(prog, "position");
-	shader->radius = glGetUniformLocation(prog, "radius");
-
-	return true;
-}
-
-static bool link_stencil_mask_program(struct stencil_mask_shader *shader) {
-	GLuint prog;
-	shader->program = prog = link_program(stencil_mask_frag_src);
-	if (!shader->program) {
-		return false;
-	}
-
-	shader->proj = glGetUniformLocation(prog, "proj");
-	shader->color = glGetUniformLocation(prog, "color");
-	shader->pos_attrib = glGetAttribLocation(prog, "pos");
-	shader->position = glGetUniformLocation(prog, "position");
-	shader->half_size = glGetUniformLocation(prog, "half_size");
-	shader->radius = glGetUniformLocation(prog, "radius");
 
 	return true;
 }
@@ -213,15 +111,11 @@ static bool link_tex_program(struct tex_shader *shader,
 	shader->proj = glGetUniformLocation(prog, "proj");
 	shader->tex = glGetUniformLocation(prog, "tex");
 	shader->alpha = glGetUniformLocation(prog, "alpha");
-	shader->dim = glGetUniformLocation(prog, "dim");
-	shader->dim_color = glGetUniformLocation(prog, "dim_color");
 	shader->pos_attrib = glGetAttribLocation(prog, "pos");
 	shader->tex_attrib = glGetAttribLocation(prog, "texcoord");
 	shader->size = glGetUniformLocation(prog, "size");
 	shader->position = glGetUniformLocation(prog, "position");
 	shader->radius = glGetUniformLocation(prog, "radius");
-	shader->saturation = glGetUniformLocation(prog, "saturation");
-	shader->has_titlebar = glGetUniformLocation(prog, "has_titlebar");
 
 	return true;
 }
@@ -253,26 +147,49 @@ static void load_gl_proc(void *proc_ptr, const char *name) {
 	*(void **)proc_ptr = proc;
 }
 
+static void fx_renderer_handle_destroy(struct wlr_addon *addon) {
+	struct fx_renderer *renderer =
+		wl_container_of(addon, renderer, addon);
+	fx_renderer_fini(renderer);
+	free(renderer);
+}
+static const struct wlr_addon_interface fx_renderer_addon_impl = {
+	.name = "fx_renderer",
+	.destroy = fx_renderer_handle_destroy,
+};
+
+void fx_renderer_init_addon(struct wlr_egl *egl, struct wlr_addon_set *addons,
+		const void * owner) {
+	struct fx_renderer *renderer = fx_renderer_create(egl);
+	if (!renderer) {
+		wlr_log(WLR_ERROR, "Failed to create fx_renderer");
+		abort();
+	}
+	wlr_addon_init(&renderer->addon, addons, owner, &fx_renderer_addon_impl);
+}
+
+struct fx_renderer *fx_renderer_addon_find(struct wlr_addon_set *addons,
+		const void * owner) {
+	struct wlr_addon *addon =
+		wlr_addon_find(addons, owner, &fx_renderer_addon_impl);
+	if (addon == NULL) {
+		return NULL;
+	}
+	struct fx_renderer *renderer = wl_container_of(addon, renderer, addon);
+	return renderer;
+}
+
 struct fx_renderer *fx_renderer_create(struct wlr_egl *egl) {
 	struct fx_renderer *renderer = calloc(1, sizeof(struct fx_renderer));
 	if (renderer == NULL) {
 		return NULL;
 	}
 
-	// TODO: wlr_egl_make_current or eglMakeCurrent?
-	// TODO: assert instead of conditional statement?
 	if (!eglMakeCurrent(wlr_egl_get_display(egl), EGL_NO_SURFACE, EGL_NO_SURFACE,
 			wlr_egl_get_context(egl))) {
 		wlr_log(WLR_ERROR, "GLES2 RENDERER: Could not make EGL current");
 		return NULL;
 	}
-
-	renderer->main_buffer = fx_framebuffer_create();
-	renderer->blur_buffer = fx_framebuffer_create();
-	renderer->effects_buffer = fx_framebuffer_create();
-	renderer->effects_buffer_swapped = fx_framebuffer_create();
-
-	renderer->blur_buffer_dirty = true;
 
 	// get extensions
 	const char *exts_str = (const char *)glGetString(GL_EXTENSIONS);
@@ -281,7 +198,7 @@ struct fx_renderer *fx_renderer_create(struct wlr_egl *egl) {
 		return NULL;
 	}
 
-	wlr_log(WLR_INFO, "Creating swayfx GLES2 renderer");
+	wlr_log(WLR_INFO, "Creating scenefx GLES2 renderer");
 	wlr_log(WLR_INFO, "Using %s", glGetString(GL_VERSION));
 	wlr_log(WLR_INFO, "GL vendor: %s", glGetString(GL_VENDOR));
 	wlr_log(WLR_INFO, "GL renderer: %s", glGetString(GL_RENDERER));
@@ -294,48 +211,8 @@ struct fx_renderer *fx_renderer_create(struct wlr_egl *egl) {
 			"glEGLImageTargetTexture2DOES");
 	}
 
-	// blur shaders
-	if (!link_blur_program(&renderer->shaders.blur1, blur1_frag_src)) {
-		goto error;
-	}
-	if (!link_blur_program(&renderer->shaders.blur2, blur2_frag_src)) {
-		goto error;
-	}
-	// box shadow shader
-	if (!link_box_shadow_program(&renderer->shaders.box_shadow)) {
-		goto error;
-	}
-	// corner border shader
-	if (!link_corner_program(&renderer->shaders.corner)) {
-		goto error;
-	}
 	// quad fragment shader
 	if (!link_quad_program(&renderer->shaders.quad)) {
-		goto error;
-	}
-	// rounded quad fragment shaders
-	if (!link_rounded_quad_program(&renderer->shaders.rounded_quad,
-			SHADER_SOURCE_QUAD_ROUND)) {
-		goto error;
-	}
-	if (!link_rounded_quad_program(&renderer->shaders.rounded_tl_quad,
-			SHADER_SOURCE_QUAD_ROUND_TOP_LEFT)) {
-		goto error;
-	}
-	if (!link_rounded_quad_program(&renderer->shaders.rounded_tr_quad,
-			SHADER_SOURCE_QUAD_ROUND_TOP_RIGHT)) {
-		goto error;
-	}
-	if (!link_rounded_quad_program(&renderer->shaders.rounded_bl_quad,
-			SHADER_SOURCE_QUAD_ROUND_BOTTOM_LEFT)) {
-		goto error;
-	}
-	if (!link_rounded_quad_program(&renderer->shaders.rounded_br_quad,
-			SHADER_SOURCE_QUAD_ROUND_BOTTOM_RIGHT)) {
-		goto error;
-	}
-	// stencil mask shader
-	if (!link_stencil_mask_program(&renderer->shaders.stencil_mask)) {
 		goto error;
 	}
 	// fragment shaders
@@ -359,17 +236,7 @@ struct fx_renderer *fx_renderer_create(struct wlr_egl *egl) {
 	return renderer;
 
 error:
-	glDeleteProgram(renderer->shaders.blur1.program);
-	glDeleteProgram(renderer->shaders.blur2.program);
-	glDeleteProgram(renderer->shaders.box_shadow.program);
-	glDeleteProgram(renderer->shaders.corner.program);
 	glDeleteProgram(renderer->shaders.quad.program);
-	glDeleteProgram(renderer->shaders.rounded_quad.program);
-	glDeleteProgram(renderer->shaders.rounded_bl_quad.program);
-	glDeleteProgram(renderer->shaders.rounded_br_quad.program);
-	glDeleteProgram(renderer->shaders.rounded_tl_quad.program);
-	glDeleteProgram(renderer->shaders.rounded_tr_quad.program);
-	glDeleteProgram(renderer->shaders.stencil_mask.program);
 	glDeleteProgram(renderer->shaders.tex_rgba.program);
 	glDeleteProgram(renderer->shaders.tex_rgbx.program);
 	glDeleteProgram(renderer->shaders.tex_ext.program);
@@ -387,38 +254,17 @@ error:
 }
 
 void fx_renderer_fini(struct fx_renderer *renderer) {
-	fx_framebuffer_release(&renderer->main_buffer);
-	fx_framebuffer_release(&renderer->blur_buffer);
-	fx_framebuffer_release(&renderer->effects_buffer);
-	fx_framebuffer_release(&renderer->effects_buffer_swapped);
+	// NO OP
 }
 
-void fx_renderer_begin(struct fx_renderer *renderer, struct wlr_output *output,
-		int width, int height) {
+void fx_renderer_begin(struct fx_renderer *renderer, int width, int height) {
 	glViewport(0, 0, width, height);
-	renderer->viewport_width = width;
-	renderer->viewport_height = height;
-
-	// Store the wlr framebuffer
-	renderer->wlr_buffer.fb = wlr_gles2_renderer_get_current_fbo(output->renderer);
-
-	// Create the framebuffers
-	fx_framebuffer_update(&renderer->main_buffer, width, height);
-	fx_framebuffer_update(&renderer->effects_buffer, width, height);
-	fx_framebuffer_update(&renderer->effects_buffer_swapped, width, height);
-
-	// Add a stencil buffer to the main buffer & bind the main buffer
-	fx_framebuffer_bind(&renderer->main_buffer);
-	fx_framebuffer_add_stencil_buffer(&renderer->main_buffer, width, height);
 
 	// refresh projection matrix
 	matrix_projection(renderer->projection, width, height,
 		WL_OUTPUT_TRANSFORM_FLIPPED_180);
 
 	glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
-
-	// Bind to our main framebuffer
-	fx_framebuffer_bind(&renderer->main_buffer);
 }
 
 void fx_renderer_clear(const float color[static 4]) {
@@ -436,15 +282,20 @@ void fx_renderer_scissor(struct wlr_box *box) {
 	}
 }
 
-bool fx_render_subtexture_with_matrix(struct fx_renderer *renderer, struct fx_texture *fx_texture,
-		const struct wlr_fbox *src_box, const struct wlr_box *dst_box, const float matrix[static 9],
-		struct decoration_data deco_data) {
+bool fx_render_subtexture_with_matrix(struct fx_renderer *renderer,
+		struct wlr_texture *wlr_texture, const struct wlr_fbox *src_box,
+		const struct wlr_box *dst_box, const float matrix[static 9],
+		struct decoration_data *deco_data) {
+
+	assert(wlr_texture_is_gles2(wlr_texture));
+	struct wlr_gles2_texture_attribs texture_attrs;
+	wlr_gles2_texture_get_attribs(wlr_texture, &texture_attrs);
 
 	struct tex_shader *shader = NULL;
 
-	switch (fx_texture->target) {
+	switch (texture_attrs.target) {
 	case GL_TEXTURE_2D:
-		if (fx_texture->has_alpha) {
+		if (texture_attrs.has_alpha) {
 			shader = &renderer->shaders.tex_rgba;
 		} else {
 			shader = &renderer->shaders.tex_rgbx;
@@ -472,7 +323,7 @@ bool fx_render_subtexture_with_matrix(struct fx_renderer *renderer, struct fx_te
 	wlr_matrix_transpose(gl_matrix, gl_matrix);
 
 	// if there's no opacity or rounded corners we don't need to blend
-	if (!fx_texture->has_alpha && deco_data.alpha == 1.0 && !deco_data.corner_radius) {
+	if (!texture_attrs.has_alpha && deco_data->alpha == 1.0 && !deco_data->corner_radius) {
 		glDisable(GL_BLEND);
 	} else {
 		glEnable(GL_BLEND);
@@ -481,29 +332,23 @@ bool fx_render_subtexture_with_matrix(struct fx_renderer *renderer, struct fx_te
 	glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
 
 	glActiveTexture(GL_TEXTURE0);
-	glBindTexture(fx_texture->target, fx_texture->id);
+	glBindTexture(texture_attrs.target, texture_attrs.tex);
 
-	glTexParameteri(fx_texture->target, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+	glTexParameteri(texture_attrs.target, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
 
 	glUseProgram(shader->program);
-
-	float *dim_color = deco_data.dim_color;
 
 	glUniformMatrix3fv(shader->proj, 1, GL_FALSE, gl_matrix);
 	glUniform1i(shader->tex, 0);
 	glUniform2f(shader->size, dst_box->width, dst_box->height);
 	glUniform2f(shader->position, dst_box->x, dst_box->y);
-	glUniform1f(shader->alpha, deco_data.alpha);
-	glUniform1f(shader->dim, deco_data.dim);
-	glUniform4f(shader->dim_color, dim_color[0], dim_color[1], dim_color[2], dim_color[3]);
-	glUniform1f(shader->has_titlebar, deco_data.has_titlebar);
-	glUniform1f(shader->saturation, deco_data.saturation);
-	glUniform1f(shader->radius, deco_data.corner_radius);
+	glUniform1f(shader->alpha, deco_data->alpha);
+	glUniform1f(shader->radius, deco_data->corner_radius);
 
-	const GLfloat x1 = src_box->x / fx_texture->width;
-	const GLfloat y1 = src_box->y / fx_texture->height;
-	const GLfloat x2 = (src_box->x + src_box->width) / fx_texture->width;
-	const GLfloat y2 = (src_box->y + src_box->height) / fx_texture->height;
+	const GLfloat x1 = src_box->x / wlr_texture->width;
+	const GLfloat y1 = src_box->y / wlr_texture->height;
+	const GLfloat x2 = (src_box->x + src_box->width) / wlr_texture->width;
+	const GLfloat y2 = (src_box->y + src_box->height) / wlr_texture->height;
 	const GLfloat texcoord[] = {
 		x2, y1, // top right
 		x1, y1, // top left
@@ -522,22 +367,9 @@ bool fx_render_subtexture_with_matrix(struct fx_renderer *renderer, struct fx_te
 	glDisableVertexAttribArray(shader->pos_attrib);
 	glDisableVertexAttribArray(shader->tex_attrib);
 
-	glBindTexture(fx_texture->target, 0);
+	glBindTexture(texture_attrs.target, 0);
 
 	return true;
-}
-
-bool fx_render_texture_with_matrix(struct fx_renderer *renderer, struct fx_texture *texture,
-		const struct wlr_box *dst_box, const float matrix[static 9],
-		struct decoration_data deco_data) {
-	struct wlr_fbox src_box = {
-		.x = 0,
-		.y = 0,
-		.width = texture->width,
-		.height = texture->height,
-	};
-	return fx_render_subtexture_with_matrix(renderer, texture, &src_box,
-			dst_box, matrix, deco_data);
 }
 
 void fx_render_rect(struct fx_renderer *renderer, const struct wlr_box *box,
@@ -577,269 +409,4 @@ void fx_render_rect(struct fx_renderer *renderer, const struct wlr_box *box,
 	glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
 
 	glDisableVertexAttribArray(shader.pos_attrib);
-}
-
-void fx_render_rounded_rect(struct fx_renderer *renderer, const struct wlr_box *box,
-		const float color[static 4], const float matrix[static 9], int radius,
-		enum corner_location corner_location) {
-	if (box->width == 0 || box->height == 0) {
-		return;
-	}
-	assert(box->width > 0 && box->height > 0);
-
-	struct rounded_quad_shader *shader = NULL;
-
-	switch (corner_location) {
-		case ALL:
-			shader = &renderer->shaders.rounded_quad;
-			break;
-		case TOP_LEFT:
-			shader = &renderer->shaders.rounded_tl_quad;
-			break;
-		case TOP_RIGHT:
-			shader = &renderer->shaders.rounded_tr_quad;
-			break;
-		case BOTTOM_LEFT:
-			shader = &renderer->shaders.rounded_bl_quad;
-			break;
-		case BOTTOM_RIGHT:
-			shader = &renderer->shaders.rounded_br_quad;
-			break;
-		default:
-			wlr_log(WLR_ERROR, "Invalid Corner Location. Aborting render");
-			abort();
-	}
-
-	float gl_matrix[9];
-	wlr_matrix_multiply(gl_matrix, renderer->projection, matrix);
-
-	// TODO: investigate why matrix is flipped prior to this cmd
-	// wlr_matrix_multiply(gl_matrix, flip_180, gl_matrix);
-
-	wlr_matrix_transpose(gl_matrix, gl_matrix);
-
-	glEnable(GL_BLEND);
-
-	glUseProgram(shader->program);
-
-	glUniformMatrix3fv(shader->proj, 1, GL_FALSE, gl_matrix);
-	glUniform4f(shader->color, color[0], color[1], color[2], color[3]);
-
-	// rounded corners
-	glUniform2f(shader->size, box->width, box->height);
-	glUniform2f(shader->position, box->x, box->y);
-	glUniform1f(shader->radius, radius);
-
-	glVertexAttribPointer(shader->pos_attrib, 2, GL_FLOAT, GL_FALSE,
-			0, verts);
-
-	glEnableVertexAttribArray(shader->pos_attrib);
-
-	glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
-
-	glDisableVertexAttribArray(shader->pos_attrib);
-}
-
-void fx_render_border_corner(struct fx_renderer *renderer, const struct wlr_box *box,
-		const float color[static 4], const float matrix[static 9],
-		enum corner_location corner_location, int radius, int border_thickness) {
-	if (border_thickness == 0 || box->width == 0 || box->height == 0) {
-		return;
-	}
-	assert(box->width > 0 && box->height > 0);
-
-	float gl_matrix[9];
-	wlr_matrix_multiply(gl_matrix, renderer->projection, matrix);
-
-	// TODO: investigate why matrix is flipped prior to this cmd
-	// wlr_matrix_multiply(gl_matrix, flip_180, gl_matrix);
-
-	wlr_matrix_transpose(gl_matrix, gl_matrix);
-
-	if (color[3] == 1.0 && !radius) {
-		glDisable(GL_BLEND);
-	} else {
-		glEnable(GL_BLEND);
-	}
-
-	struct corner_shader shader = renderer->shaders.corner;
-
-	glUseProgram(shader.program);
-
-	glUniformMatrix3fv(shader.proj, 1, GL_FALSE, gl_matrix);
-	glUniform4f(shader.color, color[0], color[1], color[2], color[3]);
-
-	glUniform1f(shader.is_top_left, corner_location == TOP_LEFT);
-	glUniform1f(shader.is_top_right, corner_location == TOP_RIGHT);
-	glUniform1f(shader.is_bottom_left, corner_location == BOTTOM_LEFT);
-	glUniform1f(shader.is_bottom_right, corner_location == BOTTOM_RIGHT);
-
-	glUniform2f(shader.position, box->x, box->y);
-	glUniform1f(shader.radius, radius);
-	glUniform2f(shader.half_size, box->width / 2.0, box->height / 2.0);
-	glUniform1f(shader.half_thickness, border_thickness / 2.0);
-
-	glVertexAttribPointer(shader.pos_attrib, 2, GL_FLOAT, GL_FALSE,
-			0, verts);
-
-	glEnableVertexAttribArray(shader.pos_attrib);
-
-	glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
-
-	glDisableVertexAttribArray(shader.pos_attrib);
-}
-
-static void fx_render_stencil_mask(struct fx_renderer *renderer, const struct wlr_box *box,
-		const float matrix[static 9], int corner_radius) {
-	if (box->width == 0 || box->height == 0) {
-		return;
-	}
-	assert(box->width > 0 && box->height > 0);
-
-	// TODO: just pass gl_matrix?
-	float gl_matrix[9];
-	wlr_matrix_multiply(gl_matrix, renderer->projection, matrix);
-
-	// TODO: investigate why matrix is flipped prior to this cmd
-	// wlr_matrix_multiply(gl_matrix, flip_180, gl_matrix);
-
-	wlr_matrix_transpose(gl_matrix, gl_matrix);
-
-	glEnable(GL_BLEND);
-
-	struct stencil_mask_shader shader = renderer->shaders.stencil_mask;
-
-	glUseProgram(shader.program);
-
-	glUniformMatrix3fv(shader.proj, 1, GL_FALSE, gl_matrix);
-
-	glUniform2f(shader.half_size, box->width * 0.5, box->height * 0.5);
-	glUniform2f(shader.position, box->x, box->y);
-	glUniform1f(shader.radius, corner_radius);
-
-	glVertexAttribPointer(shader.pos_attrib, 2, GL_FLOAT, GL_FALSE,
-			0, verts);
-
-	glEnableVertexAttribArray(shader.pos_attrib);
-
-	glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
-
-	glDisableVertexAttribArray(shader.pos_attrib);
-
-}
-
-// TODO: alpha input arg?
-void fx_render_box_shadow(struct fx_renderer *renderer, const struct wlr_box *box,
-		const float color[static 4], const float matrix[static 9], int corner_radius,
-		float blur_sigma) {
-	if (box->width == 0 || box->height == 0) {
-		return;
-	}
-	assert(box->width > 0 && box->height > 0);
-
-	float gl_matrix[9];
-	wlr_matrix_multiply(gl_matrix, renderer->projection, matrix);
-
-	// TODO: investigate why matrix is flipped prior to this cmd
-	// wlr_matrix_multiply(gl_matrix, flip_180, gl_matrix);
-
-	wlr_matrix_transpose(gl_matrix, gl_matrix);
-
-	// Init stencil work
-	struct wlr_box inner_box;
-	memcpy(&inner_box, box, sizeof(struct wlr_box));
-	inner_box.x += blur_sigma;
-	inner_box.y += blur_sigma;
-	inner_box.width -= blur_sigma * 2;
-	inner_box.height -= blur_sigma * 2;
-
-	glEnable(GL_STENCIL_TEST);
-	glClearStencil(0);
-	glClear(GL_STENCIL_BUFFER_BIT);
-
-	glStencilFunc(GL_ALWAYS, 1, 0xFF);
-	glStencilOp(GL_KEEP, GL_KEEP, GL_REPLACE);
-	// Disable writing to color buffer
-	glColorMask(GL_FALSE, GL_FALSE, GL_FALSE, GL_FALSE);
-	// Draw the rounded rect as a mask
-	fx_render_stencil_mask(renderer, &inner_box, matrix, corner_radius);
-	// Close the mask
-	glStencilFunc(GL_NOTEQUAL, 1, 0xFF);
-	glStencilOp(GL_KEEP, GL_KEEP, GL_KEEP);
-	// Reenable writing to color buffer
-	glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
-
-	// blending will practically always be needed (unless we have a madman
-	// who uses opaque shadows with zero sigma), so just enable it
-	glEnable(GL_BLEND);
-
-	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-
-	struct box_shadow_shader shader = renderer->shaders.box_shadow;
-
-	glUseProgram(shader.program);
-
-	glUniformMatrix3fv(shader.proj, 1, GL_FALSE, gl_matrix);
-	glUniform4f(shader.color, color[0], color[1], color[2], color[3]);
-	glUniform1f(shader.blur_sigma, blur_sigma);
-	glUniform1f(shader.corner_radius, corner_radius);
-
-	glUniform2f(shader.size, box->width, box->height);
-	glUniform2f(shader.position, box->x, box->y);
-
-	glVertexAttribPointer(shader.pos_attrib, 2, GL_FLOAT, GL_FALSE,
-			0, verts);
-
-	glEnableVertexAttribArray(shader.pos_attrib);
-
-	glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
-
-	glDisableVertexAttribArray(shader.pos_attrib);
-
-	glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
-
-	glClearStencil(0);
-	glClear(GL_STENCIL_BUFFER_BIT);
-	glDisable(GL_STENCIL_TEST);
-}
-
-void fx_render_blur(struct fx_renderer *renderer, const float matrix[static 9],
-		struct fx_framebuffer **buffer, struct blur_shader *shader,
-		const struct wlr_box *box, int blur_radius) {
-	glDisable(GL_BLEND);
-	glDisable(GL_STENCIL_TEST);
-
-	glActiveTexture(GL_TEXTURE0);
-
-	glBindTexture((*buffer)->texture.target, (*buffer)->texture.id);
-
-	glTexParameteri((*buffer)->texture.target, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-
-	glUseProgram(shader->program);
-
-	// OpenGL ES 2 requires the glUniformMatrix3fv transpose parameter to be set
-	// to GL_FALSE
-	float gl_matrix[9];
-	wlr_matrix_transpose(gl_matrix, matrix);
-	glUniformMatrix3fv(shader->proj, 1, GL_FALSE, gl_matrix);
-
-	glUniform1i(shader->tex, 0);
-	glUniform1f(shader->radius, blur_radius);
-
-	if (shader == &renderer->shaders.blur1) {
-		glUniform2f(shader->halfpixel, 0.5f / (renderer->viewport_width / 2.0f), 0.5f / (renderer->viewport_height / 2.0f));
-	} else {
-		glUniform2f(shader->halfpixel, 0.5f / (renderer->viewport_width * 2.0f), 0.5f / (renderer->viewport_height * 2.0f));
-	}
-
-	glVertexAttribPointer(shader->pos_attrib, 2, GL_FLOAT, GL_FALSE, 0, verts);
-	glVertexAttribPointer(shader->tex_attrib, 2, GL_FLOAT, GL_FALSE, 0, verts);
-
-	glEnableVertexAttribArray(shader->pos_attrib);
-	glEnableVertexAttribArray(shader->tex_attrib);
-
-	glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
-
-	glDisableVertexAttribArray(shader->pos_attrib);
-	glDisableVertexAttribArray(shader->tex_attrib);
 }

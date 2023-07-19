@@ -13,8 +13,6 @@
 #include <wlr/util/log.h>
 #include <wlr/util/region.h>
 #include "render/fx_renderer/fx_renderer.h"
-#include "render/fx_renderer/fx_texture.h"
-#include "types/decoration_data.h"
 #include "types/wlr_buffer.h"
 #include "types/wlr_scene.h"
 #include "util/array.h"
@@ -22,13 +20,6 @@
 #include "util/time.h"
 
 #define HIGHLIGHT_DAMAGE_FADEOUT_TIME 250
-
-static struct wlr_box get_monitor_box(struct wlr_output *output) {
-	int width, height;
-	wlr_output_transformed_resolution(output, &width, &height);
-	struct wlr_box monitor_box = { 0, 0, width, height };
-	return monitor_box;
-}
 
 static struct wlr_scene_tree *scene_tree_from_node(struct wlr_scene_node *node) {
 	assert(node->type == WLR_SCENE_NODE_TREE);
@@ -781,22 +772,21 @@ void wlr_scene_buffer_set_corner_radius(struct wlr_scene_buffer *scene_buffer,
 	scene_node_update(&scene_buffer->node, NULL);
 }
 
-static struct fx_texture scene_buffer_get_texture(
+static struct wlr_texture *scene_buffer_get_texture(
 		struct wlr_scene_buffer *scene_buffer, struct wlr_renderer *renderer) {
 	struct wlr_client_buffer *client_buffer =
 		wlr_client_buffer_get(scene_buffer->buffer);
 	if (client_buffer != NULL) {
-		return fx_texture_from_wlr_texture(client_buffer->texture);
+		return client_buffer->texture;
 	}
 
 	if (scene_buffer->texture != NULL) {
-		return fx_texture_from_wlr_texture(scene_buffer->texture);
+		return scene_buffer->texture;
 	}
 
-	struct wlr_texture *texture =
+	scene_buffer->texture =
 		wlr_texture_from_buffer(renderer, scene_buffer->buffer);
-	scene_buffer->texture = texture;
-	return fx_texture_from_wlr_texture(texture);
+	return scene_buffer->texture;
 }
 
 static void scene_node_get_size(struct wlr_scene_node *node,
@@ -1083,9 +1073,9 @@ static void render_rect(struct fx_renderer *fx_renderer, struct wlr_output *outp
 }
 
 static void render_texture(struct fx_renderer *fx_renderer, struct wlr_output *output,
-		pixman_region32_t *damage, struct fx_texture *texture,
+		pixman_region32_t *damage, struct wlr_texture *texture,
 		const struct wlr_fbox *src_box, const struct wlr_box *dst_box,
-		const float matrix[static 9], struct decoration_data deco_data) {
+		const float matrix[static 9], struct decoration_data *deco_data) {
 	assert(fx_renderer);
 
 	struct wlr_fbox default_src_box = {0};
@@ -1110,17 +1100,6 @@ static void render_texture(struct fx_renderer *fx_renderer, struct wlr_output *o
 		fx_render_subtexture_with_matrix(fx_renderer, texture, src_box,
 				&transformed_box, matrix, deco_data);
 	}
-}
-
-static void render_whole_output(struct fx_renderer *renderer, struct wlr_output *output,
-		pixman_region32_t *output_damage, struct fx_texture *texture) {
-	struct wlr_box monitor_box = get_monitor_box(output);
-	enum wl_output_transform transform = wlr_output_transform_invert(output->transform);
-	float matrix[9];
-	wlr_matrix_project_box(matrix, &monitor_box, transform, 0.0, output->transform_matrix);
-
-	render_texture(renderer, output, output_damage, texture, NULL, &monitor_box,
-			matrix, decoration_data_get_undecorated());
 }
 
 static void scene_node_render(struct fx_renderer *fx_renderer, struct wlr_scene_node *node,
@@ -1150,7 +1129,7 @@ static void scene_node_render(struct fx_renderer *fx_renderer, struct wlr_scene_
 	scene_node_get_size(node, &dst_box.width, &dst_box.height);
 	scale_box(&dst_box, output->scale);
 
-	struct fx_texture texture;
+	struct wlr_texture *texture;
 	float matrix[9];
 	enum wl_output_transform transform;
 	switch (node->type) {
@@ -1174,8 +1153,8 @@ static void scene_node_render(struct fx_renderer *fx_renderer, struct wlr_scene_
 		wlr_matrix_project_box(matrix, &dst_box, transform, 0.0,
 			output->transform_matrix);
 
-		render_texture(fx_renderer, output, &render_region, &texture, &scene_buffer->src_box,
-			&dst_box, matrix, scene_buffer->deco_data);
+		render_texture(fx_renderer, output, &render_region, texture, &scene_buffer->src_box,
+			&dst_box, matrix, &scene_buffer->deco_data);
 
 		wl_signal_emit_mutable(&scene_buffer->events.output_present, scene_output);
 		break;
@@ -1212,17 +1191,6 @@ static const struct wlr_addon_interface output_addon_impl = {
 	.destroy = scene_output_handle_destroy,
 };
 
-
-static void fx_renderer_handle_destroy(struct wlr_addon *addon) {
-	struct fx_renderer *renderer =
-		wl_container_of(addon, renderer, addon);
-	fx_renderer_fini(renderer);
-	free(renderer);
-}
-static const struct wlr_addon_interface fx_renderer_addon_impl = {
-	.name = "fx_renderer",
-	.destroy = fx_renderer_handle_destroy,
-};
 
 static void scene_node_output_update(struct wlr_scene_node *node,
 		struct wl_list *outputs, struct wlr_scene_output *ignore) {
@@ -1295,12 +1263,7 @@ struct wlr_scene_output *wlr_scene_output_create(struct wlr_scene *scene,
 
 	// Init FX Renderer
 	struct wlr_egl *egl = wlr_gles2_renderer_get_egl(output->renderer);
-	struct fx_renderer *renderer = fx_renderer_create(egl);
-	if (!renderer) {
-		wlr_log(WLR_ERROR, "Failed to create fx_renderer");
-		abort();
-	}
-	wlr_addon_init(&renderer->addon, &output->addons, scene, &fx_renderer_addon_impl);
+	fx_renderer_init_addon(egl, &output->addons, scene);
 
 	wlr_damage_ring_init(&scene_output->damage_ring);
 	wl_list_init(&scene_output->damage_highlight_regions);
@@ -1521,12 +1484,8 @@ bool wlr_scene_output_commit(struct wlr_scene_output *scene_output) {
 		scene_output->scene->debug_damage_option;
 
 	// Find the fx_renderer addon
-	struct wlr_addon *addon =
-		wlr_addon_find(&output->addons, scene_output->scene, &fx_renderer_addon_impl);
-	if (addon == NULL) {
-		return NULL;
-	}
-	struct fx_renderer *renderer = wl_container_of(addon, renderer, addon);
+	struct fx_renderer *renderer =
+		fx_renderer_addon_find(&output->addons, scene_output->scene);
 	assert(renderer != NULL);
 
 	struct render_list_constructor_data list_con = {
@@ -1629,12 +1588,7 @@ bool wlr_scene_output_commit(struct wlr_scene_output *scene_output) {
 		return true;
 	}
 
-	struct wlr_box monitor_box = get_monitor_box(output);
-	wlr_box_transform(&monitor_box, &monitor_box,
-			wlr_output_transform_invert(output->transform),
-			monitor_box.width, monitor_box.height);
-
-	fx_renderer_begin(renderer, output, monitor_box.width, monitor_box.height);
+	fx_renderer_begin(renderer, output->width, output->height);
 
 	pixman_region32_t background;
 	pixman_region32_init(&background);
@@ -1714,23 +1668,6 @@ bool wlr_scene_output_commit(struct wlr_scene_output *scene_output) {
 			}
 		}
 	}
-
-	// Draw the contents of our buffer into the wlr buffer
-	fx_framebuffer_bind(&renderer->wlr_buffer);
-
-	float clear_color[] = {0.0f, 0.0f, 0.0f, 1.0f};
-	if (pixman_region32_not_empty(&damage)) {
-		int nrects;
-		pixman_box32_t *rects = pixman_region32_rectangles(&damage, &nrects);
-		for (int i = 0; i < nrects; ++i) {
-			scissor_output(output, &rects[i]);
-			fx_renderer_clear(clear_color);
-		}
-	}
-
-	render_whole_output(renderer, output, &damage, &renderer->main_buffer.texture);
-
-	fx_renderer_scissor(NULL);
 
 	// Draw the software cursors
 	wlr_renderer_begin(output->renderer, output->width, output->height);

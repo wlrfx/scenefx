@@ -394,6 +394,12 @@ void wlr_scene_buffer_set_corner_radius(struct wlr_scene_buffer *scene_buffer,
 		int radii);
 
 /**
+* Sets the shadow of this buffer
+*/
+void wlr_scene_buffer_set_shadow_data(struct wlr_scene_buffer *scene_buffer,
+		struct shadow_data shadow_data);
+
+/**
  * Calls the buffer's frame_done signal.
  */
 void wlr_scene_buffer_send_frame_done(struct wlr_scene_buffer *scene_buffer,

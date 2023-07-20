@@ -7,6 +7,16 @@
 static float default_shadow_color[] = {0.0f, 0.0f, 0.0f, 0.5f};
 static float default_dim_color[] = {0.0f, 0.0f, 0.0f, 1.0f};
 
+struct shadow_data {
+	bool enabled;
+	float *color;
+	float blur_sigma;
+};
+
+struct shadow_data shadow_data_get_default(void);
+
+bool shadow_data_is_enabled(struct shadow_data *data);
+
 // TODO: Rename to something like `wlr_scene_node_decoration_data`?
 struct decoration_data {
 	float alpha;
@@ -21,9 +31,7 @@ struct decoration_data {
 	// TODO: Remove blur bool and add multiple fields (maybe even it's own
 	// struct?)
 	bool blur;
-	// TODO: Remove shadow bool and add multiple fields (maybe even it's own
-	// struct?)
-	bool shadow;
+	struct shadow_data shadow_data;
 };
 
 struct decoration_data decoration_data_get_undecorated(void);

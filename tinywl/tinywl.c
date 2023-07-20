@@ -753,7 +753,13 @@ static void wlr_scene_buffer_set_decoration_data_iter(
 		struct wlr_scene_buffer *buffer, int sx, int sy, void *user_data) {
 	struct wlr_scene_surface * scene_surface = wlr_scene_surface_from_buffer(buffer);
 	if (!wlr_surface_is_subsurface(scene_surface->surface)) {
+		/* Set the corner radius */
 		wlr_scene_buffer_set_corner_radius(buffer, 20);
+		/* Set the shadow data */
+		struct shadow_data shadow_data = shadow_data_get_default();
+		shadow_data.enabled = true;
+		memcpy(shadow_data.color, (float[]) {1.0f, 0.0f, 0.0f, 1.0f}, sizeof(float[4]));
+		wlr_scene_buffer_set_shadow_data(buffer, shadow_data);
 	}
 }
 

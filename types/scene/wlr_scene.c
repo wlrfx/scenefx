@@ -1,9 +1,12 @@
 #define _POSIX_C_SOURCE 200809L
 #include <assert.h>
+#include <pixman.h>
 #include <stdlib.h>
 #include <string.h>
 #include <wlr/backend.h>
 #include <wlr/render/gles2.h>
+#include <wlr/types/wlr_xdg_shell.h>
+#include <wlr/types/wlr_layer_shell_v1.h>
 #include <wlr/types/wlr_compositor.h>
 #include <wlr/types/wlr_damage_ring.h>
 #include <wlr/types/wlr_matrix.h>
@@ -13,6 +16,7 @@
 #include <wlr/util/log.h>
 #include <wlr/util/region.h>
 #include "render/fx_renderer/fx_renderer.h"
+#include "types/decoration_data.h"
 #include "types/wlr_buffer.h"
 #include "types/wlr_scene.h"
 #include "util/array.h"
@@ -20,6 +24,16 @@
 #include "util/time.h"
 
 #define HIGHLIGHT_DAMAGE_FADEOUT_TIME 250
+
+static pixman_region32_t create_damage(const struct wlr_box damage_box,
+		pixman_region32_t *output_damage) {
+	pixman_region32_t damage;
+	pixman_region32_init(&damage);
+	pixman_region32_union_rect(&damage, &damage, damage_box.x, damage_box.y,
+		damage_box.width, damage_box.height);
+	pixman_region32_intersect(&damage, &damage, output_damage);
+	return damage;
+}
 
 static struct wlr_scene_tree *scene_tree_from_node(struct wlr_scene_node *node) {
 	assert(node->type == WLR_SCENE_NODE_TREE);
@@ -240,7 +254,9 @@ static void scene_node_opaque_region(struct wlr_scene_node *node, int x, int y,
 			return;
 		}
 
-		if (scene_buffer->deco_data.alpha != 1) {
+		/* Buffer is translucent*/
+		if (scene_buffer->deco_data.alpha != 1 ||
+				scene_buffer->deco_data.corner_radius != 0) {
 			return;
 		}
 
@@ -396,6 +412,15 @@ static bool scene_node_update_iterator(struct wlr_scene_node *node,
 		scene_node_opaque_region(node, lx, ly, &opaque);
 		pixman_region32_subtract(data->visible, data->visible, &opaque);
 		pixman_region32_fini(&opaque);
+	}
+
+	/* Expand the nodes visible region by the shadow size */
+	if (node->type == WLR_SCENE_NODE_BUFFER) {
+		struct wlr_scene_buffer *buffer = wlr_scene_buffer_from_node(node);
+		struct shadow_data *data = &buffer->deco_data.shadow_data;
+		if (shadow_data_is_enabled(data)) {
+			wlr_region_expand(&node->visible, &node->visible, data->blur_sigma);
+		}
 	}
 
 	update_node_update_outputs(node, data->outputs, NULL);
@@ -772,6 +797,20 @@ void wlr_scene_buffer_set_corner_radius(struct wlr_scene_buffer *scene_buffer,
 	scene_node_update(&scene_buffer->node, NULL);
 }
 
+void wlr_scene_buffer_set_shadow_data(struct wlr_scene_buffer *scene_buffer,
+		struct shadow_data shadow_data) {
+	struct shadow_data *buff_data = &scene_buffer->deco_data.shadow_data;
+	if (buff_data->enabled == shadow_data.enabled &&
+			buff_data->blur_sigma == shadow_data.blur_sigma &&
+			buff_data->color && shadow_data.color) {
+		return;
+	}
+
+	memcpy(&scene_buffer->deco_data.shadow_data, &shadow_data,
+			sizeof(struct shadow_data));
+	scene_node_update(&scene_buffer->node, NULL);
+}
+
 static struct wlr_texture *scene_buffer_get_texture(
 		struct wlr_scene_buffer *scene_buffer, struct wlr_renderer *renderer) {
 	struct wlr_client_buffer *client_buffer =
@@ -1102,6 +1141,56 @@ static void render_texture(struct fx_renderer *fx_renderer, struct wlr_output *o
 	}
 }
 
+static void render_box_shadow(struct fx_renderer *fx_renderer,
+		struct wlr_output *output, pixman_region32_t *output_damage,
+		const struct wlr_box *surface_box, struct decoration_data *deco_data) {
+	float blur_sigma = deco_data->shadow_data.blur_sigma;
+	int corner_radius = deco_data->corner_radius;
+
+	struct wlr_box box;
+	memcpy(&box, surface_box, sizeof(struct wlr_box));
+	box.x -= blur_sigma;
+	box.y -= blur_sigma;
+	box.width += 2 * blur_sigma;
+	box.height += 2 * blur_sigma;
+	pixman_region32_t damage = create_damage(box, output_damage);
+
+	// don't damage area behind window since we dont render it anyway
+	struct wlr_box inner_box;
+	memcpy(&inner_box, surface_box, sizeof(struct wlr_box));
+	inner_box.x += corner_radius * 0.5;
+	inner_box.y += corner_radius * 0.5;
+	inner_box.width -= corner_radius;
+	inner_box.height -= corner_radius;
+	pixman_region32_t inner_region = create_damage(inner_box, output_damage);
+	pixman_region32_subtract(&damage, &damage, &inner_region);
+
+	if (!pixman_region32_not_empty(&damage)) {
+		goto damage_finish;
+	}
+
+	float matrix[9];
+	wlr_matrix_project_box(matrix, &box, WL_OUTPUT_TRANSFORM_NORMAL, 0,
+			output->transform_matrix);
+
+	// ensure the box is updated as per the output orientation
+	struct wlr_box transformed_box;
+	int width, height;
+	wlr_output_transformed_resolution(output, &width, &height);
+	wlr_box_transform(&transformed_box, &box,
+			wlr_output_transform_invert(output->transform), width, height);
+
+	int nrects;
+	pixman_box32_t *rects = pixman_region32_rectangles(&damage, &nrects);
+	for (int i = 0; i < nrects; ++i) {
+		scissor_output(output, &rects[i]);
+		fx_render_box_shadow(fx_renderer, &transformed_box, surface_box, matrix, deco_data);
+	}
+
+damage_finish:
+	pixman_region32_fini(&damage);
+}
+
 static void scene_node_render(struct fx_renderer *fx_renderer, struct wlr_scene_node *node,
 		struct wlr_scene_output *scene_output, pixman_region32_t *damage) {
 	int x, y;
@@ -1149,12 +1238,48 @@ static void scene_node_render(struct fx_renderer *fx_renderer, struct wlr_scene_
 		struct wlr_renderer *renderer = output->renderer;
 		texture = scene_buffer_get_texture(scene_buffer, renderer);
 
+		struct decoration_data *deco_data = &scene_buffer->deco_data;
+
 		transform = wlr_output_transform_invert(scene_buffer->transform);
 		wlr_matrix_project_box(matrix, &dst_box, transform, 0.0,
 			output->transform_matrix);
 
+		// Some surfaces (mostyly GTK 4) decorate their windows with shadows
+		// which extends the node size past the actual window size. This gets
+		// the actual surface geometry, mostyly ignoring CSD decorations
+		// but only if we need to.
+		if (deco_data->corner_radius != 0 ||
+				shadow_data_is_enabled(&deco_data->shadow_data)) {
+			struct wlr_box *clip_box = malloc(sizeof(struct wlr_box));
+			struct wlr_scene_surface *scene_surface =
+				wlr_scene_surface_from_buffer(scene_buffer);
+			struct wlr_surface *surface = scene_surface->surface;
+			if (wlr_surface_is_xdg_surface(surface)) {
+				struct wlr_xdg_surface *xdg_surface =
+					wlr_xdg_surface_from_wlr_surface(surface);
+				wlr_xdg_surface_get_geometry(xdg_surface, clip_box);
+				clip_box->x += x;
+				clip_box->y += y;
+			}
+
+			if (!wlr_box_empty(clip_box)) {
+				dst_box.width = fmin(dst_box.width, clip_box->width);
+				dst_box.height = fmin(dst_box.height, clip_box->height);
+				dst_box.x = fmax(dst_box.x, clip_box->x);
+				dst_box.y = fmax(dst_box.y, clip_box->y);
+			}
+
+			free(clip_box);
+		}
+
+		// Shadow
+		if (shadow_data_is_enabled(&deco_data->shadow_data)) {
+			// TODO: Compensate for SSD borders here
+			render_box_shadow(fx_renderer, output, damage, &dst_box, deco_data);
+		}
+
 		render_texture(fx_renderer, output, &render_region, texture, &scene_buffer->src_box,
-			&dst_box, matrix, &scene_buffer->deco_data);
+			&dst_box, matrix, deco_data);
 
 		wl_signal_emit_mutable(&scene_buffer->events.output_present, scene_output);
 		break;
@@ -1588,7 +1713,7 @@ bool wlr_scene_output_commit(struct wlr_scene_output *scene_output) {
 		return true;
 	}
 
-	fx_renderer_begin(renderer, output->width, output->height);
+	fx_renderer_begin(renderer, output);
 
 	pixman_region32_t background;
 	pixman_region32_init(&background);

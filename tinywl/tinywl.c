@@ -82,8 +82,10 @@ struct tinywl_view {
 	struct tinywl_server *server;
 	struct wlr_xdg_toplevel *xdg_toplevel;
 	struct wlr_scene_tree *scene_tree;
+	struct wlr_scene_rect *border[4];
 	struct wl_listener map;
 	struct wl_listener unmap;
+	struct wl_listener commit;
 	struct wl_listener destroy;
 	struct wl_listener request_move;
 	struct wl_listener request_resize;
@@ -630,11 +632,52 @@ static void server_new_output(struct wl_listener *listener, void *data) {
 	wlr_output_layout_add_auto(server->output_layout, wlr_output);
 }
 
+static void tinywl_view_resize(struct tinywl_view *view, struct wlr_box geometry) {
+	/* Fixed border width (pixels) */
+	int border_width = 5;
+
+	struct wlr_scene_tree *scene_surface = view->xdg_toplevel->base->data;
+
+	wlr_scene_rect_set_size(view->border[0], geometry.width, border_width);
+	wlr_scene_rect_set_size(view->border[1], geometry.width, border_width);
+	wlr_scene_rect_set_size(view->border[2], border_width, geometry.height - 2 * border_width);
+	wlr_scene_rect_set_size(view->border[3], border_width, geometry.height - 2 * border_width);
+
+	wlr_scene_node_set_position(&view->border[1]->node, 0, geometry.height - border_width);
+	wlr_scene_node_set_position(&view->border[2]->node, 0, border_width);
+	wlr_scene_node_set_position(&view->border[3]->node, geometry.width - border_width, border_width);
+
+	wlr_xdg_toplevel_set_size(view->xdg_toplevel, geometry.width, geometry.height);
+}
+
+static void xdg_toplevel_commit(struct wl_listener *listener, void *data) {
+	/* Called when the surface commits to the framebuffer. */
+	struct tinywl_view *view = wl_container_of(listener, view, commit);
+	struct wlr_box geometry;
+	wlr_xdg_surface_get_geometry(view->xdg_toplevel->base, &geometry);
+
+	tinywl_view_resize(view, geometry);
+}
+
 static void xdg_toplevel_map(struct wl_listener *listener, void *data) {
 	/* Called when the surface is mapped, or ready to display on-screen. */
 	struct tinywl_view *view = wl_container_of(listener, view, map);
 
 	wl_list_insert(&view->server->views, &view->link);
+
+	/* Initialize toplevel borders. */
+	static const float border_color[] = {1.0, 0.0, 0.0, 1.0};
+
+	for(int i = 0; i < 4; i++) {
+		view->border[i] = wlr_scene_rect_create(view->scene_tree, 0, 0,
+				border_color);
+
+		view->border[i]->node.data = view;
+	}
+
+	view->commit.notify = xdg_toplevel_commit;
+	wl_signal_add(&view->xdg_toplevel->base->surface->events.commit,
+			&view->commit);
 
 	focus_view(view, view->xdg_toplevel->base->surface);
 }
@@ -648,6 +691,7 @@ static void xdg_toplevel_unmap(struct wl_listener *listener, void *data) {
 		reset_cursor_mode(view->server);
 	}
 
+	wl_list_remove(&view->commit.link);
 	wl_list_remove(&view->link);
 }
 

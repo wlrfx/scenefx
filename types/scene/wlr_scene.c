@@ -955,8 +955,8 @@ bool wlr_scene_node_coords(struct wlr_scene_node *node,
 
 static void scene_node_for_each_scene_buffer(struct wlr_scene_node *node,
 		int lx, int ly, wlr_scene_buffer_iterator_func_t user_iterator,
-		bool enabled, void *user_data) {
-	if (enabled && !node->enabled) {
+		void *user_data) {
+	if (!node->enabled) {
 		return;
 	}
 
@@ -970,20 +970,14 @@ static void scene_node_for_each_scene_buffer(struct wlr_scene_node *node,
 		struct wlr_scene_tree *scene_tree = scene_tree_from_node(node);
 		struct wlr_scene_node *child;
 		wl_list_for_each(child, &scene_tree->children, link) {
-			scene_node_for_each_scene_buffer(child, lx, ly, user_iterator,
-					enabled, user_data);
+			scene_node_for_each_scene_buffer(child, lx, ly, user_iterator, user_data);
 		}
 	}
 }
 
 void wlr_scene_node_for_each_buffer(struct wlr_scene_node *node,
 		wlr_scene_buffer_iterator_func_t user_iterator, void *user_data) {
-	scene_node_for_each_scene_buffer(node, 0, 0, user_iterator, true, user_data);
-}
-
-void wlr_scene_node_for_all_buffers(struct wlr_scene_node *node,
-		wlr_scene_buffer_iterator_func_t user_iterator, void *user_data) {
-	scene_node_for_each_scene_buffer(node, 0, 0, user_iterator, false, user_data);
+	scene_node_for_each_scene_buffer(node, 0, 0, user_iterator, user_data);
 }
 
 struct node_at_data {

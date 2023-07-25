@@ -254,13 +254,6 @@ bool wlr_scene_node_coords(struct wlr_scene_node *node, int *lx, int *ly);
 void wlr_scene_node_for_each_buffer(struct wlr_scene_node *node,
 	wlr_scene_buffer_iterator_func_t iterator, void *user_data);
 /**
- * Call `iterator` on each buffer in the scene-graph, with the buffer's
- * position in layout coordinates (even if it's not enabled). The function is
- * called from root to leaves (in rendering order).
- */
-void wlr_scene_node_for_all_buffers(struct wlr_scene_node *node,
-		wlr_scene_buffer_iterator_func_t user_iterator, void *user_data);
-/**
  * Find the topmost node in this scene-graph that contains the point at the
  * given layout-local coordinates. (For surface nodes, this means accepting
  * input events at that point.) Returns the node and coordinates relative to the

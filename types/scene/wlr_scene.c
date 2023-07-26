@@ -240,7 +240,7 @@ static void scene_node_opaque_region(struct wlr_scene_node *node, int x, int y,
 			return;
 		}
 
-		if (scene_buffer->opacity != 1) {
+		if (scene_buffer->opacity != 1 || scene_buffer->corner_radius > 0) {
 			return;
 		}
 

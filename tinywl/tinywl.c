@@ -5,7 +5,6 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <time.h>
-#include <types/decoration_data.h>
 #include <unistd.h>
 #include <wayland-server-core.h>
 #include <wayland-util.h>
@@ -79,6 +78,18 @@ struct tinywl_output {
 	struct wl_listener destroy;
 };
 
+struct tinywl_decoration_data {
+	float opacity;
+	int corner_radius;
+};
+
+static struct tinywl_decoration_data tinywl_decoration_data_get_undecorated(void) {
+	return (struct tinywl_decoration_data) {
+		.opacity = 1,
+		.corner_radius = 0,
+	};
+}
+
 struct tinywl_view {
 	struct wl_list link;
 	struct tinywl_server *server;
@@ -95,7 +106,7 @@ struct tinywl_view {
 
 	struct wlr_addon addon;
 
-	struct decoration_data deco_data;
+	struct tinywl_decoration_data deco_data;
 };
 
 struct tinywl_keyboard {
@@ -597,7 +608,7 @@ static void server_cursor_frame(struct wl_listener *listener, void *data) {
 }
 
 static void output_configure_scene(struct wlr_scene_node *node,
-		struct decoration_data *deco_data) {
+		struct tinywl_decoration_data *deco_data) {
 	if (!node->enabled) {
 		return;
 	}
@@ -620,7 +631,7 @@ static void output_configure_scene(struct wlr_scene_node *node,
 				xdg_surface->role == WLR_XDG_SURFACE_ROLE_TOPLEVEL) {
 			// TODO: Be able to set whole decoration_data instead of calling
 			// each individually?
-			wlr_scene_buffer_set_opacity(buffer, deco_data->alpha);
+			wlr_scene_buffer_set_opacity(buffer, deco_data->opacity);
 
 			if (!wlr_surface_is_subsurface(xdg_surface->surface)) {
 				wlr_scene_buffer_set_corner_radius(buffer, deco_data->corner_radius);
@@ -860,7 +871,7 @@ static void server_new_xdg_surface(struct wl_listener *listener, void *data) {
 	tinywl_view_addon_assign(view, &view->scene_tree->node.addons, &view->scene_tree->node);
 
 	/* Set the scene_nodes decoration_data */
-	view->deco_data = decoration_data_get_undecorated();
+	view->deco_data = tinywl_decoration_data_get_undecorated();
 	view->deco_data.corner_radius = 20;
 
 	/* Listen to the various events it can emit */

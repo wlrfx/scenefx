@@ -8,7 +8,6 @@
 #include <wlr/render/wlr_texture.h>
 #include <wlr/util/addon.h>
 #include <wlr/util/box.h>
-#include "types/decoration_data.h"
 
 enum fx_tex_shader_source {
 	SHADER_SOURCE_TEXTURE_RGBA = 1,
@@ -75,7 +74,7 @@ void fx_renderer_scissor(struct wlr_box *box);
 bool fx_render_subtexture_with_matrix(struct fx_renderer *renderer,
 		struct wlr_texture *wlr_texture, const struct wlr_fbox *src_box,
 		const struct wlr_box *dst_box, const float matrix[static 9],
-		struct decoration_data *deco_data);
+		float opacity, int corner_radius);
 
 void fx_render_rect(struct fx_renderer *renderer, const struct wlr_box *box,
 		const float color[static 4], const float projection[static 9]);

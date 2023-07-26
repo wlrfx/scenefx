@@ -23,7 +23,6 @@
 #include <wayland-server-core.h>
 #include <wlr/types/wlr_compositor.h>
 #include <wlr/types/wlr_damage_ring.h>
-#include <types/decoration_data.h>
 
 struct wlr_output;
 struct wlr_output_layout;
@@ -150,7 +149,9 @@ struct wlr_scene_buffer {
 
 	// private state
 
-	struct decoration_data deco_data;
+	float opacity;
+	int corner_radius;
+
 	uint64_t active_outputs;
 	struct wlr_texture *texture;
 	struct wlr_fbox src_box;

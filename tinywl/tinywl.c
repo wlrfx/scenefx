@@ -78,18 +78,6 @@ struct tinywl_output {
 	struct wl_listener destroy;
 };
 
-struct tinywl_decoration_data {
-	float opacity;
-	int corner_radius;
-};
-
-static struct tinywl_decoration_data tinywl_decoration_data_get_undecorated(void) {
-	return (struct tinywl_decoration_data) {
-		.opacity = 1,
-		.corner_radius = 0,
-	};
-}
-
 struct tinywl_view {
 	struct wl_list link;
 	struct tinywl_server *server;
@@ -106,7 +94,8 @@ struct tinywl_view {
 
 	struct wlr_addon addon;
 
-	struct tinywl_decoration_data deco_data;
+	float opacity;
+	int corner_radius;
 };
 
 struct tinywl_keyboard {
@@ -608,14 +597,15 @@ static void server_cursor_frame(struct wl_listener *listener, void *data) {
 }
 
 static void output_configure_scene(struct wlr_scene_node *node,
-		struct tinywl_decoration_data *deco_data) {
+		float opacity, int corner_radius) {
 	if (!node->enabled) {
 		return;
 	}
 
 	struct tinywl_view *view = tinywl_view_addon_get(&node->addons, node);
 	if (view) {
-		deco_data = &view->deco_data;
+		opacity = view->opacity;
+		corner_radius = view->corner_radius;
 	}
 
 	if (node->type == WLR_SCENE_NODE_BUFFER) {
@@ -626,22 +616,21 @@ static void output_configure_scene(struct wlr_scene_node *node,
 		struct wlr_xdg_surface *xdg_surface =
 			wlr_xdg_surface_from_wlr_surface(scene_surface->surface);
 
-		if (deco_data &&
-				xdg_surface &&
+		if (xdg_surface &&
 				xdg_surface->role == WLR_XDG_SURFACE_ROLE_TOPLEVEL) {
 			// TODO: Be able to set whole decoration_data instead of calling
 			// each individually?
-			wlr_scene_buffer_set_opacity(buffer, deco_data->opacity);
+			wlr_scene_buffer_set_opacity(buffer, opacity);
 
 			if (!wlr_surface_is_subsurface(xdg_surface->surface)) {
-				wlr_scene_buffer_set_corner_radius(buffer, deco_data->corner_radius);
+				wlr_scene_buffer_set_corner_radius(buffer, corner_radius);
 			}
 		}
 	} else if (node->type == WLR_SCENE_NODE_TREE) {
 		struct wlr_scene_tree *tree = wl_container_of(node, tree, node);
 		struct wlr_scene_node *node;
 		wl_list_for_each(node, &tree->children, link) {
-			output_configure_scene(node, deco_data);
+			output_configure_scene(node, opacity, corner_radius);
 		}
 	}
 }
@@ -655,7 +644,7 @@ static void output_frame(struct wl_listener *listener, void *data) {
 	struct wlr_scene_output *scene_output = wlr_scene_get_scene_output(
 		scene, output->wlr_output);
 
-	output_configure_scene(&scene_output->scene->tree.node, NULL);
+	output_configure_scene(&scene_output->scene->tree.node, 1, 0);
 
 	/* Render the scene if needed and commit the output */
 	wlr_scene_output_commit(scene_output);
@@ -870,9 +859,9 @@ static void server_new_xdg_surface(struct wl_listener *listener, void *data) {
 	/* Add the view to the trees addon */
 	tinywl_view_addon_assign(view, &view->scene_tree->node.addons, &view->scene_tree->node);
 
-	/* Set the scene_nodes decoration_data */
-	view->deco_data = tinywl_decoration_data_get_undecorated();
-	view->deco_data.corner_radius = 20;
+	/* Set the scene_nodes decoration data */
+	view->opacity = 1;
+	view->corner_radius = 20;
 
 	/* Listen to the various events it can emit */
 	view->map.notify = xdg_toplevel_map;

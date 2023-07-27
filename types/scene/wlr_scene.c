@@ -1261,6 +1261,10 @@ static void scene_node_render(struct fx_renderer *fx_renderer, struct wlr_scene_
 				dst_box.height = fmin(dst_box.height, clip_box->height);
 				dst_box.x = fmax(dst_box.x, clip_box->x);
 				dst_box.y = fmax(dst_box.y, clip_box->y);
+
+				// Clip the damage to the new dst_box
+				pixman_region32_intersect_rect(&render_region, &render_region,
+						dst_box.x, dst_box.y, dst_box.width, dst_box.height);
 			}
 
 			free(clip_box);

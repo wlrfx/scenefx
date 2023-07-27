@@ -10,7 +10,7 @@
 #include <wlr/util/addon.h>
 #include <wlr/util/box.h>
 #include "render/fx_renderer/fx_stencilbuffer.h"
-#include "types/decoration_data.h"
+#include "types/fx/shadow_data.h"
 
 enum fx_tex_shader_source {
 	SHADER_SOURCE_TEXTURE_RGBA = 1,
@@ -115,13 +115,14 @@ void fx_renderer_stencil_disable(void);
 bool fx_render_subtexture_with_matrix(struct fx_renderer *renderer,
 		struct wlr_texture *wlr_texture, const struct wlr_fbox *src_box,
 		const struct wlr_box *dst_box, const float matrix[static 9],
-		struct decoration_data *deco_data);
+		float opacity, int corner_radius);
 
 void fx_render_rect(struct fx_renderer *renderer, const struct wlr_box *box,
 		const float color[static 4], const float projection[static 9]);
 
 void fx_render_box_shadow(struct fx_renderer *renderer,
 		const struct wlr_box *box, const struct wlr_box *stencil_box,
-		const float matrix[static 9], struct decoration_data *deco_data);
+		const float matrix[static 9], int corner_radius,
+		struct shadow_data *shadow_data);
 
 #endif

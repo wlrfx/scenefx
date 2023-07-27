@@ -8,7 +8,4 @@ wlr_files += files(
 	'buffer/buffer.c',
 )
 
-# Fx files
-wlr_files += files(
-	'decoration_data.c'
-)
+subdir('fx')

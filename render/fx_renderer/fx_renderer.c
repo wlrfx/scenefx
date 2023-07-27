@@ -17,7 +17,6 @@
 #include "render/fx_renderer/fx_renderer.h"
 #include "render/fx_renderer/fx_stencilbuffer.h"
 #include "render/fx_renderer/matrix.h"
-#include "types/decoration_data.h"
 
 // shaders
 #include "common_vert_src.h"
@@ -379,7 +378,7 @@ void fx_renderer_stencil_disable(void) {
 bool fx_render_subtexture_with_matrix(struct fx_renderer *renderer,
 		struct wlr_texture *wlr_texture, const struct wlr_fbox *src_box,
 		const struct wlr_box *dst_box, const float matrix[static 9],
-		struct decoration_data *deco_data) {
+		float opacity, int corner_radius) {
 
 	assert(wlr_texture_is_gles2(wlr_texture));
 	struct wlr_gles2_texture_attribs texture_attrs;
@@ -417,7 +416,7 @@ bool fx_render_subtexture_with_matrix(struct fx_renderer *renderer,
 	wlr_matrix_transpose(gl_matrix, gl_matrix);
 
 	// if there's no opacity or rounded corners we don't need to blend
-	if (!texture_attrs.has_alpha && deco_data->alpha == 1.0 && !deco_data->corner_radius) {
+	if (!texture_attrs.has_alpha && opacity == 1.0 && !corner_radius) {
 		glDisable(GL_BLEND);
 	} else {
 		glEnable(GL_BLEND);
@@ -436,8 +435,8 @@ bool fx_render_subtexture_with_matrix(struct fx_renderer *renderer,
 	glUniform1i(shader->tex, 0);
 	glUniform2f(shader->size, dst_box->width, dst_box->height);
 	glUniform2f(shader->position, dst_box->x, dst_box->y);
-	glUniform1f(shader->alpha, deco_data->alpha);
-	glUniform1f(shader->radius, deco_data->corner_radius);
+	glUniform1f(shader->alpha, opacity);
+	glUniform1f(shader->radius, corner_radius);
 
 	const GLfloat x1 = src_box->x / wlr_texture->width;
 	const GLfloat y1 = src_box->y / wlr_texture->height;
@@ -546,14 +545,15 @@ static void fx_render_stencil_mask(struct fx_renderer *renderer,
 
 void fx_render_box_shadow(struct fx_renderer *renderer,
 		const struct wlr_box *box, const struct wlr_box *stencil_box,
-		const float matrix[static 9], struct decoration_data *deco_data) {
+		const float matrix[static 9], int corner_radius,
+		struct shadow_data *shadow_data) {
 	if (box->width == 0 || box->height == 0) {
 		return;
 	}
 	assert(box->width > 0 && box->height > 0);
 
-	float *color = deco_data->shadow_data.color;
-	float blur_sigma = deco_data->shadow_data.blur_sigma;
+	float *color = shadow_data->color;
+	float blur_sigma = shadow_data->blur_sigma;
 
 	float gl_matrix[9];
 	wlr_matrix_multiply(gl_matrix, renderer->projection, matrix);
@@ -566,7 +566,7 @@ void fx_render_box_shadow(struct fx_renderer *renderer,
 	// Init stencil work
 	fx_renderer_stencil_mask_init();
 	// Draw the rounded rect as a mask
-	fx_render_stencil_mask(renderer, stencil_box, matrix, deco_data->corner_radius);
+	fx_render_stencil_mask(renderer, stencil_box, matrix, corner_radius);
 	fx_renderer_stencil_mask_close(false);
 
 	// blending will practically always be needed (unless we have a madman
@@ -582,7 +582,7 @@ void fx_render_box_shadow(struct fx_renderer *renderer,
 	glUniformMatrix3fv(shader.proj, 1, GL_FALSE, gl_matrix);
 	glUniform4f(shader.color, color[0], color[1], color[2], color[3]);
 	glUniform1f(shader.blur_sigma, blur_sigma);
-	glUniform1f(shader.corner_radius, deco_data->corner_radius);
+	glUniform1f(shader.corner_radius, corner_radius);
 
 	glUniform2f(shader.size, box->width, box->height);
 	glUniform2f(shader.position, box->x, box->y);

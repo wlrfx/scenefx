@@ -7,6 +7,7 @@
 #include <time.h>
 #include <unistd.h>
 #include <wayland-server-core.h>
+#include <wayland-util.h>
 #include <wlr/backend.h>
 #include <wlr/render/allocator.h>
 #include <wlr/render/wlr_renderer.h>
@@ -90,6 +91,11 @@ struct tinywl_view {
 	struct wl_listener request_maximize;
 	struct wl_listener request_fullscreen;
 	int x, y;
+
+	struct wlr_addon addon;
+
+	float opacity;
+	int corner_radius;
 };
 
 struct tinywl_keyboard {
@@ -101,6 +107,44 @@ struct tinywl_keyboard {
 	struct wl_listener key;
 	struct wl_listener destroy;
 };
+
+static void tinywl_view_destroy(struct tinywl_view *view) {
+	wl_list_remove(&view->map.link);
+	wl_list_remove(&view->unmap.link);
+	wl_list_remove(&view->destroy.link);
+	wl_list_remove(&view->request_move.link);
+	wl_list_remove(&view->request_resize.link);
+	wl_list_remove(&view->request_maximize.link);
+	wl_list_remove(&view->request_fullscreen.link);
+
+	free(view);
+}
+
+static void tinywl_view_addon_handle_destroy(struct wlr_addon *addon) {
+	struct tinywl_view *view = wl_container_of(addon, view, addon);
+
+	tinywl_view_destroy(view);
+}
+static const struct wlr_addon_interface tinywl_view_addon_impl = {
+	.name = "tinywl_view",
+	.destroy = tinywl_view_addon_handle_destroy,
+};
+
+static void tinywl_view_addon_assign(struct tinywl_view *view, struct wlr_addon_set *addons,
+		const void * owner) {
+	wlr_addon_init(&view->addon, addons, owner, &tinywl_view_addon_impl);
+}
+
+static struct tinywl_view *tinywl_view_addon_get(struct wlr_addon_set *addons,
+		const void * owner) {
+	struct wlr_addon *addon =
+		wlr_addon_find(addons, owner, &tinywl_view_addon_impl);
+	if (addon == NULL) {
+		return NULL;
+	}
+	struct tinywl_view *view = wl_container_of(addon, view, addon);
+	return view;
+}
 
 static void focus_view(struct tinywl_view *view, struct wlr_surface *surface) {
 	/* Note: this function only deals with keyboard focus. */
@@ -552,6 +596,45 @@ static void server_cursor_frame(struct wl_listener *listener, void *data) {
 	wlr_seat_pointer_notify_frame(server->seat);
 }
 
+static void output_configure_scene(struct wlr_scene_node *node,
+		float opacity, int corner_radius) {
+	if (!node->enabled) {
+		return;
+	}
+
+	struct tinywl_view *view = tinywl_view_addon_get(&node->addons, node);
+	if (view) {
+		opacity = view->opacity;
+		corner_radius = view->corner_radius;
+	}
+
+	if (node->type == WLR_SCENE_NODE_BUFFER) {
+		struct wlr_scene_buffer *buffer = wlr_scene_buffer_from_node(node);
+
+		struct wlr_scene_surface * scene_surface
+			= wlr_scene_surface_from_buffer(buffer);
+		struct wlr_xdg_surface *xdg_surface =
+			wlr_xdg_surface_from_wlr_surface(scene_surface->surface);
+
+		if (xdg_surface &&
+				xdg_surface->role == WLR_XDG_SURFACE_ROLE_TOPLEVEL) {
+			// TODO: Be able to set whole decoration_data instead of calling
+			// each individually?
+			wlr_scene_buffer_set_opacity(buffer, opacity);
+
+			if (!wlr_surface_is_subsurface(xdg_surface->surface)) {
+				wlr_scene_buffer_set_corner_radius(buffer, corner_radius);
+			}
+		}
+	} else if (node->type == WLR_SCENE_NODE_TREE) {
+		struct wlr_scene_tree *tree = wl_container_of(node, tree, node);
+		struct wlr_scene_node *node;
+		wl_list_for_each(node, &tree->children, link) {
+			output_configure_scene(node, opacity, corner_radius);
+		}
+	}
+}
+
 static void output_frame(struct wl_listener *listener, void *data) {
 	/* This function is called every time an output is ready to display a frame,
 	 * generally at the output's refresh rate (e.g. 60Hz). */
@@ -560,6 +643,8 @@ static void output_frame(struct wl_listener *listener, void *data) {
 
 	struct wlr_scene_output *scene_output = wlr_scene_get_scene_output(
 		scene, output->wlr_output);
+
+	output_configure_scene(&scene_output->scene->tree.node, 1, 0);
 
 	/* Render the scene if needed and commit the output */
 	wlr_scene_output_commit(scene_output);
@@ -655,15 +740,7 @@ static void xdg_toplevel_destroy(struct wl_listener *listener, void *data) {
 	/* Called when the surface is destroyed and should never be shown again. */
 	struct tinywl_view *view = wl_container_of(listener, view, destroy);
 
-	wl_list_remove(&view->map.link);
-	wl_list_remove(&view->unmap.link);
-	wl_list_remove(&view->destroy.link);
-	wl_list_remove(&view->request_move.link);
-	wl_list_remove(&view->request_resize.link);
-	wl_list_remove(&view->request_maximize.link);
-	wl_list_remove(&view->request_fullscreen.link);
-
-	free(view);
+	tinywl_view_destroy(view);
 }
 
 static void begin_interactive(struct tinywl_view *view,
@@ -778,6 +855,13 @@ static void server_new_xdg_surface(struct wl_listener *listener, void *data) {
 			&view->server->scene->tree, view->xdg_toplevel->base);
 	view->scene_tree->node.data = view;
 	xdg_surface->data = view->scene_tree;
+
+	/* Add the view to the trees addon */
+	tinywl_view_addon_assign(view, &view->scene_tree->node.addons, &view->scene_tree->node);
+
+	/* Set the scene_nodes decoration data */
+	view->opacity = 1;
+	view->corner_radius = 20;
 
 	/* Listen to the various events it can emit */
 	view->map.notify = xdg_toplevel_map;

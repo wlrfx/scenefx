@@ -282,8 +282,10 @@ void fx_renderer_scissor(struct wlr_box *box) {
 	}
 }
 
-bool fx_render_subtexture_with_matrix(struct fx_renderer *renderer, struct wlr_texture *wlr_texture,
-		const struct wlr_fbox *src_box, const struct wlr_box *dst_box, const float matrix[static 9]) {
+bool fx_render_subtexture_with_matrix(struct fx_renderer *renderer,
+		struct wlr_texture *wlr_texture, const struct wlr_fbox *src_box,
+		const struct wlr_box *dst_box, const float matrix[static 9],
+		float opacity, int corner_radius) {
 
 	assert(wlr_texture_is_gles2(wlr_texture));
 	struct wlr_gles2_texture_attribs texture_attrs;
@@ -320,12 +322,8 @@ bool fx_render_subtexture_with_matrix(struct fx_renderer *renderer, struct wlr_t
 	// to GL_FALSE
 	wlr_matrix_transpose(gl_matrix, gl_matrix);
 
-	// TODO: accept me as params!
-	float alpha = 1.0;
-	int corner_radius = 0;
-
 	// if there's no opacity or rounded corners we don't need to blend
-	if (!texture_attrs.has_alpha && alpha == 1.0 && !corner_radius) {
+	if (!texture_attrs.has_alpha && opacity == 1.0 && !corner_radius) {
 		glDisable(GL_BLEND);
 	} else {
 		glEnable(GL_BLEND);
@@ -344,7 +342,7 @@ bool fx_render_subtexture_with_matrix(struct fx_renderer *renderer, struct wlr_t
 	glUniform1i(shader->tex, 0);
 	glUniform2f(shader->size, dst_box->width, dst_box->height);
 	glUniform2f(shader->position, dst_box->x, dst_box->y);
-	glUniform1f(shader->alpha, alpha);
+	glUniform1f(shader->alpha, opacity);
 	glUniform1f(shader->radius, corner_radius);
 
 	const GLfloat x1 = src_box->x / wlr_texture->width;

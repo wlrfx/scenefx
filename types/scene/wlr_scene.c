@@ -9,6 +9,7 @@
 #include <wlr/types/wlr_matrix.h>
 #include <wlr/types/wlr_presentation_time.h>
 #include <wlr/types/wlr_scene.h>
+#include <wlr/types/wlr_subcompositor.h>
 #include <wlr/util/log.h>
 #include <wlr/util/region.h>
 #include "render/fx_renderer/fx_renderer.h"
@@ -236,6 +237,10 @@ static void scene_node_opaque_region(struct wlr_scene_node *node, int x, int y,
 		struct wlr_scene_buffer *scene_buffer = wlr_scene_buffer_from_node(node);
 
 		if (!scene_buffer->buffer) {
+			return;
+		}
+
+		if (scene_buffer->opacity != 1 || scene_buffer->corner_radius > 0) {
 			return;
 		}
 
@@ -555,6 +560,9 @@ struct wlr_scene_buffer *wlr_scene_buffer_create(struct wlr_scene_tree *parent,
 	wl_signal_init(&scene_buffer->events.frame_done);
 	pixman_region32_init(&scene_buffer->opaque_region);
 
+	scene_buffer->opacity = 1;
+	scene_buffer->corner_radius = 0;
+
 	scene_node_update(&scene_buffer->node, NULL);
 
 	return scene_buffer;
@@ -743,6 +751,26 @@ void wlr_scene_buffer_send_frame_done(struct wlr_scene_buffer *scene_buffer,
 	if (pixman_region32_not_empty(&scene_buffer->node.visible)) {
 		wl_signal_emit_mutable(&scene_buffer->events.frame_done, now);
 	}
+}
+
+void wlr_scene_buffer_set_opacity(struct wlr_scene_buffer *scene_buffer,
+		float opacity) {
+	if (scene_buffer->opacity == opacity) {
+		return;
+	}
+
+	scene_buffer->opacity = opacity;
+	scene_node_update(&scene_buffer->node, NULL);
+}
+
+void wlr_scene_buffer_set_corner_radius(struct wlr_scene_buffer *scene_buffer,
+		int radii) {
+	if (scene_buffer->corner_radius == radii) {
+		return;
+	}
+
+	scene_buffer->corner_radius = radii;
+	scene_node_update(&scene_buffer->node, NULL);
 }
 
 static struct wlr_texture *scene_buffer_get_texture(
@@ -1042,7 +1070,7 @@ static void render_rect(struct fx_renderer *fx_renderer, struct wlr_output *outp
 static void render_texture(struct fx_renderer *fx_renderer, struct wlr_output *output,
 		pixman_region32_t *damage, struct wlr_texture *texture,
 		const struct wlr_fbox *src_box, const struct wlr_box *dst_box,
-		const float matrix[static 9]) {
+		const float matrix[static 9], float opacity, int corner_radius) {
 	assert(fx_renderer);
 
 	struct wlr_fbox default_src_box = {0};
@@ -1065,7 +1093,7 @@ static void render_texture(struct fx_renderer *fx_renderer, struct wlr_output *o
 		scissor_output(output, &rects[i]);
 
 		fx_render_subtexture_with_matrix(fx_renderer, texture, src_box,
-				&transformed_box, matrix);
+				&transformed_box, matrix, opacity, corner_radius);
 	}
 }
 
@@ -1121,7 +1149,7 @@ static void scene_node_render(struct fx_renderer *fx_renderer, struct wlr_scene_
 			output->transform_matrix);
 
 		render_texture(fx_renderer, output, &render_region, texture, &scene_buffer->src_box,
-			&dst_box, matrix);
+			&dst_box, matrix, scene_buffer->opacity, scene_buffer->corner_radius);
 
 		wl_signal_emit_mutable(&scene_buffer->events.output_present, scene_output);
 		break;

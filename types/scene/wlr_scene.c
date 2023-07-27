@@ -1234,8 +1234,6 @@ static void scene_node_render(struct fx_renderer *fx_renderer, struct wlr_scene_
 		struct wlr_renderer *renderer = output->renderer;
 		texture = scene_buffer_get_texture(scene_buffer, renderer);
 
-		// struct decoration_data *deco_data = &scene_buffer->deco_data;
-
 		transform = wlr_output_transform_invert(scene_buffer->transform);
 		wlr_matrix_project_box(matrix, &dst_box, transform, 0.0,
 			output->transform_matrix);

@@ -22,23 +22,26 @@ void fx_stencilbuffer_init(struct fx_stencilbuffer *stencil_buffer, GLuint fbo,
 		first_alloc = true;
 	}
 
-	if (stencil_buffer->linked_fbo != fbo ||
-			stencil_buffer->linked_fbo == (uint32_t) -1) {
-		stencil_buffer->linked_fbo = fbo;
-		first_alloc = true;
-	}
-
 	if (first_alloc || stencil_buffer->width != width || stencil_buffer->height != height) {
 		glBindRenderbuffer(GL_RENDERBUFFER, stencil_buffer->rb);
 		glRenderbufferStorage(GL_RENDERBUFFER, GL_STENCIL_INDEX8, width, height);
-		glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_STENCIL_ATTACHMENT,
-				GL_RENDERBUFFER, stencil_buffer->rb);
 		stencil_buffer->width = width;
 		stencil_buffer->height = height;
+	}
 
+	// Reattach the existing RenderBuffer to the FrameBuffer if the FrameBuffer
+	// has changed
+	if (stencil_buffer->linked_fbo != fbo ||
+			stencil_buffer->linked_fbo == (uint32_t) -1) {
+		stencil_buffer->linked_fbo = fbo;
+
+		glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_STENCIL_ATTACHMENT,
+				GL_RENDERBUFFER, stencil_buffer->rb);
 		GLenum status = glCheckFramebufferStatus(GL_FRAMEBUFFER);
 		if (status != GL_FRAMEBUFFER_COMPLETE) {
-			wlr_log(WLR_ERROR, "Stencil buffer incomplete, couldn't create! (FB status: %i)", status);
+			wlr_log(WLR_ERROR,
+					"Stencil buffer incomplete, couldn't create! (FB status: %i)",
+					status);
 			return;
 		}
 	}

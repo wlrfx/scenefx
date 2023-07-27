@@ -599,16 +599,14 @@ static void server_cursor_frame(struct wl_listener *listener, void *data) {
 }
 
 static void output_configure_scene(struct wlr_scene_node *node,
-		float opacity, int corner_radius, struct shadow_data *shadow_data) {
+		struct tinywl_view *view) {
 	if (!node->enabled) {
 		return;
 	}
 
-	struct tinywl_view *view = tinywl_view_addon_get(&node->addons, node);
-	if (view) {
-		opacity = view->opacity;
-		corner_radius = view->corner_radius;
-		shadow_data = &view->shadow_data;
+	struct tinywl_view *_view = tinywl_view_addon_get(&node->addons, node);
+	if (_view) {
+		view = _view;
 	}
 
 	if (node->type == WLR_SCENE_NODE_BUFFER) {
@@ -619,24 +617,23 @@ static void output_configure_scene(struct wlr_scene_node *node,
 		struct wlr_xdg_surface *xdg_surface =
 			wlr_xdg_surface_from_wlr_surface(scene_surface->surface);
 
-		if (xdg_surface &&
+		if (view &&
+				xdg_surface &&
 				xdg_surface->role == WLR_XDG_SURFACE_ROLE_TOPLEVEL) {
 			// TODO: Be able to set whole decoration_data instead of calling
 			// each individually?
-			wlr_scene_buffer_set_opacity(buffer, opacity);
+			wlr_scene_buffer_set_opacity(buffer, view->opacity);
 
 			if (!wlr_surface_is_subsurface(xdg_surface->surface)) {
-				wlr_scene_buffer_set_corner_radius(buffer, corner_radius);
-				if (shadow_data) {
-					wlr_scene_buffer_set_shadow_data(buffer, *shadow_data);
-				}
+				wlr_scene_buffer_set_corner_radius(buffer, view->corner_radius);
+				wlr_scene_buffer_set_shadow_data(buffer, view->shadow_data);
 			}
 		}
 	} else if (node->type == WLR_SCENE_NODE_TREE) {
 		struct wlr_scene_tree *tree = wl_container_of(node, tree, node);
 		struct wlr_scene_node *node;
 		wl_list_for_each(node, &tree->children, link) {
-			output_configure_scene(node, opacity, corner_radius, shadow_data);
+			output_configure_scene(node, view);
 		}
 	}
 }
@@ -650,7 +647,7 @@ static void output_frame(struct wl_listener *listener, void *data) {
 	struct wlr_scene_output *scene_output = wlr_scene_get_scene_output(
 		scene, output->wlr_output);
 
-	output_configure_scene(&scene_output->scene->tree.node, 1, 0, NULL);
+	output_configure_scene(&scene_output->scene->tree.node, NULL);
 
 	/* Render the scene if needed and commit the output */
 	wlr_scene_output_commit(scene_output);

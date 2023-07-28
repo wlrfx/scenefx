@@ -614,8 +614,14 @@ static void output_configure_scene(struct wlr_scene_node *node,
 
 		struct wlr_scene_surface * scene_surface
 			= wlr_scene_surface_from_buffer(buffer);
-		struct wlr_xdg_surface *xdg_surface =
-			wlr_xdg_surface_from_wlr_surface(scene_surface->surface);
+		if (!scene_surface) {
+			return;
+		}
+
+		struct wlr_xdg_surface *xdg_surface = NULL;
+		if (wlr_surface_is_xdg_surface(scene_surface->surface)) {
+			xdg_surface = wlr_xdg_surface_from_wlr_surface(scene_surface->surface);
+		}
 
 		if (view &&
 				xdg_surface &&

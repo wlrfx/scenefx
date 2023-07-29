@@ -1244,30 +1244,23 @@ static void scene_node_render(struct fx_renderer *fx_renderer, struct wlr_scene_
 		// but only if we need to.
 		if (scene_buffer->corner_radius != 0 ||
 				shadow_data_is_enabled(&scene_buffer->shadow_data)) {
-			struct wlr_box *clip_box = malloc(sizeof(struct wlr_box));
-			struct wlr_scene_surface *scene_surface =
-				wlr_scene_surface_from_buffer(scene_buffer);
-			struct wlr_surface *surface = scene_surface->surface;
-			if (wlr_surface_is_xdg_surface(surface)) {
+			struct wlr_scene_surface *scene_surface = NULL;
+			if ((scene_surface = wlr_scene_surface_from_buffer(scene_buffer)) &&
+					wlr_surface_is_xdg_surface(scene_surface->surface)) {
 				struct wlr_xdg_surface *xdg_surface =
-					wlr_xdg_surface_from_wlr_surface(surface);
-				wlr_xdg_surface_get_geometry(xdg_surface, clip_box);
-				clip_box->x += x;
-				clip_box->y += y;
-			}
+					wlr_xdg_surface_from_wlr_surface(scene_surface->surface);
 
-			if (!wlr_box_empty(clip_box)) {
-				dst_box.width = fmin(dst_box.width, clip_box->width);
-				dst_box.height = fmin(dst_box.height, clip_box->height);
-				dst_box.x = fmax(dst_box.x, clip_box->x);
-				dst_box.y = fmax(dst_box.y, clip_box->y);
+				struct wlr_box geometry;
+				wlr_xdg_surface_get_geometry(xdg_surface, &geometry);
+				dst_box.width = fmin(dst_box.width, geometry.width);
+				dst_box.height = fmin(dst_box.height, geometry.height);
+				dst_box.x = fmax(dst_box.x, geometry.x + x);
+				dst_box.y = fmax(dst_box.y, geometry.y + y);
 
 				// Clip the damage to the new dst_box
 				pixman_region32_intersect_rect(&render_region, &render_region,
 						dst_box.x, dst_box.y, dst_box.width, dst_box.height);
 			}
-
-			free(clip_box);
 		}
 
 		// Shadow

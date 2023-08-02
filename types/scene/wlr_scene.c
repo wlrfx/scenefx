@@ -416,7 +416,7 @@ static bool scene_node_update_iterator(struct wlr_scene_node *node,
 	if (node->type == WLR_SCENE_NODE_BUFFER) {
 		struct wlr_scene_buffer *buffer = wlr_scene_buffer_from_node(node);
 		struct shadow_data *data = &buffer->shadow_data;
-		if (shadow_data_is_enabled(data)) {
+		if (scene_buffer_has_shadow(data)) {
 			wlr_region_expand(&node->visible, &node->visible, data->blur_sigma);
 		}
 	}
@@ -1242,7 +1242,7 @@ static void scene_node_render(struct fx_renderer *fx_renderer, struct wlr_scene_
 		// the actual surface geometry, mostly ignoring CSD decorations
 		// but only if we need to.
 		if (scene_buffer->corner_radius != 0 ||
-				shadow_data_is_enabled(&scene_buffer->shadow_data)) {
+				scene_buffer_has_shadow(&scene_buffer->shadow_data)) {
 			struct wlr_scene_surface *scene_surface = NULL;
 			if ((scene_surface = wlr_scene_surface_from_buffer(scene_buffer)) &&
 					wlr_surface_is_xdg_surface(scene_surface->surface)) {
@@ -1263,7 +1263,7 @@ static void scene_node_render(struct fx_renderer *fx_renderer, struct wlr_scene_
 		}
 
 		// Shadow
-		if (shadow_data_is_enabled(&scene_buffer->shadow_data)) {
+		if (scene_buffer_has_shadow(&scene_buffer->shadow_data)) {
 			// TODO: Compensate for SSD borders here
 			render_box_shadow(fx_renderer, output, damage, &dst_box,
 					scene_buffer->corner_radius, &scene_buffer->shadow_data);

@@ -14,6 +14,6 @@ struct shadow_data {
 
 struct shadow_data shadow_data_get_default(void);
 
-bool shadow_data_is_enabled(struct shadow_data *data);
+bool scene_buffer_has_shadow(struct shadow_data *data);
 
 #endif

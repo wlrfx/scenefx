@@ -1,6 +1,5 @@
 #define _POSIX_C_SOURCE 200809L
 #include <assert.h>
-#include <pixman.h>
 #include <stdlib.h>
 #include <string.h>
 #include <wlr/backend.h>
@@ -23,16 +22,6 @@
 #include "util/time.h"
 
 #define HIGHLIGHT_DAMAGE_FADEOUT_TIME 250
-
-static pixman_region32_t create_damage(const struct wlr_box damage_box,
-		pixman_region32_t *output_damage) {
-	pixman_region32_t damage;
-	pixman_region32_init(&damage);
-	pixman_region32_union_rect(&damage, &damage, damage_box.x, damage_box.y,
-		damage_box.width, damage_box.height);
-	pixman_region32_intersect(&damage, &damage, output_damage);
-	return damage;
-}
 
 static struct wlr_scene_tree *scene_tree_from_node(struct wlr_scene_node *node) {
 	assert(node->type == WLR_SCENE_NODE_TREE);
@@ -1136,42 +1125,41 @@ static void render_texture(struct fx_renderer *fx_renderer, struct wlr_output *o
 }
 
 static void render_box_shadow(struct fx_renderer *fx_renderer,
-		struct wlr_output *output, pixman_region32_t *output_damage,
+		struct wlr_output *output, pixman_region32_t *surface_damage,
 		const struct wlr_box *surface_box, int corner_radius,
 		struct shadow_data *shadow_data) {
-	float blur_sigma = shadow_data->blur_sigma;
-
-	struct wlr_box box;
-	memcpy(&box, surface_box, sizeof(struct wlr_box));
-	box.x -= blur_sigma;
-	box.y -= blur_sigma;
-	box.width += 2 * blur_sigma;
-	box.height += 2 * blur_sigma;
-	pixman_region32_t damage = create_damage(box, output_damage);
-
 	// don't damage area behind window since we dont render it anyway
-	struct wlr_box inner_box;
-	memcpy(&inner_box, surface_box, sizeof(struct wlr_box));
-	inner_box.x += corner_radius * 0.5;
-	inner_box.y += corner_radius * 0.5;
-	inner_box.width -= corner_radius;
-	inner_box.height -= corner_radius;
-	pixman_region32_t inner_region = create_damage(inner_box, output_damage);
-	pixman_region32_subtract(&damage, &damage, &inner_region);
+	pixman_region32_t inner_region;
+	pixman_region32_init(&inner_region);
+	pixman_region32_union_rect(&inner_region, &inner_region,
+			surface_box->x + corner_radius * 0.5,
+			surface_box->y + corner_radius * 0.5,
+			surface_box->width - corner_radius,
+			surface_box->height - corner_radius);
+	pixman_region32_intersect(&inner_region, &inner_region, surface_damage);
 
+	pixman_region32_t damage;
+	pixman_region32_init(&damage);
+	pixman_region32_subtract(&damage, surface_damage, &inner_region);
 	if (!pixman_region32_not_empty(&damage)) {
 		goto damage_finish;
 	}
 
+	struct wlr_box shadow_box = {
+		.x = surface_box->x - shadow_data->blur_sigma,
+		.y = surface_box->y - shadow_data->blur_sigma,
+		.width = surface_box->width + 2 * shadow_data->blur_sigma,
+		.height = surface_box->height + 2 * shadow_data->blur_sigma,
+	};
 	float matrix[9];
-	wlr_matrix_project_box(matrix, &box, WL_OUTPUT_TRANSFORM_NORMAL, 0,
+	wlr_matrix_project_box(matrix, &shadow_box, WL_OUTPUT_TRANSFORM_NORMAL, 0,
 			output->transform_matrix);
 
 	// ensure the box is updated as per the output orientation
 	struct wlr_box transformed_box;
 	int width, height;
 	wlr_output_transformed_resolution(output, &width, &height);
-	wlr_box_transform(&transformed_box, &box,
+	wlr_box_transform(&transformed_box, &shadow_box,
 			wlr_output_transform_invert(output->transform), width, height);
 
 	int nrects;
@@ -1184,6 +1172,7 @@ static void render_box_shadow(struct fx_renderer *fx_renderer,
 
 damage_finish:
 	pixman_region32_fini(&damage);
+	pixman_region32_fini(&inner_region);
 }
 
 static void scene_node_render(struct fx_renderer *fx_renderer, struct wlr_scene_node *node,
@@ -1255,19 +1244,19 @@ static void scene_node_render(struct fx_renderer *fx_renderer, struct wlr_scene_
 				dst_box.height = fmin(dst_box.height, geometry.height);
 				dst_box.x = fmax(dst_box.x, geometry.x + x);
 				dst_box.y = fmax(dst_box.y, geometry.y + y);
-
-				// Clip the damage to the new dst_box
-				pixman_region32_intersect_rect(&render_region, &render_region,
-						dst_box.x, dst_box.y, dst_box.width, dst_box.height);
 			}
 		}
 
 		// Shadow
 		if (scene_buffer_has_shadow(&scene_buffer->shadow_data)) {
 			// TODO: Compensate for SSD borders here
-			render_box_shadow(fx_renderer, output, damage, &dst_box,
+			render_box_shadow(fx_renderer, output, &render_region, &dst_box,
 					scene_buffer->corner_radius, &scene_buffer->shadow_data);
 		}
+
+		// Clip the damage to the dst_box before rendering the texture
+		pixman_region32_intersect_rect(&render_region, &render_region,
+				dst_box.x, dst_box.y, dst_box.width, dst_box.height);
 
 		render_texture(fx_renderer, output, &render_region, texture, &scene_buffer->src_box,
 			&dst_box, matrix, scene_buffer->opacity, scene_buffer->corner_radius);

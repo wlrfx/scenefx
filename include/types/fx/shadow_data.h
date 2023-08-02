@@ -4,8 +4,6 @@
 #include <stdbool.h>
 #include <wlr/util/addon.h>
 
-static float default_shadow_color[] = {0.0f, 0.0f, 0.0f, 0.5f};
-
 struct shadow_data {
 	bool enabled;
 	float *color;

@@ -5,6 +5,7 @@
 #include "wlr/util/log.h"
 
 struct shadow_data shadow_data_get_default(void) {
+	static float default_shadow_color[] = {0.0f, 0.0f, 0.0f, 0.5f};
 	return (struct shadow_data) {
 		.blur_sigma = 20,
 		.color = default_shadow_color,

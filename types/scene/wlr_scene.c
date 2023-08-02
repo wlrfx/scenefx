@@ -1704,7 +1704,7 @@ bool wlr_scene_output_commit(struct wlr_scene_output *scene_output) {
 		return true;
 	}
 
-	fx_renderer_begin(renderer, output);
+	fx_renderer_begin(renderer, output->width, output->height);
 
 	pixman_region32_t background;
 	pixman_region32_init(&background);

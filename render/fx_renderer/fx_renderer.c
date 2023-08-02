@@ -307,12 +307,8 @@ void fx_renderer_fini(struct fx_renderer *renderer) {
 	// NO OP
 }
 
-void fx_renderer_begin(struct fx_renderer *renderer, struct wlr_output *output) {
-	int width = output->width;
-	int height = output->height;
-
-	GLuint fbo = wlr_gles2_renderer_get_current_fbo(output->renderer);
-	fx_stencilbuffer_init(&renderer->stencil_buffer, fbo, width, height);
+void fx_renderer_begin(struct fx_renderer *renderer, int width, int height) {
+	fx_stencilbuffer_init(&renderer->stencil_buffer, width, height);
 
 	glViewport(0, 0, width, height);
 

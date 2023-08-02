@@ -93,7 +93,7 @@ struct fx_renderer *fx_renderer_create(struct wlr_egl *egl);
 
 void fx_renderer_fini(struct fx_renderer *renderer);
 
-void fx_renderer_begin(struct fx_renderer *renderer, struct wlr_output *output);
+void fx_renderer_begin(struct fx_renderer *renderer, int width, int height);
 
 void fx_renderer_clear(const float color[static 4]);
 

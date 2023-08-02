@@ -1238,7 +1238,7 @@ static void scene_node_render(struct fx_renderer *fx_renderer, struct wlr_scene_
 		wlr_matrix_project_box(matrix, &dst_box, transform, 0.0,
 			output->transform_matrix);
 
-		// Some surfaces (mostyly GTK 4) decorate their windows with shadows
+		// Some surfaces (mostly GTK 4) decorate their windows with shadows
 		// which extends the node size past the actual window size. This gets
 		// the actual surface geometry, mostyly ignoring CSD decorations
 		// but only if we need to.

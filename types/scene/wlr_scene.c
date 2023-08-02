@@ -6,7 +6,6 @@
 #include <wlr/backend.h>
 #include <wlr/render/gles2.h>
 #include <wlr/types/wlr_xdg_shell.h>
-#include <wlr/types/wlr_layer_shell_v1.h>
 #include <wlr/types/wlr_compositor.h>
 #include <wlr/types/wlr_damage_ring.h>
 #include <wlr/types/wlr_matrix.h>
@@ -254,7 +253,7 @@ static void scene_node_opaque_region(struct wlr_scene_node *node, int x, int y,
 			return;
 		}
 
-		/* Buffer is translucent*/
+		// Buffer is translucent
 		if (scene_buffer->opacity != 1 || scene_buffer->corner_radius > 0) {
 			return;
 		}
@@ -413,7 +412,7 @@ static bool scene_node_update_iterator(struct wlr_scene_node *node,
 		pixman_region32_fini(&opaque);
 	}
 
-	/* Expand the nodes visible region by the shadow size */
+	// Expand the nodes visible region by the shadow size
 	if (node->type == WLR_SCENE_NODE_BUFFER) {
 		struct wlr_scene_buffer *buffer = wlr_scene_buffer_from_node(node);
 		struct shadow_data *data = &buffer->shadow_data;
@@ -1240,7 +1239,7 @@ static void scene_node_render(struct fx_renderer *fx_renderer, struct wlr_scene_
 
 		// Some surfaces (mostly GTK 4) decorate their windows with shadows
 		// which extends the node size past the actual window size. This gets
-		// the actual surface geometry, mostyly ignoring CSD decorations
+		// the actual surface geometry, mostly ignoring CSD decorations
 		// but only if we need to.
 		if (scene_buffer->corner_radius != 0 ||
 				shadow_data_is_enabled(&scene_buffer->shadow_data)) {

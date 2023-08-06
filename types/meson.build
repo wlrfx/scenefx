@@ -7,3 +7,5 @@ wlr_files += files(
 	'scene/layer_shell_v1.c',
 	'buffer/buffer.c',
 )
+
+subdir('fx')

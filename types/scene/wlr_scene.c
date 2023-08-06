@@ -4,6 +4,7 @@
 #include <string.h>
 #include <wlr/backend.h>
 #include <wlr/render/gles2.h>
+#include <wlr/types/wlr_xdg_shell.h>
 #include <wlr/types/wlr_compositor.h>
 #include <wlr/types/wlr_damage_ring.h>
 #include <wlr/types/wlr_matrix.h>
@@ -13,6 +14,7 @@
 #include <wlr/util/log.h>
 #include <wlr/util/region.h>
 #include "render/fx_renderer/fx_renderer.h"
+#include "types/fx/shadow_data.h"
 #include "types/wlr_buffer.h"
 #include "types/wlr_scene.h"
 #include "util/array.h"
@@ -240,6 +242,7 @@ static void scene_node_opaque_region(struct wlr_scene_node *node, int x, int y,
 			return;
 		}
 
+		// Buffer is translucent
 		if (scene_buffer->opacity != 1 || scene_buffer->corner_radius > 0) {
 			return;
 		}
@@ -396,6 +399,15 @@ static bool scene_node_update_iterator(struct wlr_scene_node *node,
 		scene_node_opaque_region(node, lx, ly, &opaque);
 		pixman_region32_subtract(data->visible, data->visible, &opaque);
 		pixman_region32_fini(&opaque);
+	}
+
+	// Expand the nodes visible region by the shadow size
+	if (node->type == WLR_SCENE_NODE_BUFFER) {
+		struct wlr_scene_buffer *buffer = wlr_scene_buffer_from_node(node);
+		struct shadow_data *data = &buffer->shadow_data;
+		if (scene_buffer_has_shadow(data)) {
+			wlr_region_expand(&node->visible, &node->visible, data->blur_sigma);
+		}
 	}
 
 	update_node_update_outputs(node, data->outputs, NULL);
@@ -562,6 +574,7 @@ struct wlr_scene_buffer *wlr_scene_buffer_create(struct wlr_scene_tree *parent,
 
 	scene_buffer->opacity = 1;
 	scene_buffer->corner_radius = 0;
+	scene_buffer->shadow_data = shadow_data_get_default();
 
 	scene_node_update(&scene_buffer->node, NULL);
 
@@ -770,6 +783,20 @@ void wlr_scene_buffer_set_corner_radius(struct wlr_scene_buffer *scene_buffer,
 	}
 
 	scene_buffer->corner_radius = radii;
+	scene_node_update(&scene_buffer->node, NULL);
+}
+
+void wlr_scene_buffer_set_shadow_data(struct wlr_scene_buffer *scene_buffer,
+		struct shadow_data shadow_data) {
+	struct shadow_data *buff_data = &scene_buffer->shadow_data;
+	if (buff_data->enabled == shadow_data.enabled &&
+			buff_data->blur_sigma == shadow_data.blur_sigma &&
+			buff_data->color && shadow_data.color) {
+		return;
+	}
+
+	memcpy(&scene_buffer->shadow_data, &shadow_data,
+			sizeof(struct shadow_data));
 	scene_node_update(&scene_buffer->node, NULL);
 }
 
@@ -1097,6 +1124,57 @@ static void render_texture(struct fx_renderer *fx_renderer, struct wlr_output *o
 	}
 }
 
+static void render_box_shadow(struct fx_renderer *fx_renderer,
+		struct wlr_output *output, pixman_region32_t *surface_damage,
+		const struct wlr_box *surface_box, int corner_radius,
+		struct shadow_data *shadow_data) {
+	// don't damage area behind window since we dont render it anyway
+	pixman_region32_t inner_region;
+	pixman_region32_init(&inner_region);
+	pixman_region32_union_rect(&inner_region, &inner_region,
+			surface_box->x + corner_radius * 0.5,
+			surface_box->y + corner_radius * 0.5,
+			surface_box->width - corner_radius,
+			surface_box->height - corner_radius);
+	pixman_region32_intersect(&inner_region, &inner_region, surface_damage);
+
+	pixman_region32_t damage;
+	pixman_region32_init(&damage);
+	pixman_region32_subtract(&damage, surface_damage, &inner_region);
+	if (!pixman_region32_not_empty(&damage)) {
+		goto damage_finish;
+	}
+
+	struct wlr_box shadow_box = {
+		.x = surface_box->x - shadow_data->blur_sigma,
+		.y = surface_box->y - shadow_data->blur_sigma,
+		.width = surface_box->width + 2 * shadow_data->blur_sigma,
+		.height = surface_box->height + 2 * shadow_data->blur_sigma,
+	};
+	float matrix[9];
+	wlr_matrix_project_box(matrix, &shadow_box, WL_OUTPUT_TRANSFORM_NORMAL, 0,
+			output->transform_matrix);
+
+	// ensure the box is updated as per the output orientation
+	struct wlr_box transformed_box;
+	int width, height;
+	wlr_output_transformed_resolution(output, &width, &height);
+	wlr_box_transform(&transformed_box, &shadow_box,
+			wlr_output_transform_invert(output->transform), width, height);
+
+	int nrects;
+	pixman_box32_t *rects = pixman_region32_rectangles(&damage, &nrects);
+	for (int i = 0; i < nrects; ++i) {
+		scissor_output(output, &rects[i]);
+		fx_render_box_shadow(fx_renderer, &transformed_box, surface_box, matrix,
+				corner_radius, shadow_data);
+	}
+
+damage_finish:
+	pixman_region32_fini(&damage);
+	pixman_region32_fini(&inner_region);
+}
+
 static void scene_node_render(struct fx_renderer *fx_renderer, struct wlr_scene_node *node,
 		struct wlr_scene_output *scene_output, pixman_region32_t *damage) {
 	int x, y;
@@ -1147,6 +1225,38 @@ static void scene_node_render(struct fx_renderer *fx_renderer, struct wlr_scene_
 		transform = wlr_output_transform_invert(scene_buffer->transform);
 		wlr_matrix_project_box(matrix, &dst_box, transform, 0.0,
 			output->transform_matrix);
+
+		// Some surfaces (mostly GTK 4) decorate their windows with shadows
+		// which extends the node size past the actual window size. This gets
+		// the actual surface geometry, mostly ignoring CSD decorations
+		// but only if we need to.
+		if (scene_buffer->corner_radius != 0 ||
+				scene_buffer_has_shadow(&scene_buffer->shadow_data)) {
+			struct wlr_scene_surface *scene_surface = NULL;
+			if ((scene_surface = wlr_scene_surface_from_buffer(scene_buffer)) &&
+					wlr_surface_is_xdg_surface(scene_surface->surface)) {
+				struct wlr_xdg_surface *xdg_surface =
+					wlr_xdg_surface_from_wlr_surface(scene_surface->surface);
+
+				struct wlr_box geometry;
+				wlr_xdg_surface_get_geometry(xdg_surface, &geometry);
+				dst_box.width = fmin(dst_box.width, geometry.width);
+				dst_box.height = fmin(dst_box.height, geometry.height);
+				dst_box.x = fmax(dst_box.x, geometry.x + x);
+				dst_box.y = fmax(dst_box.y, geometry.y + y);
+			}
+		}
+
+		// Shadow
+		if (scene_buffer_has_shadow(&scene_buffer->shadow_data)) {
+			// TODO: Compensate for SSD borders here
+			render_box_shadow(fx_renderer, output, &render_region, &dst_box,
+					scene_buffer->corner_radius, &scene_buffer->shadow_data);
+		}
+
+		// Clip the damage to the dst_box before rendering the texture
+		pixman_region32_intersect_rect(&render_region, &render_region,
+				dst_box.x, dst_box.y, dst_box.width, dst_box.height);
 
 		render_texture(fx_renderer, output, &render_region, texture, &scene_buffer->src_box,
 			&dst_box, matrix, scene_buffer->opacity, scene_buffer->corner_radius);

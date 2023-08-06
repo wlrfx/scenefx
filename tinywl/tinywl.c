@@ -5,6 +5,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <time.h>
+#include <types/fx/shadow_data.h>
 #include <unistd.h>
 #include <wayland-server-core.h>
 #include <wayland-util.h>
@@ -96,6 +97,7 @@ struct tinywl_view {
 
 	float opacity;
 	int corner_radius;
+	struct shadow_data shadow_data;
 };
 
 struct tinywl_keyboard {
@@ -597,15 +599,14 @@ static void server_cursor_frame(struct wl_listener *listener, void *data) {
 }
 
 static void output_configure_scene(struct wlr_scene_node *node,
-		float opacity, int corner_radius) {
+		struct tinywl_view *view) {
 	if (!node->enabled) {
 		return;
 	}
 
-	struct tinywl_view *view = tinywl_view_addon_get(&node->addons, node);
-	if (view) {
-		opacity = view->opacity;
-		corner_radius = view->corner_radius;
+	struct tinywl_view *_view = tinywl_view_addon_get(&node->addons, node);
+	if (_view) {
+		view = _view;
 	}
 
 	if (node->type == WLR_SCENE_NODE_BUFFER) {
@@ -622,21 +623,23 @@ static void output_configure_scene(struct wlr_scene_node *node,
 			xdg_surface = wlr_xdg_surface_from_wlr_surface(scene_surface->surface);
 		}
 
-		if (xdg_surface &&
+		if (view &&
+				xdg_surface &&
 				xdg_surface->role == WLR_XDG_SURFACE_ROLE_TOPLEVEL) {
 			// TODO: Be able to set whole decoration_data instead of calling
 			// each individually?
-			wlr_scene_buffer_set_opacity(buffer, opacity);
+			wlr_scene_buffer_set_opacity(buffer, view->opacity);
 
 			if (!wlr_surface_is_subsurface(xdg_surface->surface)) {
-				wlr_scene_buffer_set_corner_radius(buffer, corner_radius);
+				wlr_scene_buffer_set_corner_radius(buffer, view->corner_radius);
+				wlr_scene_buffer_set_shadow_data(buffer, view->shadow_data);
 			}
 		}
 	} else if (node->type == WLR_SCENE_NODE_TREE) {
 		struct wlr_scene_tree *tree = wl_container_of(node, tree, node);
 		struct wlr_scene_node *node;
 		wl_list_for_each(node, &tree->children, link) {
-			output_configure_scene(node, opacity, corner_radius);
+			output_configure_scene(node, view);
 		}
 	}
 }
@@ -650,7 +653,7 @@ static void output_frame(struct wl_listener *listener, void *data) {
 	struct wlr_scene_output *scene_output = wlr_scene_get_scene_output(
 		scene, output->wlr_output);
 
-	output_configure_scene(&scene_output->scene->tree.node, 1, 0);
+	output_configure_scene(&scene_output->scene->tree.node, NULL);
 
 	/* Render the scene if needed and commit the output */
 	wlr_scene_output_commit(scene_output);
@@ -868,6 +871,9 @@ static void server_new_xdg_surface(struct wl_listener *listener, void *data) {
 	/* Set the scene_nodes decoration data */
 	view->opacity = 1;
 	view->corner_radius = 20;
+	view->shadow_data = shadow_data_get_default();
+	view->shadow_data.enabled = true;
+	memcpy(view->shadow_data.color, (float[]) {1.0f, 0.0f, 0.0f, 1.0f}, sizeof(float[4]));
 
 	/* Listen to the various events it can emit */
 	view->map.notify = xdg_toplevel_map;

@@ -4,6 +4,8 @@ shaders = [
     'common.vert',
     'quad.frag',
     'tex.frag',
+    'box_shadow.frag',
+    'stencil_mask.frag',
 ]
 
 foreach name : shaders

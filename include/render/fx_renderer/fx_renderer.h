@@ -6,7 +6,6 @@
 #include <stdbool.h>
 #include <wlr/render/egl.h>
 #include <wlr/render/wlr_texture.h>
-#include <wlr/types/wlr_output.h>
 #include <wlr/util/addon.h>
 #include <wlr/util/box.h>
 #include "render/fx_renderer/fx_stencilbuffer.h"

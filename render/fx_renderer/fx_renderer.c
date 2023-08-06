@@ -304,7 +304,7 @@ error:
 }
 
 void fx_renderer_fini(struct fx_renderer *renderer) {
-	// NO OP
+	fx_stencilbuffer_release(&renderer->stencil_buffer);
 }
 
 void fx_renderer_begin(struct fx_renderer *renderer, int width, int height) {

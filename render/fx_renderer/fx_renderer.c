@@ -7,6 +7,7 @@
 #include <GLES2/gl2.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <wayland-util.h>
 #include <wlr/backend.h>
 #include <wlr/render/egl.h>
 #include <wlr/render/gles2.h>
@@ -15,7 +16,7 @@
 #include <wlr/util/log.h>
 
 #include "render/fx_renderer/fx_renderer.h"
-#include "render/fx_renderer/fx_stencilbuffer.h"
+// #include "render/fx_renderer/fx_stencilbuffer.h"
 #include "render/fx_renderer/matrix.h"
 
 // shaders
@@ -24,6 +25,8 @@
 #include "tex_frag_src.h"
 #include "stencil_mask_frag_src.h"
 #include "box_shadow_frag_src.h"
+#include "blur1_frag_src.h"
+#include "blur2_frag_src.h"
 
 static const GLfloat verts[] = {
 	1, 0, // top right
@@ -157,6 +160,22 @@ static bool link_box_shadow_program(struct box_shadow_shader *shader) {
 	return true;
 }
 
+static bool link_blur_program(struct blur_shader *shader, const char *shader_program) {
+	GLuint prog;
+	shader->program = prog = link_program(shader_program);
+	if (!shader->program) {
+		return false;
+	}
+	shader->proj = glGetUniformLocation(prog, "proj");
+	shader->tex = glGetUniformLocation(prog, "tex");
+	shader->pos_attrib = glGetAttribLocation(prog, "pos");
+	shader->tex_attrib = glGetAttribLocation(prog, "texcoord");
+	shader->radius = glGetUniformLocation(prog, "radius");
+	shader->halfpixel = glGetUniformLocation(prog, "halfpixel");
+
+	return true;
+}
+
 static bool check_gl_ext(const char *exts, const char *ext) {
 	size_t extlen = strlen(ext);
 	const char *end = exts + strlen(exts);
@@ -178,7 +197,7 @@ static bool check_gl_ext(const char *exts, const char *ext) {
 static void load_gl_proc(void *proc_ptr, const char *name) {
 	void *proc = (void *)eglGetProcAddress(name);
 	if (proc == NULL) {
-		wlr_log(WLR_ERROR, "GLES2 RENDERER: eglGetProcAddress(%s) failed", name);
+		wlr_log(WLR_ERROR, "FX RENDERER: eglGetProcAddress(%s) failed", name);
 		abort();
 	}
 	*(void **)proc_ptr = proc;
@@ -187,6 +206,17 @@ static void load_gl_proc(void *proc_ptr, const char *name) {
 static void fx_renderer_handle_destroy(struct wlr_addon *addon) {
 	struct fx_renderer *renderer =
 		wl_container_of(addon, renderer, addon);
+
+	struct fx_framebuffer *fx_buffer, *fx_buffer_tmp;
+	wl_list_for_each_safe(fx_buffer, fx_buffer_tmp, &renderer->buffers, link) {
+		fx_framebuffer_release(fx_buffer);
+	}
+
+	struct fx_texture *tex, *tex_tmp;
+	wl_list_for_each_safe(tex, tex_tmp, &renderer->textures, link) {
+		fx_texture_destroy(tex);
+	}
+
 	fx_renderer_fini(renderer);
 	free(renderer);
 }
@@ -195,9 +225,9 @@ static const struct wlr_addon_interface fx_renderer_addon_impl = {
 	.destroy = fx_renderer_handle_destroy,
 };
 
-void fx_renderer_init_addon(struct wlr_egl *egl, struct wlr_addon_set *addons,
-		const void * owner) {
-	struct fx_renderer *renderer = fx_renderer_create(egl);
+void fx_renderer_init_addon(struct wlr_egl *egl, struct wlr_output *output,
+		struct wlr_addon_set *addons, const void * owner) {
+	struct fx_renderer *renderer = fx_renderer_create(egl, output);
 	if (!renderer) {
 		wlr_log(WLR_ERROR, "Failed to create fx_renderer");
 		abort();
@@ -216,24 +246,41 @@ struct fx_renderer *fx_renderer_addon_find(struct wlr_addon_set *addons,
 	return renderer;
 }
 
-struct fx_renderer *fx_renderer_create(struct wlr_egl *egl) {
+struct fx_renderer *fx_renderer_create(struct wlr_egl *egl,
+		struct wlr_output *output) {
 	struct fx_renderer *renderer = calloc(1, sizeof(struct fx_renderer));
 	if (renderer == NULL) {
 		return NULL;
 	}
 
+	wl_list_init(&renderer->buffers);
+	wl_list_init(&renderer->textures);
+
+	renderer->wlr_output = output;
+	renderer->egl = egl;
+
 	if (!eglMakeCurrent(wlr_egl_get_display(egl), EGL_NO_SURFACE, EGL_NO_SURFACE,
 			wlr_egl_get_context(egl))) {
-		wlr_log(WLR_ERROR, "GLES2 RENDERER: Could not make EGL current");
+		wlr_log(WLR_ERROR, "FX RENDERER: Could not make EGL current");
 		return NULL;
 	}
 
+	// Create the stencil buffer
 	renderer->stencil_buffer = fx_stencilbuffer_create();
+
+	// Create the FBOs
+	renderer->wlr_main_buffer_fbo = -1;
+	renderer->blur_buffer = fx_framebuffer_create();
+	renderer->blur_saved_pixels_buffer = fx_framebuffer_create();
+	renderer->effects_buffer = fx_framebuffer_create();
+	renderer->effects_buffer_swapped = fx_framebuffer_create();
+
+	renderer->blur_buffer_dirty = true;
 
 	// get extensions
 	const char *exts_str = (const char *)glGetString(GL_EXTENSIONS);
 	if (exts_str == NULL) {
-		wlr_log(WLR_ERROR, "GLES2 RENDERER: Failed to get GL_EXTENSIONS");
+		wlr_log(WLR_ERROR, "FX RENDERER: Failed to get GL_EXTENSIONS");
 		return NULL;
 	}
 
@@ -248,6 +295,12 @@ struct fx_renderer *fx_renderer_create(struct wlr_egl *egl) {
 		renderer->exts.OES_egl_image_external = true;
 		load_gl_proc(&renderer->procs.glEGLImageTargetTexture2DOES,
 			"glEGLImageTargetTexture2DOES");
+	}
+
+	if (check_gl_ext(exts_str, "GL_OES_EGL_image")) {
+		renderer->exts.OES_egl_image = true;
+		load_gl_proc(&renderer->procs.glEGLImageTargetRenderbufferStorageOES,
+			"glEGLImageTargetRenderbufferStorageOES");
 	}
 
 	// quad fragment shader
@@ -274,13 +327,21 @@ struct fx_renderer *fx_renderer_create(struct wlr_egl *egl) {
 		goto error;
 	}
 
-	if (!eglMakeCurrent(wlr_egl_get_display(egl),
-				EGL_NO_SURFACE, EGL_NO_SURFACE, EGL_NO_CONTEXT)) {
-		wlr_log(WLR_ERROR, "GLES2 RENDERER: Could not unset current EGL");
+	// blur shaders
+	if (!link_blur_program(&renderer->shaders.blur1, blur1_frag_src)) {
+		goto error;
+	}
+	if (!link_blur_program(&renderer->shaders.blur2, blur2_frag_src)) {
 		goto error;
 	}
 
-	wlr_log(WLR_INFO, "GLES2 RENDERER: Shaders Initialized Successfully");
+	if (!eglMakeCurrent(wlr_egl_get_display(egl),
+				EGL_NO_SURFACE, EGL_NO_SURFACE, EGL_NO_CONTEXT)) {
+		wlr_log(WLR_ERROR, "FX RENDERER: Could not unset current EGL");
+		goto error;
+	}
+
+	wlr_log(WLR_INFO, "FX RENDERER: Shaders Initialized Successfully");
 	return renderer;
 
 error:
@@ -290,16 +351,18 @@ error:
 	glDeleteProgram(renderer->shaders.tex_ext.program);
 	glDeleteProgram(renderer->shaders.stencil_mask.program);
 	glDeleteProgram(renderer->shaders.box_shadow.program);
+	glDeleteProgram(renderer->shaders.blur1.program);
+	glDeleteProgram(renderer->shaders.blur2.program);
 
 	if (!eglMakeCurrent(wlr_egl_get_display(egl),
 				EGL_NO_SURFACE, EGL_NO_SURFACE, EGL_NO_CONTEXT)) {
-		wlr_log(WLR_ERROR, "GLES2 RENDERER: Could not unset current EGL");
+		wlr_log(WLR_ERROR, "FX RENDERER: Could not unset current EGL");
 	}
 
 	// TODO: more freeing?
 	free(renderer);
 
-	wlr_log(WLR_ERROR, "GLES2 RENDERER: Error Initializing Shaders");
+	wlr_log(WLR_ERROR, "FX RENDERER: Error Initializing Shaders");
 	return NULL;
 }
 
@@ -311,6 +374,31 @@ void fx_renderer_begin(struct fx_renderer *renderer, int width, int height) {
 	fx_stencilbuffer_init(&renderer->stencil_buffer, width, height);
 
 	glViewport(0, 0, width, height);
+	renderer->viewport_width = width;
+	renderer->viewport_height = height;
+
+	// Store the wlr FBO
+	renderer->wlr_main_buffer_fbo =
+		wlr_gles2_renderer_get_current_fbo(renderer->wlr_output->renderer);
+	// Get the fx_texture
+	struct wlr_texture *wlr_texture = wlr_texture_from_buffer(
+			renderer->wlr_output->renderer, renderer->wlr_output->back_buffer);
+	// renderer->wlr_main_texture = wlr_texture;
+	assert(wlr_texture_is_gles2(wlr_texture));
+	// struct wlr_gles2_texture_attribs texture_attribs;
+	wlr_gles2_texture_get_attribs(wlr_texture, &renderer->wlr_main_texture_attribs);
+	// renderer->wlr_main_texture_attribs = &texture_attribs;
+	wlr_texture_destroy(wlr_texture);
+
+	// Create the additional FBOs
+	fx_framebuffer_update(renderer, &renderer->blur_saved_pixels_buffer, width, height);
+	fx_framebuffer_update(renderer, &renderer->effects_buffer, width, height);
+	fx_framebuffer_update(renderer, &renderer->effects_buffer_swapped, width, height);
+
+	// Finally bind the main wlr FBO
+	fx_framebuffer_bind_wlr_fbo(renderer);
+
+	pixman_region32_init(&renderer->blur_padding_region);
 
 	// refresh projection matrix
 	matrix_projection(renderer->projection, width, height,
@@ -376,9 +464,16 @@ bool fx_render_subtexture_with_matrix(struct fx_renderer *renderer,
 		const struct wlr_box *dst_box, const float matrix[static 9],
 		float opacity, int corner_radius) {
 
-	assert(wlr_texture_is_gles2(wlr_texture));
 	struct wlr_gles2_texture_attribs texture_attrs;
-	wlr_gles2_texture_get_attribs(wlr_texture, &texture_attrs);
+	if (wlr_texture_is_gles2(wlr_texture)) {
+		wlr_gles2_texture_get_attribs(wlr_texture, &texture_attrs);
+	} else if (wlr_texture_is_fx(wlr_texture)) {
+		struct fx_texture *fx_texture = fx_get_texture(wlr_texture);
+		wlr_gles2_texture_get_fx_attribs(fx_texture, &texture_attrs);
+	} else {
+		wlr_log(WLR_ERROR, "Texture not GLES2 or FX. Aborting...");
+		abort();
+	}
 
 	struct tex_shader *shader = NULL;
 
@@ -595,4 +690,46 @@ void fx_render_box_shadow(struct fx_renderer *renderer,
 	glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
 
 	fx_renderer_stencil_mask_fini();
+}
+
+void fx_render_blur(struct fx_renderer *renderer, const float matrix[static 9],
+		struct wlr_gles2_texture_attribs *texture, struct blur_shader *shader,
+		const struct wlr_box *box, int blur_radius) {
+	glDisable(GL_BLEND);
+	glDisable(GL_STENCIL_TEST);
+
+	glActiveTexture(GL_TEXTURE0);
+
+	glBindTexture(texture->target, texture->tex);
+
+	glTexParameteri(texture->target, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+
+	glUseProgram(shader->program);
+
+	// OpenGL ES 2 requires the glUniformMatrix3fv transpose parameter to be set
+	// to GL_FALSE
+	float gl_matrix[9];
+	wlr_matrix_transpose(gl_matrix, matrix);
+	glUniformMatrix3fv(shader->proj, 1, GL_FALSE, gl_matrix);
+
+	glUniform1i(shader->tex, 0);
+	glUniform1f(shader->radius, blur_radius);
+
+	if (shader == &renderer->shaders.blur1) {
+		glUniform2f(shader->halfpixel, 0.5f / (renderer->viewport_width / 2.0f), 0.5f / (renderer->viewport_height / 2.0f));
+	} else {
+		glUniform2f(shader->halfpixel, 0.5f / (renderer->viewport_width * 2.0f), 0.5f / (renderer->viewport_height * 2.0f));
+	}
+
+	glVertexAttribPointer(shader->pos_attrib, 2, GL_FLOAT, GL_FALSE, 0, verts);
+	glVertexAttribPointer(shader->tex_attrib, 2, GL_FLOAT, GL_FALSE, 0, verts);
+
+	glEnableVertexAttribArray(shader->pos_attrib);
+	glEnableVertexAttribArray(shader->tex_attrib);
+
+	glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+
+	glDisableVertexAttribArray(shader->pos_attrib);
+	glDisableVertexAttribArray(shader->tex_attrib);
+
 }

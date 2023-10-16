@@ -7,7 +7,9 @@ endif
 
 wlr_files += files(
 	'matrix.c',
+	'fx_framebuffer.c',
 	'fx_stencilbuffer.c',
+	'fx_texture.c',
 	'fx_renderer.c',
 )
 

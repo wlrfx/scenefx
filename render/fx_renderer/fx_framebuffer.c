@@ -93,14 +93,16 @@ void fx_framebuffer_update(struct fx_renderer *fx_renderer, struct fx_framebuffe
 		}
 	}
 
-	if (first_alloc) {
+	if (!fx_buffer->initialized) {
 		fx_buffer->initialized = true;
 
 		wlr_addon_init(&fx_buffer->addon, &fx_buffer->wlr_buffer->addons, fx_renderer,
 			&buffer_addon_impl);
 
 		wl_list_insert(&fx_renderer->buffers, &fx_buffer->link);
+	}
 
+	if (first_alloc) {
 		wlr_log(WLR_DEBUG, "Created GL FBO for buffer %dx%d",
 			fx_buffer->wlr_buffer->width, fx_buffer->wlr_buffer->height);
 	}

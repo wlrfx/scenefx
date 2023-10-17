@@ -217,7 +217,8 @@ static void fx_renderer_handle_destroy(struct wlr_addon *addon) {
 		fx_texture_destroy(tex);
 	}
 
-	fx_renderer_fini(renderer);
+	fx_stencilbuffer_release(&renderer->stencil_buffer);
+
 	free(renderer);
 }
 static const struct wlr_addon_interface fx_renderer_addon_impl = {
@@ -364,10 +365,6 @@ error:
 
 	wlr_log(WLR_ERROR, "FX RENDERER: Error Initializing Shaders");
 	return NULL;
-}
-
-void fx_renderer_fini(struct fx_renderer *renderer) {
-	fx_stencilbuffer_release(&renderer->stencil_buffer);
 }
 
 void fx_renderer_begin(struct fx_renderer *renderer, int width, int height) {

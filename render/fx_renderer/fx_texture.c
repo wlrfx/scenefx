@@ -10,130 +10,6 @@
 #include "render/pixel_format.h"
 #include "render/egl.h"
 
-struct fx_pixel_format {
-	uint32_t drm_format;
-	// optional field, if empty then internalformat = format
-	GLint gl_internalformat;
-	GLint gl_format, gl_type;
-	bool has_alpha;
-};
-
-/*
- * The DRM formats are little endian while the GL formats are big endian,
- * so DRM_FORMAT_ARGB8888 is actually compatible with GL_BGRA_EXT.
- */
-static const struct fx_pixel_format formats[] = {
-	{
-		.drm_format = DRM_FORMAT_ARGB8888,
-		.gl_format = GL_BGRA_EXT,
-		.gl_type = GL_UNSIGNED_BYTE,
-		.has_alpha = true,
-	},
-	{
-		.drm_format = DRM_FORMAT_XRGB8888,
-		.gl_format = GL_BGRA_EXT,
-		.gl_type = GL_UNSIGNED_BYTE,
-		.has_alpha = false,
-	},
-	{
-		.drm_format = DRM_FORMAT_XBGR8888,
-		.gl_format = GL_RGBA,
-		.gl_type = GL_UNSIGNED_BYTE,
-		.has_alpha = false,
-	},
-	{
-		.drm_format = DRM_FORMAT_ABGR8888,
-		.gl_format = GL_RGBA,
-		.gl_type = GL_UNSIGNED_BYTE,
-		.has_alpha = true,
-	},
-	{
-		.drm_format = DRM_FORMAT_BGR888,
-		.gl_format = GL_RGB,
-		.gl_type = GL_UNSIGNED_BYTE,
-		.has_alpha = false,
-	},
-#if WLR_LITTLE_ENDIAN
-	{
-		.drm_format = DRM_FORMAT_RGBX4444,
-		.gl_format = GL_RGBA,
-		.gl_type = GL_UNSIGNED_SHORT_4_4_4_4,
-		.has_alpha = false,
-	},
-	{
-		.drm_format = DRM_FORMAT_RGBA4444,
-		.gl_format = GL_RGBA,
-		.gl_type = GL_UNSIGNED_SHORT_4_4_4_4,
-		.has_alpha = true,
-	},
-	{
-		.drm_format = DRM_FORMAT_RGBX5551,
-		.gl_format = GL_RGBA,
-		.gl_type = GL_UNSIGNED_SHORT_5_5_5_1,
-		.has_alpha = false,
-	},
-	{
-		.drm_format = DRM_FORMAT_RGBA5551,
-		.gl_format = GL_RGBA,
-		.gl_type = GL_UNSIGNED_SHORT_5_5_5_1,
-		.has_alpha = true,
-	},
-	{
-		.drm_format = DRM_FORMAT_RGB565,
-		.gl_format = GL_RGB,
-		.gl_type = GL_UNSIGNED_SHORT_5_6_5,
-		.has_alpha = false,
-	},
-	{
-		.drm_format = DRM_FORMAT_XBGR2101010,
-		.gl_format = GL_RGBA,
-		.gl_type = GL_UNSIGNED_INT_2_10_10_10_REV_EXT,
-		.has_alpha = false,
-	},
-	{
-		.drm_format = DRM_FORMAT_ABGR2101010,
-		.gl_format = GL_RGBA,
-		.gl_type = GL_UNSIGNED_INT_2_10_10_10_REV_EXT,
-		.has_alpha = true,
-	},
-	{
-		.drm_format = DRM_FORMAT_XBGR16161616F,
-		.gl_format = GL_RGBA,
-		.gl_type = GL_HALF_FLOAT_OES,
-		.has_alpha = false,
-	},
-	{
-		.drm_format = DRM_FORMAT_ABGR16161616F,
-		.gl_format = GL_RGBA,
-		.gl_type = GL_HALF_FLOAT_OES,
-		.has_alpha = true,
-	},
-	{
-		.drm_format = DRM_FORMAT_XBGR16161616,
-		.gl_internalformat = GL_RGBA16_EXT,
-		.gl_format = GL_RGBA,
-		.gl_type = GL_UNSIGNED_SHORT,
-		.has_alpha = false,
-	},
-	{
-		.drm_format = DRM_FORMAT_ABGR16161616,
-		.gl_internalformat = GL_RGBA16_EXT,
-		.gl_format = GL_RGBA,
-		.gl_type = GL_UNSIGNED_SHORT,
-		.has_alpha = true,
-	},
-#endif
-};
-
-static const struct fx_pixel_format *get_fx_format_from_drm(uint32_t fmt) {
-	for (size_t i = 0; i < sizeof(formats) / sizeof(*formats); ++i) {
-		if (formats[i].drm_format == fmt) {
-			return &formats[i];
-		}
-	}
-	return NULL;
-}
-
 static const struct wlr_texture_impl texture_impl;
 
 bool wlr_texture_is_fx(struct wlr_texture *wlr_texture) {
@@ -181,10 +57,6 @@ static bool fx_texture_update_from_buffer(struct wlr_texture *wlr_texture,
 		return false;
 	}
 
-	const struct fx_pixel_format *fmt =
-		get_fx_format_from_drm(texture->drm_format);
-	assert(fmt);
-
 	const struct wlr_pixel_format_info *drm_fmt =
 		drm_get_pixel_format_info(texture->drm_format);
 	assert(drm_fmt);
@@ -213,7 +85,7 @@ static bool fx_texture_update_from_buffer(struct wlr_texture *wlr_texture,
 		int width = rect.x2 - rect.x1;
 		int height = rect.y2 - rect.y1;
 		glTexSubImage2D(GL_TEXTURE_2D, 0, rect.x1, rect.y1, width, height,
-			fmt->gl_format, fmt->gl_type, data);
+			GL_RGBA, GL_UNSIGNED_BYTE, data);
 	}
 
 	glPixelStorei(GL_UNPACK_ROW_LENGTH_EXT, 0);
@@ -303,13 +175,6 @@ static struct fx_texture *fx_texture_from_pixels(
 		struct fx_renderer *renderer,
 		uint32_t drm_format, uint32_t stride, uint32_t width,
 		uint32_t height, const void *data) {
-	const struct fx_pixel_format *fmt =
-		get_fx_format_from_drm(drm_format);
-	if (fmt == NULL) {
-		wlr_log(WLR_ERROR, "Unsupported pixel format 0x%"PRIX32, drm_format);
-		return NULL;
-	}
-
 	const struct wlr_pixel_format_info *drm_fmt =
 		drm_get_pixel_format_info(drm_format);
 	assert(drm_fmt);
@@ -324,13 +189,8 @@ static struct fx_texture *fx_texture_from_pixels(
 		return NULL;
 	}
 	texture->target = GL_TEXTURE_2D;
-	texture->has_alpha = fmt->has_alpha;
-	texture->drm_format = fmt->drm_format;
-
-	GLint internal_format = fmt->gl_internalformat;
-	if (!internal_format) {
-		internal_format = fmt->gl_format;
-	}
+	texture->has_alpha = false;
+	texture->drm_format = DRM_FORMAT_XBGR8888;
 
 	struct wlr_egl_context prev_ctx;
 	wlr_egl_save_context(&prev_ctx);
@@ -341,9 +201,11 @@ static struct fx_texture *fx_texture_from_pixels(
 
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
 	glPixelStorei(GL_UNPACK_ROW_LENGTH_EXT, stride / (drm_fmt->bpp / 8));
-	glTexImage2D(GL_TEXTURE_2D, 0, internal_format, width, height, 0,
-		fmt->gl_format, fmt->gl_type, data);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0,
+		GL_RGBA, GL_UNSIGNED_BYTE, data);
 	glPixelStorei(GL_UNPACK_ROW_LENGTH_EXT, 0);
 
 	glBindTexture(GL_TEXTURE_2D, 0);
@@ -398,6 +260,8 @@ static struct wlr_texture *fx_texture_from_dmabuf(
 	glBindTexture(texture->target, texture->tex);
 	glTexParameteri(texture->target, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
 	glTexParameteri(texture->target, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+	glTexParameteri(texture->target, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	glTexParameteri(texture->target, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
 	renderer->procs.glEGLImageTargetTexture2DOES(texture->target, texture->image);
 	glBindTexture(texture->target, 0);
 

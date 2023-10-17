@@ -24,6 +24,7 @@
 #include <wlr/types/wlr_compositor.h>
 #include <wlr/types/wlr_damage_ring.h>
 #include "types/fx/shadow_data.h"
+#include "types/fx/blur_data.h"
 
 struct wlr_output;
 struct wlr_output_layout;
@@ -97,6 +98,8 @@ struct wlr_scene {
 	enum wlr_scene_debug_damage_option debug_damage_option;
 	bool direct_scanout;
 	bool calculate_visibility;
+
+	struct blur_data blur_data;
 };
 
 /** A scene-graph node displaying a single surface. */
@@ -153,6 +156,8 @@ struct wlr_scene_buffer {
 	float opacity;
 	int corner_radius;
 	struct shadow_data shadow_data;
+	bool backdrop_blur;
+	bool backdrop_blur_optimized;
 
 	uint64_t active_outputs;
 	struct wlr_texture *texture;
@@ -279,6 +284,11 @@ void wlr_scene_set_presentation(struct wlr_scene *scene,
 	struct wlr_presentation *presentation);
 
 /**
+ *
+ */
+void wlr_scene_set_blur_data(struct wlr_scene *scene, struct blur_data blur_data);
+
+/**
  * Add a node displaying nothing but its children.
  */
 struct wlr_scene_tree *wlr_scene_tree_create(struct wlr_scene_tree *parent);
@@ -394,6 +404,19 @@ void wlr_scene_buffer_set_corner_radius(struct wlr_scene_buffer *scene_buffer,
 */
 void wlr_scene_buffer_set_shadow_data(struct wlr_scene_buffer *scene_buffer,
 		struct shadow_data shadow_data);
+
+/**
+* Sets the whether or not the buffer should render backdrop blur
+*/
+void wlr_scene_buffer_set_backdrop_blur(struct wlr_scene_buffer *scene_buffer,
+		bool enabled);
+
+/**
+* Sets the whether the backdrop blur should use optimized blur or not
+* TODO: Add function to update `blur_buffer`
+*/
+void wlr_scene_buffer_set_backdrop_blur_optimized(struct wlr_scene_buffer *scene_buffer,
+		bool enabled);
 
 /**
  * Calls the buffer's frame_done signal.

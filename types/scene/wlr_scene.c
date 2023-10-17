@@ -176,6 +176,8 @@ struct wlr_scene *wlr_scene_create(void) {
 	scene->direct_scanout = !env_parse_bool("WLR_SCENE_DISABLE_DIRECT_SCANOUT");
 	scene->calculate_visibility = !env_parse_bool("WLR_SCENE_DISABLE_VISIBILITY");
 
+	scene->blur_data = blur_data_get_default();
+
 	return scene;
 }
 
@@ -582,6 +584,8 @@ struct wlr_scene_buffer *wlr_scene_buffer_create(struct wlr_scene_tree *parent,
 	scene_buffer->opacity = 1;
 	scene_buffer->corner_radius = 0;
 	scene_buffer->shadow_data = shadow_data_get_default();
+	scene_buffer->backdrop_blur = false;
+	scene_buffer->backdrop_blur_optimized = false;
 
 	scene_node_update(&scene_buffer->node, NULL);
 
@@ -805,6 +809,22 @@ void wlr_scene_buffer_set_shadow_data(struct wlr_scene_buffer *scene_buffer,
 	memcpy(&scene_buffer->shadow_data, &shadow_data,
 			sizeof(struct shadow_data));
 	scene_node_update(&scene_buffer->node, NULL);
+}
+
+void wlr_scene_buffer_set_backdrop_blur(struct wlr_scene_buffer *scene_buffer,
+		bool enabled) {
+	if (scene_buffer->backdrop_blur != enabled) {
+		scene_buffer->backdrop_blur = enabled;
+		scene_node_update(&scene_buffer->node, NULL);
+	}
+}
+
+void wlr_scene_buffer_set_backdrop_blur_optimized(struct wlr_scene_buffer *scene_buffer,
+		bool enabled) {
+	if (scene_buffer->backdrop_blur_optimized != enabled) {
+		scene_buffer->backdrop_blur_optimized = enabled;
+		scene_node_update(&scene_buffer->node, NULL);
+	}
 }
 
 static struct wlr_texture *scene_buffer_get_texture(
@@ -1171,7 +1191,7 @@ static void render_blur_segments(struct fx_renderer *renderer,
 // Blurs the main_buffer content and returns the blurred framebuffer
 static struct fx_framebuffer *get_main_buffer_blur(struct fx_renderer *renderer,
 		struct wlr_output *output, pixman_region32_t *original_damage,
-		const struct wlr_box *box) {
+		const struct wlr_box *box, struct blur_data *blur_data) {
 	struct wlr_box monitor_box = get_monitor_box(output);
 
 	const enum wl_output_transform transform = wlr_output_transform_invert(output->transform);
@@ -1186,11 +1206,7 @@ static struct fx_framebuffer *get_main_buffer_blur(struct fx_renderer *renderer,
 	pixman_region32_copy(&damage, original_damage);
 	wlr_region_transform(&damage, &damage, transform, monitor_box.width, monitor_box.height);
 
-	// TODO: Make it non constant
-	int blur_radius = 5;
-	int blur_passes = 3;
-	int blur_size = pow(2, blur_passes) * blur_radius;
-	wlr_region_expand(&damage, &damage, blur_size);
+	wlr_region_expand(&damage, &damage, blur_data_calc_size(blur_data->radius, blur_data->num_passes));
 
 	// Intially draw from the wlr texture
 	glBindTexture(renderer->wlr_main_texture_attribs.target,
@@ -1202,18 +1218,18 @@ static struct fx_framebuffer *get_main_buffer_blur(struct fx_renderer *renderer,
 	struct fx_framebuffer *current_buffer = NULL;
 
 	// Downscale
-	for (int i = 0; i < blur_passes; ++i) {
+	for (int i = 0; i < blur_data->num_passes; ++i) {
 		wlr_region_scale(&tempDamage, &damage, 1.0f / (1 << (i + 1)));
 		render_blur_segments(renderer, gl_matrix, &tempDamage, &current_buffer,
-				&renderer->shaders.blur1, box, blur_radius);
+				&renderer->shaders.blur1, box, blur_data->radius);
 	}
 
 	// Upscale
-	for (int i = blur_passes - 1; i >= 0; --i) {
+	for (int i = blur_data->num_passes - 1; i >= 0; --i) {
 		// when upsampling we make the region twice as big
 		wlr_region_scale(&tempDamage, &damage, 1.0f / (1 << i));
 		render_blur_segments(renderer, gl_matrix, &tempDamage, &current_buffer,
-				&renderer->shaders.blur2, box, blur_radius);
+				&renderer->shaders.blur2, box, blur_data->radius);
 	}
 
 	pixman_region32_fini(&tempDamage);
@@ -1232,9 +1248,10 @@ struct blur_stencil_data {
 	bool should_stencil;
 };
 
-static void render_blur(bool optimized, struct fx_renderer *renderer,
+static void render_backdrop_blur(bool optimized, struct fx_renderer *renderer,
 		struct wlr_output *output, pixman_region32_t *damage, struct wlr_scene_buffer *scene_buffer,
-		const struct wlr_box *dst_box, struct blur_stencil_data *stencil_data) {
+		const struct wlr_box *dst_box, struct blur_stencil_data *stencil_data,
+		struct blur_data *blur_data) {
 	pixman_region32_t translucent_region;
 	pixman_region32_init(&translucent_region);
 
@@ -1256,7 +1273,7 @@ static void render_blur(bool optimized, struct fx_renderer *renderer,
 		pixman_region32_intersect(&translucent_region, &translucent_region, damage);
 
 		// Render the blur into its own buffer
-		buffer = get_main_buffer_blur(renderer, output, &translucent_region, dst_box);
+		buffer = get_main_buffer_blur(renderer, output, &translucent_region, dst_box, blur_data);
 	}
 	struct fx_texture *blur_texture = fx_texture_from_buffer(renderer, buffer->wlr_buffer);
 
@@ -1423,7 +1440,9 @@ static void scene_node_render(struct fx_renderer *fx_renderer, struct wlr_scene_
 				dst_box.x, dst_box.y, dst_box.width, dst_box.height);
 
 		// Blur
-		if (true) {
+		struct wlr_scene *scene = scene_node_get_root(&scene_buffer->node);
+		if (scene_buffer_has_blur(scene_buffer->backdrop_blur,
+					scene->blur_data.radius, scene->blur_data.num_passes)) {
 			pixman_region32_t opaque_region;
 			pixman_region32_init(&opaque_region);
 
@@ -1444,11 +1463,9 @@ static void scene_node_render(struct fx_renderer *fx_renderer, struct wlr_scene_
 						wlr_output_transform_invert(output->transform),
 						monitor_box.width, monitor_box.height);
 				struct blur_stencil_data stencil_data = { texture, &scene_buffer->src_box, matrix, false };
-				// bool should_optimize_blur = view ? !container_is_floating(view->container) || config->blur_xray : false;
-				// render_blur(should_optimize_blur, output, output_damage, &dst_box,
-				// 		&opaque_region, &deco_data, &stencil_data);
-				render_blur(false, fx_renderer, output, &render_region, scene_buffer,
-						&dst_box, &stencil_data);
+				render_backdrop_blur(scene_buffer->backdrop_blur_optimized,
+						fx_renderer, output, &render_region, scene_buffer,
+						&dst_box, &stencil_data, &scene->blur_data);
 			}
 
 			pixman_region32_fini(&opaque_region);
@@ -1487,6 +1504,18 @@ void wlr_scene_set_presentation(struct wlr_scene *scene,
 	scene->presentation = presentation;
 	scene->presentation_destroy.notify = scene_handle_presentation_destroy;
 	wl_signal_add(&presentation->events.destroy, &scene->presentation_destroy);
+}
+
+void wlr_scene_set_blur_data(struct wlr_scene *scene, struct blur_data blur_data) {
+	struct blur_data *buff_data = &scene->blur_data;
+	if (buff_data->radius == blur_data.radius &&
+			buff_data->num_passes && blur_data.num_passes) {
+		return;
+	}
+
+	memcpy(&scene->blur_data, &blur_data,
+			sizeof(struct blur_data));
+	scene_node_update(&scene->tree.node, NULL);
 }
 
 static void scene_output_handle_destroy(struct wlr_addon *addon) {

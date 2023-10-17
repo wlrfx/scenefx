@@ -276,7 +276,8 @@ struct fx_renderer *fx_renderer_create(struct wlr_egl *egl,
 	renderer->effects_buffer = fx_framebuffer_create();
 	renderer->effects_buffer_swapped = fx_framebuffer_create();
 
-	renderer->blur_buffer_dirty = true;
+	// TODO: Implement
+	renderer->blur_buffer_dirty = false;
 
 	// get extensions
 	const char *exts_str = (const char *)glGetString(GL_EXTENSIONS);
@@ -398,6 +399,10 @@ void fx_renderer_begin(struct fx_renderer *renderer, int width, int height) {
 		WL_OUTPUT_TRANSFORM_FLIPPED_180);
 
 	glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
+}
+
+void fx_renderer_end(struct fx_renderer *renderer) {
+	pixman_region32_fini(&renderer->blur_padding_region);
 }
 
 void fx_renderer_clear(const float color[static 4]) {

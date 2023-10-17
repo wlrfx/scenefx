@@ -11,10 +11,14 @@ struct blur_data blur_data_get_default(void) {
 	};
 }
 
-bool scene_buffer_has_blur(bool backdrop_blur, int radius, int num_passes) {
-	return backdrop_blur && radius > 0 && num_passes > 0;
+bool scene_buffer_should_blur(bool backdrop_blur, struct blur_data *blur_data) {
+	return backdrop_blur && blur_data->radius > 0 && blur_data->num_passes > 0;
 }
 
-int blur_data_calc_size(int radius, int num_passes) {
-	return pow(2, num_passes) * radius;
+int blur_data_calc_size(struct blur_data *blur_data) {
+	return pow(2, blur_data->num_passes) * blur_data->radius;
+}
+
+int blur_data_calc_outer_size(struct blur_data *blur_data) {
+	return pow(2, blur_data->num_passes + 1) * blur_data->radius;
 }

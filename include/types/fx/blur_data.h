@@ -11,8 +11,10 @@ struct blur_data {
 
 struct blur_data blur_data_get_default(void);
 
-bool scene_buffer_has_blur(bool backdrop_blur, int radius, int num_passes);
+bool scene_buffer_should_blur(bool backdrop_blur, struct blur_data *blur_data);
 
-int blur_data_calc_size(int radius, int num_passes);
+int blur_data_calc_size(struct blur_data *blur_data);
+
+int blur_data_calc_outer_size(struct blur_data *blur_data);
 
 #endif

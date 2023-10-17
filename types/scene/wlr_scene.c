@@ -1423,10 +1423,7 @@ static void scene_node_render(struct fx_renderer *fx_renderer, struct wlr_scene_
 				dst_box.x, dst_box.y, dst_box.width, dst_box.height);
 
 		// Blur
-		struct wlr_scene_surface *scene_surface = NULL;
-		if (true && (scene_surface = wlr_scene_surface_from_buffer(scene_buffer))) {
-			struct wlr_surface *surface = scene_surface->surface;
-
+		if (true) {
 			pixman_region32_t opaque_region;
 			pixman_region32_init(&opaque_region);
 
@@ -1435,14 +1432,17 @@ static void scene_node_render(struct fx_renderer *fx_renderer, struct wlr_scene_
 				has_alpha = true;
 				pixman_region32_union_rect(&opaque_region, &opaque_region, 0, 0, 0, 0);
 			} else {
-				has_alpha = !surface->opaque;
-				pixman_region32_copy(&opaque_region, &surface->opaque_region);
+				struct wlr_scene_surface *scene_surface
+					= wlr_scene_surface_from_buffer(scene_buffer);
+				has_alpha = !scene_surface->surface->opaque;
+				pixman_region32_copy(&opaque_region, &scene_surface->surface->opaque_region);
 			}
 
 			if (has_alpha) {
 				struct wlr_box monitor_box = get_monitor_box(output);
 				wlr_box_transform(&monitor_box, &monitor_box,
-						wlr_output_transform_invert(output->transform), monitor_box.width, monitor_box.height);
+						wlr_output_transform_invert(output->transform),
+						monitor_box.width, monitor_box.height);
 				struct blur_stencil_data stencil_data = { texture, &scene_buffer->src_box, matrix, false };
 				// bool should_optimize_blur = view ? !container_is_floating(view->container) || config->blur_xray : false;
 				// render_blur(should_optimize_blur, output, output_damage, &dst_box,

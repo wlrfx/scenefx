@@ -130,4 +130,6 @@ void fx_framebuffer_release(struct fx_framebuffer *fx_buffer) {
 	wlr_egl_destroy_image(fx_buffer->renderer->egl, fx_buffer->image);
 
 	wlr_egl_restore_context(&prev_ctx);
+
+	fx_buffer->initialized = false;
 }

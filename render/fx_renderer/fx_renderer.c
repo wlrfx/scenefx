@@ -371,8 +371,6 @@ void fx_renderer_fini(struct fx_renderer *renderer) {
 }
 
 void fx_renderer_begin(struct fx_renderer *renderer, int width, int height) {
-	fx_stencilbuffer_init(&renderer->stencil_buffer, width, height);
-
 	glViewport(0, 0, width, height);
 	renderer->viewport_width = width;
 	renderer->viewport_height = height;
@@ -383,12 +381,10 @@ void fx_renderer_begin(struct fx_renderer *renderer, int width, int height) {
 	// Get the fx_texture
 	struct wlr_texture *wlr_texture = wlr_texture_from_buffer(
 			renderer->wlr_output->renderer, renderer->wlr_output->back_buffer);
-	// renderer->wlr_main_texture = wlr_texture;
-	assert(wlr_texture_is_gles2(wlr_texture));
-	// struct wlr_gles2_texture_attribs texture_attribs;
 	wlr_gles2_texture_get_attribs(wlr_texture, &renderer->wlr_main_texture_attribs);
-	// renderer->wlr_main_texture_attribs = &texture_attribs;
 	wlr_texture_destroy(wlr_texture);
+	// Add the stencil to the wlr fbo
+	fx_stencilbuffer_init(&renderer->stencil_buffer, width, height);
 
 	// Create the additional FBOs
 	fx_framebuffer_update(renderer, &renderer->blur_saved_pixels_buffer, width, height);

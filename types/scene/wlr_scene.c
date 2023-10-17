@@ -1142,6 +1142,14 @@ static void render_blur_segments(struct fx_renderer *renderer,
 		fx_framebuffer_bind(&renderer->effects_buffer);
 	}
 
+	struct wlr_gles2_texture_attribs attribs;
+	if (*buffer) {
+		struct fx_texture *texture = fx_texture_from_buffer(renderer, (*buffer)->wlr_buffer);
+		wlr_gles2_texture_get_fx_attribs(texture, &attribs);
+	} else {
+		attribs = renderer->wlr_main_texture_attribs;
+	}
+
 	if (pixman_region32_not_empty(damage)) {
 		int nrects;
 		pixman_box32_t *rects = pixman_region32_rectangles(damage, &nrects);
@@ -1149,8 +1157,7 @@ static void render_blur_segments(struct fx_renderer *renderer,
 			const pixman_box32_t box = rects[i];
 			struct wlr_box new_box = { box.x1, box.y1, box.x2 - box.x1, box.y2 - box.y1 };
 			fx_renderer_scissor(&new_box);
-			fx_render_blur(renderer, matrix, &renderer->wlr_main_texture_attribs,
-					shader, &new_box, blur_radius);
+			fx_render_blur(renderer, matrix, &attribs, shader, &new_box, blur_radius);
 		}
 	}
 

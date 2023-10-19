@@ -1124,10 +1124,48 @@ static void render_texture(struct fx_renderer *fx_renderer, struct wlr_output *o
 	}
 }
 
+static void render_border(struct fx_renderer *fx_renderer, struct wlr_output *output,
+		pixman_region32_t *surface_damage, const struct wlr_box *surface_box, int corner_radius) {
+	assert(fx_renderer);
+
+	// don't damage area behind window since we dont render it anyway
+	pixman_region32_t inner_region;
+	pixman_region32_init(&inner_region);
+	pixman_region32_union_rect(&inner_region, &inner_region,
+			surface_box->x + corner_radius * 0.5,
+			surface_box->y + corner_radius * 0.5,
+			surface_box->width - corner_radius,
+			surface_box->height - corner_radius);
+	pixman_region32_intersect(&inner_region, &inner_region, surface_damage);
+
+	pixman_region32_t damage;
+	pixman_region32_init(&damage);
+	pixman_region32_subtract(&damage, surface_damage, &inner_region);
+	if (!pixman_region32_not_empty(&damage)) {
+		goto damage_finish;
+	}
+
+	int border_size = 5;
+	struct wlr_box border_box = {
+		.x = surface_box->x - border_size,
+		.y = surface_box->y - border_size,
+		.width = surface_box->width + (2 * border_size),
+		.height = surface_box->height + (2 * border_size)
+	};
+	const float color[4] = { 0.0, 0.0, 1.0, 0.0};
+	render_rect(fx_renderer, output, &damage, color, &border_box, output->transform_matrix);
+
+damage_finish:
+	pixman_region32_fini(&damage);
+	pixman_region32_fini(&inner_region);
+}
+
 static void render_box_shadow(struct fx_renderer *fx_renderer,
 		struct wlr_output *output, pixman_region32_t *surface_damage,
 		const struct wlr_box *surface_box, int corner_radius,
 		struct shadow_data *shadow_data) {
+	assert(fx_renderer);
+
 	// don't damage area behind window since we dont render it anyway
 	pixman_region32_t inner_region;
 	pixman_region32_init(&inner_region);
@@ -1247,9 +1285,16 @@ static void scene_node_render(struct fx_renderer *fx_renderer, struct wlr_scene_
 			}
 		}
 
+		// Border
+		render_border(fx_renderer, output, &render_region, &dst_box, scene_buffer->corner_radius);
+
 		// Shadow
 		if (scene_buffer_has_shadow(&scene_buffer->shadow_data)) {
 			// TODO: Compensate for SSD borders here
+			dst_box.x -= 10;
+			dst_box.y -= 10;
+			dst_box.width += 20;
+			dst_box.height += 20;
 			render_box_shadow(fx_renderer, output, &render_region, &dst_box,
 					scene_buffer->corner_radius, &scene_buffer->shadow_data);
 		}

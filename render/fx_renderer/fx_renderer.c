@@ -21,6 +21,7 @@
 // shaders
 #include "common_vert_src.h"
 #include "quad_frag_src.h"
+#include "quad_rounded_frag_src.h"
 #include "tex_frag_src.h"
 #include "stencil_mask_frag_src.h"
 #include "box_shadow_frag_src.h"
@@ -95,6 +96,23 @@ static bool link_quad_program(struct quad_shader *shader) {
 	shader->proj = glGetUniformLocation(prog, "proj");
 	shader->color = glGetUniformLocation(prog, "color");
 	shader->pos_attrib = glGetAttribLocation(prog, "pos");
+
+	return true;
+}
+
+static bool link_quad_rounded_program(struct quad_rounded_shader *shader) {
+	GLuint prog;
+	shader->program = prog = link_program(quad_frag_src);
+	if (!shader->program) {
+		return false;
+	}
+
+	shader->proj = glGetUniformLocation(prog, "proj");
+	shader->color = glGetUniformLocation(prog, "color");
+	shader->pos_attrib = glGetAttribLocation(prog, "pos");
+	shader->half_size = glGetAttribLocation(prog, "half_size");
+	shader->position = glGetAttribLocation(prog, "position");
+	shader->radius = glGetAttribLocation(prog, "radius");
 
 	return true;
 }
@@ -254,6 +272,10 @@ struct fx_renderer *fx_renderer_create(struct wlr_egl *egl) {
 	if (!link_quad_program(&renderer->shaders.quad)) {
 		goto error;
 	}
+	// quad rounded fragment shader
+	if (!link_quad_rounded_program(&renderer->shaders.quad_rounded)) {
+		goto error;
+	}
 	// fragment shaders
 	if (!link_tex_program(&renderer->shaders.tex_rgba, SHADER_SOURCE_TEXTURE_RGBA)) {
 		goto error;
@@ -285,6 +307,7 @@ struct fx_renderer *fx_renderer_create(struct wlr_egl *egl) {
 
 error:
 	glDeleteProgram(renderer->shaders.quad.program);
+	glDeleteProgram(renderer->shaders.quad_rounded.program);
 	glDeleteProgram(renderer->shaders.tex_rgba.program);
 	glDeleteProgram(renderer->shaders.tex_rgbx.program);
 	glDeleteProgram(renderer->shaders.tex_ext.program);
@@ -489,6 +512,53 @@ void fx_render_rect(struct fx_renderer *renderer, const struct wlr_box *box,
 
 	glUniformMatrix3fv(shader.proj, 1, GL_FALSE, gl_matrix);
 	glUniform4f(shader.color, color[0], color[1], color[2], color[3]);
+
+	glVertexAttribPointer(shader.pos_attrib, 2, GL_FLOAT, GL_FALSE,
+			0, verts);
+
+	glEnableVertexAttribArray(shader.pos_attrib);
+
+	glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+
+	glDisableVertexAttribArray(shader.pos_attrib);
+}
+
+void fx_render_rounded_rect(struct fx_renderer *renderer, const struct wlr_box *box,
+		const float color[static 4], const float projection[static 9], int corner_radius) {
+	if (box->width == 0 || box->height == 0) {
+		return;
+	}
+	assert(box->width > 0 && box->height > 0);
+	if (corner_radius == 0) {
+		fx_render_rect(renderer, box, color, projection);
+		return;
+	}
+
+	float matrix[9];
+	wlr_matrix_project_box(matrix, box, WL_OUTPUT_TRANSFORM_NORMAL, 0, projection);
+
+	float gl_matrix[9];
+	wlr_matrix_multiply(gl_matrix, renderer->projection, matrix);
+
+	// TODO: investigate why matrix is flipped prior to this cmd
+	// wlr_matrix_multiply(gl_matrix, flip_180, gl_matrix);
+
+	wlr_matrix_transpose(gl_matrix, gl_matrix);
+
+	if (color[3] == 1.0) {
+		glDisable(GL_BLEND);
+	} else {
+		glEnable(GL_BLEND);
+	}
+
+	struct quad_rounded_shader shader = renderer->shaders.quad_rounded;
+	glUseProgram(shader.program);
+
+	glUniformMatrix3fv(shader.proj, 1, GL_FALSE, gl_matrix);
+	glUniform4f(shader.color, color[0], color[1], color[2], color[3]);
+	glUniform2f(shader.half_size, box->width * 0.5, box->height * 0.5);
+	glUniform2f(shader.position, box->x, box->y);
+	glUniform1f(shader.radius, corner_radius);
 
 	glVertexAttribPointer(shader.pos_attrib, 2, GL_FLOAT, GL_FALSE,
 			0, verts);

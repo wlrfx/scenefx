@@ -1094,6 +1094,19 @@ static void render_rect(struct fx_renderer *fx_renderer, struct wlr_output *outp
 	}
 }
 
+static void render_rounded_rect(struct fx_renderer *fx_renderer, struct wlr_output *output,
+		pixman_region32_t *damage, const float color[static 4], const struct wlr_box *box,
+		const float matrix[static 9], int corner_radius) {
+	assert(fx_renderer);
+
+	int nrects;
+	pixman_box32_t *rects = pixman_region32_rectangles(damage, &nrects);
+	for (int i = 0; i < nrects; ++i) {
+		scissor_output(output, &rects[i]);
+		fx_render_rounded_rect(fx_renderer, box, color, matrix, corner_radius);
+	}
+}
+
 static void render_texture(struct fx_renderer *fx_renderer, struct wlr_output *output,
 		pixman_region32_t *damage, struct wlr_texture *texture,
 		const struct wlr_fbox *src_box, const struct wlr_box *dst_box,
@@ -1153,7 +1166,7 @@ static void render_border(struct fx_renderer *fx_renderer, struct wlr_output *ou
 		.height = surface_box->height + (2 * border_size)
 	};
 	const float color[4] = { 0.0, 0.0, 1.0, 0.0};
-	render_rect(fx_renderer, output, &damage, color, &border_box, output->transform_matrix);
+	render_rounded_rect(fx_renderer, output, &damage, color, &border_box, output->transform_matrix, corner_radius);
 
 damage_finish:
 	pixman_region32_fini(&damage);
@@ -1291,10 +1304,10 @@ static void scene_node_render(struct fx_renderer *fx_renderer, struct wlr_scene_
 		// Shadow
 		if (scene_buffer_has_shadow(&scene_buffer->shadow_data)) {
 			// TODO: Compensate for SSD borders here
-			dst_box.x -= 10;
-			dst_box.y -= 10;
-			dst_box.width += 20;
-			dst_box.height += 20;
+			dst_box.x -= 5;
+			dst_box.y -= 5;
+			dst_box.width += 10;
+			dst_box.height += 10;
 			render_box_shadow(fx_renderer, output, &render_region, &dst_box,
 					scene_buffer->corner_radius, &scene_buffer->shadow_data);
 		}

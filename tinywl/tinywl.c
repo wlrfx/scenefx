@@ -635,7 +635,7 @@ static void output_configure_scene(struct wlr_scene_node *node,
 			if (!wlr_surface_is_subsurface(xdg_surface->surface)) {
 				wlr_scene_buffer_set_corner_radius(buffer, view->corner_radius);
 				wlr_scene_buffer_set_border(buffer, view->border_size, view->border_color);
-				//wlr_scene_buffer_set_shadow_data(buffer, view->shadow_data);
+				wlr_scene_buffer_set_shadow_data(buffer, view->shadow_data);
 			}
 		}
 	} else if (node->type == WLR_SCENE_NODE_TREE) {

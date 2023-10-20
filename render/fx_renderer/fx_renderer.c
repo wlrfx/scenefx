@@ -110,9 +110,9 @@ static bool link_quad_rounded_program(struct quad_rounded_shader *shader) {
 	shader->proj = glGetUniformLocation(prog, "proj");
 	shader->color = glGetUniformLocation(prog, "color");
 	shader->pos_attrib = glGetAttribLocation(prog, "pos");
-	shader->half_size = glGetAttribLocation(prog, "half_size");
-	shader->position = glGetAttribLocation(prog, "position");
-	shader->radius = glGetAttribLocation(prog, "radius");
+	shader->half_size = glGetUniformLocation(prog, "half_size");
+	shader->position = glGetUniformLocation(prog, "position");
+	shader->radius = glGetUniformLocation(prog, "radius");
 
 	return true;
 }
@@ -529,7 +529,7 @@ void fx_render_rounded_rect(struct fx_renderer *renderer, const struct wlr_box *
 		return;
 	}
 	assert(box->width > 0 && box->height > 0);
-	printf("corner_radius: %d\n", corner_radius);
+
 	if (corner_radius == 0) {
 		fx_render_rect(renderer, box, color, projection);
 		return;

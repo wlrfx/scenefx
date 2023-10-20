@@ -617,6 +617,10 @@ void fx_render_rounded_rect(struct fx_renderer *renderer,
 	glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
 
 	glDisableVertexAttribArray(shader.pos_attrib);
+
+	if (corner_radius) {
+		fx_renderer_stencil_mask_fini();
+	}
 }
 
 void fx_render_box_shadow(struct fx_renderer *renderer,

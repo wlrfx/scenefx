@@ -1313,11 +1313,12 @@ static void scene_node_render(struct fx_renderer *fx_renderer, struct wlr_scene_
 		// Shadow
 		if (scene_buffer_has_shadow(&scene_buffer->shadow_data)) {
 			// TODO: Compensate for SSD borders here
-			dst_box.x -= scene_buffer->border_size;
-			dst_box.y -= scene_buffer->border_size;
-			dst_box.width += (2 * scene_buffer->border_size);
-			dst_box.height += (2 * scene_buffer->border_size);
-			render_box_shadow(fx_renderer, output, &render_region, &dst_box,
+			struct wlr_box shadow_box = dst_box;
+			shadow_box.x -= scene_buffer->border_size;
+			shadow_box.y -= scene_buffer->border_size;
+			shadow_box.width += (2 * scene_buffer->border_size);
+			shadow_box.height += (2 * scene_buffer->border_size);
+			render_box_shadow(fx_renderer, output, &render_region, &shadow_box,
 					scene_buffer->corner_radius, &scene_buffer->shadow_data);
 		}
 

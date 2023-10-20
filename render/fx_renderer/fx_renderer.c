@@ -523,54 +523,6 @@ void fx_render_rect(struct fx_renderer *renderer, const struct wlr_box *box,
 	glDisableVertexAttribArray(shader.pos_attrib);
 }
 
-void fx_render_rounded_rect(struct fx_renderer *renderer, const struct wlr_box *box,
-		const float color[static 4], const float projection[static 9], int corner_radius) {
-	if (box->width == 0 || box->height == 0) {
-		return;
-	}
-	assert(box->width > 0 && box->height > 0);
-
-	if (corner_radius == 0) {
-		fx_render_rect(renderer, box, color, projection);
-		return;
-	}
-
-	float matrix[9];
-	wlr_matrix_project_box(matrix, box, WL_OUTPUT_TRANSFORM_NORMAL, 0, projection);
-
-	float gl_matrix[9];
-	wlr_matrix_multiply(gl_matrix, renderer->projection, matrix);
-
-	// TODO: investigate why matrix is flipped prior to this cmd
-	// wlr_matrix_multiply(gl_matrix, flip_180, gl_matrix);
-
-	wlr_matrix_transpose(gl_matrix, gl_matrix);
-
-	if (color[3] == 1.0) {
-		glDisable(GL_BLEND);
-	} else {
-		glEnable(GL_BLEND);
-	}
-
-	struct quad_rounded_shader shader = renderer->shaders.quad_rounded;
-	glUseProgram(shader.program);
-
-	glUniformMatrix3fv(shader.proj, 1, GL_FALSE, gl_matrix);
-	glUniform4f(shader.color, color[0], color[1], color[2], color[3]);
-	glUniform2f(shader.half_size, box->width * 0.5, box->height * 0.5);
-	glUniform2f(shader.position, box->x, box->y);
-	glUniform1f(shader.radius, corner_radius);
-
-	glVertexAttribPointer(shader.pos_attrib, 2, GL_FLOAT, GL_FALSE,
-			0, verts);
-
-	glEnableVertexAttribArray(shader.pos_attrib);
-
-	glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
-
-	glDisableVertexAttribArray(shader.pos_attrib);
-}
-
 static void fx_render_stencil_mask(struct fx_renderer *renderer,
 		const struct wlr_box *box, const float matrix[static 9],
 		int corner_radius) {
@@ -596,6 +548,63 @@ static void fx_render_stencil_mask(struct fx_renderer *renderer,
 
 	glUniformMatrix3fv(shader.proj, 1, GL_FALSE, gl_matrix);
 
+	glUniform2f(shader.half_size, box->width * 0.5, box->height * 0.5);
+	glUniform2f(shader.position, box->x, box->y);
+	glUniform1f(shader.radius, corner_radius);
+
+	glVertexAttribPointer(shader.pos_attrib, 2, GL_FLOAT, GL_FALSE,
+			0, verts);
+
+	glEnableVertexAttribArray(shader.pos_attrib);
+
+	glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+
+	glDisableVertexAttribArray(shader.pos_attrib);
+}
+
+void fx_render_rounded_rect(struct fx_renderer *renderer,
+		const struct wlr_box *box, const struct wlr_box *stencil_box,
+		const float color[static 4], const float projection[static 9], int corner_radius) {
+	if (box->width == 0 || box->height == 0) {
+		return;
+	}
+	assert(box->width > 0 && box->height > 0);
+
+	if (corner_radius == 0) {
+		fx_render_rect(renderer, box, color, projection);
+		return;
+	}
+
+	float matrix[9];
+	wlr_matrix_project_box(matrix, box, WL_OUTPUT_TRANSFORM_NORMAL, 0, projection);
+
+	float gl_matrix[9];
+	wlr_matrix_multiply(gl_matrix, renderer->projection, matrix);
+
+	// TODO: investigate why matrix is flipped prior to this cmd
+	// wlr_matrix_multiply(gl_matrix, flip_180, gl_matrix);
+
+	wlr_matrix_transpose(gl_matrix, gl_matrix);
+
+	if (corner_radius) {
+		// Init stencil work
+		fx_renderer_stencil_mask_init();
+		// Draw the rounded rect as a mask
+		fx_render_stencil_mask(renderer, stencil_box, matrix, corner_radius);
+		fx_renderer_stencil_mask_close(false);
+
+		glEnable(GL_BLEND);
+	} else if (color[3] != 1.0) {
+		glEnable(GL_BLEND);
+	} else {
+		glDisable(GL_BLEND);
+	}
+
+	struct quad_rounded_shader shader = renderer->shaders.quad_rounded;
+	glUseProgram(shader.program);
+
+	glUniformMatrix3fv(shader.proj, 1, GL_FALSE, gl_matrix);
+	glUniform4f(shader.color, color[0], color[1], color[2], color[3]);
 	glUniform2f(shader.half_size, box->width * 0.5, box->height * 0.5);
 	glUniform2f(shader.position, box->x, box->y);
 	glUniform1f(shader.radius, corner_radius);

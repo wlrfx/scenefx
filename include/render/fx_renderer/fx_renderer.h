@@ -130,8 +130,9 @@ bool fx_render_subtexture_with_matrix(struct fx_renderer *renderer,
 void fx_render_rect(struct fx_renderer *renderer, const struct wlr_box *box,
 		const float color[static 4], const float projection[static 9]);
 
-void fx_render_rounded_rect(struct fx_renderer *renderer, const struct wlr_box *box,
-		const float color[static 4], const float projection[static 9], int radius);
+void fx_render_rounded_rect(struct fx_renderer *renderer,
+		const struct wlr_box *box, const struct wlr_box *stencil_box,
+		const float color[static 4], const float projection[static 9], int corner_radius);
 
 void fx_render_box_shadow(struct fx_renderer *renderer,
 		const struct wlr_box *box, const struct wlr_box *stencil_box,

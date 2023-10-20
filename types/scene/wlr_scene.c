@@ -1109,19 +1109,6 @@ static void render_rect(struct fx_renderer *fx_renderer, struct wlr_output *outp
 	}
 }
 
-static void render_rounded_rect(struct fx_renderer *fx_renderer, struct wlr_output *output,
-		pixman_region32_t *damage, const float color[static 4], const struct wlr_box *box,
-		const float matrix[static 9], int corner_radius) {
-	assert(fx_renderer);
-
-	int nrects;
-	pixman_box32_t *rects = pixman_region32_rectangles(damage, &nrects);
-	for (int i = 0; i < nrects; ++i) {
-		scissor_output(output, &rects[i]);
-		fx_render_rounded_rect(fx_renderer, box, color, matrix, corner_radius);
-	}
-}
-
 static void render_texture(struct fx_renderer *fx_renderer, struct wlr_output *output,
 		pixman_region32_t *damage, struct wlr_texture *texture,
 		const struct wlr_fbox *src_box, const struct wlr_box *dst_box,
@@ -1180,8 +1167,14 @@ static void render_border(struct fx_renderer *fx_renderer, struct wlr_output *ou
 		.width = surface_box->width + (2 * size),
 		.height = surface_box->height + (2 * size)
 	};
-	render_rounded_rect(fx_renderer, output, &damage, color, &border_box,
-		output->transform_matrix, corner_radius);
+
+	int nrects;
+	pixman_box32_t *rects = pixman_region32_rectangles(&damage, &nrects);
+	for (int i = 0; i < nrects; ++i) {
+		scissor_output(output, &rects[i]);
+		fx_render_rounded_rect(fx_renderer, &border_box, surface_box, color,
+			output->transform_matrix, corner_radius);
+	}
 
 damage_finish:
 	pixman_region32_fini(&damage);

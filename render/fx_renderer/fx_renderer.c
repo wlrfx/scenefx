@@ -529,6 +529,7 @@ void fx_render_rounded_rect(struct fx_renderer *renderer, const struct wlr_box *
 		return;
 	}
 	assert(box->width > 0 && box->height > 0);
+	printf("corner_radius: %d\n", corner_radius);
 	if (corner_radius == 0) {
 		fx_render_rect(renderer, box, color, projection);
 		return;

@@ -102,7 +102,7 @@ static bool link_quad_program(struct quad_shader *shader) {
 
 static bool link_quad_rounded_program(struct quad_rounded_shader *shader) {
 	GLuint prog;
-	shader->program = prog = link_program(quad_frag_src);
+	shader->program = prog = link_program(quad_rounded_frag_src);
 	if (!shader->program) {
 		return false;
 	}

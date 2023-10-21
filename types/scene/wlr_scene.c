@@ -1306,24 +1306,27 @@ static void scene_node_render(struct fx_renderer *fx_renderer, struct wlr_scene_
 			}
 		}
 
-		// Border
 		int border_corner_radius = scene_buffer->corner_radius;
-		if (scene_buffer->border_size) {
-			border_corner_radius += scene_buffer->border_size;
-			render_border(fx_renderer, output, &render_region, &dst_box,
-				scene_buffer->border_size, scene_buffer->border_color, border_corner_radius);
-		}
 
 		// Shadow
 		if (scene_buffer_has_shadow(&scene_buffer->shadow_data)) {
 			// TODO: Compensate for SSD borders here
 			struct wlr_box shadow_box = dst_box;
-			shadow_box.x -= scene_buffer->border_size;
-			shadow_box.y -= scene_buffer->border_size;
-			shadow_box.width += (2 * scene_buffer->border_size);
-			shadow_box.height += (2 * scene_buffer->border_size);
+			if (scene_buffer->border_size) {
+				border_corner_radius += scene_buffer->border_size;
+				shadow_box.x -= scene_buffer->border_size;
+				shadow_box.y -= scene_buffer->border_size;
+				shadow_box.width += (2 * scene_buffer->border_size);
+				shadow_box.height += (2 * scene_buffer->border_size);
+			}
 			render_box_shadow(fx_renderer, output, &render_region, &shadow_box,
 					border_corner_radius, &scene_buffer->shadow_data);
+		}
+
+		// Border
+		if (scene_buffer->border_size) {
+			render_border(fx_renderer, output, &render_region, &dst_box,
+				scene_buffer->border_size, scene_buffer->border_color, border_corner_radius);
 		}
 
 		// Clip the damage to the dst_box before rendering the texture

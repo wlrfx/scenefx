@@ -6,6 +6,7 @@
 #include <stdio.h>
 #include <time.h>
 #include <types/fx/shadow_data.h>
+#include <types/fx/border_data.h>
 #include <unistd.h>
 #include <wayland-server-core.h>
 #include <wayland-util.h>
@@ -97,8 +98,7 @@ struct tinywl_view {
 
 	float opacity;
 	int corner_radius;
-	int border_size;
-	float border_color[4];
+	struct border_data border_data;
 	struct shadow_data shadow_data;
 };
 
@@ -634,7 +634,7 @@ static void output_configure_scene(struct wlr_scene_node *node,
 
 			if (!wlr_surface_is_subsurface(xdg_surface->surface)) {
 				wlr_scene_buffer_set_corner_radius(buffer, view->corner_radius);
-				wlr_scene_buffer_set_border(buffer, view->border_size, view->border_color);
+				wlr_scene_buffer_set_border(buffer, view->border_data);
 				wlr_scene_buffer_set_shadow_data(buffer, view->shadow_data);
 			}
 		}
@@ -874,9 +874,15 @@ static void server_new_xdg_surface(struct wl_listener *listener, void *data) {
 	/* Set the scene_nodes decoration data */
 	view->opacity = 1;
 	view->corner_radius = 20;
-	view->border_size = 3;
+	// Border
+	view->border_data = border_data_get_default();
+	view->border_data.enabled = true;
+	view->border_data.width = 5;
+	view->border_data.height = 20;
+	view->border_data.y_offset = -15;
 	float border_color[4] = { 0.5, 0.5, 0.5, 0.5 };
-	memcpy(view->border_color, border_color, sizeof(view->border_color));
+	memcpy(view->border_data.color, border_color, sizeof(view->border_data.color));
+	// Shadow
 	view->shadow_data = shadow_data_get_default();
 	view->shadow_data.enabled = true;
 	memcpy(view->shadow_data.color, (float[]) {1.0f, 0.0f, 0.0f, 1.0f}, sizeof(float[4]));

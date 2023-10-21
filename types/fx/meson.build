@@ -1,3 +1,4 @@
 wlr_files += files(
-	'shadow_data.c'
+	'border_data.c',
+	'shadow_data.c',
 )

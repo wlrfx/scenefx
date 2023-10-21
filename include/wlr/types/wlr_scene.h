@@ -2,6 +2,7 @@
  * This an unstable interface of wlroots. No guarantees are made regarding the
  * future consistency of this API.
  */
+#include "types/fx/border_data.h"
 #ifndef WLR_USE_UNSTABLE
 #error "Add -DWLR_USE_UNSTABLE to enable unstable wlroots features"
 #endif
@@ -152,8 +153,7 @@ struct wlr_scene_buffer {
 
 	float opacity;
 	int corner_radius;
-	int border_size;
-	float border_color[4];
+	struct border_data border_data;
 	struct shadow_data shadow_data;
 
 	uint64_t active_outputs;
@@ -395,7 +395,7 @@ void wlr_scene_buffer_set_corner_radius(struct wlr_scene_buffer *scene_buffer,
 * Sets the border size and color of this buffer
 */
 void wlr_scene_buffer_set_border(struct wlr_scene_buffer *scene_buffer,
-		int size, float color[static 4]);
+		struct border_data data);
 
 /**
 * Sets the shadow of this buffer

@@ -14,6 +14,7 @@
 #include <wlr/util/log.h>
 #include <wlr/util/region.h>
 #include "render/fx_renderer/fx_renderer.h"
+#include "types/fx/border_data.h"
 #include "types/fx/shadow_data.h"
 #include "types/wlr_buffer.h"
 #include "types/wlr_scene.h"
@@ -404,7 +405,7 @@ static bool scene_node_update_iterator(struct wlr_scene_node *node,
 	// Expand the nodes visible region by the border & shadow size
 	if (node->type == WLR_SCENE_NODE_BUFFER) {
 		struct wlr_scene_buffer *buffer = wlr_scene_buffer_from_node(node);
-		wlr_region_expand(&node->visible, &node->visible, buffer->border_size);
+		border_data_expand_damage(&buffer->border_data, &node->visible);
 		struct shadow_data *shadow_data = &buffer->shadow_data;
 		if (scene_buffer_has_shadow(shadow_data)) {
 			wlr_region_expand(&node->visible, &node->visible, shadow_data->blur_sigma);
@@ -575,9 +576,7 @@ struct wlr_scene_buffer *wlr_scene_buffer_create(struct wlr_scene_tree *parent,
 
 	scene_buffer->opacity = 1;
 	scene_buffer->corner_radius = 0;
-	scene_buffer->border_size = 0;
-	float default_border_color[4] = { 0, 0, 0, 0 };
-	memcpy(scene_buffer->border_color, default_border_color, sizeof(scene_buffer->border_color));
+	scene_buffer->border_data = border_data_get_default();
 	scene_buffer->shadow_data = shadow_data_get_default();
 
 	scene_node_update(&scene_buffer->node, NULL);
@@ -791,13 +790,21 @@ void wlr_scene_buffer_set_corner_radius(struct wlr_scene_buffer *scene_buffer,
 }
 
 void wlr_scene_buffer_set_border(struct wlr_scene_buffer *scene_buffer,
-		int size, float color[static 4]) {
-	if (scene_buffer->border_size == size) {
+		struct border_data border_data) {
+	struct border_data *buff_data = &scene_buffer->border_data;
+	if (buff_data->enabled == border_data.enabled &&
+			buff_data->width == border_data.width &&
+			buff_data->height == border_data.height &&
+			buff_data->x_offset == border_data.x_offset &&
+			buff_data->y_offset == border_data.y_offset &&
+			buff_data->color[0] && border_data.color[0] &&
+			buff_data->color[1] && border_data.color[1] &&
+			buff_data->color[2] && border_data.color[2] &&
+			buff_data->color[3] && border_data.color[3]) {
 		return;
 	}
 
-	scene_buffer->border_size = size;
-	memcpy(scene_buffer->border_color, color, sizeof(scene_buffer->border_color));
+	memcpy(&scene_buffer->border_data, &border_data, sizeof(struct border_data));
 	scene_node_update(&scene_buffer->node, NULL);
 }
 
@@ -1141,7 +1148,7 @@ static void render_texture(struct fx_renderer *fx_renderer, struct wlr_output *o
 
 static void render_border(struct fx_renderer *fx_renderer, struct wlr_output *output,
 		pixman_region32_t *surface_damage, const struct wlr_box *surface_box,
-		int size, float color[static 4], int corner_radius) {
+		struct border_data *border_data, int corner_radius) {
 	assert(fx_renderer);
 
 	// don't damage area behind window since we dont render it anyway
@@ -1162,17 +1169,17 @@ static void render_border(struct fx_renderer *fx_renderer, struct wlr_output *ou
 	}
 
 	struct wlr_box border_box = {
-		.x = surface_box->x - size,
-		.y = surface_box->y - size,
-		.width = surface_box->width + (2 * size),
-		.height = surface_box->height + (2 * size)
+		.x = surface_box->x + border_data->x_offset - border_data->width,
+		.y = surface_box->y + border_data->y_offset - border_data->height,
+		.width = surface_box->width + (2 * border_data->width),
+		.height = surface_box->height + (2 * border_data->height)
 	};
 
 	int nrects;
 	pixman_box32_t *rects = pixman_region32_rectangles(&damage, &nrects);
 	for (int i = 0; i < nrects; ++i) {
 		scissor_output(output, &rects[i]);
-		fx_render_rounded_rect(fx_renderer, &border_box, surface_box, color,
+		fx_render_rounded_rect(fx_renderer, &border_box, surface_box, border_data->color,
 			output->transform_matrix, corner_radius);
 	}
 
@@ -1306,24 +1313,30 @@ static void scene_node_render(struct fx_renderer *fx_renderer, struct wlr_scene_
 			}
 		}
 
-		// Border
-		int border_corner_radius = scene_buffer->corner_radius;
-		if (scene_buffer->border_size) {
-			border_corner_radius += scene_buffer->border_size;
-			render_border(fx_renderer, output, &render_region, &dst_box,
-				scene_buffer->border_size, scene_buffer->border_color, border_corner_radius);
-		}
-
 		// Shadow
+		int border_corner_radius = scene_buffer->corner_radius;
 		if (scene_buffer_has_shadow(&scene_buffer->shadow_data)) {
 			// TODO: Compensate for SSD borders here
 			struct wlr_box shadow_box = dst_box;
-			shadow_box.x -= scene_buffer->border_size;
-			shadow_box.y -= scene_buffer->border_size;
-			shadow_box.width += (2 * scene_buffer->border_size);
-			shadow_box.height += (2 * scene_buffer->border_size);
+			struct border_data *border = &scene_buffer->border_data;
+			if (scene_buffer_has_border(border)) {
+				shadow_box.x += border->x_offset - border->width;
+				shadow_box.y += border->y_offset - border->height;
+				shadow_box.width += (2 * border->width);
+				shadow_box.height += (2 * border->height);
+				// Add the smallest border size offset to the corner radius.
+				// This makes it match the surface corner radii, specially when
+				// a border with a non-symmetrical size.
+				border_corner_radius += border_data_get_min_size(&scene_buffer->border_data);
+			}
 			render_box_shadow(fx_renderer, output, &render_region, &shadow_box,
 					border_corner_radius, &scene_buffer->shadow_data);
+		}
+
+		// Border
+		if (scene_buffer_has_border(&scene_buffer->border_data)) {
+			render_border(fx_renderer, output, &render_region, &dst_box,
+				&scene_buffer->border_data, border_corner_radius);
 		}
 
 		// Clip the damage to the dst_box before rendering the texture

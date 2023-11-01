@@ -562,15 +562,16 @@ static void fx_render_stencil_mask(struct fx_renderer *renderer,
 	glDisableVertexAttribArray(shader.pos_attrib);
 }
 
-void fx_render_rounded_rect(struct fx_renderer *renderer,
+void fx_render_border(struct fx_renderer *renderer,
 		const struct wlr_box *box, const struct wlr_box *stencil_box,
-		const float color[static 4], const float projection[static 9], int corner_radius) {
+		const float color[static 4], const float projection[static 9],
+		int outer_corner_radius, int inner_corner_radius) {
 	if (box->width == 0 || box->height == 0) {
 		return;
 	}
 	assert(box->width > 0 && box->height > 0);
 
-	if (corner_radius == 0) {
+	if (outer_corner_radius == 0) {
 		fx_render_rect(renderer, box, color, projection);
 		return;
 	}
@@ -586,19 +587,14 @@ void fx_render_rounded_rect(struct fx_renderer *renderer,
 
 	wlr_matrix_transpose(gl_matrix, gl_matrix);
 
-	if (corner_radius) {
-		// Init stencil work
+	if (inner_corner_radius) {
 		fx_renderer_stencil_mask_init();
-		// Draw the rounded rect as a mask
-		fx_render_stencil_mask(renderer, stencil_box, matrix, corner_radius);
+		fx_render_stencil_mask(renderer, stencil_box, matrix, inner_corner_radius);
 		fx_renderer_stencil_mask_close(false);
-
-		glEnable(GL_BLEND);
-	} else if (color[3] != 1.0) {
-		glEnable(GL_BLEND);
-	} else {
-		glDisable(GL_BLEND);
 	}
+
+	// to get to this point, there needs to be a corner radius, so blend
+	glEnable(GL_BLEND);
 
 	struct quad_rounded_shader shader = renderer->shaders.quad_rounded;
 	glUseProgram(shader.program);
@@ -607,7 +603,7 @@ void fx_render_rounded_rect(struct fx_renderer *renderer,
 	glUniform4f(shader.color, color[0], color[1], color[2], color[3]);
 	glUniform2f(shader.half_size, box->width * 0.5, box->height * 0.5);
 	glUniform2f(shader.position, box->x, box->y);
-	glUniform1f(shader.radius, corner_radius);
+	glUniform1f(shader.radius, outer_corner_radius);
 
 	glVertexAttribPointer(shader.pos_attrib, 2, GL_FLOAT, GL_FALSE,
 			0, verts);
@@ -618,7 +614,7 @@ void fx_render_rounded_rect(struct fx_renderer *renderer,
 
 	glDisableVertexAttribArray(shader.pos_attrib);
 
-	if (corner_radius) {
+	if (inner_corner_radius) {
 		fx_renderer_stencil_mask_fini();
 	}
 }
@@ -632,9 +628,6 @@ void fx_render_box_shadow(struct fx_renderer *renderer,
 	}
 	assert(box->width > 0 && box->height > 0);
 
-	float *color = shadow_data->color;
-	float blur_sigma = shadow_data->blur_sigma;
-
 	float gl_matrix[9];
 	wlr_matrix_multiply(gl_matrix, renderer->projection, matrix);
 
@@ -643,15 +636,16 @@ void fx_render_box_shadow(struct fx_renderer *renderer,
 
 	wlr_matrix_transpose(gl_matrix, gl_matrix);
 
-	// Init stencil work
-	fx_renderer_stencil_mask_init();
-	// Draw the rounded rect as a mask
-	fx_render_stencil_mask(renderer, stencil_box, matrix, corner_radius);
-	fx_renderer_stencil_mask_close(false);
-
-	// blending will practically always be needed (unless we have a madman
-	// who uses opaque shadows with zero sigma), so just enable it
-	glEnable(GL_BLEND);
+	if (corner_radius) {
+		fx_renderer_stencil_mask_init();
+		fx_render_stencil_mask(renderer, stencil_box, matrix, corner_radius);
+		fx_renderer_stencil_mask_close(false);
+		glEnable(GL_BLEND);
+	} else if (shadow_data->blur_sigma != 0.0f) {
+		glEnable(GL_BLEND);
+	} else {
+		glDisable(GL_BLEND);
+	}
 
 	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
@@ -660,8 +654,9 @@ void fx_render_box_shadow(struct fx_renderer *renderer,
 	glUseProgram(shader.program);
 
 	glUniformMatrix3fv(shader.proj, 1, GL_FALSE, gl_matrix);
+	float *color = shadow_data->color;
 	glUniform4f(shader.color, color[0], color[1], color[2], color[3]);
-	glUniform1f(shader.blur_sigma, blur_sigma);
+	glUniform1f(shader.blur_sigma, shadow_data->blur_sigma);
 	glUniform1f(shader.corner_radius, corner_radius);
 
 	glUniform2f(shader.size, box->width, box->height);

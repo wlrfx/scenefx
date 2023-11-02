@@ -673,5 +673,7 @@ void fx_render_box_shadow(struct fx_renderer *renderer,
 
 	glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
 
-	fx_renderer_stencil_mask_fini();
+	if (corner_radius) {
+		fx_renderer_stencil_mask_fini();
+	}
 }

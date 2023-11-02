@@ -1149,10 +1149,10 @@ static void render_border(struct fx_renderer *fx_renderer, struct wlr_output *ou
 	pixman_region32_t inner_region;
 	pixman_region32_init(&inner_region);
 	pixman_region32_union_rect(&inner_region, &inner_region,
-			surface_box->x + outer_corner_radius * 0.5,
-			surface_box->y + outer_corner_radius * 0.5,
-			surface_box->width - outer_corner_radius,
-			surface_box->height - outer_corner_radius);
+			surface_box->x + inner_corner_radius * 0.5,
+			surface_box->y + inner_corner_radius * 0.5,
+			surface_box->width - inner_corner_radius,
+			surface_box->height - inner_corner_radius);
 	pixman_region32_intersect(&inner_region, &inner_region, surface_damage);
 
 	pixman_region32_t damage;

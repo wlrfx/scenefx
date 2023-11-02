@@ -21,7 +21,7 @@ uniform sampler2D tex;
 #endif
 
 uniform float alpha;
-uniform vec2 size;
+uniform vec2 half_size;
 uniform vec2 position;
 uniform float radius;
 
@@ -34,11 +34,8 @@ vec4 sample_texture() {
 }
 
 void main() {
-	gl_FragColor = sample_texture() * alpha;
-	vec2 corner_distance = min(gl_FragCoord.xy - position, size + position - gl_FragCoord.xy);
-	if (max(corner_distance.x, corner_distance.y) < radius) {
-		float d = radius - distance(corner_distance, vec2(radius));
-		float smooth = smoothstep(-1.0, 0.5, d);
-		gl_FragColor = mix(vec4(0), gl_FragColor, smooth);
-	}
+	vec2 q = abs(gl_FragCoord.xy - position - half_size) - half_size + radius;
+	float dist = min(max(q.x,q.y), 0.0) + length(max(q, 0.0)) - radius;
+	float smoothedAlpha = 1.0 - smoothstep(-1.0, 0.5, dist);
+	gl_FragColor = mix(vec4(0), sample_texture() * alpha, smoothedAlpha);
 }

@@ -134,7 +134,7 @@ static bool link_tex_program(struct tex_shader *shader,
 	shader->alpha = glGetUniformLocation(prog, "alpha");
 	shader->pos_attrib = glGetAttribLocation(prog, "pos");
 	shader->tex_attrib = glGetAttribLocation(prog, "texcoord");
-	shader->size = glGetUniformLocation(prog, "size");
+	shader->half_size = glGetUniformLocation(prog, "half_size");
 	shader->position = glGetUniformLocation(prog, "position");
 	shader->radius = glGetUniformLocation(prog, "radius");
 
@@ -452,7 +452,7 @@ bool fx_render_subtexture_with_matrix(struct fx_renderer *renderer,
 
 	glUniformMatrix3fv(shader->proj, 1, GL_FALSE, gl_matrix);
 	glUniform1i(shader->tex, 0);
-	glUniform2f(shader->size, dst_box->width, dst_box->height);
+	glUniform2f(shader->half_size, dst_box->width * 0.5, dst_box->height * 0.5);
 	glUniform2f(shader->position, dst_box->x, dst_box->y);
 	glUniform1f(shader->alpha, opacity);
 	glUniform1f(shader->radius, corner_radius);

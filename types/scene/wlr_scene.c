@@ -1144,6 +1144,7 @@ static void render_border(struct fx_renderer *fx_renderer, struct wlr_output *ou
 		const struct wlr_box *surface_box, float color[static 4],
 		int outer_corner_radius, int inner_corner_radius) {
 	assert(fx_renderer);
+	printf("render border corner radius: %d\n", outer_corner_radius);
 
 	// don't damage area behind window since we dont render it anyway
 	pixman_region32_t inner_region;
@@ -1271,6 +1272,7 @@ static void scene_node_render(struct fx_renderer *fx_renderer, struct wlr_scene_
 	case WLR_SCENE_NODE_BUFFER:;
 		struct wlr_scene_buffer *scene_buffer = wlr_scene_buffer_from_node(node);
 		assert(scene_buffer->buffer);
+		printf("render node corner radius: %d\n", scene_buffer->corner_radius);
 
 		struct wlr_renderer *renderer = output->renderer;
 		texture = scene_buffer_get_texture(scene_buffer, renderer);
@@ -1304,7 +1306,9 @@ static void scene_node_render(struct fx_renderer *fx_renderer, struct wlr_scene_
 		int decoration_corner_radius = scene_buffer->corner_radius;
 		struct wlr_box decoration_box = dst_box;
 		if (scene_buffer->border_size) {
-			decoration_corner_radius += scene_buffer->border_size;
+			if (decoration_corner_radius) {
+				decoration_corner_radius += scene_buffer->border_size;
+			}
 			decoration_box.x -= scene_buffer->border_size;
 			decoration_box.y -= scene_buffer->border_size;
 			decoration_box.width += (2 * scene_buffer->border_size);

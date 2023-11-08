@@ -152,6 +152,8 @@ struct wlr_scene_buffer {
 
 	float opacity;
 	int corner_radius;
+	int border_size;
+	float border_color[4];
 	struct shadow_data shadow_data;
 
 	uint64_t active_outputs;
@@ -388,6 +390,12 @@ void wlr_scene_buffer_set_opacity(struct wlr_scene_buffer *scene_buffer,
 */
 void wlr_scene_buffer_set_corner_radius(struct wlr_scene_buffer *scene_buffer,
 		int radii);
+
+/**
+* Sets the border size and color of this buffer
+*/
+void wlr_scene_buffer_set_border(struct wlr_scene_buffer *scene_buffer,
+		int size, float color[static 4]);
 
 /**
 * Sets the shadow of this buffer

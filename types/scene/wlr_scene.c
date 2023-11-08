@@ -401,12 +401,13 @@ static bool scene_node_update_iterator(struct wlr_scene_node *node,
 		pixman_region32_fini(&opaque);
 	}
 
-	// Expand the nodes visible region by the shadow size
+	// Expand the nodes visible region by the border & shadow size
 	if (node->type == WLR_SCENE_NODE_BUFFER) {
 		struct wlr_scene_buffer *buffer = wlr_scene_buffer_from_node(node);
-		struct shadow_data *data = &buffer->shadow_data;
-		if (scene_buffer_has_shadow(data)) {
-			wlr_region_expand(&node->visible, &node->visible, data->blur_sigma);
+		wlr_region_expand(&node->visible, &node->visible, buffer->border_size);
+		struct shadow_data *shadow_data = &buffer->shadow_data;
+		if (scene_buffer_has_shadow(shadow_data)) {
+			wlr_region_expand(&node->visible, &node->visible, shadow_data->blur_sigma);
 		}
 	}
 
@@ -574,6 +575,9 @@ struct wlr_scene_buffer *wlr_scene_buffer_create(struct wlr_scene_tree *parent,
 
 	scene_buffer->opacity = 1;
 	scene_buffer->corner_radius = 0;
+	scene_buffer->border_size = 0;
+	float default_border_color[4] = { 0, 0, 0, 0 };
+	memcpy(scene_buffer->border_color, default_border_color, sizeof(scene_buffer->border_color));
 	scene_buffer->shadow_data = shadow_data_get_default();
 
 	scene_node_update(&scene_buffer->node, NULL);
@@ -783,6 +787,17 @@ void wlr_scene_buffer_set_corner_radius(struct wlr_scene_buffer *scene_buffer,
 	}
 
 	scene_buffer->corner_radius = radii;
+	scene_node_update(&scene_buffer->node, NULL);
+}
+
+void wlr_scene_buffer_set_border(struct wlr_scene_buffer *scene_buffer,
+		int size, float color[static 4]) {
+	if (scene_buffer->border_size == size) {
+		return;
+	}
+
+	scene_buffer->border_size = size;
+	memcpy(scene_buffer->border_color, color, sizeof(scene_buffer->border_color));
 	scene_node_update(&scene_buffer->node, NULL);
 }
 
@@ -1124,10 +1139,49 @@ static void render_texture(struct fx_renderer *fx_renderer, struct wlr_output *o
 	}
 }
 
+static void render_border(struct fx_renderer *fx_renderer, struct wlr_output *output,
+		pixman_region32_t *surface_damage, const struct wlr_box *border_box,
+		const struct wlr_box *surface_box, float color[static 4],
+		int outer_corner_radius, int inner_corner_radius) {
+	assert(fx_renderer);
+	printf("render border corner radius: %d\n", outer_corner_radius);
+
+	// don't damage area behind window since we dont render it anyway
+	pixman_region32_t inner_region;
+	pixman_region32_init(&inner_region);
+	pixman_region32_union_rect(&inner_region, &inner_region,
+			surface_box->x + inner_corner_radius * 0.5,
+			surface_box->y + inner_corner_radius * 0.5,
+			surface_box->width - inner_corner_radius,
+			surface_box->height - inner_corner_radius);
+	pixman_region32_intersect(&inner_region, &inner_region, surface_damage);
+
+	pixman_region32_t damage;
+	pixman_region32_init(&damage);
+	pixman_region32_subtract(&damage, surface_damage, &inner_region);
+	if (!pixman_region32_not_empty(&damage)) {
+		goto damage_finish;
+	}
+
+	int nrects;
+	pixman_box32_t *rects = pixman_region32_rectangles(&damage, &nrects);
+	for (int i = 0; i < nrects; ++i) {
+		scissor_output(output, &rects[i]);
+		fx_render_border(fx_renderer, border_box, surface_box, color,
+				output->transform_matrix, outer_corner_radius, inner_corner_radius);
+	}
+
+damage_finish:
+	pixman_region32_fini(&damage);
+	pixman_region32_fini(&inner_region);
+}
+
 static void render_box_shadow(struct fx_renderer *fx_renderer,
 		struct wlr_output *output, pixman_region32_t *surface_damage,
 		const struct wlr_box *surface_box, int corner_radius,
 		struct shadow_data *shadow_data) {
+	assert(fx_renderer);
+
 	// don't damage area behind window since we dont render it anyway
 	pixman_region32_t inner_region;
 	pixman_region32_init(&inner_region);
@@ -1218,6 +1272,7 @@ static void scene_node_render(struct fx_renderer *fx_renderer, struct wlr_scene_
 	case WLR_SCENE_NODE_BUFFER:;
 		struct wlr_scene_buffer *scene_buffer = wlr_scene_buffer_from_node(node);
 		assert(scene_buffer->buffer);
+		printf("render node corner radius: %d\n", scene_buffer->corner_radius);
 
 		struct wlr_renderer *renderer = output->renderer;
 		texture = scene_buffer_get_texture(scene_buffer, renderer);
@@ -1247,11 +1302,30 @@ static void scene_node_render(struct fx_renderer *fx_renderer, struct wlr_scene_
 			}
 		}
 
+		// TODO: Compensate for SSD borders here
+		int decoration_corner_radius = scene_buffer->corner_radius;
+		struct wlr_box decoration_box = dst_box;
+		if (scene_buffer->border_size) {
+			if (decoration_corner_radius) {
+				decoration_corner_radius += scene_buffer->border_size;
+			}
+			decoration_box.x -= scene_buffer->border_size;
+			decoration_box.y -= scene_buffer->border_size;
+			decoration_box.width += (2 * scene_buffer->border_size);
+			decoration_box.height += (2 * scene_buffer->border_size);
+		}
+
 		// Shadow
 		if (scene_buffer_has_shadow(&scene_buffer->shadow_data)) {
-			// TODO: Compensate for SSD borders here
-			render_box_shadow(fx_renderer, output, &render_region, &dst_box,
-					scene_buffer->corner_radius, &scene_buffer->shadow_data);
+			render_box_shadow(fx_renderer, output, &render_region, &decoration_box,
+					decoration_corner_radius, &scene_buffer->shadow_data);
+		}
+
+		// Border
+		if (scene_buffer->border_size) {
+			render_border(fx_renderer, output, &render_region, &decoration_box, &dst_box,
+				scene_buffer->border_color, decoration_corner_radius,
+				scene_buffer->corner_radius);
 		}
 
 		// Clip the damage to the dst_box before rendering the texture

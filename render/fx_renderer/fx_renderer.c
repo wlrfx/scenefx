@@ -9,6 +9,7 @@
 #include <stdlib.h>
 #include <wayland-util.h>
 #include <wlr/backend.h>
+#include <wlr/render/allocator.h>
 #include <wlr/render/egl.h>
 #include <wlr/render/gles2.h>
 #include <wlr/types/wlr_matrix.h>
@@ -259,6 +260,17 @@ struct fx_renderer *fx_renderer_create(struct wlr_egl *egl,
 
 	renderer->wlr_output = output;
 	renderer->egl = egl;
+
+	// Get DRM format
+	const struct wlr_drm_format_set *display_formats =
+		wlr_output_get_primary_formats(output, output->allocator->buffer_caps);
+	if (!(renderer->drm_format =
+				wlr_drm_format_set_get(display_formats, output->render_format))) {
+		wlr_log(WLR_ERROR,
+				"FX RENDERER: Could not get drm format: %u",
+				output->render_format);
+		return NULL;
+	}
 
 	if (!eglMakeCurrent(wlr_egl_get_display(egl), EGL_NO_SURFACE, EGL_NO_SURFACE,
 			wlr_egl_get_context(egl))) {

@@ -121,6 +121,8 @@ struct fx_renderer {
 	GLuint wlr_main_buffer_fbo;
 	struct wlr_gles2_texture_attribs wlr_main_texture_attribs;
 
+	const struct wlr_drm_format *drm_format;
+
 	// Contains the blurred background for tiled windows
 	// struct wlr_buffer blur_buffer;
 	struct fx_framebuffer blur_buffer;

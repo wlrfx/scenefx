@@ -53,7 +53,7 @@ void fx_framebuffer_update(struct fx_renderer *fx_renderer, struct fx_framebuffe
 			fx_buffer->wlr_buffer->height != height) {
 		wlr_buffer_drop(fx_buffer->wlr_buffer);
 		fx_buffer->wlr_buffer = wlr_allocator_create_buffer(output->allocator,
-				width, height, output->swapchain->format);
+				width, height, fx_renderer->drm_format);
 		first_alloc = true;
 	}
 

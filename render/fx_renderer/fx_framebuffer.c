@@ -3,12 +3,10 @@
 #include <wlr/interfaces/wlr_buffer.h>
 #include <wlr/render/interface.h>
 #include <wlr/render/allocator.h>
-#include <wlr/render/swapchain.h>
 #include <wlr/util/log.h>
 
 #include "render/egl.h"
 #include "render/fx_renderer/fx_renderer.h"
-#include "render/gles2.h"
 
 static void handle_buffer_destroy(struct wlr_addon *addon) {
 	struct fx_framebuffer *buffer =

@@ -1145,6 +1145,8 @@ static void render_texture(struct fx_renderer *fx_renderer, struct wlr_output *o
 		const float matrix[static 9], float opacity, int corner_radius) {
 	assert(fx_renderer);
 
+	corner_radius *= output->scale;
+
 	struct wlr_fbox default_src_box = {0};
 	if (wlr_fbox_empty(src_box)) {
 		default_src_box.width = texture->width;
@@ -1341,6 +1343,7 @@ static void render_box_shadow(struct fx_renderer *fx_renderer,
 		struct wlr_output *output, pixman_region32_t *surface_damage,
 		const struct wlr_box *surface_box, int corner_radius,
 		struct shadow_data *shadow_data) {
+	corner_radius *= output->scale;
 	// don't damage area behind window since we dont render it anyway
 	pixman_region32_t inner_region;
 	pixman_region32_init(&inner_region);
@@ -1453,10 +1456,14 @@ static void scene_node_render(struct fx_renderer *fx_renderer, struct wlr_scene_
 
 				struct wlr_box geometry;
 				wlr_xdg_surface_get_geometry(xdg_surface, &geometry);
+				geometry.x += x;
+				geometry.y += y;
+				scale_box(&geometry, output->scale);
+
 				dst_box.width = fmin(dst_box.width, geometry.width);
 				dst_box.height = fmin(dst_box.height, geometry.height);
-				dst_box.x = fmax(dst_box.x, geometry.x + x);
-				dst_box.y = fmax(dst_box.y, geometry.y + y);
+				dst_box.x = fmax(dst_box.x, geometry.x);
+				dst_box.y = fmax(dst_box.y, geometry.y);
 			}
 		}
 
@@ -1490,7 +1497,8 @@ static void scene_node_render(struct fx_renderer *fx_renderer, struct wlr_scene_
 				wlr_box_transform(&monitor_box, &monitor_box,
 						wlr_output_transform_invert(output->transform),
 						monitor_box.width, monitor_box.height);
-				struct blur_stencil_data stencil_data = { texture, &scene_buffer->src_box, matrix, false };
+				struct blur_stencil_data stencil_data =
+					{ texture, &scene_buffer->src_box, matrix, false };
 				render_backdrop_blur(scene_buffer->backdrop_blur_optimized,
 						fx_renderer, output, &render_region, scene_buffer,
 						&dst_box, &stencil_data, &scene->blur_data);
@@ -1502,6 +1510,7 @@ static void scene_node_render(struct fx_renderer *fx_renderer, struct wlr_scene_
 		// Shadow
 		if (scene_buffer_has_shadow(&scene_buffer->shadow_data)) {
 			// TODO: Compensate for SSD borders here
+			// TODO: Fix Shadows being clipped when using scaling
 			render_box_shadow(fx_renderer, output, &shadow_region, &dst_box,
 					scene_buffer->corner_radius, &scene_buffer->shadow_data);
 		}
@@ -1878,15 +1887,17 @@ static struct blur_info workspace_get_blur_info(int list_len,
 		switch (node->type) {
 		case WLR_SCENE_NODE_BUFFER:;
 			struct wlr_scene_buffer *scene_buffer = wlr_scene_buffer_from_node(node);
-			struct wlr_scene_surface *scene_surface = wlr_scene_surface_from_buffer(scene_buffer);
+			struct wlr_scene_surface *scene_surface =
+				wlr_scene_surface_from_buffer(scene_buffer);
 			assert(scene_buffer->buffer);
 			if (scene_buffer->backdrop_blur && !scene_surface->surface->opaque) {
 				int x, y;
 				wlr_scene_node_coords(node, &x, &y);
 				pixman_region32_union_rect(blur_region, blur_region,
-						x - scene_output->x,
-						y - scene_output->y,
-						scene_buffer->dst_width, scene_buffer->dst_height);
+						(x - scene_output->x) * scene_output->output->scale,
+						(y - scene_output->y) * scene_output->output->scale,
+						scene_buffer->dst_width * scene_output->output->scale,
+						scene_buffer->dst_height * scene_output->output->scale);
 				if (scene_buffer->backdrop_blur_optimized) {
 					has_optimized = true;
 				}
@@ -2050,7 +2061,7 @@ bool wlr_scene_output_commit(struct wlr_scene_output *scene_output) {
 			pixman_region32_init(&extended_damage);
 			pixman_region32_intersect(&extended_damage, &damage, &blur_region);
 			// Expand the region to compensate for blur artifacts
-			wlr_region_expand(&extended_damage, &extended_damage, blur_data_calc_outer_size(blur_data));
+			wlr_region_expand(&extended_damage, &extended_damage, blur_data_calc_size(blur_data));
 			// Limit to the monitors viewport
 			pixman_region32_intersect_rect(&extended_damage, &extended_damage,
 					0, 0, output_width, output_height);

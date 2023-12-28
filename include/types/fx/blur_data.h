@@ -15,6 +15,4 @@ bool scene_buffer_should_blur(bool backdrop_blur, struct blur_data *blur_data);
 
 int blur_data_calc_size(struct blur_data *blur_data);
 
-int blur_data_calc_outer_size(struct blur_data *blur_data);
-
 #endif

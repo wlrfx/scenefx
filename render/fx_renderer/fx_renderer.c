@@ -8,6 +8,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <wlr/backend.h>
+#include <wlr/render/allocator.h>
 #include <wlr/render/egl.h>
 #include <wlr/render/gles2.h>
 #include <wlr/types/wlr_matrix.h>
@@ -178,7 +179,7 @@ static bool check_gl_ext(const char *exts, const char *ext) {
 static void load_gl_proc(void *proc_ptr, const char *name) {
 	void *proc = (void *)eglGetProcAddress(name);
 	if (proc == NULL) {
-		wlr_log(WLR_ERROR, "GLES2 RENDERER: eglGetProcAddress(%s) failed", name);
+		wlr_log(WLR_ERROR, "FX RENDERER: eglGetProcAddress(%s) failed", name);
 		abort();
 	}
 	*(void **)proc_ptr = proc;
@@ -187,7 +188,19 @@ static void load_gl_proc(void *proc_ptr, const char *name) {
 static void fx_renderer_handle_destroy(struct wlr_addon *addon) {
 	struct fx_renderer *renderer =
 		wl_container_of(addon, renderer, addon);
-	fx_renderer_fini(renderer);
+
+	struct fx_framebuffer *fx_buffer, *fx_buffer_tmp;
+	wl_list_for_each_safe(fx_buffer, fx_buffer_tmp, &renderer->buffers, link) {
+		fx_framebuffer_release(fx_buffer);
+	}
+
+	struct fx_texture *tex, *tex_tmp;
+	wl_list_for_each_safe(tex, tex_tmp, &renderer->textures, link) {
+		fx_texture_destroy(tex);
+	}
+
+	fx_stencilbuffer_release(&renderer->stencil_buffer);
+
 	free(renderer);
 }
 static const struct wlr_addon_interface fx_renderer_addon_impl = {
@@ -195,9 +208,9 @@ static const struct wlr_addon_interface fx_renderer_addon_impl = {
 	.destroy = fx_renderer_handle_destroy,
 };
 
-void fx_renderer_init_addon(struct wlr_egl *egl, struct wlr_addon_set *addons,
-		const void * owner) {
-	struct fx_renderer *renderer = fx_renderer_create(egl);
+void fx_renderer_init_addon(struct wlr_egl *egl, struct wlr_output *output,
+		struct wlr_addon_set *addons, const void * owner) {
+	struct fx_renderer *renderer = fx_renderer_create(egl, output);
 	if (!renderer) {
 		wlr_log(WLR_ERROR, "Failed to create fx_renderer");
 		abort();
@@ -216,38 +229,55 @@ struct fx_renderer *fx_renderer_addon_find(struct wlr_addon_set *addons,
 	return renderer;
 }
 
-struct fx_renderer *fx_renderer_create(struct wlr_egl *egl) {
+struct fx_renderer *fx_renderer_create(struct wlr_egl *egl,
+		struct wlr_output *output) {
 	struct fx_renderer *renderer = calloc(1, sizeof(struct fx_renderer));
 	if (renderer == NULL) {
 		return NULL;
 	}
 
+	wl_list_init(&renderer->buffers);
+	wl_list_init(&renderer->textures);
+
+	renderer->wlr_output = output;
+	renderer->egl = egl;
+
 	if (!eglMakeCurrent(wlr_egl_get_display(egl), EGL_NO_SURFACE, EGL_NO_SURFACE,
 			wlr_egl_get_context(egl))) {
-		wlr_log(WLR_ERROR, "GLES2 RENDERER: Could not make EGL current");
+		wlr_log(WLR_ERROR, "FX RENDERER: Could not make EGL current");
 		return NULL;
 	}
 
+	// Create the stencil buffer
 	renderer->stencil_buffer = fx_stencilbuffer_create();
+
+	// Create the FBOs
+	renderer->wlr_main_buffer_fbo = -1;
 
 	// get extensions
 	const char *exts_str = (const char *)glGetString(GL_EXTENSIONS);
 	if (exts_str == NULL) {
-		wlr_log(WLR_ERROR, "GLES2 RENDERER: Failed to get GL_EXTENSIONS");
+		wlr_log(WLR_ERROR, "FX RENDERER: Failed to get GL_EXTENSIONS");
 		return NULL;
 	}
 
-	wlr_log(WLR_INFO, "Creating scenefx GLES2 renderer");
+	wlr_log(WLR_INFO, "Creating scenefx FX renderer");
 	wlr_log(WLR_INFO, "Using %s", glGetString(GL_VERSION));
 	wlr_log(WLR_INFO, "GL vendor: %s", glGetString(GL_VENDOR));
 	wlr_log(WLR_INFO, "GL renderer: %s", glGetString(GL_RENDERER));
-	wlr_log(WLR_INFO, "Supported GLES2 extensions: %s", exts_str);
+	wlr_log(WLR_INFO, "Supported FX extensions: %s", exts_str);
 
 	// TODO: the rest of the gl checks
 	if (check_gl_ext(exts_str, "GL_OES_EGL_image_external")) {
 		renderer->exts.OES_egl_image_external = true;
 		load_gl_proc(&renderer->procs.glEGLImageTargetTexture2DOES,
 			"glEGLImageTargetTexture2DOES");
+	}
+
+	if (check_gl_ext(exts_str, "GL_OES_EGL_image")) {
+		renderer->exts.OES_egl_image = true;
+		load_gl_proc(&renderer->procs.glEGLImageTargetRenderbufferStorageOES,
+			"glEGLImageTargetRenderbufferStorageOES");
 	}
 
 	// quad fragment shader
@@ -276,11 +306,11 @@ struct fx_renderer *fx_renderer_create(struct wlr_egl *egl) {
 
 	if (!eglMakeCurrent(wlr_egl_get_display(egl),
 				EGL_NO_SURFACE, EGL_NO_SURFACE, EGL_NO_CONTEXT)) {
-		wlr_log(WLR_ERROR, "GLES2 RENDERER: Could not unset current EGL");
+		wlr_log(WLR_ERROR, "FX RENDERER: Could not unset current EGL");
 		goto error;
 	}
 
-	wlr_log(WLR_INFO, "GLES2 RENDERER: Shaders Initialized Successfully");
+	wlr_log(WLR_INFO, "FX RENDERER: Shaders Initialized Successfully");
 	return renderer;
 
 error:
@@ -293,30 +323,43 @@ error:
 
 	if (!eglMakeCurrent(wlr_egl_get_display(egl),
 				EGL_NO_SURFACE, EGL_NO_SURFACE, EGL_NO_CONTEXT)) {
-		wlr_log(WLR_ERROR, "GLES2 RENDERER: Could not unset current EGL");
+		wlr_log(WLR_ERROR, "FX RENDERER: Could not unset current EGL");
 	}
 
 	// TODO: more freeing?
 	free(renderer);
 
-	wlr_log(WLR_ERROR, "GLES2 RENDERER: Error Initializing Shaders");
+	wlr_log(WLR_ERROR, "FX RENDERER: Error Initializing Shaders");
 	return NULL;
 }
 
-void fx_renderer_fini(struct fx_renderer *renderer) {
-	fx_stencilbuffer_release(&renderer->stencil_buffer);
-}
-
 void fx_renderer_begin(struct fx_renderer *renderer, int width, int height) {
+	glViewport(0, 0, width, height);
+	renderer->viewport_width = width;
+	renderer->viewport_height = height;
+
+	// Store the wlr FBO
+	renderer->wlr_main_buffer_fbo =
+		wlr_gles2_renderer_get_current_fbo(renderer->wlr_output->renderer);
+	// Get the fx_texture
+	struct wlr_texture *wlr_texture = wlr_texture_from_buffer(
+			renderer->wlr_output->renderer, renderer->wlr_output->back_buffer);
+	wlr_gles2_texture_get_attribs(wlr_texture, &renderer->wlr_main_texture_attribs);
+	wlr_texture_destroy(wlr_texture);
+	// Add the stencil to the wlr fbo
 	fx_stencilbuffer_init(&renderer->stencil_buffer, width, height);
 
-	glViewport(0, 0, width, height);
+	// Finally bind the main wlr FBO
+	fx_framebuffer_bind_wlr_fbo(renderer);
 
 	// refresh projection matrix
 	matrix_projection(renderer->projection, width, height,
 		WL_OUTPUT_TRANSFORM_FLIPPED_180);
 
 	glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
+}
+
+void fx_renderer_end(struct fx_renderer *renderer) {
 }
 
 void fx_renderer_clear(const float color[static 4]) {
@@ -376,9 +419,16 @@ bool fx_render_subtexture_with_matrix(struct fx_renderer *renderer,
 		const struct wlr_box *dst_box, const float matrix[static 9],
 		float opacity, int corner_radius) {
 
-	assert(wlr_texture_is_gles2(wlr_texture));
 	struct wlr_gles2_texture_attribs texture_attrs;
-	wlr_gles2_texture_get_attribs(wlr_texture, &texture_attrs);
+	if (wlr_texture_is_gles2(wlr_texture)) {
+		wlr_gles2_texture_get_attribs(wlr_texture, &texture_attrs);
+	} else if (wlr_texture_is_fx(wlr_texture)) {
+		struct fx_texture *fx_texture = fx_get_texture(wlr_texture);
+		wlr_gles2_texture_get_fx_attribs(fx_texture, &texture_attrs);
+	} else {
+		wlr_log(WLR_ERROR, "Texture not GLES2 or FX. Aborting...");
+		abort();
+	}
 
 	struct tex_shader *shader = NULL;
 

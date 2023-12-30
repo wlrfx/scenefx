@@ -1559,7 +1559,7 @@ struct wlr_scene_output *wlr_scene_output_create(struct wlr_scene *scene,
 
 	// Init FX Renderer
 	struct wlr_egl *egl = wlr_gles2_renderer_get_egl(output->renderer);
-	fx_renderer_init_addon(egl, &output->addons, scene);
+	fx_renderer_init_addon(egl, output, &output->addons, scene);
 
 	wlr_damage_ring_init(&scene_output->damage_ring);
 	wl_list_init(&scene_output->damage_highlight_regions);
@@ -2049,6 +2049,9 @@ static bool scene_entry_try_direct_scanout(struct render_list_entry *entry,
 // 			}
 // 		}
 // 	}
+//
+// 	fx_renderer_scissor(NULL);
+// 	fx_renderer_end(renderer);
 //
 // 	// Draw the software cursors
 // 	wlr_renderer_begin(output->renderer, output->width, output->height);

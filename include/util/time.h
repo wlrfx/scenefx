@@ -1,17 +1,23 @@
 #ifndef UTIL_TIME_H
 #define UTIL_TIME_H
 
+#include <stdint.h>
 #include <time.h>
 
 /**
  * Get the current time, in milliseconds.
  */
-uint32_t get_current_time_msec(void);
+int64_t get_current_time_msec(void);
 
 /**
  * Convert a timespec to milliseconds.
  */
 int64_t timespec_to_msec(const struct timespec *a);
+
+/**
+ * Convert a timespec to nanoseconds.
+ */
+int64_t timespec_to_nsec(const struct timespec *a);
 
 /**
  * Convert nanoseconds to a timespec.

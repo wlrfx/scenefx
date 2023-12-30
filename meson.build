@@ -107,7 +107,7 @@ wayland_server = dependency('wayland-server',
 )
 
 wlroots_options = [ 'examples=false' ]
-wlroots_version = ['>=0.16.0', '<0.17.0']
+wlroots_version = ['>=0.17.0', '<0.18.0']
 subproject(
 	'wlroots',
 	default_options: wlroots_options,

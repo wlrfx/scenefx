@@ -633,6 +633,11 @@ static void output_configure_scene(struct wlr_scene_node *node,
 			if (!wlr_surface_is_subsurface(xdg_surface->surface)) {
 				wlr_scene_buffer_set_corner_radius(buffer, view->corner_radius);
 				wlr_scene_buffer_set_shadow_data(buffer, view->shadow_data);
+				wlr_scene_buffer_set_backdrop_blur(buffer, true);
+				// TODO: `ADD_FUNCTION_HERE`
+				// Can be used to call `ADD_FUNCTION_HERE` to only blur e.g.
+				// the BACKGROUND and BOTTOM layers
+				wlr_scene_buffer_set_backdrop_blur_optimized(buffer, false);
 			}
 		}
 	} else if (node->type == WLR_SCENE_NODE_TREE) {
@@ -983,6 +988,13 @@ int main(int argc, char *argv[]) {
 	 */
 	server.scene = wlr_scene_create();
 	wlr_scene_attach_output_layout(server.scene, server.output_layout);
+
+	// Set the blur_data
+	struct blur_data blur_data = {
+		.radius = 5,
+		.num_passes = 3,
+	};
+	wlr_scene_set_blur_data(server.scene, blur_data);
 
 	/* Set up xdg-shell version 3. The xdg-shell is a Wayland protocol which is
 	 * used for application windows. For more detail on shells, refer to my

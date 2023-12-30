@@ -1,5 +1,5 @@
-#ifndef RENDER_PIXEL_FORMAT_H
-#define RENDER_PIXEL_FORMAT_H
+#ifndef FX_RENDER_PIXEL_FORMAT_H
+#define FX_RENDER_PIXEL_FORMAT_H
 
 #include <wayland-server-protocol.h>
 

@@ -1,7 +1,6 @@
 #include <assert.h>
 #include <stdlib.h>
 #include <wlr/render/interface.h>
-#include <wlr/render/gles2.h>
 #include <wlr/types/wlr_buffer.h>
 #include <wlr/util/log.h>
 #include <drm_fourcc.h>
@@ -18,7 +17,8 @@ bool wlr_texture_is_fx(struct wlr_texture *wlr_texture) {
 
 struct fx_texture *fx_get_texture(struct wlr_texture *wlr_texture) {
 	assert(wlr_texture_is_fx(wlr_texture));
-	return (struct fx_texture *) wlr_texture;
+	struct fx_texture *texture = wl_container_of(wlr_texture, texture, wlr_texture);
+	return texture;
 }
 
 static bool fx_texture_update_from_buffer(struct wlr_texture *wlr_texture,
@@ -42,6 +42,10 @@ static bool fx_texture_update_from_buffer(struct wlr_texture *wlr_texture,
 		return false;
 	}
 
+	const struct fx_pixel_format *fmt =
+		get_fx_format_from_drm(texture->drm_format);
+	assert(fmt);
+
 	const struct wlr_pixel_format_info *drm_fmt =
 		drm_get_pixel_format_info(texture->drm_format);
 	assert(drm_fmt);
@@ -60,6 +64,8 @@ static bool fx_texture_update_from_buffer(struct wlr_texture *wlr_texture,
 	wlr_egl_save_context(&prev_ctx);
 	wlr_egl_make_current(texture->fx_renderer->egl);
 
+	push_fx_debug(texture->fx_renderer);
+
 	glBindTexture(GL_TEXTURE_2D, texture->tex);
 
 	int rects_len = 0;
@@ -75,7 +81,7 @@ static bool fx_texture_update_from_buffer(struct wlr_texture *wlr_texture,
 		int width = rect.x2 - rect.x1;
 		int height = rect.y2 - rect.y1;
 		glTexSubImage2D(GL_TEXTURE_2D, 0, rect.x1, rect.y1, width, height,
-			GL_RGBA, GL_UNSIGNED_BYTE, data);
+			fmt->gl_format, fmt->gl_type, data);
 	}
 
 	glPixelStorei(GL_UNPACK_ROW_LENGTH_EXT, 0);
@@ -83,6 +89,8 @@ static bool fx_texture_update_from_buffer(struct wlr_texture *wlr_texture,
 	glPixelStorei(GL_UNPACK_SKIP_ROWS_EXT, 0);
 
 	glBindTexture(GL_TEXTURE_2D, 0);
+
+	pop_fx_debug(texture->fx_renderer);
 
 	wlr_egl_restore_context(&prev_ctx);
 
@@ -104,10 +112,14 @@ static bool fx_texture_invalidate(struct fx_texture *texture) {
 	wlr_egl_save_context(&prev_ctx);
 	wlr_egl_make_current(texture->fx_renderer->egl);
 
+	push_fx_debug(texture->fx_renderer);
+
 	glBindTexture(texture->target, texture->tex);
 	texture->fx_renderer->procs.glEGLImageTargetTexture2DOES(texture->target,
 		texture->image);
 	glBindTexture(texture->target, 0);
+
+	pop_fx_debug(texture->fx_renderer);
 
 	wlr_egl_restore_context(&prev_ctx);
 
@@ -155,21 +167,28 @@ static struct fx_texture *fx_texture_create(
 		wlr_log_errno(WLR_ERROR, "Allocation failed");
 		return NULL;
 	}
-	wlr_texture_init(&texture->wlr_texture, renderer->wlr_output->renderer,
+	wlr_texture_init(&texture->wlr_texture, &renderer->wlr_renderer,
 			&texture_impl, width, height);
 	texture->fx_renderer = renderer;
 	wl_list_insert(&renderer->textures, &texture->link);
 	return texture;
 }
 
-static struct fx_texture *fx_texture_from_pixels(
-		struct fx_renderer *renderer,
+static struct wlr_texture *fx_texture_from_pixels(
+		struct wlr_renderer *wlr_renderer,
 		uint32_t drm_format, uint32_t stride, uint32_t width,
 		uint32_t height, const void *data) {
+	struct fx_renderer *renderer = fx_get_renderer(wlr_renderer);
+
+	const struct fx_pixel_format *fmt = get_fx_format_from_drm(drm_format);
+	if (fmt == NULL) {
+		wlr_log(WLR_ERROR, "Unsupported pixel format 0x%"PRIX32, drm_format);
+		return NULL;
+	}
+
 	const struct wlr_pixel_format_info *drm_fmt =
 		drm_get_pixel_format_info(drm_format);
 	assert(drm_fmt);
-
 	if (pixel_format_info_pixels_per_block(drm_fmt) != 1) {
 		wlr_log(WLR_ERROR, "Cannot upload texture: block formats are not supported");
 		return NULL;
@@ -185,35 +204,43 @@ static struct fx_texture *fx_texture_from_pixels(
 		return NULL;
 	}
 	texture->target = GL_TEXTURE_2D;
-	texture->has_alpha = false;
-	texture->drm_format = DRM_FORMAT_XBGR8888;
+	texture->has_alpha = fmt->has_alpha;
+	texture->drm_format = fmt->drm_format;
+
+	GLint internal_format = fmt->gl_internalformat;
+	if (!internal_format) {
+		internal_format = fmt->gl_format;
+	}
 
 	struct wlr_egl_context prev_ctx;
 	wlr_egl_save_context(&prev_ctx);
 	wlr_egl_make_current(renderer->egl);
+
+	push_fx_debug(renderer);
 
 	glGenTextures(1, &texture->tex);
 	glBindTexture(GL_TEXTURE_2D, texture->tex);
 
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
 	glPixelStorei(GL_UNPACK_ROW_LENGTH_EXT, stride / drm_fmt->bytes_per_block);
-	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0,
-		GL_RGBA, GL_UNSIGNED_BYTE, data);
+	glTexImage2D(GL_TEXTURE_2D, 0, internal_format, width, height, 0,
+		fmt->gl_format, fmt->gl_type, data);
 	glPixelStorei(GL_UNPACK_ROW_LENGTH_EXT, 0);
 
 	glBindTexture(GL_TEXTURE_2D, 0);
 
+	pop_fx_debug(renderer);
+
 	wlr_egl_restore_context(&prev_ctx);
 
-	return texture;
+	return &texture->wlr_texture;
 }
 
 static struct wlr_texture *fx_texture_from_dmabuf(
-		struct fx_renderer *renderer,
+		struct wlr_renderer *wlr_renderer,
 		struct wlr_dmabuf_attributes *attribs) {
+	struct fx_renderer *renderer = fx_get_renderer(wlr_renderer);
 
 	if (!renderer->procs.glEGLImageTargetTexture2DOES) {
 		return NULL;
@@ -252,14 +279,16 @@ static struct wlr_texture *fx_texture_from_dmabuf(
 
 	texture->target = external_only ? GL_TEXTURE_EXTERNAL_OES : GL_TEXTURE_2D;
 
+	push_fx_debug(renderer);
+
 	glGenTextures(1, &texture->tex);
 	glBindTexture(texture->target, texture->tex);
 	glTexParameteri(texture->target, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
 	glTexParameteri(texture->target, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-	glTexParameteri(texture->target, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-	glTexParameteri(texture->target, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
 	renderer->procs.glEGLImageTargetTexture2DOES(texture->target, texture->image);
 	glBindTexture(texture->target, 0);
+
+	pop_fx_debug(renderer);
 
 	wlr_egl_restore_context(&prev_ctx);
 
@@ -277,7 +306,7 @@ static const struct wlr_addon_interface texture_addon_impl = {
 	.destroy = texture_handle_buffer_destroy,
 };
 
-static struct fx_texture *fx_texture_from_dmabuf_buffer(
+static struct wlr_texture *fx_texture_from_dmabuf_buffer(
 		struct fx_renderer *renderer, struct wlr_buffer *buffer,
 		struct wlr_dmabuf_attributes *dmabuf) {
 	struct wlr_addon *addon =
@@ -290,11 +319,11 @@ static struct fx_texture *fx_texture_from_dmabuf_buffer(
 			return false;
 		}
 		wlr_buffer_lock(texture->buffer);
-		return texture;
+		return &texture->wlr_texture;
 	}
 
 	struct wlr_texture *wlr_texture =
-		fx_texture_from_dmabuf(renderer, dmabuf);
+		fx_texture_from_dmabuf(&renderer->wlr_renderer, dmabuf);
 	if (wlr_texture == NULL) {
 		return false;
 	}
@@ -304,11 +333,13 @@ static struct fx_texture *fx_texture_from_dmabuf_buffer(
 	wlr_addon_init(&texture->buffer_addon, &buffer->addons,
 		renderer, &texture_addon_impl);
 
-	return texture;
+	return &texture->wlr_texture;
 }
 
-struct fx_texture *fx_texture_from_buffer(struct fx_renderer *renderer,
+struct wlr_texture *fx_texture_from_buffer(struct wlr_renderer *wlr_renderer,
 		struct wlr_buffer *buffer) {
+	struct fx_renderer *renderer = fx_get_renderer(wlr_renderer);
+
 	void *data;
 	uint32_t format;
 	size_t stride;
@@ -317,7 +348,7 @@ struct fx_texture *fx_texture_from_buffer(struct fx_renderer *renderer,
 		return fx_texture_from_dmabuf_buffer(renderer, buffer, &dmabuf);
 	} else if (wlr_buffer_begin_data_ptr_access(buffer,
 			WLR_BUFFER_DATA_PTR_ACCESS_READ, &data, &format, &stride)) {
-		struct fx_texture *tex = fx_texture_from_pixels(renderer,
+		struct wlr_texture *tex = fx_texture_from_pixels(wlr_renderer,
 			format, stride, buffer->width, buffer->height, data);
 		wlr_buffer_end_data_ptr_access(buffer);
 		return tex;
@@ -326,10 +357,12 @@ struct fx_texture *fx_texture_from_buffer(struct fx_renderer *renderer,
 	}
 }
 
-void wlr_gles2_texture_get_fx_attribs(struct fx_texture *texture,
-		struct wlr_gles2_texture_attribs *attribs) {
-	memset(attribs, 0, sizeof(*attribs));
-	attribs->target = texture->target;
-	attribs->tex = texture->tex;
-	attribs->has_alpha = texture->has_alpha;
+void fx_texture_get_attribs(struct wlr_texture *wlr_texture,
+		struct fx_texture_attribs *attribs) {
+	struct fx_texture *texture = fx_get_texture(wlr_texture);
+	*attribs = (struct fx_texture_attribs){
+		.target = texture->target,
+		.tex = texture->tex,
+		.has_alpha = texture->has_alpha,
+	};
 }

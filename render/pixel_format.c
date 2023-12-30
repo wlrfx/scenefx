@@ -1,6 +1,6 @@
+#include <assert.h>
 #include <drm_fourcc.h>
 #include <wlr/util/log.h>
-
 #include "render/pixel_format.h"
 
 static const struct wlr_pixel_format_info pixel_format_info[] = {

@@ -177,19 +177,6 @@ void push_fx_debug_(struct fx_renderer *renderer,
 #define push_fx_debug(renderer) push_fx_debug_(renderer, _WLR_FILENAME, __func__)
 void pop_fx_debug(struct fx_renderer *renderer);
 
-// Initialize the stenciling work
-void fx_renderer_stencil_mask_init(void);
-
-// Close the mask
-void fx_renderer_stencil_mask_close(bool draw_inside_mask);
-
-// Finish stenciling and clear the buffer
-void fx_renderer_stencil_mask_fini(void);
-
-void fx_renderer_stencil_enable(void);
-
-void fx_renderer_stencil_disable(void);
-
 ///
 /// Render Timer
 ///

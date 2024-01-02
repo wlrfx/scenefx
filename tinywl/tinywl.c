@@ -859,7 +859,7 @@ static void server_new_xdg_surface(struct wl_listener *listener, void *data) {
 	toplevel->corner_radius = 20;
 	toplevel->shadow_data = shadow_data_get_default();
 	toplevel->shadow_data.enabled = true;
-	memcpy(toplevel->shadow_data.color, (float[]) {1.0f, 0.0f, 0.0f, 1.0f}, sizeof(float[4]));
+	toplevel->shadow_data.color = (struct wlr_render_color) {1.0f, 0.0f, 0.0f, 1.0f};
 
 	/* Listen to the various events it can emit */
 	toplevel->map.notify = xdg_toplevel_map;

@@ -5,6 +5,7 @@
 #include <wlr/render/pass.h>
 #include <wlr/util/box.h>
 #include <wlr/render/interface.h>
+#include "types/fx/shadow_data.h"
 
 struct fx_gles_render_pass {
 	struct wlr_render_pass base;
@@ -24,6 +25,7 @@ struct fx_gles_render_pass *fx_renderer_begin_buffer_pass(struct wlr_renderer *r
 
 struct fx_render_texture_options {
 	struct wlr_render_texture_options base;
+	struct wlr_box *clip_box; // Used to clip csd. Ignored if NULL
 	int corner_radius;
 };
 
@@ -48,5 +50,18 @@ void fx_render_pass_add_texture(struct fx_gles_render_pass *render_pass,
  */
 void fx_render_pass_add_rect(struct fx_gles_render_pass *render_pass,
 	const struct fx_render_rect_options *options);
+
+/**
+ * Render a stencil mask.
+ */
+void fx_render_pass_add_stencil_mask(struct fx_gles_render_pass *pass,
+		const struct fx_render_rect_options *fx_options, int corner_radius);
+
+/**
+ * Render a box shadow.
+ */
+void fx_render_pass_add_box_shadow(struct fx_gles_render_pass *pass,
+		const struct fx_render_rect_options *fx_options,
+		int corner_radius, struct shadow_data *shadow_data);
 
 #endif

@@ -471,9 +471,10 @@ static bool scene_node_update_iterator(struct wlr_scene_node *node,
 	// Expand the nodes visible region by the shadow size
 	if (node->type == WLR_SCENE_NODE_BUFFER) {
 		struct wlr_scene_buffer *buffer = wlr_scene_buffer_from_node(node);
-		struct shadow_data *data = &buffer->shadow_data;
-		if (scene_buffer_has_shadow(data)) {
-			wlr_region_expand(&node->visible, &node->visible, data->blur_sigma);
+		struct shadow_data *shadow_data = &buffer->shadow_data;
+		if (scene_buffer_has_shadow(shadow_data)) {
+			wlr_region_expand(&node->visible, &node->visible, shadow_data->blur_sigma);
+			wlr_region_expand(data->visible, data->visible, shadow_data->blur_sigma);
 		}
 	}
 
@@ -876,7 +877,10 @@ void wlr_scene_buffer_set_shadow_data(struct wlr_scene_buffer *scene_buffer,
 	struct shadow_data *buff_data = &scene_buffer->shadow_data;
 	if (buff_data->enabled == shadow_data.enabled &&
 			buff_data->blur_sigma == shadow_data.blur_sigma &&
-			buff_data->color && shadow_data.color) {
+			buff_data->color.r && shadow_data.color.r &&
+			buff_data->color.g && shadow_data.color.g &&
+			buff_data->color.b && shadow_data.color.b &&
+			buff_data->color.a && shadow_data.color.a) {
 		return;
 	}
 
@@ -1148,6 +1152,38 @@ struct wlr_scene_node *wlr_scene_node_at(struct wlr_scene_node *node,
 	return NULL;
 }
 
+// Some surfaces (mostly GTK 4) decorate their windows with shadows
+// which extends the node size past the actual window size. This gets
+// the actual surface geometry, mostly ignoring CSD decorations
+// but only if we need to.
+static void clip_xdg(struct wlr_scene_buffer *scene_buffer,
+		pixman_region32_t *clip, struct wlr_box *dst_box,
+		int x, int y, int scale) {
+	if (scene_buffer->corner_radius == 0 &&
+			!scene_buffer_has_shadow(&scene_buffer->shadow_data)) {
+		return;
+	}
+
+	struct wlr_scene_surface *scene_surface =
+		wlr_scene_surface_try_from_buffer(scene_buffer);
+	struct wlr_xdg_surface *xdg_surface = NULL;
+	if (scene_surface &&
+			(xdg_surface =
+			 wlr_xdg_surface_try_from_wlr_surface(scene_surface->surface))) {
+		struct wlr_box geometry;
+		wlr_xdg_surface_get_geometry(xdg_surface, &geometry);
+		dst_box->width = fmin(dst_box->width, geometry.width);
+		dst_box->height = fmin(dst_box->height, geometry.height);
+		dst_box->x = fmax(dst_box->x, geometry.x + x);
+		dst_box->y = fmax(dst_box->y, geometry.y + y);
+		scale_box(&geometry, scale);
+
+		pixman_region32_intersect_rect(clip, clip,
+				geometry.x + x, geometry.y + y,
+				geometry.width, geometry.height);
+	}
+}
+
 struct render_list_entry {
 	struct wlr_scene_node *node;
 	bool sent_dmabuf_feedback;
@@ -1219,6 +1255,29 @@ static void scene_entry_render(struct render_list_entry *entry, const struct ren
 			wlr_output_transform_invert(scene_buffer->transform);
 		transform = wlr_output_transform_compose(transform, data->transform);
 
+		struct wlr_box xdg_box = dst_box;
+		// Tries to clip
+		clip_xdg(scene_buffer, &render_region, &xdg_box,
+				entry->x, entry->y, data->scale);
+		// Shadow
+		if (scene_buffer_has_shadow(&scene_buffer->shadow_data)) {
+			// TODO: Compensate for SSD borders here
+			pixman_region32_t shadow_clip;
+			pixman_region32_init(&shadow_clip);
+			// Extend the size of the clip box
+			wlr_region_expand(&shadow_clip, &render_region,
+					scene_buffer->shadow_data.blur_sigma);
+			struct fx_render_rect_options shadow_options = {
+				.base = {
+					.box = xdg_box,
+					.clip = &shadow_clip,
+				},
+			};
+			fx_render_pass_add_box_shadow(data->render_pass, &shadow_options,
+					scene_buffer->corner_radius, &scene_buffer->shadow_data);
+			pixman_region32_fini(&shadow_clip);
+		}
+
 		struct fx_render_texture_options tex_options = {
 			.base = (struct wlr_render_texture_options){
 				.texture = texture,
@@ -1231,6 +1290,7 @@ static void scene_entry_render(struct render_list_entry *entry, const struct ren
 				.blend_mode = pixman_region32_not_empty(&opaque) ?
 					WLR_RENDER_BLEND_MODE_PREMULTIPLIED : WLR_RENDER_BLEND_MODE_NONE,
 			},
+			.clip_box = &xdg_box,
 			.corner_radius = scene_buffer->corner_radius,
 		};
 		fx_render_pass_add_texture(data->render_pass, &tex_options);

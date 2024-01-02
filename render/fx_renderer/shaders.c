@@ -144,7 +144,6 @@ static bool link_stencil_mask_program(struct stencil_mask_shader *shader) {
 	shader->proj = glGetUniformLocation(prog, "proj");
 	shader->color = glGetUniformLocation(prog, "color");
 	shader->pos_attrib = glGetAttribLocation(prog, "pos");
-	shader->tex_proj = glGetUniformLocation(prog, "tex_proj");
 	shader->position = glGetUniformLocation(prog, "position");
 	shader->half_size = glGetUniformLocation(prog, "half_size");
 	shader->radius = glGetUniformLocation(prog, "radius");
@@ -161,7 +160,6 @@ static bool link_box_shadow_program(struct box_shadow_shader *shader) {
 	shader->proj = glGetUniformLocation(prog, "proj");
 	shader->color = glGetUniformLocation(prog, "color");
 	shader->pos_attrib = glGetAttribLocation(prog, "pos");
-	shader->tex_proj = glGetUniformLocation(prog, "tex_proj");
 	shader->position = glGetUniformLocation(prog, "position");
 	shader->size = glGetUniformLocation(prog, "size");
 	shader->blur_sigma = glGetUniformLocation(prog, "blur_sigma");
@@ -190,15 +188,16 @@ bool link_shaders(struct fx_renderer *renderer) {
 		return false;
 	}
 
-	// TODO: Fix the shader compilation errors
-	// // stencil mask shader
-	// if (!link_stencil_mask_program(&renderer->shaders.stencil_mask)) {
-	// 	return false;
-	// }
-	// // box shadow shader
-	// if (!link_box_shadow_program(&renderer->shaders.box_shadow)) {
-	// 	return false;
-	// }
+	// stencil mask shader
+	if (!link_stencil_mask_program(&renderer->shaders.stencil_mask)) {
+		wlr_log(WLR_ERROR, "Could not link stencil mask shader");
+		return false;
+	}
+	// box shadow shader
+	if (!link_box_shadow_program(&renderer->shaders.box_shadow)) {
+		wlr_log(WLR_ERROR, "Could not link box shadow shader");
+		return false;
+	}
 
 	return true;
 }

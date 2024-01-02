@@ -42,24 +42,20 @@ struct tex_shader {
 struct stencil_mask_shader {
 	GLuint program;
 	GLint proj;
-	GLint tex_proj;
-	GLint tex;
+	GLint color;
 	GLint pos_attrib;
 	GLint half_size;
 	GLint position;
-	GLint color;
 	GLint radius;
 };
 
 struct box_shadow_shader {
 	GLuint program;
 	GLint proj;
-	GLint tex_proj;
-	GLint tex;
+	GLint color;
 	GLint pos_attrib;
 	GLint position;
 	GLint size;
-	GLint color;
 	GLint blur_sigma;
 	GLint corner_radius;
 };

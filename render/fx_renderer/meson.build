@@ -12,7 +12,6 @@ wlr_files += files(
 	'pixel_format.c',
 	'fx_pass.c',
 	'fx_framebuffer.c',
-	'fx_stencilbuffer.c',
 	'fx_texture.c',
 	'fx_renderer.c',
 )

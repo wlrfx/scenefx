@@ -21,7 +21,6 @@
 
 #include "render/egl.h"
 #include "render/fx_renderer/fx_renderer.h"
-#include "render/fx_renderer/fx_stencilbuffer.h"
 #include "render/fx_renderer/matrix.h"
 #include "render/fx_renderer/util.h"
 #include "render/pixel_format.h"
@@ -137,12 +136,6 @@ static bool fx_renderer_begin(struct wlr_renderer *wlr_renderer, uint32_t width,
 	glViewport(0, 0, width, height);
 	renderer->viewport_width = width;
 	renderer->viewport_height = height;
-
-	// Add the stencil to the wlr fbo
-	fx_stencilbuffer_init(&renderer->stencil_buffer, width, height);
-
-	// Finally bind the main wlr FBO
-	fx_framebuffer_bind_wlr_fbo(renderer);
 
 	// refresh projection matrix
 	matrix_projection(renderer->projection, width, height,
@@ -566,8 +559,6 @@ static void fx_renderer_destroy(struct wlr_renderer *wlr_renderer) {
 		fx_texture_destroy(tex);
 	}
 
-	fx_stencilbuffer_release(&renderer->stencil_buffer);
-
 	push_fx_debug(renderer);
 	glDeleteProgram(renderer->shaders.quad.program);
 	glDeleteProgram(renderer->shaders.tex_rgba.program);
@@ -794,9 +785,6 @@ struct wlr_renderer *fx_renderer_create_egl(struct wlr_egl *egl) {
 	renderer->egl = egl;
 	renderer->exts_str = exts_str;
 	renderer->drm_fd = -1;
-
-	// Create the stencil buffer
-	renderer->stencil_buffer = fx_stencilbuffer_create();
 
 	wlr_log(WLR_INFO, "Creating scenefx FX renderer");
 	wlr_log(WLR_INFO, "Using %s", glGetString(GL_VERSION));

@@ -62,14 +62,31 @@ struct fx_framebuffer *fx_framebuffer_get_or_create(struct fx_renderer *renderer
 	glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0,
 		GL_RENDERBUFFER, buffer->rbo);
 	GLenum fb_status = glCheckFramebufferStatus(GL_FRAMEBUFFER);
+	if (fb_status != GL_FRAMEBUFFER_COMPLETE) {
+		wlr_log(WLR_ERROR, "Failed to create FBO");
+		glBindFramebuffer(GL_FRAMEBUFFER, 0);
+		goto error_image;
+	}
+
+	// Init stencil buffer
+	glGenRenderbuffers(1, &buffer->sb);
+	glBindRenderbuffer(GL_RENDERBUFFER, buffer->sb);
+	glRenderbufferStorage(GL_RENDERBUFFER, GL_STENCIL_INDEX8,
+			wlr_buffer->width, wlr_buffer->height);
+	glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_STENCIL_ATTACHMENT,
+			GL_RENDERBUFFER, buffer->sb);
+	fb_status = glCheckFramebufferStatus(GL_FRAMEBUFFER);
+	if (fb_status != GL_FRAMEBUFFER_COMPLETE) {
+		wlr_log(WLR_ERROR,
+				"Stencil buffer incomplete, couldn't create! (FB status: %i)",
+				fb_status);
+		glBindFramebuffer(GL_FRAMEBUFFER, 0);
+		goto error_stencil;
+	}
+
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
 	pop_fx_debug(renderer);
-
-	if (fb_status != GL_FRAMEBUFFER_COMPLETE) {
-		wlr_log(WLR_ERROR, "Failed to create FBO");
-		goto error_image;
-	}
 
 	wlr_addon_init(&buffer->addon, &wlr_buffer->addons, renderer,
 		&buffer_addon_impl);
@@ -81,6 +98,8 @@ struct fx_framebuffer *fx_framebuffer_get_or_create(struct fx_renderer *renderer
 
 	return buffer;
 
+error_stencil:
+	glDeleteRenderbuffers(1, &buffer->sb);
 error_image:
 	wlr_egl_destroy_image(renderer->egl, buffer->image);
 error_buffer:

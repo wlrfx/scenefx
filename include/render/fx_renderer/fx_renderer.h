@@ -11,7 +11,6 @@
 #include <wlr/util/addon.h>
 #include <wlr/util/box.h>
 
-#include "render/fx_renderer/fx_stencilbuffer.h"
 #include "render/fx_renderer/shaders.h"
 #include "render/pass.h"
 #include "types/fx/shadow_data.h"
@@ -44,6 +43,7 @@ struct fx_framebuffer {
 	EGLImageKHR image;
 	GLuint rbo;
 	GLuint fbo;
+	GLuint sb; // Stencil
 
 	struct wlr_addon addon;
 };
@@ -152,8 +152,6 @@ struct fx_renderer {
 
 	struct wl_list buffers; // fx_framebuffer.link
 	struct wl_list textures; // fx_texture.link
-
-	struct fx_stencilbuffer stencil_buffer;
 
 	struct fx_framebuffer *current_buffer;
 	uint32_t viewport_width, viewport_height;

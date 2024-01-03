@@ -1156,31 +1156,43 @@ struct wlr_scene_node *wlr_scene_node_at(struct wlr_scene_node *node,
 // which extends the node size past the actual window size. This gets
 // the actual surface geometry, mostly ignoring CSD decorations
 // but only if we need to.
-static void clip_xdg(struct wlr_scene_buffer *scene_buffer,
+static void clip_xdg(struct wlr_scene_node *node,
 		pixman_region32_t *clip, struct wlr_box *dst_box,
-		int x, int y, int scale) {
-	if (scene_buffer->corner_radius == 0 &&
-			!scene_buffer_has_shadow(&scene_buffer->shadow_data)) {
+		int x, int y, float scale) {
+	struct wlr_scene_buffer *scene_buffer = NULL;
+	switch (node->type) {
+	default:
+		return;
+	case WLR_SCENE_NODE_BUFFER:
+		scene_buffer = wlr_scene_buffer_from_node(node);
+		break;
+	}
+
+	if (!scene_buffer || (scene_buffer->corner_radius == 0 &&
+				!scene_buffer_has_shadow(&scene_buffer->shadow_data))) {
 		return;
 	}
 
-	struct wlr_scene_surface *scene_surface =
-		wlr_scene_surface_try_from_buffer(scene_buffer);
+	struct wlr_scene_surface *scene_surface = wlr_scene_surface_try_from_buffer(scene_buffer);
 	struct wlr_xdg_surface *xdg_surface = NULL;
 	if (scene_surface &&
-			(xdg_surface =
-			 wlr_xdg_surface_try_from_wlr_surface(scene_surface->surface))) {
+			(xdg_surface = wlr_xdg_surface_try_from_wlr_surface(scene_surface->surface))) {
 		struct wlr_box geometry;
 		wlr_xdg_surface_get_geometry(xdg_surface, &geometry);
-		dst_box->width = fmin(dst_box->width, geometry.width);
-		dst_box->height = fmin(dst_box->height, geometry.height);
-		dst_box->x = fmax(dst_box->x, geometry.x + x);
-		dst_box->y = fmax(dst_box->y, geometry.y + y);
 		scale_box(&geometry, scale);
 
+		if (dst_box->width > geometry.width) {
+			dst_box->width = geometry.width;
+			dst_box->x = geometry.x + x;
+		}
+		if (dst_box->height > geometry.height) {
+			dst_box->height = geometry.height;
+			dst_box->y = geometry.y + y;
+		}
+
 		pixman_region32_intersect_rect(clip, clip,
-				geometry.x + x, geometry.y + y,
-				geometry.width, geometry.height);
+				dst_box->x, dst_box->y,
+				dst_box->width, dst_box->height);
 	}
 }
 
@@ -1217,7 +1229,12 @@ static void scene_entry_render(struct render_list_entry *entry, const struct ren
 	scale_output_damage(&opaque, data->scale);
 	pixman_region32_subtract(&opaque, &render_region, &opaque);
 
+	struct wlr_box xdg_box = dst_box;
+	// Tries to clip
+	clip_xdg(node, &render_region, &xdg_box, dst_box.x, dst_box.y, data->scale);
+
 	transform_output_box(&dst_box, data);
+	transform_output_box(&xdg_box, data);
 	transform_output_damage(&render_region, data);
 
 	switch (node->type) {
@@ -1238,6 +1255,7 @@ static void scene_entry_render(struct render_list_entry *entry, const struct ren
 				},
 				.clip = &render_region,
 			},
+			.scale = data->scale,
 		};
 		fx_render_pass_add_rect(data->render_pass, &rect_options);
 		break;
@@ -1255,10 +1273,6 @@ static void scene_entry_render(struct render_list_entry *entry, const struct ren
 			wlr_output_transform_invert(scene_buffer->transform);
 		transform = wlr_output_transform_compose(transform, data->transform);
 
-		struct wlr_box xdg_box = dst_box;
-		// Tries to clip
-		clip_xdg(scene_buffer, &render_region, &xdg_box,
-				entry->x, entry->y, data->scale);
 		// Shadow
 		if (scene_buffer_has_shadow(&scene_buffer->shadow_data)) {
 			// TODO: Compensate for SSD borders here
@@ -1266,15 +1280,17 @@ static void scene_entry_render(struct render_list_entry *entry, const struct ren
 			pixman_region32_init(&shadow_clip);
 			// Extend the size of the clip box
 			wlr_region_expand(&shadow_clip, &render_region,
-					scene_buffer->shadow_data.blur_sigma);
+					scene_buffer->shadow_data.blur_sigma * data->scale);
 			struct fx_render_rect_options shadow_options = {
 				.base = {
 					.box = xdg_box,
 					.clip = &shadow_clip,
 				},
+				.scale = data->scale,
 			};
 			fx_render_pass_add_box_shadow(data->render_pass, &shadow_options,
-					scene_buffer->corner_radius, &scene_buffer->shadow_data);
+					scene_buffer->corner_radius * data->scale,
+					&scene_buffer->shadow_data);
 			pixman_region32_fini(&shadow_clip);
 		}
 
@@ -1290,8 +1306,9 @@ static void scene_entry_render(struct render_list_entry *entry, const struct ren
 				.blend_mode = pixman_region32_not_empty(&opaque) ?
 					WLR_RENDER_BLEND_MODE_PREMULTIPLIED : WLR_RENDER_BLEND_MODE_NONE,
 			},
+			.scale = data->scale,
 			.clip_box = &xdg_box,
-			.corner_radius = scene_buffer->corner_radius,
+			.corner_radius = scene_buffer->corner_radius * data->scale,
 		};
 		fx_render_pass_add_texture(data->render_pass, &tex_options);
 

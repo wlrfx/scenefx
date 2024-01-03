@@ -25,6 +25,7 @@ struct fx_gles_render_pass *fx_renderer_begin_buffer_pass(struct wlr_renderer *r
 
 struct fx_render_texture_options {
 	struct wlr_render_texture_options base;
+	float scale;
 	struct wlr_box *clip_box; // Used to clip csd. Ignored if NULL
 	int corner_radius;
 };
@@ -34,6 +35,7 @@ struct fx_render_texture_options fx_render_texture_options_default(
 
 struct fx_render_rect_options {
 	struct wlr_render_rect_options base;
+	float scale;
 };
 
 struct fx_render_rect_options fx_render_rect_options_default(

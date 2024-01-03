@@ -19,6 +19,7 @@ struct fx_render_texture_options fx_render_texture_options_default(
 		const struct wlr_render_texture_options *base) {
 	struct fx_render_texture_options options = {
 		.corner_radius = 0,
+		.scale = 1.0f,
 		.clip_box = NULL,
 	};
 	memcpy(&options.base, base, sizeof(*base));
@@ -27,7 +28,9 @@ struct fx_render_texture_options fx_render_texture_options_default(
 
 struct fx_render_rect_options fx_render_rect_options_default(
 		const struct wlr_render_rect_options *base) {
-	struct fx_render_rect_options options = {};
+	struct fx_render_rect_options options = {
+		.scale = 1.0f,
+	};
 	memcpy(&options.base, base, sizeof(*base));
 	return options;
 }
@@ -376,7 +379,7 @@ void fx_render_pass_add_box_shadow(struct fx_gles_render_pass *pass,
 	wlr_render_rect_options_get_box(options, pass->buffer->buffer, &box);
 	assert(box.width > 0 && box.height > 0);
 	struct wlr_box surface_box = box;
-	float blur_sigma = shadow_data->blur_sigma;
+	float blur_sigma = shadow_data->blur_sigma * fx_options->scale;
 
 	// Extend the size of the box
 	box.x -= blur_sigma;

@@ -3,10 +3,11 @@
 
 #include <stdbool.h>
 #include <wlr/util/addon.h>
+#include <wlr/render/pass.h>
 
 struct shadow_data {
 	bool enabled;
-	float *color;
+	struct wlr_render_color color;
 	float blur_sigma;
 };
 

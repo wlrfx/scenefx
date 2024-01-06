@@ -5,14 +5,13 @@
 #include "wlr/util/log.h"
 
 struct shadow_data shadow_data_get_default(void) {
-	static float default_shadow_color[] = {0.0f, 0.0f, 0.0f, 0.5f};
 	return (struct shadow_data) {
 		.blur_sigma = 20,
-		.color = default_shadow_color,
+		.color = {0.0f, 0.0f, 0.0f, 0.5f},
 		.enabled = false,
 	};
 }
 
 bool scene_buffer_has_shadow(struct shadow_data *data) {
-	return data->enabled && data->blur_sigma > 0 && data->color[3] > 0.0;
+	return data->enabled && data->blur_sigma > 0 && data->color.a > 0.0;
 }

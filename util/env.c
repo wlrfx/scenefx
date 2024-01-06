@@ -19,7 +19,7 @@ bool env_parse_bool(const char *option) {
 	return false;
 }
 
-ssize_t env_parse_switch(const char *option, const char **switches) {
+size_t env_parse_switch(const char *option, const char **switches) {
 	const char *env = getenv(option);
 	if (env) {
 		wlr_log(WLR_INFO, "Loading %s option: %s", option, env);

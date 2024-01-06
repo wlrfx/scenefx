@@ -10,7 +10,11 @@
 #extension GL_OES_EGL_image_external : require
 #endif
 
+#ifdef GL_FRAGMENT_PRECISION_HIGH
+precision highp float;
+#else
 precision mediump float;
+#endif
 
 varying vec2 v_texcoord;
 
@@ -21,6 +25,7 @@ uniform sampler2D tex;
 #endif
 
 uniform float alpha;
+
 uniform vec2 size;
 uniform vec2 position;
 uniform float radius;

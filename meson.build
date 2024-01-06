@@ -126,6 +126,7 @@ drm = dependency('libdrm',
 		'tests=false',
 	],
 )
+xkbcommon = dependency('xkbcommon')
 pixman = dependency('pixman-1',
 	version: '>=0.42.0',
 	fallback: 'pixman',
@@ -139,6 +140,7 @@ wlr_deps = [
 	wlroots,
 	wayland_server,
 	drm,
+	xkbcommon,
 	pixman,
 	math,
 	rt,

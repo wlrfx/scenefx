@@ -1,6 +1,7 @@
 #define _POSIX_C_SOURCE 200809L
 #include <assert.h>
 #include <stdlib.h>
+#include <scenefx/types/wlr_scene.h>
 #include <string.h>
 #include <wlr/backend.h>
 #include <wlr/render/gles2.h>
@@ -8,7 +9,6 @@
 #include <wlr/types/wlr_damage_ring.h>
 #include <wlr/types/wlr_matrix.h>
 #include <wlr/types/wlr_presentation_time.h>
-#include <wlr/types/wlr_scene.h>
 #include <wlr/types/wlr_subcompositor.h>
 #include <wlr/types/wlr_xdg_shell.h>
 #include <wlr/util/log.h>
@@ -16,7 +16,7 @@
 #include <wlr/render/swapchain.h>
 
 #include "render/pass.h"
-#include "types/fx/shadow_data.h"
+#include "scenefx/types/fx/shadow_data.h"
 #include "types/wlr_buffer.h"
 #include "types/wlr_output.h"
 #include "types/wlr_scene.h"

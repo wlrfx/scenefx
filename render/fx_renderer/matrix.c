@@ -2,6 +2,7 @@
 #include <string.h>
 #include <wlr/types/wlr_output.h>
 
+#include "config.h"
 #include "render/fx_renderer/matrix.h"
 
 static const float transforms[][9] = {
@@ -47,6 +48,8 @@ static const float transforms[][9] = {
 	},
 };
 
+#if !HAVE_WLROOTS_SUBPROJECT
+
 void matrix_projection(float mat[static 9], int width, int height,
 		enum wl_output_transform transform) {
 	memset(mat, 0, sizeof(*mat) * 9);
@@ -68,3 +71,5 @@ void matrix_projection(float mat[static 9], int width, int height,
 	// Identity
 	mat[8] = 1.0f;
 }
+
+#endif /* ifndef HAVE_WLROOTS_SUBPROJECT */

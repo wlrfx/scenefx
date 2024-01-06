@@ -152,6 +152,8 @@ subdir('render')
 subdir('types')
 subdir('util')
 
+subdir('include')
+
 scenefx_inc = include_directories('include')
 
 lib_scenefx = library(

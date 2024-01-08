@@ -1,7 +1,7 @@
 #include <assert.h>
 #include <stdlib.h>
 #include <string.h>
-#include "types/fx/shadow_data.h"
+#include "scenefx/types/fx/shadow_data.h"
 #include "wlr/util/log.h"
 
 struct shadow_data shadow_data_get_default(void) {

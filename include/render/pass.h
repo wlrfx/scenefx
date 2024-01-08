@@ -5,7 +5,7 @@
 #include <wlr/render/pass.h>
 #include <wlr/util/box.h>
 #include <wlr/render/interface.h>
-#include "types/fx/shadow_data.h"
+#include "scenefx/types/fx/shadow_data.h"
 
 struct fx_gles_render_pass {
 	struct wlr_render_pass base;

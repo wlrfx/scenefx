@@ -11,7 +11,7 @@
 #include "render/fx_renderer/fx_renderer.h"
 #include "render/fx_renderer/matrix.h"
 #include "render/pass.h"
-#include "types/fx/shadow_data.h"
+#include "scenefx/types/fx/shadow_data.h"
 
 #define MAX_QUADS 86 // 4kb
 

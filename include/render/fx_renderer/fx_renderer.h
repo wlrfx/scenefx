@@ -13,7 +13,7 @@
 
 #include "render/fx_renderer/shaders.h"
 #include "render/pass.h"
-#include "types/fx/shadow_data.h"
+#include "scenefx/types/fx/shadow_data.h"
 
 struct fx_pixel_format {
 	uint32_t drm_format;
@@ -166,8 +166,6 @@ struct fx_render_timer *fx_get_render_timer(
 struct fx_texture *fx_get_texture(
 	struct wlr_texture *wlr_texture);
 
-struct wlr_renderer *fx_renderer_create_with_drm_fd(int drm_fd);
-struct wlr_renderer *fx_renderer_create(struct wlr_backend *backend);
 struct wlr_renderer *fx_renderer_create_egl(struct wlr_egl *egl);
 
 struct wlr_egl *wlr_fx_renderer_get_egl(struct wlr_renderer *renderer);

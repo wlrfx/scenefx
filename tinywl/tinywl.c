@@ -5,7 +5,9 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <time.h>
-#include <types/fx/shadow_data.h>
+#include <scenefx/fx_renderer/fx_renderer.h>
+#include <scenefx/types/fx/shadow_data.h>
+#include <scenefx/types/wlr_scene.h>
 #include <unistd.h>
 #include <wayland-server-core.h>
 #include <wayland-util.h>
@@ -26,10 +28,6 @@
 #include <wlr/types/wlr_xdg_shell.h>
 #include <wlr/util/log.h>
 #include <xkbcommon/xkbcommon.h>
-
-#include "types/wlr_scene.h"
-
-#include "render/fx_renderer/fx_renderer.h"
 
 /* For brevity's sake, struct members are annotated where they are used. */
 enum tinywl_cursor_mode {

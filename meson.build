@@ -92,14 +92,14 @@ wayland_server = dependency('wayland-server',
 	default_options: wayland_project_options,
 )
 
-wlroots_options = [ 'examples=false' ]
+wlroots_options = [ 'examples=false', 'default_library=static' ]
 wlroots_version = ['>=0.17.0', '<0.18.0']
-subproject(
+wlroots_is_sub = subproject(
 	'wlroots',
 	default_options: wlroots_options,
 	required: false,
 	version: wlroots_version,
-)
+).found()
 wlroots = dependency('wlroots',
 	version: wlroots_version,
 	default_options: wlroots_options,
@@ -126,6 +126,7 @@ drm = dependency('libdrm',
 		'tests=false',
 	],
 )
+xkbcommon = dependency('xkbcommon')
 pixman = dependency('pixman-1',
 	version: '>=0.42.0',
 	fallback: 'pixman',
@@ -139,6 +140,7 @@ wlr_deps = [
 	wlroots,
 	wayland_server,
 	drm,
+	xkbcommon,
 	pixman,
 	math,
 	rt,
@@ -149,6 +151,8 @@ subdir('render')
 
 subdir('types')
 subdir('util')
+
+subdir('include')
 
 scenefx_inc = include_directories('include')
 

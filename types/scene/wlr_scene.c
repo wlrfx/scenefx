@@ -1,6 +1,7 @@
 #define _POSIX_C_SOURCE 200809L
 #include <assert.h>
 #include <stdlib.h>
+#include <scenefx/types/fx/shadow_data.h>
 #include <scenefx/types/wlr_scene.h>
 #include <string.h>
 #include <wlr/backend.h>
@@ -259,6 +260,10 @@ static void scene_node_opaque_region(struct wlr_scene_node *node, int x, int y,
 			return;
 		}
 
+		if (scene_buffer_has_shadow(&scene_buffer->shadow_data)) {
+			return;
+		}
+
 		if (!buffer_is_opaque(scene_buffer->buffer)) {
 			pixman_region32_copy(opaque, &scene_buffer->opaque_region);
 			pixman_region32_intersect_rect(opaque, opaque, 0, 0, width, height);
@@ -474,7 +479,6 @@ static bool scene_node_update_iterator(struct wlr_scene_node *node,
 		struct shadow_data *shadow_data = &buffer->shadow_data;
 		if (scene_buffer_has_shadow(shadow_data)) {
 			wlr_region_expand(&node->visible, &node->visible, shadow_data->blur_sigma);
-			wlr_region_expand(data->visible, data->visible, shadow_data->blur_sigma);
 		}
 	}
 
@@ -1168,6 +1172,7 @@ static void clip_xdg(struct wlr_scene_node *node,
 		break;
 	}
 
+	// Don't clip if the scene buffer doesn't have any effects
 	if (!scene_buffer || (scene_buffer->corner_radius == 0 &&
 				!scene_buffer_has_shadow(&scene_buffer->shadow_data))) {
 		return;
@@ -1223,19 +1228,23 @@ static void scene_entry_render(struct render_list_entry *entry, const struct ren
 	scene_node_get_size(node, &dst_box.width, &dst_box.height);
 	scale_box(&dst_box, data->scale);
 
+	// Tries to clip the node to the xdg geometry size, clipping CSD
+	struct wlr_box xdg_box = dst_box;
+	pixman_region32_t geometry_region; // The actual geometry region excluding CSD
+	pixman_region32_init(&geometry_region);
+	pixman_region32_copy(&geometry_region, &render_region);
+	clip_xdg(node, &geometry_region, &xdg_box, dst_box.x, dst_box.y, data->scale);
+
 	pixman_region32_t opaque;
 	pixman_region32_init(&opaque);
 	scene_node_opaque_region(node, dst_box.x, dst_box.y, &opaque);
 	scale_output_damage(&opaque, data->scale);
 	pixman_region32_subtract(&opaque, &render_region, &opaque);
 
-	struct wlr_box xdg_box = dst_box;
-	// Tries to clip
-	clip_xdg(node, &render_region, &xdg_box, dst_box.x, dst_box.y, data->scale);
-
 	transform_output_box(&dst_box, data);
 	transform_output_box(&xdg_box, data);
 	transform_output_damage(&render_region, data);
+	transform_output_damage(&geometry_region, data);
 
 	switch (node->type) {
 	case WLR_SCENE_NODE_TREE:
@@ -1275,23 +1284,16 @@ static void scene_entry_render(struct render_list_entry *entry, const struct ren
 
 		// Shadow
 		if (scene_buffer_has_shadow(&scene_buffer->shadow_data)) {
-			// TODO: Compensate for SSD borders here
-			pixman_region32_t shadow_clip;
-			pixman_region32_init(&shadow_clip);
-			// Extend the size of the clip box
-			wlr_region_expand(&shadow_clip, &render_region,
-					scene_buffer->shadow_data.blur_sigma * data->scale);
 			struct fx_render_rect_options shadow_options = {
 				.base = {
 					.box = xdg_box,
-					.clip = &shadow_clip,
+					.clip = &render_region, // Render with the original extended clip region
 				},
 				.scale = data->scale,
 			};
 			fx_render_pass_add_box_shadow(data->render_pass, &shadow_options,
 					scene_buffer->corner_radius * data->scale,
 					&scene_buffer->shadow_data);
-			pixman_region32_fini(&shadow_clip);
 		}
 
 		struct fx_render_texture_options tex_options = {
@@ -1300,7 +1302,7 @@ static void scene_entry_render(struct render_list_entry *entry, const struct ren
 				.src_box = scene_buffer->src_box,
 				.dst_box = dst_box,
 				.transform = transform,
-				.clip = &render_region,
+				.clip = &geometry_region, // Render with the smaller region, clipping CSD
 				.alpha = &scene_buffer->opacity,
 				.filter_mode = scene_buffer->filter_mode,
 				.blend_mode = pixman_region32_not_empty(&opaque) ?
@@ -1321,6 +1323,7 @@ static void scene_entry_render(struct render_list_entry *entry, const struct ren
 	}
 
 	pixman_region32_fini(&opaque);
+	pixman_region32_fini(&geometry_region);
 	pixman_region32_fini(&render_region);
 }
 

@@ -66,7 +66,7 @@ struct fx_render_timer *fx_get_render_timer(struct wlr_render_timer *wlr_timer) 
 	return timer;
 }
 
-static bool fx_bind_main_buffer(struct wlr_renderer *wlr_renderer,
+static bool fx_bind_buffer(struct wlr_renderer *wlr_renderer,
 		struct wlr_buffer *wlr_buffer) {
 	struct fx_renderer *renderer = fx_get_renderer(wlr_renderer);
 
@@ -138,6 +138,8 @@ static bool fx_renderer_begin(struct wlr_renderer *wlr_renderer, uint32_t width,
 	renderer->viewport_width = width;
 	renderer->viewport_height = height;
 
+	pixman_region32_init(&renderer->blur_padding_region);
+
 	// refresh projection matrix
 	matrix_projection(renderer->projection, width, height,
 		WL_OUTPUT_TRANSFORM_FLIPPED_180);
@@ -153,8 +155,8 @@ static bool fx_renderer_begin(struct wlr_renderer *wlr_renderer, uint32_t width,
 }
 
 static void fx_renderer_end(struct wlr_renderer *wlr_renderer) {
-	fx_get_renderer_in_context(wlr_renderer);
-	// no-op
+	struct fx_renderer *renderer = fx_get_renderer_in_context(wlr_renderer);
+	pixman_region32_fini(&renderer->blur_padding_region);
 }
 
 static void fx_renderer_clear(struct wlr_renderer *wlr_renderer,
@@ -239,6 +241,7 @@ static bool fx_render_subtexture_with_matrix(
 	glUniform2f(shader->size, box->width, box->height);
 	glUniform2f(shader->position, box->x, box->y);
 	glUniform1f(shader->radius, 0);
+	glUniform1f(shader->discard_transparent, false);
 
 	float tex_matrix[9];
 	wlr_matrix_identity(tex_matrix);
@@ -451,7 +454,7 @@ static void fx_renderer_destroy(struct wlr_renderer *wlr_renderer) {
 static struct wlr_render_pass *begin_buffer_pass(struct wlr_renderer *wlr_renderer,
 		struct wlr_buffer *wlr_buffer, const struct wlr_buffer_pass_options *options) {
 	struct fx_gles_render_pass *pass =
-		fx_renderer_begin_buffer_pass(wlr_renderer, wlr_buffer, options);
+		fx_renderer_begin_buffer_pass(wlr_renderer, wlr_buffer, NULL, options);
 	if (!pass) {
 		return NULL;
 	}
@@ -530,7 +533,7 @@ static void fx_render_timer_destroy(struct wlr_render_timer *wlr_timer) {
 
 static const struct wlr_renderer_impl renderer_impl = {
 	.destroy = fx_renderer_destroy,
-	.bind_buffer = fx_bind_main_buffer,
+	.bind_buffer = fx_bind_buffer,
 	.begin = fx_renderer_begin,
 	.end = fx_renderer_end,
 	.clear = fx_renderer_clear,
@@ -751,6 +754,9 @@ struct wlr_renderer *fx_renderer_create_egl(struct wlr_egl *egl) {
 	if (!link_shaders(renderer)) {
 		goto error;
 	}
+
+	renderer->blur_buffer_dirty = false;
+
 	pop_fx_debug(renderer);
 
 	wlr_log(WLR_INFO, "FX RENDERER: Shaders Initialized Successfully");
@@ -760,13 +766,6 @@ struct wlr_renderer *fx_renderer_create_egl(struct wlr_egl *egl) {
 	return &renderer->wlr_renderer;
 
 error:
-	glDeleteProgram(renderer->shaders.quad.program);
-	glDeleteProgram(renderer->shaders.tex_rgba.program);
-	glDeleteProgram(renderer->shaders.tex_rgbx.program);
-	glDeleteProgram(renderer->shaders.tex_ext.program);
-	glDeleteProgram(renderer->shaders.stencil_mask.program);
-	glDeleteProgram(renderer->shaders.box_shadow.program);
-
 	pop_fx_debug(renderer);
 
 	if (renderer->exts.KHR_debug) {

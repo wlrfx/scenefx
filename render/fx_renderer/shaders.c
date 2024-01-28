@@ -12,6 +12,8 @@
 #include "tex_frag_src.h"
 #include "stencil_mask_frag_src.h"
 #include "box_shadow_frag_src.h"
+#include "blur1_frag_src.h"
+#include "blur2_frag_src.h"
 
 GLuint compile_shader(GLuint type, const GLchar *src) {
 	GLuint shader = glCreateShader(type);
@@ -130,6 +132,7 @@ static bool link_tex_program(struct tex_shader *shader,
 	shader->size = glGetUniformLocation(prog, "size");
 	shader->position = glGetUniformLocation(prog, "position");
 	shader->radius = glGetUniformLocation(prog, "radius");
+	shader->discard_transparent = glGetUniformLocation(prog, "discard_transparent");
 
 	return true;
 }
@@ -168,36 +171,74 @@ static bool link_box_shadow_program(struct box_shadow_shader *shader) {
 	return true;
 }
 
+static bool link_blur_program(struct blur_shader *shader, const char *shader_program) {
+	GLuint prog;
+	shader->program = prog = link_program(shader_program);
+	if (!shader->program) {
+		return false;
+	}
+	shader->proj = glGetUniformLocation(prog, "proj");
+	shader->tex = glGetUniformLocation(prog, "tex");
+	shader->pos_attrib = glGetAttribLocation(prog, "pos");
+	shader->tex_proj = glGetUniformLocation(prog, "tex_proj");
+	shader->radius = glGetUniformLocation(prog, "radius");
+	shader->halfpixel = glGetUniformLocation(prog, "halfpixel");
+
+	return true;
+}
+
 bool link_shaders(struct fx_renderer *renderer) {
 	// quad fragment shader
 	if (!link_quad_program(&renderer->shaders.quad)) {
 		wlr_log(WLR_ERROR, "Could not link quad shader");
-		return false;
+		goto error;
 	}
 	// fragment shaders
 	if (!link_tex_program(&renderer->shaders.tex_rgba, SHADER_SOURCE_TEXTURE_RGBA)) {
 		wlr_log(WLR_ERROR, "Could not link tex_RGBA shader");
-		return false;
+		goto error;
 	}
 	if (!link_tex_program(&renderer->shaders.tex_rgbx, SHADER_SOURCE_TEXTURE_RGBX)) {
 		wlr_log(WLR_ERROR, "Could not link tex_RGBX shader");
-		return false;
+		goto error;
 	}
 	if (!link_tex_program(&renderer->shaders.tex_ext, SHADER_SOURCE_TEXTURE_EXTERNAL)) {
 		wlr_log(WLR_ERROR, "Could not link tex_EXTERNAL shader");
-		return false;
+		goto error;
 	}
 
 	// stencil mask shader
 	if (!link_stencil_mask_program(&renderer->shaders.stencil_mask)) {
 		wlr_log(WLR_ERROR, "Could not link stencil mask shader");
-		return false;
+		goto error;
 	}
 	// box shadow shader
 	if (!link_box_shadow_program(&renderer->shaders.box_shadow)) {
 		wlr_log(WLR_ERROR, "Could not link box shadow shader");
-		return false;
+		goto error;
+	}
+
+	// Blur shaders
+	if (!link_blur_program(&renderer->shaders.blur1, blur1_frag_src)) {
+		wlr_log(WLR_ERROR, "Could not link blur1 shader");
+		goto error;
+	}
+	if (!link_blur_program(&renderer->shaders.blur2, blur2_frag_src)) {
+		wlr_log(WLR_ERROR, "Could not link blur2 shader");
+		goto error;
 	}
 
 	return true;
+
+error:
+	glDeleteProgram(renderer->shaders.quad.program);
+	glDeleteProgram(renderer->shaders.tex_rgba.program);
+	glDeleteProgram(renderer->shaders.tex_rgbx.program);
+	glDeleteProgram(renderer->shaders.tex_ext.program);
+	glDeleteProgram(renderer->shaders.stencil_mask.program);
+	glDeleteProgram(renderer->shaders.box_shadow.program);
+	glDeleteProgram(renderer->shaders.blur1.program);
+	glDeleteProgram(renderer->shaders.blur2.program);
+
+	return false;
 }

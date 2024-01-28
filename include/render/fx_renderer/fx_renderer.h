@@ -48,6 +48,10 @@ struct fx_framebuffer {
 	struct wlr_addon addon;
 };
 
+/** Should only be used with custom fbs */
+void fx_framebuffer_get_or_create_bufferless(struct fx_renderer *fx_renderer,
+		struct wlr_output *output, struct fx_framebuffer **fx_buffer);
+
 struct fx_framebuffer *fx_framebuffer_get_or_create(struct fx_renderer *renderer,
 		struct wlr_buffer *wlr_buffer);
 
@@ -141,20 +145,28 @@ struct fx_renderer {
 		PFNGLGETINTEGER64VEXTPROC glGetInteger64vEXT;
 	} procs;
 
-	struct {
-		struct quad_shader quad;
-		struct tex_shader tex_rgba;
-		struct tex_shader tex_rgbx;
-		struct tex_shader tex_ext;
-		struct box_shadow_shader box_shadow;
-		struct stencil_mask_shader stencil_mask;
-	} shaders;
+	struct shaders shaders;
 
 	struct wl_list buffers; // fx_framebuffer.link
 	struct wl_list textures; // fx_texture.link
 
 	struct fx_framebuffer *current_buffer;
 	uint32_t viewport_width, viewport_height;
+
+	// Contains the blurred background for tiled windows
+	struct fx_framebuffer *blur_buffer;
+	// Contains the original pixels to draw over the areas where artifact are visible
+	struct fx_framebuffer *blur_saved_pixels_buffer;
+	// Blur swaps between the two effects buffers everytime it scales the image
+	// Buffer used for effects
+	struct fx_framebuffer *effects_buffer;
+	// Swap buffer used for effects
+	struct fx_framebuffer *effects_buffer_swapped;
+
+	// The region where there's blur
+	pixman_region32_t blur_padding_region;
+
+	bool blur_buffer_dirty;
 };
 
 bool wlr_renderer_is_fx(struct wlr_renderer *wlr_renderer);

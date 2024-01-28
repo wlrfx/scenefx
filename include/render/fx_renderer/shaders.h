@@ -37,6 +37,7 @@ struct tex_shader {
 	GLint size;
 	GLint position;
 	GLint radius;
+	GLint discard_transparent;
 };
 
 struct stencil_mask_shader {
@@ -58,6 +59,27 @@ struct box_shadow_shader {
 	GLint size;
 	GLint blur_sigma;
 	GLint corner_radius;
+};
+
+struct blur_shader {
+	GLuint program;
+	GLint proj;
+	GLint tex_proj;
+	GLint tex;
+	GLint pos_attrib;
+	GLint radius;
+	GLint halfpixel;
+};
+
+struct shaders {
+	struct quad_shader quad;
+	struct tex_shader tex_rgba;
+	struct tex_shader tex_rgbx;
+	struct tex_shader tex_ext;
+	struct box_shadow_shader box_shadow;
+	struct stencil_mask_shader stencil_mask;
+	struct blur_shader blur1;
+	struct blur_shader blur2;
 };
 
 bool link_shaders(struct fx_renderer *renderer);

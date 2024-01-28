@@ -590,6 +590,11 @@ static void output_configure_scene(struct wlr_scene_node *node,
 			if (!wlr_subsurface_try_from_wlr_surface(xdg_surface->surface)) {
 				wlr_scene_buffer_set_corner_radius(buffer, toplevel->corner_radius);
 				wlr_scene_buffer_set_shadow_data(buffer, toplevel->shadow_data);
+				wlr_scene_buffer_set_backdrop_blur(buffer, true);
+				// TODO: `ADD_FUNCTION_HERE`
+				// Can be used to call `ADD_FUNCTION_HERE` to only blur e.g.
+				// the BACKGROUND and BOTTOM layers
+				wlr_scene_buffer_set_backdrop_blur_optimized(buffer, false);
 			}
 		}
 	} else if (node->type == WLR_SCENE_NODE_TREE) {

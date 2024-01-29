@@ -71,6 +71,18 @@ struct blur_shader {
 	GLint halfpixel;
 };
 
+struct blur_effects_shader {
+	GLuint program;
+	GLint proj;
+	GLint tex_proj;
+	GLint tex;
+	GLint pos_attrib;
+	GLfloat noise;
+	GLfloat brightness;
+	GLfloat contrast;
+	GLfloat saturation;
+};
+
 struct shaders {
 	struct quad_shader quad;
 	struct tex_shader tex_rgba;
@@ -80,6 +92,7 @@ struct shaders {
 	struct stencil_mask_shader stencil_mask;
 	struct blur_shader blur1;
 	struct blur_shader blur2;
+	struct blur_effects_shader blur_effects;
 };
 
 bool link_shaders(struct fx_renderer *renderer);

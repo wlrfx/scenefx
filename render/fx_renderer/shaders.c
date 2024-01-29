@@ -14,6 +14,7 @@
 #include "box_shadow_frag_src.h"
 #include "blur1_frag_src.h"
 #include "blur2_frag_src.h"
+#include "blur_effects_frag_src.h"
 
 GLuint compile_shader(GLuint type, const GLchar *src) {
 	GLuint shader = glCreateShader(type);
@@ -187,6 +188,24 @@ static bool link_blur_program(struct blur_shader *shader, const char *shader_pro
 	return true;
 }
 
+static bool link_blur_effects_program(struct blur_effects_shader *shader) {
+	GLuint prog;
+	shader->program = prog = link_program(blur_effects_frag_src);
+	if (!shader->program) {
+		return false;
+	}
+	shader->proj = glGetUniformLocation(prog, "proj");
+	shader->tex = glGetUniformLocation(prog, "tex");
+	shader->pos_attrib = glGetAttribLocation(prog, "pos");
+	shader->tex_proj = glGetUniformLocation(prog, "tex_proj");
+	shader->noise = glGetUniformLocation(prog, "noise");
+	shader->brightness = glGetUniformLocation(prog, "brightness");
+	shader->contrast = glGetUniformLocation(prog, "contrast");
+	shader->saturation = glGetUniformLocation(prog, "saturation");
+
+	return true;
+}
+
 bool link_shaders(struct fx_renderer *renderer) {
 	// quad fragment shader
 	if (!link_quad_program(&renderer->shaders.quad)) {
@@ -227,6 +246,10 @@ bool link_shaders(struct fx_renderer *renderer) {
 		wlr_log(WLR_ERROR, "Could not link blur2 shader");
 		goto error;
 	}
+	if (!link_blur_effects_program(&renderer->shaders.blur_effects)) {
+		wlr_log(WLR_ERROR, "Could not link blur_effects shader");
+		goto error;
+	}
 
 	return true;
 
@@ -239,6 +262,7 @@ error:
 	glDeleteProgram(renderer->shaders.box_shadow.program);
 	glDeleteProgram(renderer->shaders.blur1.program);
 	glDeleteProgram(renderer->shaders.blur2.program);
+	glDeleteProgram(renderer->shaders.blur_effects.program);
 
 	return false;
 }

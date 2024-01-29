@@ -8,6 +8,7 @@ shaders = [
     'stencil_mask.frag',
     'blur1.frag',
     'blur2.frag',
+    'blur_effects.frag',
 ]
 
 foreach name : shaders

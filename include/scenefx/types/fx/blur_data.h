@@ -7,12 +7,20 @@
 struct blur_data {
 	int num_passes;
 	int radius;
+	float noise;
+	float brightness;
+	float contrast;
+	float saturation;
 	bool ignore_transparent;
 };
 
 struct blur_data blur_data_get_default(void);
 
 bool scene_buffer_should_blur(bool backdrop_blur, struct blur_data *blur_data);
+
+bool blur_data_should_parameters_blur_effects(struct blur_data *blur_data);
+
+bool blur_data_cmp(struct blur_data *a, struct blur_data *b);
 
 int blur_data_calc_size(struct blur_data *blur_data);
 

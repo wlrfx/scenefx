@@ -1416,8 +1416,7 @@ void wlr_scene_set_presentation(struct wlr_scene *scene,
 
 void wlr_scene_set_blur_data(struct wlr_scene *scene, struct blur_data blur_data) {
 	struct blur_data *buff_data = &scene->blur_data;
-	if (buff_data->radius == blur_data.radius &&
-			buff_data->num_passes && blur_data.num_passes) {
+	if (blur_data_cmp(buff_data, &blur_data)) {
 		return;
 	}
 

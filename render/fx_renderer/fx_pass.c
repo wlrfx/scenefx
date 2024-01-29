@@ -525,6 +525,67 @@ static void render_blur_segments(struct fx_gles_render_pass *pass,
 	}
 }
 
+static void render_blur_effects(struct fx_gles_render_pass *pass,
+		struct fx_render_blur_options *fx_options) {
+	struct fx_render_texture_options *tex_options = &fx_options->tex_options;
+	struct wlr_render_texture_options *options = &tex_options->base;
+
+	check_tex_src_box(options);
+
+	struct fx_renderer *renderer = pass->buffer->renderer;
+	struct blur_data *blur_data = fx_options->blur_data;
+	struct fx_texture *texture = fx_get_texture(options->texture);
+
+	struct blur_effects_shader shader = renderer->shaders.blur_effects;
+
+	struct wlr_box dst_box;
+	struct wlr_fbox src_fbox;
+	wlr_render_texture_options_get_src_box(options, &src_fbox);
+	wlr_render_texture_options_get_dst_box(options, &dst_box);
+
+	src_fbox.x /= options->texture->width;
+	src_fbox.y /= options->texture->height;
+	src_fbox.width /= options->texture->width;
+	src_fbox.height /= options->texture->height;
+
+	glDisable(GL_BLEND);
+	glDisable(GL_STENCIL_TEST);
+
+	push_fx_debug(renderer);
+
+	glUseProgram(shader.program);
+
+	glActiveTexture(GL_TEXTURE0);
+	glBindTexture(texture->target, texture->tex);
+
+	switch (options->filter_mode) {
+	case WLR_SCALE_FILTER_BILINEAR:
+		glTexParameteri(texture->target, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+		glTexParameteri(texture->target, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+		break;
+	case WLR_SCALE_FILTER_NEAREST:
+		glTexParameteri(texture->target, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+		glTexParameteri(texture->target, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+		break;
+	}
+
+	glUniform1i(shader.tex, 0);
+	glUniform1f(shader.noise, blur_data->noise);
+	glUniform1f(shader.brightness, blur_data->brightness);
+	glUniform1f(shader.contrast, blur_data->contrast);
+	glUniform1f(shader.saturation, blur_data->saturation);
+
+	set_proj_matrix(shader.proj, pass->projection_matrix, &dst_box);
+	set_tex_matrix(shader.tex_proj, options->transform, &src_fbox);
+
+	render(&dst_box, options->clip, shader.pos_attrib);
+
+	glBindTexture(texture->target, 0);
+	pop_fx_debug(renderer);
+
+	wlr_texture_destroy(options->texture);
+}
+
 // Blurs the main_buffer content and returns the blurred framebuffer
 static struct fx_framebuffer *get_main_buffer_blur(struct fx_gles_render_pass *pass,
 		struct fx_renderer *renderer, struct fx_render_blur_options *fx_options,
@@ -572,6 +633,26 @@ static struct fx_framebuffer *get_main_buffer_blur(struct fx_gles_render_pass *p
 	}
 
 	pixman_region32_fini(&scaled_damage);
+
+	// Render additional blur effects like saturation, noise, contrast, etc...
+	if (blur_data_should_parameters_blur_effects(blur_data)
+			&& pixman_region32_not_empty(&damage)) {
+		if (current_buffer == renderer->effects_buffer) {
+			fx_framebuffer_bind(renderer->effects_buffer_swapped);
+		} else {
+			fx_framebuffer_bind(renderer->effects_buffer);
+		}
+		fx_options->tex_options.base.clip = &damage;
+		fx_options->tex_options.base.texture = fx_texture_from_buffer(
+				&renderer->wlr_renderer, current_buffer->buffer);
+		render_blur_effects(pass, fx_options);
+		if (current_buffer != renderer->effects_buffer) {
+			current_buffer = renderer->effects_buffer;
+		} else {
+			current_buffer = renderer->effects_buffer_swapped;
+		}
+	}
+
 	pixman_region32_fini(&damage);
 
 	// Bind back to the default buffer

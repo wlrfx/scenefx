@@ -896,15 +896,7 @@ void wlr_scene_buffer_set_backdrop_blur(struct wlr_scene_buffer *scene_buffer,
 		bool enabled) {
 	if (scene_buffer->backdrop_blur != enabled) {
 		scene_buffer->backdrop_blur = enabled;
-		// Mark the blur buffers as dirty
-		struct wlr_scene *scene = scene_node_get_root(&scene_buffer->node);
-		struct wlr_scene_output *current_output;
-		wl_list_for_each(current_output, &scene->outputs, link) {
-			struct wlr_output *output = current_output->output;
-			struct fx_renderer *renderer = fx_get_renderer(output->renderer);
-			renderer->blur_buffer_dirty = true;
-		}
-		scene_node_update(&scene->tree.node, NULL);
+		wlr_scene_optimized_blur_mark_dirty(scene_node_get_root(&scene_buffer->node));
 	}
 }
 
@@ -912,16 +904,23 @@ void wlr_scene_buffer_set_backdrop_blur_optimized(struct wlr_scene_buffer *scene
 		bool enabled) {
 	if (scene_buffer->backdrop_blur_optimized != enabled) {
 		scene_buffer->backdrop_blur_optimized = enabled;
-		// Mark the blur buffers as dirty
-		struct wlr_scene *scene = scene_node_get_root(&scene_buffer->node);
-		struct wlr_scene_output *current_output;
-		wl_list_for_each(current_output, &scene->outputs, link) {
-			struct wlr_output *output = current_output->output;
-			struct fx_renderer *renderer = fx_get_renderer(output->renderer);
-			renderer->blur_buffer_dirty = true;
-		}
-		scene_node_update(&scene->tree.node, NULL);
+		wlr_scene_optimized_blur_mark_dirty(scene_node_get_root(&scene_buffer->node));
 	}
+}
+
+static void output_optimized_blur_mark_dirty(struct wlr_output *output) {
+	struct fx_renderer *renderer = fx_get_renderer(output->renderer);
+	renderer->blur_buffer_dirty = true;
+}
+
+void wlr_scene_optimized_blur_mark_dirty(struct wlr_scene *scene) {
+	// Mark the blur buffers as dirty
+	struct wlr_scene_output *current_output;
+	wl_list_for_each(current_output, &scene->outputs, link) {
+		struct wlr_output *output = current_output->output;
+		output_optimized_blur_mark_dirty(output);
+	}
+	scene_node_update(&scene->tree.node, NULL);
 }
 
 static struct wlr_texture *scene_buffer_get_texture(
@@ -1359,9 +1358,16 @@ static void scene_entry_render(struct render_list_entry *entry, const struct ren
 				struct fx_render_blur_options blur_options = {
 					.tex_options = tex_options,
 					.scene_buffer = scene_buffer,
+					.output = output,
 					.monitor_box = monitor_box,
 					.blur_data = &scene->blur_data,
 				};
+				// Re-render the optimized blur buffer when needed
+				if (data->render_pass->buffer->renderer->blur_buffer_dirty
+						&& scene_buffer->backdrop_blur_optimized) {
+					fx_render_pass_add_optimized_blur(data->render_pass, &blur_options);
+				}
+				// Render the actual blur behind the surface
 				fx_render_pass_add_blur(data->render_pass, &blur_options);
 
 			}
@@ -1422,14 +1428,8 @@ void wlr_scene_set_blur_data(struct wlr_scene *scene, struct blur_data blur_data
 
 	memcpy(&scene->blur_data, &blur_data,
 			sizeof(struct blur_data));
-	// Mark the blur buffers as dirty
-	struct wlr_scene_output *current_output;
-	wl_list_for_each(current_output, &scene->outputs, link) {
-		struct wlr_output *output = current_output->output;
-		struct fx_renderer *renderer = fx_get_renderer(output->renderer);
-		renderer->blur_buffer_dirty = true;
-	}
-	scene_node_update(&scene->tree.node, NULL);
+
+	wlr_scene_optimized_blur_mark_dirty(scene);
 }
 
 static bool wlr_scene_should_blur(struct wlr_scene *scene) {
@@ -1483,6 +1483,9 @@ static void scene_output_update_geometry(struct wlr_scene_output *scene_output,
 		bool force_update) {
 	wlr_damage_ring_add_whole(&scene_output->damage_ring);
 	wlr_output_schedule_frame(scene_output->output);
+
+	// Re-render the optimized blur when the output is changed
+	output_optimized_blur_mark_dirty(scene_output->output);
 
 	scene_node_output_update(&scene_output->scene->tree.node,
 			&scene_output->scene->outputs, NULL, force_update ? scene_output : NULL);
@@ -2177,8 +2180,6 @@ bool wlr_scene_output_build_state(struct wlr_scene_output *scene_output,
 
 	for (int i = list_len - 1; i >= 0; i--) {
 		struct render_list_entry *entry = &list_data[i];
-		// TODO: Implement dirty
-		renderer->blur_buffer_dirty = false;
 		scene_entry_render(entry, &render_data);
 
 		if (entry->node->type == WLR_SCENE_NODE_BUFFER) {

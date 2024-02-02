@@ -679,7 +679,7 @@ void fx_render_pass_add_blur(struct fx_gles_render_pass *pass,
 		goto damage_finish;
 	}
 
-	struct fx_framebuffer *buffer = renderer->blur_buffer;
+	struct fx_framebuffer *buffer = renderer->optimized_blur_buffer;
 	if (!buffer || !scene_buffer->backdrop_blur_optimized) {
 		pixman_region32_translate(&translucent_region, dst_box.x, dst_box.y);
 		pixman_region32_intersect(&translucent_region, &translucent_region, options->clip);
@@ -708,10 +708,10 @@ void fx_render_pass_add_blur(struct fx_gles_render_pass *pass,
 	// Draw the blurred texture
 	tex_options->base.dst_box = fx_options->monitor_box;
 	tex_options->base.src_box = (struct wlr_fbox) {
-		.x = fx_options->monitor_box.x,
-		.y = fx_options->monitor_box.y,
-		.width = fx_options->monitor_box.width,
-		.height = fx_options->monitor_box.height,
+		.x = 0,
+		.y = 0,
+		.width = buffer->buffer->width,
+		.height = buffer->buffer->height,
 	};
 	tex_options->base.texture = &blur_texture->wlr_texture;
 	fx_render_pass_add_texture(pass, tex_options);
@@ -725,6 +725,31 @@ void fx_render_pass_add_blur(struct fx_gles_render_pass *pass,
 
 damage_finish:
 	pixman_region32_fini(&translucent_region);
+}
+
+void fx_render_pass_add_optimized_blur(struct fx_gles_render_pass *pass,
+		struct fx_render_blur_options *fx_options) {
+	struct fx_renderer *renderer = pass->buffer->renderer;
+	struct wlr_box monitor_box = fx_options->monitor_box;
+
+	pixman_region32_t fake_damage;
+	pixman_region32_init_rect(&fake_damage, 0, 0, monitor_box.width, monitor_box.height);
+
+	// Render the blur into its own buffer
+	struct fx_render_blur_options blur_options = *fx_options;
+	blur_options.tex_options.base.clip = &fake_damage;
+	struct fx_framebuffer *buffer = get_main_buffer_blur(pass, &blur_options);
+
+	// Update the optimized blur buffer if invalid
+	fx_framebuffer_get_or_create_bufferless(renderer, fx_options->output,
+			&renderer->optimized_blur_buffer);
+
+	// Render the newly blurred content into the blur_buffer
+	fx_renderer_read_to_buffer(pass, &fake_damage, renderer->optimized_blur_buffer, buffer);
+
+	pixman_region32_fini(&fake_damage);
+
+	renderer->blur_buffer_dirty = false;
 }
 
 void fx_renderer_read_to_buffer(struct fx_gles_render_pass *pass,

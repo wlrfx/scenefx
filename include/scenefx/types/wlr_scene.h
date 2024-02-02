@@ -484,6 +484,14 @@ void wlr_scene_buffer_set_backdrop_blur_optimized(struct wlr_scene_buffer *scene
 		bool enabled);
 
 /**
+ * Tells the renderer to re-render the optimized blur.
+ *
+ * An example use would be to call this when a "static" node changes, like a
+ * wallpaper.
+ */
+void wlr_scene_optimized_blur_mark_dirty(struct wlr_scene *scene);
+
+/**
  * Calls the buffer's frame_done signal.
  */
 void wlr_scene_buffer_send_frame_done(struct wlr_scene_buffer *scene_buffer,

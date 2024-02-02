@@ -154,7 +154,7 @@ struct fx_renderer {
 	uint32_t viewport_width, viewport_height;
 
 	// Contains the blurred background for tiled windows
-	struct fx_framebuffer *blur_buffer;
+	struct fx_framebuffer *optimized_blur_buffer;
 	// Contains the original pixels to draw over the areas where artifact are visible
 	struct fx_framebuffer *blur_saved_pixels_buffer;
 	// Blur swaps between the two effects buffers everytime it scales the image

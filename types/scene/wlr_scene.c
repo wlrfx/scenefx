@@ -2125,7 +2125,7 @@ bool wlr_scene_output_build_state(struct wlr_scene_output *scene_output,
 			pixman_region32_fini(&extended_damage);
 
 			// Capture the padding pixels before blur for later use
-			fx_renderer_read_to_buffer(render_pass, &renderer->wlr_renderer, &renderer->blur_padding_region,
+			fx_renderer_read_to_buffer(render_pass, &renderer->blur_padding_region,
 					renderer->blur_saved_pixels_buffer, render_pass->buffer);
 		}
 	}
@@ -2199,7 +2199,7 @@ bool wlr_scene_output_build_state(struct wlr_scene_output *scene_output,
 	if (!renderer->blur_buffer_dirty) {
 		// TODO: Investigate blitting instead
 		// Render the saved pixels over the blur artifacts
-		fx_renderer_read_to_buffer(render_pass, &renderer->wlr_renderer, &renderer->blur_padding_region,
+		fx_renderer_read_to_buffer(render_pass, &renderer->blur_padding_region,
 				render_pass->buffer, renderer->blur_saved_pixels_buffer);
 	}
 

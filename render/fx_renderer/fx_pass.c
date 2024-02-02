@@ -727,13 +727,15 @@ damage_finish:
 	pixman_region32_fini(&translucent_region);
 }
 
-void fx_renderer_read_to_buffer(struct fx_gles_render_pass *pass, struct wlr_renderer *renderer,
-		pixman_region32_t *region, struct fx_framebuffer *dst_buffer, struct fx_framebuffer *src_buffer) {
+void fx_renderer_read_to_buffer(struct fx_gles_render_pass *pass,
+		pixman_region32_t *region, struct fx_framebuffer *dst_buffer,
+		struct fx_framebuffer *src_buffer) {
 	if (!pixman_region32_not_empty(region)) {
 		return;
 	}
 
-	struct wlr_texture *src_tex = fx_texture_from_buffer(renderer, src_buffer->buffer);
+	struct wlr_texture *src_tex =
+		fx_texture_from_buffer(&pass->buffer->renderer->wlr_renderer, src_buffer->buffer);
 	if (src_tex == NULL) {
 		return;
 	}

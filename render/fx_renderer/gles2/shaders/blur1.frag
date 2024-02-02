@@ -15,7 +15,4 @@ void main() {
     sum += texture2D(tex, uv - vec2(halfpixel.x, -halfpixel.y) * radius);
 
     gl_FragColor = sum / 8.0;
-
-	// REMOVE
-    // gl_FragColor = texture2D(tex, uv);
 }

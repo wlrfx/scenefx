@@ -48,6 +48,7 @@ struct fx_render_blur_options {
 	struct wlr_scene_buffer *scene_buffer;
 	struct wlr_output *output;
 	struct wlr_box monitor_box;
+	struct fx_framebuffer *current_buffer;
 	struct blur_data *blur_data;
 };
 

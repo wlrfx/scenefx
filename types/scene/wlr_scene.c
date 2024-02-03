@@ -1213,7 +1213,8 @@ static void clip_xdg(struct wlr_scene_node *node,
 
 	// Don't clip if the scene buffer doesn't have any effects
 	if (!scene_buffer || (scene_buffer->corner_radius == 0 &&
-				!scene_buffer_has_shadow(&scene_buffer->shadow_data))) {
+				!scene_buffer_has_shadow(&scene_buffer->shadow_data) &&
+				!scene_buffer->backdrop_blur)) {
 		return;
 	}
 

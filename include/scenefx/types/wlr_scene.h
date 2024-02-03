@@ -478,13 +478,13 @@ void wlr_scene_buffer_set_backdrop_blur(struct wlr_scene_buffer *scene_buffer,
 
 /**
 * Sets the whether the backdrop blur should use optimized blur or not
-* TODO: Add function to update `blur_buffer`
 */
 void wlr_scene_buffer_set_backdrop_blur_optimized(struct wlr_scene_buffer *scene_buffer,
 		bool enabled);
 
 /**
- * Tells the renderer to re-render the optimized blur.
+ * Tells the renderer to re-render the optimized blur. Very expensive so should
+ * only be called when needed.
  *
  * An example use would be to call this when a "static" node changes, like a
  * wallpaper.

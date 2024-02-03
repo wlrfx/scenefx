@@ -260,6 +260,14 @@ static void scene_node_opaque_region(struct wlr_scene_node *node, int x, int y,
 			return;
 		}
 
+		if (scene_buffer->corner_radius > 0) {
+			return;
+		}
+
+		if (scene_buffer_has_shadow(&scene_buffer->shadow_data)) {
+			return;
+		}
+
 		if (!buffer_is_opaque(scene_buffer->buffer)) {
 			pixman_region32_copy(opaque, &scene_buffer->opaque_region);
 			pixman_region32_intersect_rect(opaque, opaque, 0, 0, width, height);

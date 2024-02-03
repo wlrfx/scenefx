@@ -693,7 +693,7 @@ void fx_render_pass_add_blur(struct fx_gles_render_pass *pass,
 	blur_texture->has_alpha = true;
 
 	// Get a stencil of the window ignoring transparent regions
-	if (fx_options->blur_data->ignore_transparent) {
+	if (fx_options->ignore_transparent) {
 		stencil_mask_init();
 
 		struct fx_render_texture_options tex_options = fx_options->tex_options;
@@ -717,7 +717,7 @@ void fx_render_pass_add_blur(struct fx_gles_render_pass *pass,
 	wlr_texture_destroy(&blur_texture->wlr_texture);
 
 	// Finish stenciling
-	if (fx_options->blur_data->ignore_transparent) {
+	if (fx_options->ignore_transparent) {
 		stencil_mask_fini();
 	}
 

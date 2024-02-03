@@ -4,7 +4,6 @@ struct blur_data blur_data_get_default(void) {
 	return (struct blur_data) {
 		.radius = 5,
 		.num_passes = 3,
-		.ignore_transparent = true,
 		.noise = 0.02,
 		.brightness = 0.9,
 		.contrast = 0.9,
@@ -26,7 +25,6 @@ bool blur_data_should_parameters_blur_effects(struct blur_data *blur_data) {
 bool blur_data_cmp(struct blur_data *a, struct blur_data *b) {
 	return a->radius == b->radius &&
 		a->num_passes && b->num_passes &&
-		a->ignore_transparent == b->ignore_transparent &&
 		a->noise == b->noise &&
 		a->brightness == b->brightness &&
 		a->contrast == b->contrast &&

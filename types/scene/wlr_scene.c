@@ -645,6 +645,7 @@ struct wlr_scene_buffer *wlr_scene_buffer_create(struct wlr_scene_tree *parent,
 	scene_buffer->shadow_data = shadow_data_get_default();
 	scene_buffer->backdrop_blur = false;
 	scene_buffer->backdrop_blur_optimized = false;
+	scene_buffer->backdrop_blur_ignore_transparent = true;
 
 	scene_node_update(&scene_buffer->node, NULL);
 
@@ -904,6 +905,14 @@ void wlr_scene_buffer_set_backdrop_blur_optimized(struct wlr_scene_buffer *scene
 		bool enabled) {
 	if (scene_buffer->backdrop_blur_optimized != enabled) {
 		scene_buffer->backdrop_blur_optimized = enabled;
+		wlr_scene_optimized_blur_mark_dirty(scene_node_get_root(&scene_buffer->node));
+	}
+}
+
+void wlr_scene_buffer_set_backdrop_blur_ignore_transparent(
+		struct wlr_scene_buffer *scene_buffer, bool enabled) {
+	if (scene_buffer->backdrop_blur_ignore_transparent != enabled) {
+		scene_buffer->backdrop_blur_ignore_transparent = enabled;
 		wlr_scene_optimized_blur_mark_dirty(scene_node_get_root(&scene_buffer->node));
 	}
 }
@@ -1361,6 +1370,7 @@ static void scene_entry_render(struct render_list_entry *entry, const struct ren
 					.output = output,
 					.monitor_box = monitor_box,
 					.blur_data = &scene->blur_data,
+					.ignore_transparent = scene_buffer->backdrop_blur_ignore_transparent,
 				};
 				// Re-render the optimized blur buffer when needed
 				if (data->render_pass->buffer->renderer->blur_buffer_dirty

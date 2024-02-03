@@ -183,6 +183,7 @@ struct wlr_scene_buffer {
 	struct shadow_data shadow_data;
 	bool backdrop_blur;
 	bool backdrop_blur_optimized;
+	bool backdrop_blur_ignore_transparent;
 
 	float opacity;
 	enum wlr_scale_filter_mode filter_mode;
@@ -481,6 +482,13 @@ void wlr_scene_buffer_set_backdrop_blur(struct wlr_scene_buffer *scene_buffer,
 */
 void wlr_scene_buffer_set_backdrop_blur_optimized(struct wlr_scene_buffer *scene_buffer,
 		bool enabled);
+
+/**
+* Sets the whether the backdrop blur should not render in fully transparent
+* segments.
+*/
+void wlr_scene_buffer_set_backdrop_blur_ignore_transparent(
+		struct wlr_scene_buffer *scene_buffer, bool enabled);
 
 /**
  * Tells the renderer to re-render the optimized blur. Very expensive so should

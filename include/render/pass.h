@@ -50,6 +50,7 @@ struct fx_render_blur_options {
 	struct wlr_box monitor_box;
 	struct fx_framebuffer *current_buffer;
 	struct blur_data *blur_data;
+	bool ignore_transparent;
 };
 
 /**

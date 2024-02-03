@@ -11,7 +11,6 @@ struct blur_data {
 	float brightness;
 	float contrast;
 	float saturation;
-	bool ignore_transparent;
 };
 
 struct blur_data blur_data_get_default(void);

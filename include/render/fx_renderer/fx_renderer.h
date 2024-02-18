@@ -56,8 +56,6 @@ struct fx_framebuffer *fx_framebuffer_get_or_create(struct fx_renderer *renderer
 
 void fx_framebuffer_bind(struct fx_framebuffer *buffer);
 
-void fx_framebuffer_bind_wlr_fbo(struct fx_renderer *renderer);
-
 void fx_framebuffer_destroy(struct fx_framebuffer *buffer);
 
 ///

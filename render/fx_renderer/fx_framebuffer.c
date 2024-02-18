@@ -142,10 +142,6 @@ void fx_framebuffer_bind(struct fx_framebuffer *fx_buffer) {
 	glBindFramebuffer(GL_FRAMEBUFFER, fx_buffer->fbo);
 }
 
-void fx_framebuffer_bind_wlr_fbo(struct fx_renderer *renderer) {
-	glBindFramebuffer(GL_FRAMEBUFFER, renderer->current_buffer->fbo);
-}
-
 void fx_framebuffer_destroy(struct fx_framebuffer *fx_buffer) {
 	// Release the framebuffer
 	wl_list_remove(&fx_buffer->link);

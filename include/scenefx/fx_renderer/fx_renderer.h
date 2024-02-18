@@ -2,7 +2,6 @@
 #define SCENEFX_FX_OPENGL_H
 
 #include <wlr/backend.h>
-#include <wlr/render/allocator.h>
 
 struct wlr_renderer *fx_renderer_create_with_drm_fd(int drm_fd);
 struct wlr_renderer *fx_renderer_create(struct wlr_backend *backend);

@@ -1855,7 +1855,6 @@ struct blur_info {
 static struct blur_info workspace_get_blur_info(int list_len,
 		struct render_list_entry *list_data, struct wlr_scene_output *scene_output,
 		pixman_region32_t *blur_region) {
-	// TODO: Check if a check for "is current workspace" is also needed
 	if (!wlr_scene_should_blur(scene_output->scene)) {
 		return (struct blur_info) {
 			.has_blur = false,

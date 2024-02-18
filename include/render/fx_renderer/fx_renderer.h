@@ -13,7 +13,6 @@
 
 #include "render/fx_renderer/shaders.h"
 #include "render/pass.h"
-#include "scenefx/types/fx/shadow_data.h"
 
 struct fx_pixel_format {
 	uint32_t drm_format;

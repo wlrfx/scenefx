@@ -43,7 +43,7 @@ struct fx_render_rect_options {
 struct fx_render_rect_options fx_render_rect_options_default(
 		const struct wlr_render_rect_options *base);
 
-struct fx_render_blur_options {
+struct fx_render_blur_pass_options {
 	struct fx_render_texture_options tex_options;
 	struct wlr_scene_buffer *scene_buffer;
 	struct wlr_output *output;
@@ -82,13 +82,13 @@ void fx_render_pass_add_box_shadow(struct fx_gles_render_pass *pass,
  * Render blur.
  */
 void fx_render_pass_add_blur(struct fx_gles_render_pass *pass,
-		struct fx_render_blur_options *fx_options);
+		struct fx_render_blur_pass_options *fx_options);
 
 /**
  * Render optimized blur.
  */
 void fx_render_pass_add_optimized_blur(struct fx_gles_render_pass *pass,
-		struct fx_render_blur_options *fx_options);
+		struct fx_render_blur_pass_options *fx_options);
 
 /**
  * Render from one buffer to another

@@ -1373,7 +1373,7 @@ static void scene_entry_render(struct render_list_entry *entry, const struct ren
 				wlr_box_transform(&monitor_box, &monitor_box,
 						wlr_output_transform_invert(output->transform),
 						monitor_box.width, monitor_box.height);
-				struct fx_render_blur_options blur_options = {
+				struct fx_render_blur_pass_options blur_options = {
 					.tex_options = tex_options,
 					.scene_buffer = scene_buffer,
 					.output = output,

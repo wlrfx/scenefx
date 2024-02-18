@@ -442,7 +442,7 @@ void fx_render_pass_add_box_shadow(struct fx_gles_render_pass *pass,
 
 // Renders the blur for each damaged rect and swaps the buffer
 static void render_blur_segments(struct fx_gles_render_pass *pass,
-		struct fx_render_blur_options *fx_options, struct blur_shader* shader) {
+		struct fx_render_blur_pass_options *fx_options, struct blur_shader* shader) {
 	struct fx_render_texture_options *tex_options = &fx_options->tex_options;
 	struct wlr_render_texture_options *options = &tex_options->base;
 	struct fx_renderer *renderer = pass->buffer->renderer;
@@ -525,7 +525,7 @@ static void render_blur_segments(struct fx_gles_render_pass *pass,
 }
 
 static void render_blur_effects(struct fx_gles_render_pass *pass,
-		struct fx_render_blur_options *fx_options) {
+		struct fx_render_blur_pass_options *fx_options) {
 	struct fx_render_texture_options *tex_options = &fx_options->tex_options;
 	struct wlr_render_texture_options *options = &tex_options->base;
 
@@ -587,7 +587,7 @@ static void render_blur_effects(struct fx_gles_render_pass *pass,
 
 // Blurs the main_buffer content and returns the blurred framebuffer
 static struct fx_framebuffer *get_main_buffer_blur(struct fx_gles_render_pass *pass,
-		struct fx_render_blur_options *fx_options) {
+		struct fx_render_blur_pass_options *fx_options) {
 	struct fx_renderer *renderer = pass->buffer->renderer;
 	struct blur_data *blur_data = fx_options->blur_data;
 
@@ -656,7 +656,7 @@ static struct fx_framebuffer *get_main_buffer_blur(struct fx_gles_render_pass *p
 }
 
 void fx_render_pass_add_blur(struct fx_gles_render_pass *pass,
-		struct fx_render_blur_options *fx_options) {
+		struct fx_render_blur_pass_options *fx_options) {
 	struct fx_renderer *renderer = pass->buffer->renderer;
 	struct fx_render_texture_options *tex_options = &fx_options->tex_options;
 	const struct wlr_render_texture_options *options = &tex_options->base;
@@ -682,7 +682,7 @@ void fx_render_pass_add_blur(struct fx_gles_render_pass *pass,
 		pixman_region32_intersect(&translucent_region, &translucent_region, options->clip);
 
 		// Render the blur into its own buffer
-		struct fx_render_blur_options blur_options = *fx_options;
+		struct fx_render_blur_pass_options blur_options = *fx_options;
 		blur_options.tex_options.base.clip = &translucent_region;
 		blur_options.current_buffer = pass->buffer;
 		buffer = get_main_buffer_blur(pass, &blur_options);
@@ -726,7 +726,7 @@ damage_finish:
 }
 
 void fx_render_pass_add_optimized_blur(struct fx_gles_render_pass *pass,
-		struct fx_render_blur_options *fx_options) {
+		struct fx_render_blur_pass_options *fx_options) {
 	struct fx_renderer *renderer = pass->buffer->renderer;
 	struct wlr_box monitor_box = fx_options->monitor_box;
 
@@ -734,7 +734,7 @@ void fx_render_pass_add_optimized_blur(struct fx_gles_render_pass *pass,
 	pixman_region32_init_rect(&fake_damage, 0, 0, monitor_box.width, monitor_box.height);
 
 	// Render the blur into its own buffer
-	struct fx_render_blur_options blur_options = *fx_options;
+	struct fx_render_blur_pass_options blur_options = *fx_options;
 	blur_options.tex_options.base.clip = &fake_damage;
 	blur_options.current_buffer = pass->buffer;
 	struct fx_framebuffer *buffer = get_main_buffer_blur(pass, &blur_options);

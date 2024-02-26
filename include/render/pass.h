@@ -45,11 +45,12 @@ struct fx_render_rect_options fx_render_rect_options_default(
 
 struct fx_render_blur_pass_options {
 	struct fx_render_texture_options tex_options;
-	struct wlr_scene_buffer *scene_buffer;
+	pixman_region32_t *opaque_region;
 	struct wlr_output *output;
 	struct wlr_box monitor_box;
 	struct fx_framebuffer *current_buffer;
 	struct blur_data *blur_data;
+	bool use_optimized_blur;
 	bool ignore_transparent;
 };
 

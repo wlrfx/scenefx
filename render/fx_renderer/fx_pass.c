@@ -15,7 +15,6 @@
 #include "render/pass.h"
 #include "scenefx/types/fx/blur_data.h"
 #include "scenefx/types/fx/shadow_data.h"
-#include "scenefx/types/wlr_scene.h"
 
 #define MAX_QUADS 86 // 4kb
 
@@ -660,7 +659,6 @@ void fx_render_pass_add_blur(struct fx_gles_render_pass *pass,
 	struct fx_renderer *renderer = pass->buffer->renderer;
 	struct fx_render_texture_options *tex_options = &fx_options->tex_options;
 	const struct wlr_render_texture_options *options = &tex_options->base;
-	struct wlr_scene_buffer *scene_buffer = fx_options->scene_buffer;
 
 	pixman_region32_t translucent_region;
 	pixman_region32_init(&translucent_region);
@@ -670,14 +668,14 @@ void fx_render_pass_add_blur(struct fx_gles_render_pass *pass,
 
 	// Gets the translucent region
 	pixman_box32_t surface_box = { 0, 0, dst_box.width, dst_box.height };
-	pixman_region32_copy(&translucent_region, &scene_buffer->opaque_region);
+	pixman_region32_copy(&translucent_region, fx_options->opaque_region);
 	pixman_region32_inverse(&translucent_region, &translucent_region, &surface_box);
 	if (!pixman_region32_not_empty(&translucent_region)) {
 		goto damage_finish;
 	}
 
 	struct fx_framebuffer *buffer = renderer->optimized_blur_buffer;
-	if (!buffer || !scene_buffer->backdrop_blur_optimized) {
+	if (!buffer || !fx_options->use_optimized_blur) {
 		pixman_region32_translate(&translucent_region, dst_box.x, dst_box.y);
 		pixman_region32_intersect(&translucent_region, &translucent_region, options->clip);
 

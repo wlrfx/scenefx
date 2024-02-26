@@ -557,6 +557,50 @@ static void server_cursor_frame(struct wl_listener *listener, void *data) {
 	wlr_seat_pointer_notify_frame(server->seat);
 }
 
+static void output_configure_scene(struct wlr_scene_node *node,
+		struct tinywl_toplevel *toplevel) {
+	if (!node->enabled) {
+		return;
+	}
+
+	struct tinywl_toplevel *_toplevel = node->data;
+	if (_toplevel) {
+		toplevel = _toplevel;
+	}
+
+	if (node->type == WLR_SCENE_NODE_BUFFER) {
+		struct wlr_scene_buffer *buffer = wlr_scene_buffer_from_node(node);
+
+		struct wlr_scene_surface * scene_surface =
+			wlr_scene_surface_try_from_buffer(buffer);
+		if (!scene_surface) {
+			return;
+		}
+
+		struct wlr_xdg_surface *xdg_surface =
+			wlr_xdg_surface_try_from_wlr_surface(scene_surface->surface);
+
+		if (toplevel &&
+				xdg_surface &&
+				xdg_surface->role == WLR_XDG_SURFACE_ROLE_TOPLEVEL) {
+			// TODO: Be able to set whole decoration_data instead of calling
+			// each individually?
+			wlr_scene_buffer_set_opacity(buffer, toplevel->opacity);
+
+			if (!wlr_subsurface_try_from_wlr_surface(xdg_surface->surface)) {
+				wlr_scene_buffer_set_corner_radius(buffer, toplevel->corner_radius);
+				wlr_scene_buffer_set_shadow_data(buffer, toplevel->shadow_data);
+			}
+		}
+	} else if (node->type == WLR_SCENE_NODE_TREE) {
+		struct wlr_scene_tree *tree = wl_container_of(node, tree, node);
+		struct wlr_scene_node *node;
+		wl_list_for_each(node, &tree->children, link) {
+			output_configure_scene(node, toplevel);
+		}
+	}
+}
+
 static void output_frame(struct wl_listener *listener, void *data) {
 	/* This function is called every time an output is ready to display a frame,
 	 * generally at the output's refresh rate (e.g. 60Hz). */
@@ -565,6 +609,8 @@ static void output_frame(struct wl_listener *listener, void *data) {
 
 	struct wlr_scene_output *scene_output = wlr_scene_get_scene_output(
 		scene, output->wlr_output);
+
+	output_configure_scene(&scene_output->scene->tree.node, NULL);
 
 	/* Render the scene if needed and commit the output */
 	wlr_scene_output_commit(scene_output, NULL);
@@ -657,41 +703,9 @@ static void server_new_output(struct wl_listener *listener, void *data) {
 	wlr_scene_output_layout_add_output(server->scene_layout, l_output, scene_output);
 }
 
-static void iter_xdg_scene_buffers(struct wlr_scene_buffer *buffer, int sx,
-								   int sy, void *user_data) {
-	struct tinywl_toplevel *toplevel = user_data;
-
-	struct wlr_scene_surface * scene_surface = wlr_scene_surface_try_from_buffer(buffer);
-	if (!scene_surface) {
-		return;
-	}
-
-	struct wlr_xdg_surface *xdg_surface =
-		wlr_xdg_surface_try_from_wlr_surface(scene_surface->surface);
-	if (toplevel &&
-			xdg_surface &&
-			xdg_surface->role == WLR_XDG_SURFACE_ROLE_TOPLEVEL) {
-		// TODO: Be able to set whole decoration_data instead of calling
-		// each individually?
-		wlr_scene_buffer_set_opacity(buffer, toplevel->opacity);
-
-		if (!wlr_subsurface_try_from_wlr_surface(xdg_surface->surface)) {
-			wlr_scene_buffer_set_corner_radius(buffer, toplevel->corner_radius);
-			wlr_scene_buffer_set_shadow_data(buffer, toplevel->shadow_data);
-
-			wlr_scene_buffer_set_backdrop_blur(buffer, true);
-			wlr_scene_buffer_set_backdrop_blur_optimized(buffer, false);
-			wlr_scene_buffer_set_backdrop_blur_ignore_transparent(buffer, true);
-		}
-	}
-}
-
 static void xdg_toplevel_map(struct wl_listener *listener, void *data) {
 	/* Called when the surface is mapped, or ready to display on-screen. */
 	struct tinywl_toplevel *toplevel = wl_container_of(listener, toplevel, map);
-
-	wlr_scene_node_for_each_buffer(&toplevel->scene_tree->node,
-								   iter_xdg_scene_buffers, toplevel);
 
 	wl_list_insert(&toplevel->server->toplevels, &toplevel->link);
 

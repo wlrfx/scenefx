@@ -1,5 +1,5 @@
-#ifndef TYPES_FX_SHADOW_DATA_H
-#define TYPES_FX_SHADOW_DATA_H
+#ifndef TYPES_DECORATION_DATA
+#define TYPES_DECORATION_DATA
 
 #include <stdbool.h>
 #include <wlr/util/addon.h>

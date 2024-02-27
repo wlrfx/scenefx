@@ -142,7 +142,17 @@ struct fx_renderer {
 		PFNGLGETINTEGER64VEXTPROC glGetInteger64vEXT;
 	} procs;
 
-	struct shaders shaders;
+	struct {
+		struct quad_shader quad;
+		struct tex_shader tex_rgba;
+		struct tex_shader tex_rgbx;
+		struct tex_shader tex_ext;
+		struct box_shadow_shader box_shadow;
+		struct stencil_mask_shader stencil_mask;
+		struct blur_shader blur1;
+		struct blur_shader blur2;
+		struct blur_effects_shader blur_effects;
+	} shaders;
 
 	struct wl_list buffers; // fx_framebuffer.link
 	struct wl_list textures; // fx_texture.link

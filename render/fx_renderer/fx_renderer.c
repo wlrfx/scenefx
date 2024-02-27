@@ -632,6 +632,67 @@ struct wlr_renderer *fx_renderer_create(struct wlr_backend *backend) {
 	return renderer_autocreate(backend, -1);
 }
 
+static bool link_shaders(struct fx_renderer *renderer) {
+	// quad fragment shader
+	if (!link_quad_program(&renderer->shaders.quad)) {
+		wlr_log(WLR_ERROR, "Could not link quad shader");
+		goto error;
+	}
+	// fragment shaders
+	if (!link_tex_program(&renderer->shaders.tex_rgba, SHADER_SOURCE_TEXTURE_RGBA)) {
+		wlr_log(WLR_ERROR, "Could not link tex_RGBA shader");
+		goto error;
+	}
+	if (!link_tex_program(&renderer->shaders.tex_rgbx, SHADER_SOURCE_TEXTURE_RGBX)) {
+		wlr_log(WLR_ERROR, "Could not link tex_RGBX shader");
+		goto error;
+	}
+	if (!link_tex_program(&renderer->shaders.tex_ext, SHADER_SOURCE_TEXTURE_EXTERNAL)) {
+		wlr_log(WLR_ERROR, "Could not link tex_EXTERNAL shader");
+		goto error;
+	}
+
+	// stencil mask shader
+	if (!link_stencil_mask_program(&renderer->shaders.stencil_mask)) {
+		wlr_log(WLR_ERROR, "Could not link stencil mask shader");
+		goto error;
+	}
+	// box shadow shader
+	if (!link_box_shadow_program(&renderer->shaders.box_shadow)) {
+		wlr_log(WLR_ERROR, "Could not link box shadow shader");
+		goto error;
+	}
+
+	// Blur shaders
+	if (!link_blur1_program(&renderer->shaders.blur1)) {
+		wlr_log(WLR_ERROR, "Could not link blur1 shader");
+		goto error;
+	}
+	if (!link_blur2_program(&renderer->shaders.blur2)) {
+		wlr_log(WLR_ERROR, "Could not link blur2 shader");
+		goto error;
+	}
+	if (!link_blur_effects_program(&renderer->shaders.blur_effects)) {
+		wlr_log(WLR_ERROR, "Could not link blur_effects shader");
+		goto error;
+	}
+
+	return true;
+
+error:
+	glDeleteProgram(renderer->shaders.quad.program);
+	glDeleteProgram(renderer->shaders.tex_rgba.program);
+	glDeleteProgram(renderer->shaders.tex_rgbx.program);
+	glDeleteProgram(renderer->shaders.tex_ext.program);
+	glDeleteProgram(renderer->shaders.stencil_mask.program);
+	glDeleteProgram(renderer->shaders.box_shadow.program);
+	glDeleteProgram(renderer->shaders.blur1.program);
+	glDeleteProgram(renderer->shaders.blur2.program);
+	glDeleteProgram(renderer->shaders.blur_effects.program);
+
+	return false;
+}
+
 struct wlr_renderer *fx_renderer_create_egl(struct wlr_egl *egl) {
 	if (!wlr_egl_make_current(egl)) {
 		return NULL;

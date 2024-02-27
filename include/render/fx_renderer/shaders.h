@@ -27,6 +27,8 @@ struct quad_shader {
 	GLint pos_attrib;
 };
 
+bool link_quad_program(struct quad_shader *shader);
+
 struct tex_shader {
 	GLuint program;
 	GLint proj;
@@ -40,6 +42,8 @@ struct tex_shader {
 	GLint discard_transparent;
 };
 
+bool link_tex_program(struct tex_shader *shader, enum fx_tex_shader_source source);
+
 struct stencil_mask_shader {
 	GLuint program;
 	GLint proj;
@@ -49,6 +53,8 @@ struct stencil_mask_shader {
 	GLint position;
 	GLint radius;
 };
+
+bool link_stencil_mask_program(struct stencil_mask_shader *shader);
 
 struct box_shadow_shader {
 	GLuint program;
@@ -61,6 +67,8 @@ struct box_shadow_shader {
 	GLint corner_radius;
 };
 
+bool link_box_shadow_program(struct box_shadow_shader *shader);
+
 struct blur_shader {
 	GLuint program;
 	GLint proj;
@@ -70,6 +78,9 @@ struct blur_shader {
 	GLint radius;
 	GLint halfpixel;
 };
+
+bool link_blur1_program(struct blur_shader *shader);
+bool link_blur2_program(struct blur_shader *shader);
 
 struct blur_effects_shader {
 	GLuint program;
@@ -83,18 +94,6 @@ struct blur_effects_shader {
 	GLfloat saturation;
 };
 
-struct shaders {
-	struct quad_shader quad;
-	struct tex_shader tex_rgba;
-	struct tex_shader tex_rgbx;
-	struct tex_shader tex_ext;
-	struct box_shadow_shader box_shadow;
-	struct stencil_mask_shader stencil_mask;
-	struct blur_shader blur1;
-	struct blur_shader blur2;
-	struct blur_effects_shader blur_effects;
-};
-
-bool link_shaders(struct fx_renderer *renderer);
+bool link_blur_effects_program(struct blur_effects_shader *shader);
 
 #endif

@@ -20,7 +20,6 @@
  */
 
 #include <pixman.h>
-#include "scenefx/types/fx/shadow_data.h"
 #include <time.h>
 #include <wayland-server-core.h>
 #include <wlr/render/wlr_renderer.h>
@@ -28,6 +27,9 @@
 #include <wlr/types/wlr_linux_dmabuf_v1.h>
 #include <wlr/util/addon.h>
 #include <wlr/util/box.h>
+
+#include "scenefx/types/fx/shadow_data.h"
+#include "scenefx/types/fx/blur_data.h"
 
 struct wlr_output;
 struct wlr_output_layout;
@@ -111,6 +113,8 @@ struct wlr_scene {
 	enum wlr_scene_debug_damage_option debug_damage_option;
 	bool direct_scanout;
 	bool calculate_visibility;
+
+	struct blur_data blur_data;
 };
 
 /** A scene-graph node displaying a single surface. */
@@ -176,10 +180,13 @@ struct wlr_scene_buffer {
 	 */
 	struct wlr_scene_output *primary_output;
 
-	float opacity;
 	int corner_radius;
 	struct shadow_data shadow_data;
+	bool backdrop_blur;
+	bool backdrop_blur_optimized;
+	bool backdrop_blur_ignore_transparent;
 
+	float opacity;
 	enum wlr_scale_filter_mode filter_mode;
 	struct wlr_fbox src_box;
 	int dst_width, dst_height;
@@ -313,6 +320,9 @@ struct wlr_scene *wlr_scene_create(void);
  */
 void wlr_scene_set_presentation(struct wlr_scene *scene,
 	struct wlr_presentation *presentation);
+
+/** Sets the global blur parameters */
+void wlr_scene_set_blur_data(struct wlr_scene *scene, struct blur_data blur_data);
 
 /**
  * Handles linux_dmabuf_v1 feedback for all surfaces in the scene.
@@ -461,6 +471,34 @@ void wlr_scene_buffer_set_corner_radius(struct wlr_scene_buffer *scene_buffer,
 */
 void wlr_scene_buffer_set_shadow_data(struct wlr_scene_buffer *scene_buffer,
 		struct shadow_data shadow_data);
+
+/**
+* Sets the whether or not the buffer should render backdrop blur
+*/
+void wlr_scene_buffer_set_backdrop_blur(struct wlr_scene_buffer *scene_buffer,
+		bool enabled);
+
+/**
+* Sets the whether the backdrop blur should use optimized blur or not
+*/
+void wlr_scene_buffer_set_backdrop_blur_optimized(struct wlr_scene_buffer *scene_buffer,
+		bool enabled);
+
+/**
+* Sets the whether the backdrop blur should not render in fully transparent
+* segments.
+*/
+void wlr_scene_buffer_set_backdrop_blur_ignore_transparent(
+		struct wlr_scene_buffer *scene_buffer, bool enabled);
+
+/**
+ * Tells the renderer to re-render the optimized blur. Very expensive so should
+ * only be called when needed.
+ *
+ * An example use would be to call this when a "static" node changes, like a
+ * wallpaper.
+ */
+void wlr_scene_optimized_blur_mark_dirty(struct wlr_scene *scene);
 
 /**
  * Calls the buffer's frame_done signal.

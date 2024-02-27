@@ -179,6 +179,7 @@ struct wlr_scene_buffer {
 	float opacity;
 	int corner_radius;
 	struct shadow_data shadow_data;
+
 	enum wlr_scale_filter_mode filter_mode;
 	struct wlr_fbox src_box;
 	int dst_width, dst_height;

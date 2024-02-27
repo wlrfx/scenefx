@@ -4,13 +4,16 @@
 #include <assert.h>
 #include <pixman.h>
 #include <time.h>
+#include <wlr/render/allocator.h>
 #include <wlr/types/wlr_matrix.h>
 #include <wlr/util/log.h>
+#include <wlr/util/region.h>
 
 #include "render/egl.h"
 #include "render/fx_renderer/fx_renderer.h"
 #include "render/fx_renderer/matrix.h"
 #include "render/pass.h"
+#include "scenefx/types/fx/blur_data.h"
 #include "scenefx/types/fx/shadow_data.h"
 
 #define MAX_QUADS 86 // 4kb
@@ -19,6 +22,7 @@ struct fx_render_texture_options fx_render_texture_options_default(
 		const struct wlr_render_texture_options *base) {
 	struct fx_render_texture_options options = {
 		.corner_radius = 0,
+		.discard_transparent = false,
 		.scale = 1.0f,
 		.clip_box = NULL,
 	};
@@ -73,6 +77,8 @@ static bool render_pass_submit(struct wlr_render_pass *wlr_pass) {
 
 	wlr_buffer_unlock(pass->buffer->buffer);
 	free(pass);
+
+	pixman_region32_fini(&renderer->blur_padding_region);
 
 	return true;
 }
@@ -307,6 +313,7 @@ void fx_render_pass_add_texture(struct fx_gles_render_pass *pass,
 	glUniform2f(shader->size, clip_box->width, clip_box->height);
 	glUniform2f(shader->position, clip_box->x, clip_box->y);
 	glUniform1f(shader->radius, fx_options->corner_radius);
+	glUniform1f(shader->discard_transparent, fx_options->discard_transparent);
 
 	set_proj_matrix(shader->proj, pass->projection_matrix, &dst_box);
 	set_tex_matrix(shader->tex_proj, options->transform, &src_fbox);
@@ -432,6 +439,353 @@ void fx_render_pass_add_box_shadow(struct fx_gles_render_pass *pass,
 	pop_fx_debug(renderer);
 }
 
+// Renders the blur for each damaged rect and swaps the buffer
+static void render_blur_segments(struct fx_gles_render_pass *pass,
+		struct fx_render_blur_pass_options *fx_options, struct blur_shader* shader) {
+	struct fx_render_texture_options *tex_options = &fx_options->tex_options;
+	struct wlr_render_texture_options *options = &tex_options->base;
+	struct fx_renderer *renderer = pass->buffer->renderer;
+	struct blur_data *blur_data = fx_options->blur_data;
+
+	// Swap fbo
+	if (fx_options->current_buffer == renderer->effects_buffer) {
+		fx_framebuffer_bind(renderer->effects_buffer_swapped);
+	} else {
+		fx_framebuffer_bind(renderer->effects_buffer);
+	}
+
+	options->texture = fx_texture_from_buffer(&renderer->wlr_renderer,
+			fx_options->current_buffer->buffer);
+	struct fx_texture *texture = fx_get_texture(options->texture);
+
+	/*
+	 * Render
+	 */
+
+	struct wlr_box dst_box;
+	struct wlr_fbox src_fbox;
+	wlr_render_texture_options_get_src_box(options, &src_fbox);
+	wlr_render_texture_options_get_dst_box(options, &dst_box);
+	src_fbox.x /= options->texture->width;
+	src_fbox.y /= options->texture->height;
+	src_fbox.width /= options->texture->width;
+	src_fbox.height /= options->texture->height;
+
+	glDisable(GL_BLEND);
+	glDisable(GL_STENCIL_TEST);
+
+	push_fx_debug(renderer);
+
+	glUseProgram(shader->program);
+
+	glActiveTexture(GL_TEXTURE0);
+	glBindTexture(texture->target, texture->tex);
+
+	switch (options->filter_mode) {
+	case WLR_SCALE_FILTER_BILINEAR:
+		glTexParameteri(texture->target, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+		glTexParameteri(texture->target, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+		break;
+	case WLR_SCALE_FILTER_NEAREST:
+		glTexParameteri(texture->target, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+		glTexParameteri(texture->target, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+		break;
+	}
+
+	glUniform1i(shader->tex, 0);
+	glUniform1f(shader->radius, blur_data->radius);
+
+	if (shader == &renderer->shaders.blur1) {
+		glUniform2f(shader->halfpixel,
+				0.5f / (options->texture->width / 2.0f),
+				0.5f / (options->texture->height / 2.0f));
+	} else {
+		glUniform2f(shader->halfpixel,
+				0.5f / (options->texture->width * 2.0f),
+				0.5f / (options->texture->height * 2.0f));
+	}
+
+	set_proj_matrix(shader->proj, pass->projection_matrix, &dst_box);
+	set_tex_matrix(shader->tex_proj, options->transform, &src_fbox);
+
+	render(&dst_box, options->clip, shader->pos_attrib);
+
+	glBindTexture(texture->target, 0);
+	pop_fx_debug(renderer);
+
+	wlr_texture_destroy(options->texture);
+
+	// Swap buffer. We don't want to draw to the same buffer
+	if (fx_options->current_buffer != renderer->effects_buffer) {
+		fx_options->current_buffer = renderer->effects_buffer;
+	} else {
+		fx_options->current_buffer = renderer->effects_buffer_swapped;
+	}
+}
+
+static void render_blur_effects(struct fx_gles_render_pass *pass,
+		struct fx_render_blur_pass_options *fx_options) {
+	struct fx_render_texture_options *tex_options = &fx_options->tex_options;
+	struct wlr_render_texture_options *options = &tex_options->base;
+
+	check_tex_src_box(options);
+
+	struct fx_renderer *renderer = pass->buffer->renderer;
+	struct blur_data *blur_data = fx_options->blur_data;
+	struct fx_texture *texture = fx_get_texture(options->texture);
+
+	struct blur_effects_shader shader = renderer->shaders.blur_effects;
+
+	struct wlr_box dst_box;
+	struct wlr_fbox src_fbox;
+	wlr_render_texture_options_get_src_box(options, &src_fbox);
+	wlr_render_texture_options_get_dst_box(options, &dst_box);
+
+	src_fbox.x /= options->texture->width;
+	src_fbox.y /= options->texture->height;
+	src_fbox.width /= options->texture->width;
+	src_fbox.height /= options->texture->height;
+
+	glDisable(GL_BLEND);
+	glDisable(GL_STENCIL_TEST);
+
+	push_fx_debug(renderer);
+
+	glUseProgram(shader.program);
+
+	glActiveTexture(GL_TEXTURE0);
+	glBindTexture(texture->target, texture->tex);
+
+	switch (options->filter_mode) {
+	case WLR_SCALE_FILTER_BILINEAR:
+		glTexParameteri(texture->target, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+		glTexParameteri(texture->target, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+		break;
+	case WLR_SCALE_FILTER_NEAREST:
+		glTexParameteri(texture->target, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+		glTexParameteri(texture->target, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+		break;
+	}
+
+	glUniform1i(shader.tex, 0);
+	glUniform1f(shader.noise, blur_data->noise);
+	glUniform1f(shader.brightness, blur_data->brightness);
+	glUniform1f(shader.contrast, blur_data->contrast);
+	glUniform1f(shader.saturation, blur_data->saturation);
+
+	set_proj_matrix(shader.proj, pass->projection_matrix, &dst_box);
+	set_tex_matrix(shader.tex_proj, options->transform, &src_fbox);
+
+	render(&dst_box, options->clip, shader.pos_attrib);
+
+	glBindTexture(texture->target, 0);
+	pop_fx_debug(renderer);
+
+	wlr_texture_destroy(options->texture);
+}
+
+// Blurs the main_buffer content and returns the blurred framebuffer
+static struct fx_framebuffer *get_main_buffer_blur(struct fx_gles_render_pass *pass,
+		struct fx_render_blur_pass_options *fx_options) {
+	struct fx_renderer *renderer = pass->buffer->renderer;
+	struct blur_data *blur_data = fx_options->blur_data;
+
+	pixman_region32_t damage;
+	pixman_region32_init(&damage);
+	pixman_region32_copy(&damage, fx_options->tex_options.base.clip);
+	wlr_region_transform(&damage, &damage, fx_options->tex_options.base.transform,
+			fx_options->monitor_box.width, fx_options->monitor_box.height);
+
+	wlr_region_expand(&damage, &damage, blur_data_calc_size(fx_options->blur_data));
+
+	// damage region will be scaled, make a temp
+	pixman_region32_t scaled_damage;
+	pixman_region32_init(&scaled_damage);
+
+	fx_options->tex_options.base.src_box = (struct wlr_fbox) {
+		fx_options->monitor_box.x,
+		fx_options->monitor_box.y,
+		fx_options->monitor_box.width,
+		fx_options->monitor_box.height,
+	};
+	fx_options->tex_options.base.dst_box = fx_options->monitor_box;
+	// Clip the blur to the damage
+	fx_options->tex_options.base.clip = &scaled_damage;
+
+	// Downscale
+	for (int i = 0; i < blur_data->num_passes; ++i) {
+		wlr_region_scale(&scaled_damage, &damage, 1.0f / (1 << (i + 1)));
+		render_blur_segments(pass, fx_options, &renderer->shaders.blur1);
+	}
+
+	// Upscale
+	for (int i = blur_data->num_passes - 1; i >= 0; --i) {
+		// when upsampling we make the region twice as big
+		wlr_region_scale(&scaled_damage, &damage, 1.0f / (1 << i));
+		render_blur_segments(pass, fx_options, &renderer->shaders.blur2);
+	}
+
+	pixman_region32_fini(&scaled_damage);
+
+	// Render additional blur effects like saturation, noise, contrast, etc...
+	if (blur_data_should_parameters_blur_effects(blur_data)
+			&& pixman_region32_not_empty(&damage)) {
+		if (fx_options->current_buffer == renderer->effects_buffer) {
+			fx_framebuffer_bind(renderer->effects_buffer_swapped);
+		} else {
+			fx_framebuffer_bind(renderer->effects_buffer);
+		}
+		fx_options->tex_options.base.clip = &damage;
+		fx_options->tex_options.base.texture = fx_texture_from_buffer(
+				&renderer->wlr_renderer, fx_options->current_buffer->buffer);
+		render_blur_effects(pass, fx_options);
+		if (fx_options->current_buffer != renderer->effects_buffer) {
+			fx_options->current_buffer = renderer->effects_buffer;
+		} else {
+			fx_options->current_buffer = renderer->effects_buffer_swapped;
+		}
+	}
+
+	pixman_region32_fini(&damage);
+
+	// Bind back to the default buffer
+	fx_framebuffer_bind(pass->buffer);
+
+	return fx_options->current_buffer;
+}
+
+void fx_render_pass_add_blur(struct fx_gles_render_pass *pass,
+		struct fx_render_blur_pass_options *fx_options) {
+	struct fx_renderer *renderer = pass->buffer->renderer;
+	struct fx_render_texture_options *tex_options = &fx_options->tex_options;
+	const struct wlr_render_texture_options *options = &tex_options->base;
+
+	pixman_region32_t translucent_region;
+	pixman_region32_init(&translucent_region);
+
+	struct wlr_box dst_box;
+	wlr_render_texture_options_get_dst_box(options, &dst_box);
+
+	// Gets the translucent region
+	pixman_box32_t surface_box = { 0, 0, dst_box.width, dst_box.height };
+	pixman_region32_copy(&translucent_region, fx_options->opaque_region);
+	pixman_region32_inverse(&translucent_region, &translucent_region, &surface_box);
+	if (!pixman_region32_not_empty(&translucent_region)) {
+		goto damage_finish;
+	}
+
+	struct fx_framebuffer *buffer = renderer->optimized_blur_buffer;
+	if (!buffer || !fx_options->use_optimized_blur) {
+		pixman_region32_translate(&translucent_region, dst_box.x, dst_box.y);
+		pixman_region32_intersect(&translucent_region, &translucent_region, options->clip);
+
+		// Render the blur into its own buffer
+		struct fx_render_blur_pass_options blur_options = *fx_options;
+		blur_options.tex_options.base.clip = &translucent_region;
+		blur_options.current_buffer = pass->buffer;
+		buffer = get_main_buffer_blur(pass, &blur_options);
+	}
+	struct wlr_texture *wlr_texture =
+		fx_texture_from_buffer(&renderer->wlr_renderer, buffer->buffer);
+	struct fx_texture *blur_texture = fx_get_texture(wlr_texture);
+	blur_texture->has_alpha = true;
+
+	// Get a stencil of the window ignoring transparent regions
+	if (fx_options->ignore_transparent) {
+		stencil_mask_init();
+
+		struct fx_render_texture_options tex_options = fx_options->tex_options;
+		tex_options.discard_transparent = true;
+		fx_render_pass_add_texture(pass, &tex_options);
+
+		stencil_mask_close(true);
+	}
+
+	// Draw the blurred texture
+	tex_options->base.dst_box = fx_options->monitor_box;
+	tex_options->base.src_box = (struct wlr_fbox) {
+		.x = 0,
+		.y = 0,
+		.width = buffer->buffer->width,
+		.height = buffer->buffer->height,
+	};
+	tex_options->base.texture = &blur_texture->wlr_texture;
+	fx_render_pass_add_texture(pass, tex_options);
+
+	wlr_texture_destroy(&blur_texture->wlr_texture);
+
+	// Finish stenciling
+	if (fx_options->ignore_transparent) {
+		stencil_mask_fini();
+	}
+
+damage_finish:
+	pixman_region32_fini(&translucent_region);
+}
+
+void fx_render_pass_add_optimized_blur(struct fx_gles_render_pass *pass,
+		struct fx_render_blur_pass_options *fx_options) {
+	struct fx_renderer *renderer = pass->buffer->renderer;
+	struct wlr_box monitor_box = fx_options->monitor_box;
+
+	pixman_region32_t fake_damage;
+	pixman_region32_init_rect(&fake_damage, 0, 0, monitor_box.width, monitor_box.height);
+
+	// Render the blur into its own buffer
+	struct fx_render_blur_pass_options blur_options = *fx_options;
+	blur_options.tex_options.base.clip = &fake_damage;
+	blur_options.current_buffer = pass->buffer;
+	struct fx_framebuffer *buffer = get_main_buffer_blur(pass, &blur_options);
+
+	// Update the optimized blur buffer if invalid
+	fx_framebuffer_get_or_create_custom(renderer, fx_options->output,
+			&renderer->optimized_blur_buffer);
+
+	// Render the newly blurred content into the blur_buffer
+	fx_renderer_read_to_buffer(pass, &fake_damage, renderer->optimized_blur_buffer, buffer);
+
+	pixman_region32_fini(&fake_damage);
+
+	renderer->blur_buffer_dirty = false;
+}
+
+void fx_renderer_read_to_buffer(struct fx_gles_render_pass *pass,
+		pixman_region32_t *region, struct fx_framebuffer *dst_buffer,
+		struct fx_framebuffer *src_buffer) {
+	if (!pixman_region32_not_empty(region)) {
+		return;
+	}
+
+	struct wlr_texture *src_tex =
+		fx_texture_from_buffer(&pass->buffer->renderer->wlr_renderer, src_buffer->buffer);
+	if (src_tex == NULL) {
+		return;
+	}
+
+	// Draw onto the dst_buffer
+	fx_framebuffer_bind(dst_buffer);
+	wlr_render_pass_add_texture(&pass->base, &(struct wlr_render_texture_options) {
+		.texture = src_tex,
+		.clip = region,
+		.blend_mode = WLR_RENDER_BLEND_MODE_NONE,
+		.dst_box = (struct wlr_box){
+			.width = dst_buffer->buffer->width,
+			.height = dst_buffer->buffer->height,
+		},
+		.src_box = (struct wlr_fbox){
+			.x = 0,
+			.y = 0,
+			.width = src_buffer->buffer->width,
+			.height = src_buffer->buffer->height,
+		},
+	});
+	wlr_texture_destroy(src_tex);
+
+	// Bind back to the main WLR buffer
+	fx_framebuffer_bind(pass->buffer);
+}
+
+
 static const char *reset_status_str(GLenum status) {
 	switch (status) {
 	case GL_GUILTY_CONTEXT_RESET_KHR:
@@ -483,8 +837,9 @@ static struct fx_gles_render_pass *begin_buffer_pass(struct fx_framebuffer *buff
 	return pass;
 }
 
-struct fx_gles_render_pass *fx_renderer_begin_buffer_pass(struct wlr_renderer *wlr_renderer,
-		struct wlr_buffer *wlr_buffer, const struct wlr_buffer_pass_options *options) {
+struct fx_gles_render_pass *fx_renderer_begin_buffer_pass(
+		struct wlr_renderer *wlr_renderer, struct wlr_buffer *wlr_buffer,
+		struct wlr_output *output, const struct wlr_buffer_pass_options *options) {
 	struct fx_renderer *renderer = fx_get_renderer(wlr_renderer);
 	if (!wlr_egl_make_current(renderer->egl)) {
 		return NULL;
@@ -500,6 +855,15 @@ struct fx_gles_render_pass *fx_renderer_begin_buffer_pass(struct wlr_renderer *w
 	if (!buffer) {
 		return NULL;
 	}
+
+	// Update the buffers if needed
+	if (output) {
+		fx_framebuffer_get_or_create_custom(renderer, output, &renderer->blur_saved_pixels_buffer);
+		fx_framebuffer_get_or_create_custom(renderer, output, &renderer->effects_buffer);
+		fx_framebuffer_get_or_create_custom(renderer, output, &renderer->effects_buffer_swapped);
+	}
+
+	pixman_region32_init(&renderer->blur_padding_region);
 
 	struct fx_gles_render_pass *pass = begin_buffer_pass(buffer, timer);
 	if (!pass) {

@@ -1312,6 +1312,7 @@ static void scene_entry_render(struct render_list_entry *entry, const struct ren
 			.clip_box = &xdg_box,
 			.corner_radius = scene_buffer->corner_radius * data->scale,
 		};
+
 		fx_render_pass_add_texture(data->render_pass, &tex_options);
 
 		struct wlr_scene_output_sample_event sample_event = {
@@ -1919,8 +1920,8 @@ bool wlr_scene_output_build_state(struct wlr_scene_output *scene_output,
 	}
 
 	struct fx_gles_render_pass *render_pass =
-		fx_renderer_begin_buffer_pass(output->renderer, buffer,
-				&(struct wlr_buffer_pass_options){
+		fx_renderer_begin_buffer_pass(output->renderer, buffer, output,
+				&(struct wlr_buffer_pass_options) {
 					.timer = timer ? timer->render_timer : NULL,
 				}
 			);

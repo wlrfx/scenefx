@@ -12,6 +12,9 @@
 #include "tex_frag_src.h"
 #include "stencil_mask_frag_src.h"
 #include "box_shadow_frag_src.h"
+#include "blur1_frag_src.h"
+#include "blur2_frag_src.h"
+#include "blur_effects_frag_src.h"
 
 GLuint compile_shader(GLuint type, const GLchar *src) {
 	GLuint shader = glCreateShader(type);
@@ -96,7 +99,7 @@ void load_gl_proc(void *proc_ptr, const char *name) {
 
 // Shaders
 
-static bool link_quad_program(struct quad_shader *shader) {
+bool link_quad_program(struct quad_shader *shader) {
 	GLuint prog;
 	shader->program = prog = link_program(quad_frag_src);
 	if (!shader->program) {
@@ -110,7 +113,7 @@ static bool link_quad_program(struct quad_shader *shader) {
 	return true;
 }
 
-static bool link_tex_program(struct tex_shader *shader,
+bool link_tex_program(struct tex_shader *shader,
 		enum fx_tex_shader_source source) {
 	GLchar frag_src[2048];
 	snprintf(frag_src, sizeof(frag_src),
@@ -130,11 +133,12 @@ static bool link_tex_program(struct tex_shader *shader,
 	shader->size = glGetUniformLocation(prog, "size");
 	shader->position = glGetUniformLocation(prog, "position");
 	shader->radius = glGetUniformLocation(prog, "radius");
+	shader->discard_transparent = glGetUniformLocation(prog, "discard_transparent");
 
 	return true;
 }
 
-static bool link_stencil_mask_program(struct stencil_mask_shader *shader) {
+bool link_stencil_mask_program(struct stencil_mask_shader *shader) {
 	GLuint prog;
 	shader->program = prog = link_program(stencil_mask_frag_src);
 	if (!shader->program) {
@@ -151,7 +155,7 @@ static bool link_stencil_mask_program(struct stencil_mask_shader *shader) {
 	return true;
 }
 
-static bool link_box_shadow_program(struct box_shadow_shader *shader) {
+bool link_box_shadow_program(struct box_shadow_shader *shader) {
 	GLuint prog;
 	shader->program = prog = link_program(box_shadow_frag_src);
 	if (!shader->program) {
@@ -168,36 +172,52 @@ static bool link_box_shadow_program(struct box_shadow_shader *shader) {
 	return true;
 }
 
-bool link_shaders(struct fx_renderer *renderer) {
-	// quad fragment shader
-	if (!link_quad_program(&renderer->shaders.quad)) {
-		wlr_log(WLR_ERROR, "Could not link quad shader");
+bool link_blur1_program(struct blur_shader *shader) {
+	GLuint prog;
+	shader->program = prog = link_program(blur1_frag_src);
+	if (!shader->program) {
 		return false;
 	}
-	// fragment shaders
-	if (!link_tex_program(&renderer->shaders.tex_rgba, SHADER_SOURCE_TEXTURE_RGBA)) {
-		wlr_log(WLR_ERROR, "Could not link tex_RGBA shader");
-		return false;
-	}
-	if (!link_tex_program(&renderer->shaders.tex_rgbx, SHADER_SOURCE_TEXTURE_RGBX)) {
-		wlr_log(WLR_ERROR, "Could not link tex_RGBX shader");
-		return false;
-	}
-	if (!link_tex_program(&renderer->shaders.tex_ext, SHADER_SOURCE_TEXTURE_EXTERNAL)) {
-		wlr_log(WLR_ERROR, "Could not link tex_EXTERNAL shader");
-		return false;
-	}
+	shader->proj = glGetUniformLocation(prog, "proj");
+	shader->tex = glGetUniformLocation(prog, "tex");
+	shader->pos_attrib = glGetAttribLocation(prog, "pos");
+	shader->tex_proj = glGetUniformLocation(prog, "tex_proj");
+	shader->radius = glGetUniformLocation(prog, "radius");
+	shader->halfpixel = glGetUniformLocation(prog, "halfpixel");
 
-	// stencil mask shader
-	if (!link_stencil_mask_program(&renderer->shaders.stencil_mask)) {
-		wlr_log(WLR_ERROR, "Could not link stencil mask shader");
+	return true;
+}
+
+bool link_blur2_program(struct blur_shader *shader) {
+	GLuint prog;
+	shader->program = prog = link_program(blur2_frag_src);
+	if (!shader->program) {
 		return false;
 	}
-	// box shadow shader
-	if (!link_box_shadow_program(&renderer->shaders.box_shadow)) {
-		wlr_log(WLR_ERROR, "Could not link box shadow shader");
+	shader->proj = glGetUniformLocation(prog, "proj");
+	shader->tex = glGetUniformLocation(prog, "tex");
+	shader->pos_attrib = glGetAttribLocation(prog, "pos");
+	shader->tex_proj = glGetUniformLocation(prog, "tex_proj");
+	shader->radius = glGetUniformLocation(prog, "radius");
+	shader->halfpixel = glGetUniformLocation(prog, "halfpixel");
+
+	return true;
+}
+
+bool link_blur_effects_program(struct blur_effects_shader *shader) {
+	GLuint prog;
+	shader->program = prog = link_program(blur_effects_frag_src);
+	if (!shader->program) {
 		return false;
 	}
+	shader->proj = glGetUniformLocation(prog, "proj");
+	shader->tex = glGetUniformLocation(prog, "tex");
+	shader->pos_attrib = glGetAttribLocation(prog, "pos");
+	shader->tex_proj = glGetUniformLocation(prog, "tex_proj");
+	shader->noise = glGetUniformLocation(prog, "noise");
+	shader->brightness = glGetUniformLocation(prog, "brightness");
+	shader->contrast = glGetUniformLocation(prog, "contrast");
+	shader->saturation = glGetUniformLocation(prog, "saturation");
 
 	return true;
 }

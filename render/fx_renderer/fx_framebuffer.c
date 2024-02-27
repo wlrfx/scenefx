@@ -20,6 +20,37 @@ static const struct wlr_addon_interface buffer_addon_impl = {
 	.destroy = handle_buffer_destroy,
 };
 
+void fx_framebuffer_get_or_create_custom(struct fx_renderer *renderer,
+		struct wlr_output *output, struct fx_framebuffer **fx_framebuffer) {
+	struct wlr_allocator *allocator = output->allocator;
+	struct wlr_swapchain *swapchain = output->swapchain;
+	int width = output->width;
+	int height = output->height;
+	struct wlr_buffer *wlr_buffer = NULL;
+
+	if (*fx_framebuffer == NULL) {
+		wlr_buffer = wlr_allocator_create_buffer(allocator, width, height,
+				&swapchain->format);
+		if (wlr_buffer == NULL) {
+			wlr_log(WLR_ERROR, "Failed to allocate buffer");
+			return;
+		}
+	} else {
+		if ((wlr_buffer = (*fx_framebuffer)->buffer) &&
+				wlr_buffer->width == width &&
+				wlr_buffer->height == height) {
+			return;
+		}
+		// Create a new wlr_buffer if it's null or if the output size has
+		// changed
+		fx_framebuffer_destroy(*fx_framebuffer);
+		wlr_buffer_drop(wlr_buffer);
+		wlr_buffer = wlr_allocator_create_buffer(allocator,
+				width, height, &swapchain->format);
+	}
+	*fx_framebuffer = fx_framebuffer_get_or_create(renderer, wlr_buffer);
+}
+
 struct fx_framebuffer *fx_framebuffer_get_or_create(struct fx_renderer *renderer,
 		struct wlr_buffer *wlr_buffer) {
 	struct wlr_addon *addon =
@@ -111,10 +142,6 @@ void fx_framebuffer_bind(struct fx_framebuffer *fx_buffer) {
 	glBindFramebuffer(GL_FRAMEBUFFER, fx_buffer->fbo);
 }
 
-void fx_framebuffer_bind_wlr_fbo(struct fx_renderer *renderer) {
-	glBindFramebuffer(GL_FRAMEBUFFER, renderer->current_buffer->fbo);
-}
-
 void fx_framebuffer_destroy(struct fx_framebuffer *fx_buffer) {
 	// Release the framebuffer
 	wl_list_remove(&fx_buffer->link);
@@ -128,6 +155,8 @@ void fx_framebuffer_destroy(struct fx_framebuffer *fx_buffer) {
 	fx_buffer->fbo = -1;
 	glDeleteRenderbuffers(1, &fx_buffer->rbo);
 	fx_buffer->rbo = -1;
+	glDeleteRenderbuffers(1, &fx_buffer->sb);
+	fx_buffer->sb = -1;
 
 	wlr_egl_destroy_image(fx_buffer->renderer->egl, fx_buffer->image);
 

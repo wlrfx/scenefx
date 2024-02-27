@@ -13,7 +13,6 @@
 
 #include "render/fx_renderer/shaders.h"
 #include "render/pass.h"
-#include "scenefx/types/fx/shadow_data.h"
 
 struct fx_pixel_format {
 	uint32_t drm_format;
@@ -48,12 +47,14 @@ struct fx_framebuffer {
 	struct wlr_addon addon;
 };
 
+/** Should only be used with custom fbs */
+void fx_framebuffer_get_or_create_custom(struct fx_renderer *fx_renderer,
+		struct wlr_output *output, struct fx_framebuffer **fx_buffer);
+
 struct fx_framebuffer *fx_framebuffer_get_or_create(struct fx_renderer *renderer,
 		struct wlr_buffer *wlr_buffer);
 
 void fx_framebuffer_bind(struct fx_framebuffer *buffer);
-
-void fx_framebuffer_bind_wlr_fbo(struct fx_renderer *renderer);
 
 void fx_framebuffer_destroy(struct fx_framebuffer *buffer);
 
@@ -148,6 +149,9 @@ struct fx_renderer {
 		struct tex_shader tex_ext;
 		struct box_shadow_shader box_shadow;
 		struct stencil_mask_shader stencil_mask;
+		struct blur_shader blur1;
+		struct blur_shader blur2;
+		struct blur_effects_shader blur_effects;
 	} shaders;
 
 	struct wl_list buffers; // fx_framebuffer.link
@@ -155,6 +159,21 @@ struct fx_renderer {
 
 	struct fx_framebuffer *current_buffer;
 	uint32_t viewport_width, viewport_height;
+
+	// Contains the blurred background for tiled windows
+	struct fx_framebuffer *optimized_blur_buffer;
+	// Contains the original pixels to draw over the areas where artifact are visible
+	struct fx_framebuffer *blur_saved_pixels_buffer;
+	// Blur swaps between the two effects buffers everytime it scales the image
+	// Buffer used for effects
+	struct fx_framebuffer *effects_buffer;
+	// Swap buffer used for effects
+	struct fx_framebuffer *effects_buffer_swapped;
+
+	// The region where there's blur
+	pixman_region32_t blur_padding_region;
+
+	bool blur_buffer_dirty;
 };
 
 bool wlr_renderer_is_fx(struct wlr_renderer *wlr_renderer);

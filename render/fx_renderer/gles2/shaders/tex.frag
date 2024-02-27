@@ -29,6 +29,7 @@ uniform float alpha;
 uniform vec2 size;
 uniform vec2 position;
 uniform float radius;
+uniform bool discard_transparent;
 
 vec4 sample_texture() {
 #if SOURCE == SOURCE_TEXTURE_RGBA || SOURCE == SOURCE_TEXTURE_EXTERNAL
@@ -45,5 +46,9 @@ void main() {
 		float d = radius - distance(corner_distance, vec2(radius));
 		float smooth = smoothstep(-1.0, 0.5, d);
 		gl_FragColor = mix(vec4(0), gl_FragColor, smooth);
+	}
+
+	if (discard_transparent && gl_FragColor.a == 0.0) {
+		discard;
 	}
 }

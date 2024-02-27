@@ -20,7 +20,7 @@ static const struct wlr_addon_interface buffer_addon_impl = {
 	.destroy = handle_buffer_destroy,
 };
 
-void fx_framebuffer_get_or_create_bufferless(struct fx_renderer *renderer,
+void fx_framebuffer_get_or_create_custom(struct fx_renderer *renderer,
 		struct wlr_output *output, struct fx_framebuffer **fx_framebuffer) {
 	struct wlr_allocator *allocator = output->allocator;
 	struct wlr_swapchain *swapchain = output->swapchain;

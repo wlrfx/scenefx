@@ -48,7 +48,7 @@ struct fx_framebuffer {
 };
 
 /** Should only be used with custom fbs */
-void fx_framebuffer_get_or_create_bufferless(struct fx_renderer *fx_renderer,
+void fx_framebuffer_get_or_create_custom(struct fx_renderer *fx_renderer,
 		struct wlr_output *output, struct fx_framebuffer **fx_buffer);
 
 struct fx_framebuffer *fx_framebuffer_get_or_create(struct fx_renderer *renderer,

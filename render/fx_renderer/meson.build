@@ -10,6 +10,7 @@ wlr_files += files(
 	'shaders.c',
 	'pixel_format.c',
 	'fx_pass.c',
+	'fx_effect_framebuffers.c',
 	'fx_framebuffer.c',
 	'fx_texture.c',
 	'fx_renderer.c',

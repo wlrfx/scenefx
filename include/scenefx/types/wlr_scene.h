@@ -57,6 +57,7 @@ enum wlr_scene_node_type {
 	WLR_SCENE_NODE_TREE,
 	WLR_SCENE_NODE_RECT,
 	WLR_SCENE_NODE_BUFFER,
+	WLR_SCENE_NODE_BLUR,
 };
 
 /** A node is an object in the scene. */
@@ -142,6 +143,12 @@ struct wlr_scene_rect {
 	struct wlr_scene_node node;
 	int width, height;
 	float color[4];
+};
+
+/** A scene-graph node telling SceneFX to render the optimized blur */
+struct wlr_scene_blur {
+	struct wlr_scene_node node;
+	int width, height;
 };
 
 struct wlr_scene_outputs_update_event {
@@ -390,6 +397,27 @@ void wlr_scene_rect_set_size(struct wlr_scene_rect *rect, int width, int height)
  * Change the color of an existing rectangle node.
  */
 void wlr_scene_rect_set_color(struct wlr_scene_rect *rect, const float color[static 4]);
+
+/**
+ * If this node represents a wlr_scene_blur, that rect will be returned. It
+ * is not legal to feed a node that does not represent a wlr_scene_blur.
+ */
+struct wlr_scene_blur *wlr_scene_blur_from_node(struct wlr_scene_node *node);
+
+/**
+ * Add a node indicating to the renderer to render optimized blur to the scene-graph.
+ * NOTE: Has to be positioned where to draw the optimized blur. This allows
+ * for unique effects like only blurring half of the output.
+ */
+struct wlr_scene_blur *wlr_scene_blur_create(struct wlr_scene_tree *parent,
+		int width, int height);
+
+/**
+ * Change the width and height of an existing blur node.
+ * This calls `wlr_scene_optimized_blur_mark_dirty` as well
+ */
+void wlr_scene_blur_set_size(struct wlr_scene_blur *blur_node, int width,
+		int height);
 
 /**
  * Add a node displaying a buffer to the scene-graph.

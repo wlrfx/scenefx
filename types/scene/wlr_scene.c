@@ -16,6 +16,7 @@
 #include <wlr/util/region.h>
 #include <wlr/render/swapchain.h>
 
+#include "render/fx_renderer/fx_effect_framebuffers.h"
 #include "render/fx_renderer/fx_renderer.h"
 #include "render/pass.h"
 #include "scenefx/types/fx/shadow_data.h"
@@ -39,6 +40,12 @@ struct wlr_scene_rect *wlr_scene_rect_from_node(struct wlr_scene_node *node) {
 	assert(node->type == WLR_SCENE_NODE_RECT);
 	struct wlr_scene_rect *rect = wl_container_of(node, rect, node);
 	return rect;
+}
+
+struct wlr_scene_blur *wlr_scene_blur_from_node(struct wlr_scene_node *node) {
+	assert(node->type == WLR_SCENE_NODE_BLUR);
+	struct wlr_scene_blur *blur_node = wl_container_of(node, blur_node, node);
+	return blur_node;
 }
 
 struct wlr_scene_buffer *wlr_scene_buffer_from_node(
@@ -216,6 +223,7 @@ static bool _scene_nodes_in_box(struct wlr_scene_node *node, struct wlr_box *box
 			}
 		}
 		break;
+	case WLR_SCENE_NODE_BLUR:;
 	case WLR_SCENE_NODE_RECT:
 	case WLR_SCENE_NODE_BUFFER:;
 		struct wlr_box node_box = { .x = lx, .y = ly };
@@ -274,6 +282,9 @@ static void scene_node_opaque_region(struct wlr_scene_node *node, int x, int y,
 			pixman_region32_translate(opaque, x, y);
 			return;
 		}
+	} else if (node->type == WLR_SCENE_NODE_BLUR) {
+		// Always transparent
+		return;
 	}
 
 	pixman_region32_fini(opaque);
@@ -307,6 +318,11 @@ static void scale_output_damage(pixman_region32_t *damage, float scale) {
 	}
 }
 
+struct blur_info {
+	bool has_blur;
+	bool has_optimized;
+};
+
 struct render_data {
 	enum wl_output_transform transform;
 	float scale;
@@ -317,6 +333,8 @@ struct render_data {
 
 	struct fx_gles_render_pass *render_pass;
 	pixman_region32_t damage;
+
+	struct blur_info blur_info;
 };
 
 static void transform_output_damage(pixman_region32_t *damage, const struct render_data *data) {
@@ -628,6 +646,36 @@ void wlr_scene_rect_set_color(struct wlr_scene_rect *rect, const float color[sta
 	scene_node_update(&rect->node, NULL);
 }
 
+struct wlr_scene_blur *wlr_scene_blur_create(struct wlr_scene_tree *parent,
+		int width, int height) {
+	struct wlr_scene_blur *scene_blur = calloc(1, sizeof(*scene_blur));
+	if (scene_blur == NULL) {
+		return NULL;
+	}
+	assert(parent);
+	scene_node_init(&scene_blur->node, WLR_SCENE_NODE_BLUR, parent);
+
+	scene_blur->width = width;
+	scene_blur->height = height;
+
+	scene_node_update(&scene_blur->node, NULL);
+
+	return scene_blur;
+}
+
+void wlr_scene_blur_set_size(struct wlr_scene_blur *blur_node, int width,
+		int height) {
+	if (blur_node->width == width && blur_node->height == height) {
+		return;
+	}
+
+	blur_node->width = width;
+	blur_node->height = height;
+	scene_node_update(&blur_node->node, NULL);
+
+	wlr_scene_optimized_blur_mark_dirty(scene_node_get_root(&blur_node->node));
+}
+
 struct wlr_scene_buffer *wlr_scene_buffer_create(struct wlr_scene_tree *parent,
 		struct wlr_buffer *buffer) {
 	struct wlr_scene_buffer *scene_buffer = calloc(1, sizeof(*scene_buffer));
@@ -927,9 +975,13 @@ void wlr_scene_buffer_set_backdrop_blur_ignore_transparent(
 
 static void output_optimized_blur_mark_dirty(struct wlr_output *output) {
 	struct fx_renderer *renderer = fx_get_renderer(output->renderer);
-	renderer->blur_buffer_dirty = true;
+	struct fx_effect_framebuffers *fbos;
+	if ((fbos = fx_effect_framebuffers_try_get(renderer, output))) {
+		fbos->blur_buffer_dirty = true;
+	}
 }
 
+// TODO: Only re-render the dirty output instead of all
 void wlr_scene_optimized_blur_mark_dirty(struct wlr_scene *scene) {
 	// Mark the blur buffers as dirty
 	struct wlr_scene_output *current_output;
@@ -965,6 +1017,11 @@ static void scene_node_get_size(struct wlr_scene_node *node,
 	switch (node->type) {
 	case WLR_SCENE_NODE_TREE:
 		return;
+	case WLR_SCENE_NODE_BLUR:;
+		struct wlr_scene_blur *scene_blur = wlr_scene_blur_from_node(node);
+		*width = scene_blur->width;
+		*height = scene_blur->height;
+		break;
 	case WLR_SCENE_NODE_RECT:;
 		struct wlr_scene_rect *scene_rect = wlr_scene_rect_from_node(node);
 		*width = scene_rect->width;
@@ -1168,6 +1225,9 @@ static bool scene_node_at_iterator(struct wlr_scene_node *node,
 				!scene_buffer->point_accepts_input(scene_buffer, &rx, &ry)) {
 			return false;
 		}
+	} else if (node->type == WLR_SCENE_NODE_BLUR) {
+		// Disable interaction
+		return false;
 	}
 
 	at_data->rx = rx;
@@ -1294,6 +1354,7 @@ static void scene_entry_render(struct render_list_entry *entry, const struct ren
 	transform_output_damage(&render_region, data);
 	transform_output_damage(&geometry_region, data);
 
+	struct wlr_scene *scene = data->output->scene;
 	switch (node->type) {
 	case WLR_SCENE_NODE_TREE:
 		assert(false);
@@ -1315,6 +1376,41 @@ static void scene_entry_render(struct render_list_entry *entry, const struct ren
 			.scale = data->scale,
 		};
 		fx_render_pass_add_rect(data->render_pass, &rect_options);
+		break;
+	case WLR_SCENE_NODE_BLUR:;
+		// Re-render the optimized blur buffer when needed
+		if (scene_buffer_should_blur(data->blur_info.has_blur, &scene->blur_data)
+				&& data->render_pass->fx_effect_framebuffers->blur_buffer_dirty
+				&& data->blur_info.has_optimized) {
+			struct wlr_output *output = data->output->output;
+			int width, height;
+			wlr_output_transformed_resolution(output, &width, &height);
+			struct wlr_box monitor_box = { 0, 0, width, height };
+			wlr_box_transform(&monitor_box, &monitor_box,
+					wlr_output_transform_invert(output->transform),
+					monitor_box.width, monitor_box.height);
+
+			const float opacity = 1.0f;
+			enum wl_output_transform transform =
+				wlr_output_transform_invert(data->transform);
+			transform = wlr_output_transform_compose(transform, data->transform);
+			struct fx_render_blur_pass_options blur_options = {
+				.tex_options = {
+					.base = {
+						.transform = transform,
+						.alpha = &opacity,
+						.blend_mode = WLR_RENDER_BLEND_MODE_NONE,
+					},
+					.scale = data->scale,
+					.corner_radius = 0,
+					.discard_transparent = false,
+				},
+				.output = output,
+				.monitor_box = monitor_box,
+				.blur_data = &scene->blur_data,
+			};
+			fx_render_pass_add_optimized_blur(data->render_pass, &blur_options);
+		}
 		break;
 	case WLR_SCENE_NODE_BUFFER:;
 		struct wlr_scene_buffer *scene_buffer = wlr_scene_buffer_from_node(node);
@@ -1349,7 +1445,6 @@ static void scene_entry_render(struct render_list_entry *entry, const struct ren
 		};
 
 		// Blur
-		struct wlr_scene *scene = data->output->scene;
 		if (scene_buffer_should_blur(scene_buffer->backdrop_blur, &scene->blur_data)) {
 			pixman_region32_t opaque_region;
 			pixman_region32_init(&opaque_region);
@@ -1382,11 +1477,6 @@ static void scene_entry_render(struct render_list_entry *entry, const struct ren
 					.blur_data = &scene->blur_data,
 					.ignore_transparent = scene_buffer->backdrop_blur_ignore_transparent,
 				};
-				// Re-render the optimized blur buffer when needed
-				if (data->render_pass->buffer->renderer->blur_buffer_dirty
-						&& scene_buffer->backdrop_blur_optimized) {
-					fx_render_pass_add_optimized_blur(data->render_pass, &blur_options);
-				}
 				// Render the actual blur behind the surface
 				fx_render_pass_add_blur(data->render_pass, &blur_options);
 
@@ -1848,11 +1938,6 @@ static bool scene_entry_try_direct_scanout(struct render_list_entry *entry,
 	return true;
 }
 
-struct blur_info {
-	bool has_blur;
-	bool has_optimized;
-};
-
 static struct blur_info workspace_get_blur_info(int list_len,
 		struct render_list_entry *list_data, struct wlr_scene_output *scene_output,
 		pixman_region32_t *blur_region) {
@@ -1950,6 +2035,10 @@ bool wlr_scene_output_build_state(struct wlr_scene_output *scene_output,
 		.scale = output->scale,
 		.logical = { .x = scene_output->x, .y = scene_output->y },
 		.output = scene_output,
+		.blur_info = {
+			.has_blur = false,
+			.has_optimized = false,
+		}
 	};
 
 	output_pending_resolution(output, state,
@@ -2104,10 +2193,11 @@ bool wlr_scene_output_build_state(struct wlr_scene_output *scene_output,
 	pixman_region32_init(&blur_region);
 	struct blur_info blur_info =
 		workspace_get_blur_info(list_len, list_data, scene_output, &blur_region);
+	render_data.blur_info = blur_info;
 	// Expand the damage to compensate for blur
 	if (blur_info.has_blur) {
 		// Skip the blur artifact prevention if damaging the whole viewport
-		if (renderer->blur_buffer_dirty) {
+		if (render_pass->fx_effect_framebuffers->blur_buffer_dirty) {
 			// Needs to be extended before clearing
 			pixman_region32_union_rect(&render_data.damage, &render_data.damage,
 					0, 0, output->width, output->height);
@@ -2148,7 +2238,8 @@ bool wlr_scene_output_build_state(struct wlr_scene_output *scene_output,
 
 			// Capture the padding pixels before blur for later use
 			fx_renderer_read_to_buffer(render_pass, &renderer->blur_padding_region,
-					renderer->blur_saved_pixels_buffer, render_pass->buffer);
+					render_pass->fx_effect_framebuffers->blur_saved_pixels_buffer,
+					render_pass->buffer);
 		}
 	}
 	pixman_region32_fini(&blur_region);
@@ -2216,11 +2307,12 @@ bool wlr_scene_output_build_state(struct wlr_scene_output *scene_output,
 	}
 
 	// Not needed if we damaged the whole viewport
-	if (!renderer->blur_buffer_dirty) {
+	if (!render_pass->fx_effect_framebuffers->blur_buffer_dirty) {
 		// TODO: Investigate blitting instead
 		// Render the saved pixels over the blur artifacts
 		fx_renderer_read_to_buffer(render_pass, &renderer->blur_padding_region,
-				render_pass->buffer, renderer->blur_saved_pixels_buffer);
+				render_pass->buffer,
+				render_pass->fx_effect_framebuffers->blur_saved_pixels_buffer);
 	}
 
 	if (debug_damage == WLR_SCENE_DEBUG_DAMAGE_HIGHLIGHT) {

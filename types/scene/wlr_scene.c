@@ -673,7 +673,7 @@ void wlr_scene_blur_set_size(struct wlr_scene_blur *blur_node, int width,
 	blur_node->height = height;
 	scene_node_update(&blur_node->node, NULL);
 
-	wlr_scene_optimized_blur_mark_dirty(scene_node_get_root(&blur_node->node));
+	wlr_scene_optimized_blur_mark_dirty(scene_node_get_root(&blur_node->node), NULL);
 }
 
 struct wlr_scene_buffer *wlr_scene_buffer_create(struct wlr_scene_tree *parent,
@@ -953,7 +953,7 @@ void wlr_scene_buffer_set_backdrop_blur(struct wlr_scene_buffer *scene_buffer,
 		bool enabled) {
 	if (scene_buffer->backdrop_blur != enabled) {
 		scene_buffer->backdrop_blur = enabled;
-		wlr_scene_optimized_blur_mark_dirty(scene_node_get_root(&scene_buffer->node));
+		wlr_scene_optimized_blur_mark_dirty(scene_node_get_root(&scene_buffer->node), NULL);
 	}
 }
 
@@ -961,7 +961,7 @@ void wlr_scene_buffer_set_backdrop_blur_optimized(struct wlr_scene_buffer *scene
 		bool enabled) {
 	if (scene_buffer->backdrop_blur_optimized != enabled) {
 		scene_buffer->backdrop_blur_optimized = enabled;
-		wlr_scene_optimized_blur_mark_dirty(scene_node_get_root(&scene_buffer->node));
+		wlr_scene_optimized_blur_mark_dirty(scene_node_get_root(&scene_buffer->node), NULL);
 	}
 }
 
@@ -969,7 +969,7 @@ void wlr_scene_buffer_set_backdrop_blur_ignore_transparent(
 		struct wlr_scene_buffer *scene_buffer, bool enabled) {
 	if (scene_buffer->backdrop_blur_ignore_transparent != enabled) {
 		scene_buffer->backdrop_blur_ignore_transparent = enabled;
-		wlr_scene_optimized_blur_mark_dirty(scene_node_get_root(&scene_buffer->node));
+		wlr_scene_optimized_blur_mark_dirty(scene_node_get_root(&scene_buffer->node), NULL);
 	}
 }
 
@@ -981,12 +981,16 @@ static void output_optimized_blur_mark_dirty(struct wlr_output *output) {
 	}
 }
 
-// TODO: Only re-render the dirty output instead of all
-void wlr_scene_optimized_blur_mark_dirty(struct wlr_scene *scene) {
+void wlr_scene_optimized_blur_mark_dirty(struct wlr_scene *scene,
+		struct wlr_output *output) {
 	// Mark the blur buffers as dirty
-	struct wlr_scene_output *current_output;
-	wl_list_for_each(current_output, &scene->outputs, link) {
-		struct wlr_output *output = current_output->output;
+	if (!output) {
+		struct wlr_scene_output *current_output;
+		wl_list_for_each(current_output, &scene->outputs, link) {
+			struct wlr_output *output = current_output->output;
+			output_optimized_blur_mark_dirty(output);
+		}
+	} else {
 		output_optimized_blur_mark_dirty(output);
 	}
 	scene_node_update(&scene->tree.node, NULL);
@@ -1539,7 +1543,7 @@ void wlr_scene_set_blur_data(struct wlr_scene *scene, struct blur_data blur_data
 	memcpy(&scene->blur_data, &blur_data,
 			sizeof(struct blur_data));
 
-	wlr_scene_optimized_blur_mark_dirty(scene);
+	wlr_scene_optimized_blur_mark_dirty(scene, NULL);
 }
 
 static bool wlr_scene_should_blur(struct wlr_scene *scene) {

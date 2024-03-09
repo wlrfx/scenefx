@@ -20,6 +20,7 @@
 #include <wlr/util/log.h>
 
 #include "render/egl.h"
+#include "render/pass.h"
 #include "render/pixel_format.h"
 #include "render/fx_renderer/util.h"
 #include "render/fx_renderer/fx_renderer.h"
@@ -453,6 +454,8 @@ static void fx_renderer_destroy(struct wlr_renderer *wlr_renderer) {
 
 static struct wlr_render_pass *begin_buffer_pass(struct wlr_renderer *wlr_renderer,
 		struct wlr_buffer *wlr_buffer, const struct wlr_buffer_pass_options *options) {
+	struct fx_renderer *renderer = fx_get_renderer(wlr_renderer);
+	renderer->basic_renderer = true;
 	struct fx_gles_render_pass *pass =
 		fx_renderer_begin_buffer_pass(wlr_renderer, wlr_buffer, NULL, options);
 	if (!pass) {
@@ -815,8 +818,6 @@ struct wlr_renderer *fx_renderer_create_egl(struct wlr_egl *egl) {
 	if (!link_shaders(renderer)) {
 		goto error;
 	}
-
-	renderer->blur_buffer_dirty = false;
 
 	pop_fx_debug(renderer);
 

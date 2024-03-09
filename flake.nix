@@ -26,7 +26,7 @@
           default = pkgs.mkShell {
             name = "scenefx-shell";
 
-            inputsFrom = [ pkgs.wlroots_0_16 ];
+            inputsFrom = [ pkgs.wlroots_0_17 ];
 
             nativeBuildInputs = with pkgs; [
               cmake
@@ -40,7 +40,7 @@
             shellHook = with pkgs; ''(
               mkdir -p "$PWD/subprojects"
               cd "$PWD/subprojects"
-              cp -R --no-preserve=mode,ownership ${wlroots_0_16.src} wlroots
+              cp -R --no-preserve=mode,ownership ${wlroots_0_17.src} wlroots
             )'';
           };
         });

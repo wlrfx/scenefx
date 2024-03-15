@@ -13,6 +13,16 @@ struct fx_gles_render_pass {
 	struct fx_render_timer *timer;
 };
 
+/**
+ * Begin a new render pass with the supplied destination buffer.
+ *
+ * Callers must call wlr_render_pass_submit() once they are done with the
+ * render pass.
+ */
+struct fx_gles_render_pass *fx_renderer_begin_buffer_pass(struct wlr_renderer *wlr_renderer,
+		struct wlr_buffer *wlr_buffer, struct wlr_output *output,
+		const struct wlr_buffer_pass_options *options);
+
 struct fx_render_texture_options {
 	struct wlr_render_texture_options base;
 	float scale;

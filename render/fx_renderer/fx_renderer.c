@@ -23,7 +23,7 @@
 #include "render/pixel_format.h"
 #include "render/fx_renderer/util.h"
 #include "render/fx_renderer/fx_renderer.h"
-#include "scenefx/fx_renderer/fx_renderer.h"
+#include "scenefx/render/fx_renderer/fx_renderer.h"
 #include "render/fx_renderer/matrix.h"
 #include "util/time.h"
 

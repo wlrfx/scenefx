@@ -12,7 +12,6 @@
 #include <wlr/util/box.h>
 
 #include "render/fx_renderer/shaders.h"
-#include "render/pass.h"
 
 struct fx_pixel_format {
 	uint32_t drm_format;
@@ -160,26 +159,16 @@ struct fx_renderer {
 	struct fx_framebuffer *current_buffer;
 	uint32_t viewport_width, viewport_height;
 
-	// Contains the blurred background for tiled windows
-	struct fx_framebuffer *optimized_blur_buffer;
-	// Contains the original pixels to draw over the areas where artifact are visible
-	struct fx_framebuffer *blur_saved_pixels_buffer;
-	// Blur swaps between the two effects buffers everytime it scales the image
-	// Buffer used for effects
-	struct fx_framebuffer *effects_buffer;
-	// Swap buffer used for effects
-	struct fx_framebuffer *effects_buffer_swapped;
+	// Set to true when 'wlr_renderer_begin_buffer_pass' is called instead of
+	// our custom 'fx_renderer_begin_buffer_pass' function
+	bool basic_renderer;
 
 	// The region where there's blur
 	pixman_region32_t blur_padding_region;
-
-	bool blur_buffer_dirty;
 };
 
 bool wlr_renderer_is_fx(struct wlr_renderer *wlr_renderer);
 
-struct fx_renderer *fx_get_renderer(
-	struct wlr_renderer *wlr_renderer);
 struct fx_render_timer *fx_get_render_timer(
 	struct wlr_render_timer *timer);
 struct fx_texture *fx_get_texture(

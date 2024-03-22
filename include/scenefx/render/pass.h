@@ -9,6 +9,7 @@
 struct fx_gles_render_pass {
 	struct wlr_render_pass base;
 	struct fx_framebuffer *buffer;
+	struct fx_effect_framebuffers *fx_effect_framebuffers;
 	float projection_matrix[9];
 	struct fx_render_timer *timer;
 };

@@ -83,24 +83,12 @@ struct fx_texture {
 	struct wlr_addon buffer_addon;
 };
 
-struct fx_texture_attribs {
-	GLenum target; /* either GL_TEXTURE_2D or GL_TEXTURE_EXTERNAL_OES */
-	GLuint tex;
-
-	bool has_alpha;
-};
-
 struct fx_texture *fx_get_texture(struct wlr_texture *wlr_texture);
-
-struct wlr_texture *fx_texture_from_buffer(struct wlr_renderer *wlr_renderer,
-		struct wlr_buffer *buffer);
 
 void fx_texture_destroy(struct fx_texture *texture);
 
 bool wlr_texture_is_fx(struct wlr_texture *wlr_texture);
 
-void fx_texture_get_attribs(struct wlr_texture *texture,
-	struct fx_texture_attribs *attribs);
 
 ///
 /// fx_renderer

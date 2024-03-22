@@ -388,9 +388,9 @@ void fx_render_pass_add_box_shadow(struct fx_gles_render_pass *pass,
 	struct wlr_box surface_box = box;
 	float blur_sigma = shadow_data->blur_sigma * fx_options->scale;
 
-	// Extend the size of the box
-	box.x -= blur_sigma;
-	box.y -= blur_sigma;
+	// Extend the size of the box while also considering the shadow offset
+	box.x -= blur_sigma - shadow_data->offset_x;
+	box.y -= blur_sigma - shadow_data->offset_y;
 	box.width += blur_sigma * 2;
 	box.height += blur_sigma * 2;
 

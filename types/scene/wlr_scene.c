@@ -1,5 +1,6 @@
 #define _POSIX_C_SOURCE 200809L
 #include <assert.h>
+#include <pixman.h>
 #include <stdlib.h>
 #include <scenefx/types/fx/shadow_data.h>
 #include <scenefx/types/wlr_scene.h>
@@ -16,7 +17,7 @@
 #include <wlr/util/region.h>
 #include <wlr/render/swapchain.h>
 
-#include "render/pass.h"
+#include "scenefx/render/pass.h"
 #include "scenefx/types/fx/shadow_data.h"
 #include "types/wlr_buffer.h"
 #include "types/wlr_output.h"
@@ -478,7 +479,16 @@ static bool scene_node_update_iterator(struct wlr_scene_node *node,
 		struct wlr_scene_buffer *buffer = wlr_scene_buffer_from_node(node);
 		struct shadow_data *shadow_data = &buffer->shadow_data;
 		if (scene_buffer_has_shadow(shadow_data)) {
-			wlr_region_expand(&node->visible, &node->visible, shadow_data->blur_sigma);
+			// Expand towards the damage while also compensating for the x and y
+			// offsets
+			pixman_region32_t shadow;
+			pixman_region32_init(&shadow);
+			pixman_region32_copy(&shadow, &node->visible);
+			wlr_region_expand(&shadow, &shadow, shadow_data->blur_sigma);
+			pixman_region32_translate(&shadow, shadow_data->offset_x, shadow_data->offset_y);
+			pixman_region32_subtract(&shadow, &shadow, &node->visible);
+			pixman_region32_union(&node->visible, &node->visible, &shadow);
+			pixman_region32_fini(&shadow);
 		}
 	}
 
@@ -881,6 +891,8 @@ void wlr_scene_buffer_set_shadow_data(struct wlr_scene_buffer *scene_buffer,
 	struct shadow_data *buff_data = &scene_buffer->shadow_data;
 	if (buff_data->enabled == shadow_data.enabled &&
 			buff_data->blur_sigma == shadow_data.blur_sigma &&
+			buff_data->offset_x == shadow_data.offset_x &&
+			buff_data->offset_y == shadow_data.offset_y &&
 			buff_data->color.r && shadow_data.color.r &&
 			buff_data->color.g && shadow_data.color.g &&
 			buff_data->color.b && shadow_data.color.b &&

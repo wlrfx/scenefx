@@ -489,9 +489,7 @@ static void render_blur_segments(struct fx_gles_render_pass *pass,
 		glTexParameteri(texture->target, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 		break;
 	case WLR_SCALE_FILTER_NEAREST:
-		glTexParameteri(texture->target, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-		glTexParameteri(texture->target, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-		break;
+		abort();
 	}
 
 	glUniform1i(shader->tex, 0);
@@ -564,9 +562,7 @@ static void render_blur_effects(struct fx_gles_render_pass *pass,
 		glTexParameteri(texture->target, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 		break;
 	case WLR_SCALE_FILTER_NEAREST:
-		glTexParameteri(texture->target, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-		glTexParameteri(texture->target, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-		break;
+		abort();
 	}
 
 	glUniform1i(shader.tex, 0);
@@ -613,6 +609,8 @@ static struct fx_framebuffer *get_main_buffer_blur(struct fx_gles_render_pass *p
 	fx_options->tex_options.base.dst_box = fx_options->monitor_box;
 	// Clip the blur to the damage
 	fx_options->tex_options.base.clip = &scaled_damage;
+	// Artifacts with NEAREST filter
+	fx_options->tex_options.base.filter_mode = WLR_SCALE_FILTER_BILINEAR;
 
 	// Downscale
 	for (int i = 0; i < blur_data->num_passes; ++i) {

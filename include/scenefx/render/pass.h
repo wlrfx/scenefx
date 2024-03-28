@@ -14,6 +14,8 @@ struct fx_gles_render_pass {
 	struct fx_render_timer *timer;
 };
 
+enum corner_location { TOP_LEFT, TOP_RIGHT, BOTTOM_LEFT, BOTTOM_RIGHT };
+
 /**
  * Begin a new render pass with the supplied destination buffer.
  *
@@ -35,6 +37,13 @@ struct fx_render_texture_options {
 struct fx_render_rect_options {
 	struct wlr_render_rect_options base;
 	float scale;
+};
+
+struct fx_render_rounded_border_corner_options {
+	struct wlr_render_rect_options base;
+	float scale;
+	enum corner_location corner_location;
+	float border_thickness;
 };
 
 struct fx_render_blur_pass_options {
@@ -59,6 +68,12 @@ void fx_render_pass_add_texture(struct fx_gles_render_pass *render_pass,
  */
 void fx_render_pass_add_rect(struct fx_gles_render_pass *render_pass,
 	const struct fx_render_rect_options *options);
+
+/**
+ * Render a border corner.
+ */
+void fx_render_pass_add_rounded_border_corner(struct fx_gles_render_pass *render_pass,
+	const struct fx_render_rounded_border_corner_options *options);
 
 /**
  * Render a box shadow.

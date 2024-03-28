@@ -349,6 +349,40 @@ void fx_render_pass_add_rect(struct fx_gles_render_pass *pass,
 	pop_fx_debug(renderer);
 }
 
+void fx_render_pass_add_rounded_border_corner(struct fx_gles_render_pass *pass,
+		const struct fx_render_rounded_border_corner_options *fx_options) {
+	const struct wlr_render_rect_options *options = &fx_options->base;
+
+	struct fx_renderer *renderer = pass->buffer->renderer;
+
+	const struct wlr_render_color *color = &options->color;
+	struct wlr_box box;
+	wlr_render_rect_options_get_box(options, pass->buffer->buffer, &box);
+	assert(box.width > 0 && box.width == box.height); // should be a perfect square since we are drawing a circle
+
+	push_fx_debug(renderer);
+	setup_blending(WLR_RENDER_BLEND_MODE_PREMULTIPLIED);
+
+	glUseProgram(renderer->shaders.rounded_border_corner_shader.program);
+
+	set_proj_matrix(renderer->shaders.rounded_border_corner_shader.proj, pass->projection_matrix, &box);
+	glUniform4f(renderer->shaders.rounded_border_corner_shader.color, color->r, color->g, color->b, color->a);
+
+	glUniform1f(renderer->shaders.rounded_border_corner_shader.is_top_left, fx_options->corner_location == TOP_LEFT);
+	glUniform1f(renderer->shaders.rounded_border_corner_shader.is_top_right, fx_options->corner_location == TOP_RIGHT);
+	glUniform1f(renderer->shaders.rounded_border_corner_shader.is_bottom_left, fx_options->corner_location == BOTTOM_LEFT);
+	glUniform1f(renderer->shaders.rounded_border_corner_shader.is_bottom_right, fx_options->corner_location == BOTTOM_RIGHT);
+
+	glUniform2f(renderer->shaders.rounded_border_corner_shader.position, box.x, box.y);
+	glUniform1f(renderer->shaders.rounded_border_corner_shader.radius, box.x);
+	glUniform2f(renderer->shaders.rounded_border_corner_shader.half_size, box.width / 2.0, box.height / 2.0);
+	glUniform1f(renderer->shaders.rounded_border_corner_shader.half_thickness, fx_options->border_thickness / 2.0);
+
+	render(&box, options->clip, renderer->shaders.rounded_border_corner_shader.pos_attrib);
+
+	pop_fx_debug(renderer);
+}
+
 void fx_render_pass_add_stencil_mask(struct fx_gles_render_pass *pass,
 		const struct fx_render_rect_options *fx_options, int corner_radius) {
 	const struct wlr_render_rect_options *options = &fx_options->base;

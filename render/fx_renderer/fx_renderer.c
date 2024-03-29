@@ -655,6 +655,12 @@ static bool link_shaders(struct fx_renderer *renderer) {
 		goto error;
 	}
 
+	// border corner shader
+	if (!link_rounded_border_corner_program(&renderer->shaders.rounded_border_corner)) {
+		wlr_log(WLR_ERROR, "Could not link rounded border corner shader");
+		goto error;
+	}
+
 	// stencil mask shader
 	if (!link_stencil_mask_program(&renderer->shaders.stencil_mask)) {
 		wlr_log(WLR_ERROR, "Could not link stencil mask shader");

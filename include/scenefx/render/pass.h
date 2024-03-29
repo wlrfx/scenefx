@@ -42,8 +42,9 @@ struct fx_render_rect_options {
 struct fx_render_rounded_border_corner_options {
 	struct wlr_render_rect_options base;
 	float scale;
+	int corner_radius;
+	int border_thickness;
 	enum corner_location corner_location;
-	float border_thickness;
 };
 
 struct fx_render_blur_pass_options {

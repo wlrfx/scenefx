@@ -363,22 +363,22 @@ void fx_render_pass_add_rounded_border_corner(struct fx_gles_render_pass *pass,
 	push_fx_debug(renderer);
 	setup_blending(WLR_RENDER_BLEND_MODE_PREMULTIPLIED);
 
-	glUseProgram(renderer->shaders.rounded_border_corner_shader.program);
+	glUseProgram(renderer->shaders.rounded_border_corner.program);
 
-	set_proj_matrix(renderer->shaders.rounded_border_corner_shader.proj, pass->projection_matrix, &box);
-	glUniform4f(renderer->shaders.rounded_border_corner_shader.color, color->r, color->g, color->b, color->a);
+	set_proj_matrix(renderer->shaders.rounded_border_corner.proj, pass->projection_matrix, &box);
+	glUniform4f(renderer->shaders.rounded_border_corner.color, color->r, color->g, color->b, color->a);
 
-	glUniform1f(renderer->shaders.rounded_border_corner_shader.is_top_left, fx_options->corner_location == TOP_LEFT);
-	glUniform1f(renderer->shaders.rounded_border_corner_shader.is_top_right, fx_options->corner_location == TOP_RIGHT);
-	glUniform1f(renderer->shaders.rounded_border_corner_shader.is_bottom_left, fx_options->corner_location == BOTTOM_LEFT);
-	glUniform1f(renderer->shaders.rounded_border_corner_shader.is_bottom_right, fx_options->corner_location == BOTTOM_RIGHT);
+	glUniform1f(renderer->shaders.rounded_border_corner.is_top_left, fx_options->corner_location == TOP_LEFT);
+	glUniform1f(renderer->shaders.rounded_border_corner.is_top_right, fx_options->corner_location == TOP_RIGHT);
+	glUniform1f(renderer->shaders.rounded_border_corner.is_bottom_left, fx_options->corner_location == BOTTOM_LEFT);
+	glUniform1f(renderer->shaders.rounded_border_corner.is_bottom_right, fx_options->corner_location == BOTTOM_RIGHT);
 
-	glUniform2f(renderer->shaders.rounded_border_corner_shader.position, box.x, box.y);
-	glUniform1f(renderer->shaders.rounded_border_corner_shader.radius, box.x);
-	glUniform2f(renderer->shaders.rounded_border_corner_shader.half_size, box.width / 2.0, box.height / 2.0);
-	glUniform1f(renderer->shaders.rounded_border_corner_shader.half_thickness, fx_options->border_thickness / 2.0);
+	glUniform2f(renderer->shaders.rounded_border_corner.position, box.x, box.y);
+	glUniform1f(renderer->shaders.rounded_border_corner.radius, fx_options->corner_radius);
+	glUniform2f(renderer->shaders.rounded_border_corner.half_size, box.width / 2.0, box.height / 2.0);
+	glUniform1f(renderer->shaders.rounded_border_corner.half_thickness, fx_options->border_thickness / 2.0);
 
-	render(&box, options->clip, renderer->shaders.rounded_border_corner_shader.pos_attrib);
+	render(&box, options->clip, renderer->shaders.rounded_border_corner.pos_attrib);
 
 	pop_fx_debug(renderer);
 }

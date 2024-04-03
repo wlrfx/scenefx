@@ -134,6 +134,7 @@ bool link_tex_program(struct tex_shader *shader,
 	shader->size = glGetUniformLocation(prog, "size");
 	shader->position = glGetUniformLocation(prog, "position");
 	shader->radius = glGetUniformLocation(prog, "radius");
+	shader->has_titlebar = glGetUniformLocation(prog, "has_titlebar");
 	shader->discard_transparent = glGetUniformLocation(prog, "discard_transparent");
 
 	return true;

@@ -31,6 +31,7 @@ struct fx_render_texture_options {
 	float scale;
 	struct wlr_box *clip_box; // Used to clip csd. Ignored if NULL
 	int corner_radius;
+	bool has_titlebar;
 	bool discard_transparent;
 };
 

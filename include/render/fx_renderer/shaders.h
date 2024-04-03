@@ -39,6 +39,7 @@ struct tex_shader {
 	GLint size;
 	GLint position;
 	GLint radius;
+	GLint has_titlebar;
 	GLint discard_transparent;
 };
 

@@ -24,6 +24,7 @@ struct fx_render_texture_options fx_render_texture_options_default(
 		const struct wlr_render_texture_options *base) {
 	struct fx_render_texture_options options = {
 		.corner_radius = 0,
+		.has_titlebar = false,
 		.discard_transparent = false,
 		.scale = 1.0f,
 		.clip_box = NULL,
@@ -315,6 +316,7 @@ void fx_render_pass_add_texture(struct fx_gles_render_pass *pass,
 	glUniform2f(shader->size, clip_box->width, clip_box->height);
 	glUniform2f(shader->position, clip_box->x, clip_box->y);
 	glUniform1f(shader->radius, fx_options->corner_radius);
+	glUniform1f(shader->has_titlebar, fx_options->has_titlebar);
 	glUniform1f(shader->discard_transparent, fx_options->discard_transparent);
 
 	set_proj_matrix(shader->proj, pass->projection_matrix, &dst_box);

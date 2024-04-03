@@ -29,6 +29,7 @@ uniform float alpha;
 uniform vec2 size;
 uniform vec2 position;
 uniform float radius;
+uniform bool has_titlebar;
 uniform bool discard_transparent;
 
 vec4 sample_texture() {
@@ -41,11 +42,14 @@ vec4 sample_texture() {
 
 void main() {
 	gl_FragColor = sample_texture() * alpha;
-	vec2 corner_distance = min(gl_FragCoord.xy - position, size + position - gl_FragCoord.xy);
-	if (max(corner_distance.x, corner_distance.y) < radius) {
-		float d = radius - distance(corner_distance, vec2(radius));
-		float smooth = smoothstep(-1.0, 0.5, d);
-		gl_FragColor = mix(vec4(0), gl_FragColor, smooth);
+
+	if (!has_titlebar || gl_FragCoord.y - position.y > radius) {
+		vec2 corner_distance = min(gl_FragCoord.xy - position, size + position - gl_FragCoord.xy);
+		if (max(corner_distance.x, corner_distance.y) < radius) {
+			float d = radius - distance(corner_distance, vec2(radius));
+			float smooth = smoothstep(-1.0, 0.5, d);
+			gl_FragColor = mix(vec4(0), gl_FragColor, smooth);
+		}
 	}
 
 	if (discard_transparent && gl_FragColor.a == 0.0) {

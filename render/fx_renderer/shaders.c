@@ -9,6 +9,7 @@
 #include "GLES2/gl2.h"
 #include "common_vert_src.h"
 #include "quad_frag_src.h"
+#include "quad_round_frag_src.h"
 #include "tex_frag_src.h"
 #include "rounded_border_corner_frag_src.h"
 #include "stencil_mask_frag_src.h"
@@ -110,6 +111,27 @@ bool link_quad_program(struct quad_shader *shader) {
 	shader->proj = glGetUniformLocation(prog, "proj");
 	shader->color = glGetUniformLocation(prog, "color");
 	shader->pos_attrib = glGetAttribLocation(prog, "pos");
+
+	return true;
+}
+
+bool link_quad_round_program(struct quad_round_shader *shader, enum fx_rounded_quad_shader_source source) {
+	GLchar quad_src[2048];
+	snprintf(quad_src, sizeof(quad_src),
+		"#define SOURCE %d\n%s", source, quad_round_frag_src);
+
+	GLuint prog;
+	shader->program = prog = link_program(quad_src);
+	if (!shader->program) {
+		return false;
+	}
+
+	shader->proj = glGetUniformLocation(prog, "proj");
+	shader->color = glGetUniformLocation(prog, "color");
+	shader->pos_attrib = glGetAttribLocation(prog, "pos");
+	shader->size = glGetUniformLocation(prog, "size");
+	shader->position = glGetUniformLocation(prog, "position");
+	shader->radius = glGetUniformLocation(prog, "radius");
 
 	return true;
 }

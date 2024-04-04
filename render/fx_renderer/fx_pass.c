@@ -351,6 +351,55 @@ void fx_render_pass_add_rect(struct fx_gles_render_pass *pass,
 	pop_fx_debug(renderer);
 }
 
+void fx_render_pass_add_rounded_rect(struct fx_gles_render_pass *pass,
+		const struct fx_render_rounded_rect_options *fx_options) {
+	const struct wlr_render_rect_options *options = &fx_options->base;
+
+	struct fx_renderer *renderer = pass->buffer->renderer;
+
+	struct quad_round_shader *shader = NULL;
+	switch (fx_options->corner_location) {
+	case ALL:
+		shader = &renderer->shaders.quad_round;
+		break;
+	case TOP_LEFT:
+		shader = &renderer->shaders.quad_round_tl;
+		break;
+	case TOP_RIGHT:
+		shader = &renderer->shaders.quad_round_tr;
+		break;
+	case BOTTOM_LEFT:
+		shader = &renderer->shaders.quad_round_bl;
+		break;
+	case BOTTOM_RIGHT:
+		shader = &renderer->shaders.quad_round_br;
+		break;
+	default:
+		wlr_log(WLR_ERROR, "Invalid Corner Location. Aborting render");
+		abort();
+	}
+
+	const struct wlr_render_color *color = &options->color;
+	struct wlr_box box;
+	wlr_render_rect_options_get_box(options, pass->buffer->buffer, &box);
+
+	push_fx_debug(renderer);
+	setup_blending(WLR_RENDER_BLEND_MODE_PREMULTIPLIED);
+
+	glUseProgram(shader->program);
+
+	set_proj_matrix(shader->proj, pass->projection_matrix, &box);
+	glUniform4f(shader->color, color->r, color->g, color->b, color->a);
+
+	glUniform2f(shader->size, box.width, box.height);
+	glUniform2f(shader->position, box.x, box.y);
+	glUniform1f(shader->radius, fx_options->corner_radius);
+
+	render(&box, options->clip, shader->pos_attrib);
+
+	pop_fx_debug(renderer);
+}
+
 void fx_render_pass_add_rounded_border_corner(struct fx_gles_render_pass *pass,
 		const struct fx_render_rounded_border_corner_options *fx_options) {
 	const struct wlr_render_rect_options *options = &fx_options->base;

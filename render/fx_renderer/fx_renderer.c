@@ -3,6 +3,7 @@
 	https://gitlab.freedesktop.org/wlroots/wlroots/-/tree/master/render/gles2
 */
 
+#include "render/fx_renderer/shaders.h"
 #define _POSIX_C_SOURCE 199309L
 #include <assert.h>
 #include <drm_fourcc.h>
@@ -641,6 +642,33 @@ static bool link_shaders(struct fx_renderer *renderer) {
 		wlr_log(WLR_ERROR, "Could not link quad shader");
 		goto error;
 	}
+
+	// rounded quad fragment shaders
+	if (!link_quad_round_program(&renderer->shaders.quad_round, SHADER_SOURCE_QUAD_ROUND)) {
+		wlr_log(WLR_ERROR, "Could not link quad shader");
+		goto error;
+	}
+	// rounded quad fragment shaders
+	if (!link_quad_round_program(&renderer->shaders.quad_round_tl, SHADER_SOURCE_QUAD_ROUND_TOP_LEFT)) {
+		wlr_log(WLR_ERROR, "Could not link quad shader");
+		goto error;
+	}
+	// rounded quad fragment shaders
+	if (!link_quad_round_program(&renderer->shaders.quad_round_tr, SHADER_SOURCE_QUAD_ROUND_TOP_RIGHT)) {
+		wlr_log(WLR_ERROR, "Could not link quad shader");
+		goto error;
+	}
+	// rounded quad fragment shaders
+	if (!link_quad_round_program(&renderer->shaders.quad_round_bl, SHADER_SOURCE_QUAD_ROUND_BOTTOM_LEFT)) {
+		wlr_log(WLR_ERROR, "Could not link quad shader");
+		goto error;
+	}
+	// rounded quad fragment shaders
+	if (!link_quad_round_program(&renderer->shaders.quad_round_br, SHADER_SOURCE_QUAD_ROUND_BOTTOM_RIGHT)) {
+		wlr_log(WLR_ERROR, "Could not link quad shader");
+		goto error;
+	}
+
 	// fragment shaders
 	if (!link_tex_program(&renderer->shaders.tex_rgba, SHADER_SOURCE_TEXTURE_RGBA)) {
 		wlr_log(WLR_ERROR, "Could not link tex_RGBA shader");
@@ -690,9 +718,15 @@ static bool link_shaders(struct fx_renderer *renderer) {
 
 error:
 	glDeleteProgram(renderer->shaders.quad.program);
+	glDeleteProgram(renderer->shaders.quad_round.program);
+	glDeleteProgram(renderer->shaders.quad_round_tl.program);
+	glDeleteProgram(renderer->shaders.quad_round_tr.program);
+	glDeleteProgram(renderer->shaders.quad_round_bl.program);
+	glDeleteProgram(renderer->shaders.quad_round_br.program);
 	glDeleteProgram(renderer->shaders.tex_rgba.program);
 	glDeleteProgram(renderer->shaders.tex_rgbx.program);
 	glDeleteProgram(renderer->shaders.tex_ext.program);
+	glDeleteProgram(renderer->shaders.rounded_border_corner.program);
 	glDeleteProgram(renderer->shaders.stencil_mask.program);
 	glDeleteProgram(renderer->shaders.box_shadow.program);
 	glDeleteProgram(renderer->shaders.blur1.program);

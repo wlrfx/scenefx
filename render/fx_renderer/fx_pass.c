@@ -292,8 +292,11 @@ void fx_render_pass_add_texture(struct fx_gles_render_pass *pass,
 	src_fbox.height /= options->texture->height;
 
 	push_fx_debug(renderer);
-	setup_blending(!texture->has_alpha && alpha == 1.0 ?
-		WLR_RENDER_BLEND_MODE_NONE : options->blend_mode);
+	bool has_alpha = texture->has_alpha
+		|| alpha < 1.0
+		|| fx_options->corner_radius > 0
+		|| fx_options->discard_transparent;
+	setup_blending(!has_alpha ? WLR_RENDER_BLEND_MODE_NONE : options->blend_mode);
 
 	glUseProgram(shader->program);
 

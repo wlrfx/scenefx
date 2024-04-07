@@ -31,6 +31,8 @@ uniform vec2 position;
 uniform float radius;
 uniform bool has_titlebar;
 uniform bool discard_transparent;
+uniform float dim;
+uniform vec4 dim_color;
 
 vec4 sample_texture() {
 #if SOURCE == SOURCE_TEXTURE_RGBA || SOURCE == SOURCE_TEXTURE_EXTERNAL
@@ -41,7 +43,7 @@ vec4 sample_texture() {
 }
 
 void main() {
-	gl_FragColor = sample_texture() * alpha;
+	gl_FragColor = mix(sample_texture(), dim_color, dim) * alpha;
 
 	if (!has_titlebar || gl_FragCoord.y - position.y > radius) {
 		vec2 corner_distance = min(gl_FragCoord.xy - position, size + position - gl_FragCoord.xy);

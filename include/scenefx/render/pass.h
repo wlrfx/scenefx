@@ -33,6 +33,8 @@ struct fx_render_texture_options {
 	int corner_radius;
 	bool has_titlebar;
 	bool discard_transparent;
+	float dim;
+	struct wlr_render_color dim_color;
 };
 
 struct fx_render_rect_options {

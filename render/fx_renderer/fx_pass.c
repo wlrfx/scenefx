@@ -26,6 +26,8 @@ struct fx_render_texture_options fx_render_texture_options_default(
 		.corner_radius = 0,
 		.has_titlebar = false,
 		.discard_transparent = false,
+		.dim = 0.0f,
+		.dim_color = { 1, 1, 1, 1 },
 		.scale = 1.0f,
 		.clip_box = NULL,
 	};
@@ -295,7 +297,8 @@ void fx_render_pass_add_texture(struct fx_gles_render_pass *pass,
 	bool has_alpha = texture->has_alpha
 		|| alpha < 1.0
 		|| fx_options->corner_radius > 0
-		|| fx_options->discard_transparent;
+		|| fx_options->discard_transparent
+		|| (fx_options->dim && fx_options->dim_color.a < 1.0);
 	setup_blending(!has_alpha ? WLR_RENDER_BLEND_MODE_NONE : options->blend_mode);
 
 	glUseProgram(shader->program);
@@ -321,6 +324,9 @@ void fx_render_pass_add_texture(struct fx_gles_render_pass *pass,
 	glUniform1f(shader->radius, fx_options->corner_radius);
 	glUniform1f(shader->has_titlebar, fx_options->has_titlebar);
 	glUniform1f(shader->discard_transparent, fx_options->discard_transparent);
+	glUniform1f(shader->dim, fx_options->dim);
+	struct wlr_render_color dim_color = fx_options->dim_color;
+	glUniform4f(shader->dim_color, dim_color.r, dim_color.g, dim_color.b, dim_color.a);
 
 	set_proj_matrix(shader->proj, pass->projection_matrix, &dst_box);
 	set_tex_matrix(shader->tex_proj, options->transform, &src_fbox);

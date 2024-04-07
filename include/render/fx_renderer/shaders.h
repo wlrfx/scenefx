@@ -61,6 +61,8 @@ struct tex_shader {
 	GLint radius;
 	GLint has_titlebar;
 	GLint discard_transparent;
+	GLint dim;
+	GLint dim_color;
 };
 
 bool link_tex_program(struct tex_shader *shader, enum fx_tex_shader_source source);

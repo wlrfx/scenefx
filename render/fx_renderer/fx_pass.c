@@ -855,7 +855,7 @@ void fx_render_pass_add_optimized_blur(struct fx_gles_render_pass *pass,
 
 	// Render the newly blurred content into the blur_buffer
 	fx_renderer_read_to_buffer(pass, &fake_damage,
-			pass->fx_effect_framebuffers->optimized_blur_buffer, buffer);
+			pass->fx_effect_framebuffers->optimized_blur_buffer, buffer, false);
 
 	pixman_region32_fini(&fake_damage);
 
@@ -864,7 +864,7 @@ void fx_render_pass_add_optimized_blur(struct fx_gles_render_pass *pass,
 
 void fx_renderer_read_to_buffer(struct fx_gles_render_pass *pass,
 		pixman_region32_t *_region, struct fx_framebuffer *dst_buffer,
-		struct fx_framebuffer *src_buffer) {
+		struct fx_framebuffer *src_buffer, bool transformed_region) {
 	if (!_region || !pixman_region32_not_empty(_region)) {
 		return;
 	}
@@ -874,7 +874,7 @@ void fx_renderer_read_to_buffer(struct fx_gles_render_pass *pass,
 	pixman_region32_copy(&region, _region);
 
 	// Restore the transformed region to normal
-	if (pass->output) {
+	if (pass->output && transformed_region) {
 		int ow, oh;
 		wlr_output_transformed_resolution(pass->output, &ow, &oh);
 		enum wl_output_transform transform =

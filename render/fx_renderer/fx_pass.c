@@ -449,14 +449,11 @@ void fx_render_pass_add_rounded_border_corner(struct fx_gles_render_pass *pass,
 }
 
 void fx_render_pass_add_stencil_mask(struct fx_gles_render_pass *pass,
-		const struct fx_render_rect_options *fx_options, int corner_radius) {
-	const struct wlr_render_rect_options *options = &fx_options->base;
+		const struct fx_render_stencil_box_options *options) {
 
 	struct fx_renderer *renderer = pass->buffer->renderer;
 
-	const struct wlr_render_color *color = &options->color;
-	struct wlr_box box;
-	wlr_render_rect_options_get_box(options, pass->buffer->buffer, &box);
+	struct wlr_box box = options->box;
 	assert(box.width > 0 && box.height > 0);
 
 	push_fx_debug(renderer);
@@ -465,10 +462,9 @@ void fx_render_pass_add_stencil_mask(struct fx_gles_render_pass *pass,
 	glUseProgram(renderer->shaders.stencil_mask.program);
 
 	set_proj_matrix(renderer->shaders.stencil_mask.proj, pass->projection_matrix, &box);
-	glUniform4f(renderer->shaders.stencil_mask.color, color->r, color->g, color->b, color->a);
 	glUniform2f(renderer->shaders.stencil_mask.half_size, box.width * 0.5, box.height * 0.5);
 	glUniform2f(renderer->shaders.stencil_mask.position, box.x, box.y);
-	glUniform1f(renderer->shaders.stencil_mask.radius, corner_radius);
+	glUniform1f(renderer->shaders.stencil_mask.radius, options->corner_radius);
 
 	render(&box, options->clip, renderer->shaders.stencil_mask.pos_attrib);
 
@@ -476,35 +472,25 @@ void fx_render_pass_add_stencil_mask(struct fx_gles_render_pass *pass,
 }
 
 void fx_render_pass_add_box_shadow(struct fx_gles_render_pass *pass,
-		const struct fx_render_rect_options *fx_options,
-		int corner_radius, struct shadow_data *shadow_data) {
-	const struct wlr_render_rect_options *options = &fx_options->base;
-
+		const struct fx_render_box_shadow_options *options) {
 	struct fx_renderer *renderer = pass->buffer->renderer;
+	struct shadow_data *shadow_data = options->shadow_data;
 
 	const struct wlr_render_color *color = &shadow_data->color;
-	struct wlr_box box;
-	wlr_render_rect_options_get_box(options, pass->buffer->buffer, &box);
-	assert(box.width > 0 && box.height > 0);
-	struct wlr_box surface_box = box;
-	float blur_sigma = shadow_data->blur_sigma * fx_options->scale;
-
-	// Extend the size of the box while also considering the shadow offset
-	box.x -= blur_sigma - shadow_data->offset_x;
-	box.y -= blur_sigma - shadow_data->offset_y;
-	box.width += blur_sigma * 2;
-	box.height += blur_sigma * 2;
+	struct wlr_box shadow_box = options->shadow_box;
+	assert(shadow_box.width > 0 && shadow_box.height > 0);
+	struct wlr_box surface_box = options->clip_box;
+	float blur_sigma = shadow_data->blur_sigma * options->scale;
 
 	pixman_region32_t render_region;
 	pixman_region32_init(&render_region);
 
 	pixman_region32_t inner_region;
-	pixman_region32_init(&inner_region);
-	pixman_region32_union_rect(&inner_region, &inner_region,
-			surface_box.x + corner_radius * 0.5,
-			surface_box.y + corner_radius * 0.5,
-			surface_box.width - corner_radius,
-			surface_box.height - corner_radius);
+	pixman_region32_init_rect(&inner_region,
+			surface_box.x + options->corner_radius * 0.5,
+			surface_box.y + options->corner_radius * 0.5,
+			surface_box.width - options->corner_radius,
+			surface_box.height - options->corner_radius);
 	pixman_region32_subtract(&render_region, options->clip, &inner_region);
 	pixman_region32_fini(&inner_region);
 
@@ -513,7 +499,12 @@ void fx_render_pass_add_box_shadow(struct fx_gles_render_pass *pass,
 	// Init stencil work
 	stencil_mask_init();
 	// Draw the rounded rect as a mask
-	fx_render_pass_add_stencil_mask(pass, fx_options, corner_radius);
+	struct fx_render_stencil_box_options stencil_options = {
+		.box = options->clip_box,
+		.corner_radius = options->corner_radius,
+		.clip = options->clip,
+	};
+	fx_render_pass_add_stencil_mask(pass, &stencil_options);
 	stencil_mask_close(false);
 
 	// blending will practically always be needed (unless we have a madman
@@ -523,14 +514,15 @@ void fx_render_pass_add_box_shadow(struct fx_gles_render_pass *pass,
 
 	glUseProgram(renderer->shaders.box_shadow.program);
 
-	set_proj_matrix(renderer->shaders.box_shadow.proj, pass->projection_matrix, &box);
+	set_proj_matrix(renderer->shaders.box_shadow.proj, pass->projection_matrix, &shadow_box);
 	glUniform4f(renderer->shaders.box_shadow.color, color->r, color->g, color->b, color->a);
 	glUniform1f(renderer->shaders.box_shadow.blur_sigma, blur_sigma);
-	glUniform1f(renderer->shaders.box_shadow.corner_radius, corner_radius);
-	glUniform2f(renderer->shaders.box_shadow.size, box.width, box.height);
-	glUniform2f(renderer->shaders.box_shadow.position, box.x, box.y);
+	glUniform1f(renderer->shaders.box_shadow.corner_radius, options->corner_radius);
+	glUniform2f(renderer->shaders.box_shadow.size, shadow_box.width, shadow_box.height);
+	glUniform2f(renderer->shaders.box_shadow.position, shadow_box.x, shadow_box.y);
 
-	render(&box, &render_region, renderer->shaders.box_shadow.pos_attrib);
+	render(&shadow_box, &render_region, renderer->shaders.box_shadow.pos_attrib);
+
 	pixman_region32_fini(&render_region);
 
 	glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);

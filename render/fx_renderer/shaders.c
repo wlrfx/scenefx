@@ -194,7 +194,6 @@ bool link_stencil_mask_program(struct stencil_mask_shader *shader) {
 	}
 
 	shader->proj = glGetUniformLocation(prog, "proj");
-	shader->color = glGetUniformLocation(prog, "color");
 	shader->pos_attrib = glGetAttribLocation(prog, "pos");
 	shader->position = glGetUniformLocation(prog, "position");
 	shader->half_size = glGetUniformLocation(prog, "half_size");

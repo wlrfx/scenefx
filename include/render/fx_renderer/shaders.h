@@ -87,7 +87,6 @@ bool link_rounded_border_corner_program(struct rounded_border_corner_shader *sha
 struct stencil_mask_shader {
 	GLuint program;
 	GLint proj;
-	GLint color;
 	GLint pos_attrib;
 	GLint half_size;
 	GLint position;

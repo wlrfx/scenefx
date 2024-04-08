@@ -43,6 +43,17 @@ struct fx_render_rect_options {
 	float scale;
 };
 
+struct fx_render_box_shadow_options {
+	struct wlr_box shadow_box;
+	struct wlr_box clip_box;
+	/* Clip region, leave NULL to disable clipping */
+	const pixman_region32_t *clip;
+
+	float scale;
+	struct shadow_data *shadow_data;
+	int corner_radius;
+};
+
 struct fx_render_rounded_rect_options {
 	struct wlr_render_rect_options base;
 	float scale;
@@ -95,8 +106,7 @@ void fx_render_pass_add_rounded_border_corner(struct fx_gles_render_pass *render
  * Render a box shadow.
  */
 void fx_render_pass_add_box_shadow(struct fx_gles_render_pass *pass,
-		const struct fx_render_rect_options *fx_options,
-		int corner_radius, struct shadow_data *shadow_data);
+		const struct fx_render_box_shadow_options *options);
 
 /**
  * Render blur.

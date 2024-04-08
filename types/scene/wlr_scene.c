@@ -1247,6 +1247,9 @@ static void scene_entry_render(struct render_list_entry *entry, const struct ren
 	pixman_region32_copy(&geometry_region, &render_region);
 	clip_xdg(node, &geometry_region, &xdg_box, dst_box.x, dst_box.y, data->scale);
 
+	// Shadow box
+	struct wlr_box shadow_box = xdg_box;
+
 	pixman_region32_t opaque;
 	pixman_region32_init(&opaque);
 	scene_node_opaque_region(node, dst_box.x, dst_box.y, &opaque);
@@ -1296,16 +1299,22 @@ static void scene_entry_render(struct render_list_entry *entry, const struct ren
 
 		// Shadow
 		if (scene_buffer_has_shadow(&scene_buffer->shadow_data)) {
-			struct fx_render_rect_options shadow_options = {
-				.base = {
-					.box = xdg_box,
-					.clip = &render_region, // Render with the original extended clip region
-				},
+			struct shadow_data shadow_data = scene_buffer->shadow_data;
+			shadow_box.x -= shadow_data.blur_sigma - shadow_data.offset_x;
+			shadow_box.y -= shadow_data.blur_sigma - shadow_data.offset_y;
+			shadow_box.width += shadow_data.blur_sigma * 2;
+			shadow_box.height += shadow_data.blur_sigma * 2;
+			transform_output_box(&shadow_box, data);
+
+			struct fx_render_box_shadow_options shadow_options = {
+				.shadow_box = shadow_box,
+				.clip_box = xdg_box,
+				.clip = &render_region,
 				.scale = data->scale,
+				.shadow_data = &shadow_data,
+				.corner_radius = scene_buffer->corner_radius * data->scale,
 			};
-			fx_render_pass_add_box_shadow(data->render_pass, &shadow_options,
-					scene_buffer->corner_radius * data->scale,
-					&scene_buffer->shadow_data);
+			fx_render_pass_add_box_shadow(data->render_pass, &shadow_options);
 		}
 
 		struct fx_render_texture_options tex_options = {

@@ -863,15 +863,29 @@ void fx_render_pass_add_optimized_blur(struct fx_gles_render_pass *pass,
 }
 
 void fx_renderer_read_to_buffer(struct fx_gles_render_pass *pass,
-		pixman_region32_t *region, struct fx_framebuffer *dst_buffer,
+		pixman_region32_t *_region, struct fx_framebuffer *dst_buffer,
 		struct fx_framebuffer *src_buffer) {
-	if (!pixman_region32_not_empty(region)) {
+	if (!_region || !pixman_region32_not_empty(_region)) {
 		return;
+	}
+
+	pixman_region32_t region;
+	pixman_region32_init(&region);
+	pixman_region32_copy(&region, _region);
+
+	// Restore the transformed region to normal
+	if (pass->output) {
+		int ow, oh;
+		wlr_output_transformed_resolution(pass->output, &ow, &oh);
+		enum wl_output_transform transform =
+			wlr_output_transform_invert(pass->output->transform);
+		wlr_region_transform(&region, &region, transform, ow, oh);
 	}
 
 	struct wlr_texture *src_tex =
 		fx_texture_from_buffer(&pass->buffer->renderer->wlr_renderer, src_buffer->buffer);
 	if (src_tex == NULL) {
+		pixman_region32_fini(&region);
 		return;
 	}
 
@@ -879,7 +893,8 @@ void fx_renderer_read_to_buffer(struct fx_gles_render_pass *pass,
 	fx_framebuffer_bind(dst_buffer);
 	wlr_render_pass_add_texture(&pass->base, &(struct wlr_render_texture_options) {
 		.texture = src_tex,
-		.clip = region,
+		.clip = &region,
+		.transform = WL_OUTPUT_TRANSFORM_NORMAL,
 		.blend_mode = WLR_RENDER_BLEND_MODE_NONE,
 		.dst_box = (struct wlr_box){
 			.width = dst_buffer->buffer->width,
@@ -896,6 +911,8 @@ void fx_renderer_read_to_buffer(struct fx_gles_render_pass *pass,
 
 	// Bind back to the main WLR buffer
 	fx_framebuffer_bind(pass->buffer);
+
+	pixman_region32_fini(&region);
 }
 
 

@@ -14,7 +14,7 @@ struct fx_gles_render_pass {
 	struct fx_render_timer *timer;
 };
 
-enum corner_location { TOP_LEFT, TOP_RIGHT, BOTTOM_LEFT, BOTTOM_RIGHT, ALL };
+enum corner_location { TOP_LEFT, TOP_RIGHT, BOTTOM_RIGHT, BOTTOM_LEFT, ALL };
 
 /**
  * Begin a new render pass with the supplied destination buffer.

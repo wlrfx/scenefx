@@ -10,6 +10,7 @@ struct fx_gles_render_pass {
 	struct wlr_render_pass base;
 	struct fx_framebuffer *buffer;
 	struct fx_effect_framebuffers *fx_effect_framebuffers;
+	struct wlr_output *output;
 	float projection_matrix[9];
 	struct fx_render_timer *timer;
 };
@@ -29,7 +30,7 @@ struct fx_gles_render_pass *fx_renderer_begin_buffer_pass(struct wlr_renderer *w
 struct fx_render_texture_options {
 	struct wlr_render_texture_options base;
 	float scale;
-	struct wlr_box *clip_box; // Used to clip csd. Ignored if NULL
+	const struct wlr_box *clip_box; // Used to clip csd. Ignored if NULL
 	int corner_radius;
 	bool has_titlebar;
 	bool discard_transparent;
@@ -60,8 +61,6 @@ struct fx_render_rounded_border_corner_options {
 struct fx_render_blur_pass_options {
 	struct fx_render_texture_options tex_options;
 	pixman_region32_t *opaque_region;
-	struct wlr_output *output;
-	struct wlr_box monitor_box;
 	struct fx_framebuffer *current_buffer;
 	struct blur_data *blur_data;
 	bool use_optimized_blur;

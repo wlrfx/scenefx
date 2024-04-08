@@ -44,6 +44,11 @@ struct fx_render_rect_options fx_render_rect_options_default(
 	return options;
 }
 
+// Gets a non-transformed wlr_box
+static struct wlr_box get_monitor_box(struct wlr_output *output) {
+	return (struct wlr_box) { 0, 0, output->width, output->height };
+}
+
 ///
 /// Base Wlroots pass functions
 ///
@@ -283,7 +288,7 @@ void fx_render_pass_add_texture(struct fx_gles_render_pass *pass,
 	wlr_render_texture_options_get_dst_box(options, &dst_box);
 	float alpha = wlr_render_texture_options_get_alpha(options);
 
-	struct wlr_box *clip_box = &dst_box;
+	const struct wlr_box *clip_box = &dst_box;
 	if (!wlr_box_empty(fx_options->clip_box)) {
 		clip_box = fx_options->clip_box;
 	}
@@ -554,6 +559,8 @@ static void render_blur_segments(struct fx_gles_render_pass *pass,
 			fx_options->current_buffer->buffer);
 	struct fx_texture *texture = fx_get_texture(options->texture);
 
+	check_tex_src_box(options);
+
 	/*
 	 * Render
 	 */
@@ -681,12 +688,13 @@ static struct fx_framebuffer *get_main_buffer_blur(struct fx_gles_render_pass *p
 		struct fx_render_blur_pass_options *fx_options) {
 	struct fx_renderer *renderer = pass->buffer->renderer;
 	struct blur_data *blur_data = fx_options->blur_data;
+	struct wlr_box monitor_box = get_monitor_box(pass->output);
 
 	pixman_region32_t damage;
 	pixman_region32_init(&damage);
 	pixman_region32_copy(&damage, fx_options->tex_options.base.clip);
 	wlr_region_transform(&damage, &damage, fx_options->tex_options.base.transform,
-			fx_options->monitor_box.width, fx_options->monitor_box.height);
+			monitor_box.width, monitor_box.height);
 
 	wlr_region_expand(&damage, &damage, blur_data_calc_size(fx_options->blur_data));
 
@@ -695,12 +703,12 @@ static struct fx_framebuffer *get_main_buffer_blur(struct fx_gles_render_pass *p
 	pixman_region32_init(&scaled_damage);
 
 	fx_options->tex_options.base.src_box = (struct wlr_fbox) {
-		fx_options->monitor_box.x,
-		fx_options->monitor_box.y,
-		fx_options->monitor_box.width,
-		fx_options->monitor_box.height,
+		monitor_box.x,
+		monitor_box.y,
+		monitor_box.width,
+		monitor_box.height,
 	};
-	fx_options->tex_options.base.dst_box = fx_options->monitor_box;
+	fx_options->tex_options.base.dst_box = monitor_box;
 	// Clip the blur to the damage
 	fx_options->tex_options.base.clip = &scaled_damage;
 	// Artifacts with NEAREST filter
@@ -801,7 +809,7 @@ void fx_render_pass_add_blur(struct fx_gles_render_pass *pass,
 	}
 
 	// Draw the blurred texture
-	tex_options->base.dst_box = fx_options->monitor_box;
+	tex_options->base.dst_box = get_monitor_box(pass->output);
 	tex_options->base.src_box = (struct wlr_fbox) {
 		.x = 0,
 		.y = 0,
@@ -830,7 +838,7 @@ void fx_render_pass_add_optimized_blur(struct fx_gles_render_pass *pass,
 		abort();
 	}
 	struct fx_renderer *renderer = pass->buffer->renderer;
-	struct wlr_box monitor_box = fx_options->monitor_box;
+	struct wlr_box monitor_box = get_monitor_box(pass->output);
 
 	pixman_region32_t fake_damage;
 	pixman_region32_init_rect(&fake_damage, 0, 0, monitor_box.width, monitor_box.height);
@@ -842,7 +850,7 @@ void fx_render_pass_add_optimized_blur(struct fx_gles_render_pass *pass,
 	struct fx_framebuffer *buffer = get_main_buffer_blur(pass, &blur_options);
 
 	// Update the optimized blur buffer if invalid
-	fx_framebuffer_get_or_create_custom(renderer, fx_options->output,
+	fx_framebuffer_get_or_create_custom(renderer, pass->output,
 			&pass->fx_effect_framebuffers->optimized_blur_buffer);
 
 	// Render the newly blurred content into the blur_buffer
@@ -979,5 +987,6 @@ struct fx_gles_render_pass *fx_renderer_begin_buffer_pass(
 		return NULL;
 	}
 	pass->fx_effect_framebuffers = fbos;
+	pass->output = output;
 	return pass;
 }

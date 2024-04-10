@@ -480,7 +480,7 @@ void fx_render_pass_add_box_shadow(struct fx_gles_render_pass *pass,
 	struct wlr_box shadow_box = options->shadow_box;
 	assert(shadow_box.width > 0 && shadow_box.height > 0);
 	struct wlr_box surface_box = options->clip_box;
-	float blur_sigma = shadow_data->blur_sigma * options->scale;
+	float blur_sigma = shadow_data->blur_sigma;
 
 	pixman_region32_t render_region;
 	pixman_region32_init(&render_region);

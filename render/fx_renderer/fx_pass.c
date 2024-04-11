@@ -489,8 +489,8 @@ void fx_render_pass_add_box_shadow(struct fx_gles_render_pass *pass,
 	pixman_region32_init_rect(&inner_region,
 			surface_box.x + options->corner_radius * 0.5,
 			surface_box.y + options->corner_radius * 0.5,
-			surface_box.width - options->corner_radius,
-			surface_box.height - options->corner_radius);
+			fmax(surface_box.width - options->corner_radius, 0),
+			fmax(surface_box.height - options->corner_radius, 0));
 	pixman_region32_subtract(&render_region, options->clip, &inner_region);
 	pixman_region32_fini(&inner_region);
 

@@ -29,7 +29,6 @@ struct fx_gles_render_pass *fx_renderer_begin_buffer_pass(struct wlr_renderer *w
 
 struct fx_render_texture_options {
 	struct wlr_render_texture_options base;
-	float scale;
 	const struct wlr_box *clip_box; // Used to clip csd. Ignored if NULL
 	int corner_radius;
 	bool has_titlebar;
@@ -40,7 +39,7 @@ struct fx_render_texture_options {
 
 struct fx_render_rect_options {
 	struct wlr_render_rect_options base;
-	float scale;
+	// TODO: Add effects here in the future
 };
 
 struct fx_render_box_shadow_options {
@@ -49,21 +48,18 @@ struct fx_render_box_shadow_options {
 	/* Clip region, leave NULL to disable clipping */
 	const pixman_region32_t *clip;
 
-	float scale;
 	struct shadow_data *shadow_data;
 	int corner_radius;
 };
 
 struct fx_render_rounded_rect_options {
 	struct wlr_render_rect_options base;
-	float scale;
 	int corner_radius;
 	enum corner_location corner_location;
 };
 
 struct fx_render_rounded_border_corner_options {
 	struct wlr_render_rect_options base;
-	float scale;
 	int corner_radius;
 	int border_thickness;
 	enum corner_location corner_location;

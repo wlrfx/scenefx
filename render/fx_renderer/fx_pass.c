@@ -28,7 +28,6 @@ struct fx_render_texture_options fx_render_texture_options_default(
 		.discard_transparent = false,
 		.dim = 0.0f,
 		.dim_color = { 1, 1, 1, 1 },
-		.scale = 1.0f,
 		.clip_box = NULL,
 	};
 	memcpy(&options.base, base, sizeof(*base));
@@ -38,9 +37,8 @@ struct fx_render_texture_options fx_render_texture_options_default(
 struct fx_render_rect_options fx_render_rect_options_default(
 		const struct wlr_render_rect_options *base) {
 	struct fx_render_rect_options options = {
-		.scale = 1.0f,
+		.base = *base,
 	};
-	memcpy(&options.base, base, sizeof(*base));
 	return options;
 }
 

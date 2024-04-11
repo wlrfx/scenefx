@@ -1279,7 +1279,6 @@ static void scene_entry_render(struct render_list_entry *entry, const struct ren
 				},
 				.clip = &render_region,
 			},
-			.scale = data->scale,
 		};
 		fx_render_pass_add_rect(data->render_pass, &rect_options);
 		break;
@@ -1310,7 +1309,6 @@ static void scene_entry_render(struct render_list_entry *entry, const struct ren
 				.shadow_box = shadow_box,
 				.clip_box = xdg_box,
 				.clip = &render_region,
-				.scale = data->scale,
 				.shadow_data = &shadow_data,
 				.corner_radius = scene_buffer->corner_radius * data->scale,
 			};
@@ -1329,7 +1327,6 @@ static void scene_entry_render(struct render_list_entry *entry, const struct ren
 				.blend_mode = pixman_region32_not_empty(&opaque) ?
 					WLR_RENDER_BLEND_MODE_PREMULTIPLIED : WLR_RENDER_BLEND_MODE_NONE,
 			},
-			.scale = data->scale,
 			.clip_box = &xdg_box,
 			.corner_radius = scene_buffer->corner_radius * data->scale,
 		};

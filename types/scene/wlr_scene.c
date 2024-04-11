@@ -1305,6 +1305,8 @@ static void scene_entry_render(struct render_list_entry *entry, const struct ren
 			shadow_box.height += shadow_data.blur_sigma * 2;
 			transform_output_box(&shadow_box, data);
 
+			shadow_data.color.a *= scene_buffer->opacity;
+
 			struct fx_render_box_shadow_options shadow_options = {
 				.shadow_box = shadow_box,
 				.clip_box = xdg_box,

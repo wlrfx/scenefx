@@ -9,6 +9,8 @@ struct shadow_data {
 	bool enabled;
 	struct wlr_render_color color;
 	float blur_sigma;
+	float offset_x;
+	float offset_y;
 };
 
 struct shadow_data shadow_data_get_default(void);

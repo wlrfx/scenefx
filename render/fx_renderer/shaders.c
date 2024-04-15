@@ -3,13 +3,15 @@
 #include <stdlib.h>
 #include <wlr/util/log.h>
 
-#include "render/fx_renderer/fx_renderer.h"
 #include "render/fx_renderer/shaders.h"
 
 // shaders
+#include "GLES2/gl2.h"
 #include "common_vert_src.h"
 #include "quad_frag_src.h"
+#include "quad_round_frag_src.h"
 #include "tex_frag_src.h"
+#include "rounded_border_corner_frag_src.h"
 #include "stencil_mask_frag_src.h"
 #include "box_shadow_frag_src.h"
 #include "blur1_frag_src.h"
@@ -113,6 +115,27 @@ bool link_quad_program(struct quad_shader *shader) {
 	return true;
 }
 
+bool link_quad_round_program(struct quad_round_shader *shader, enum fx_rounded_quad_shader_source source) {
+	GLchar quad_src[2048];
+	snprintf(quad_src, sizeof(quad_src),
+		"#define SOURCE %d\n%s", source, quad_round_frag_src);
+
+	GLuint prog;
+	shader->program = prog = link_program(quad_src);
+	if (!shader->program) {
+		return false;
+	}
+
+	shader->proj = glGetUniformLocation(prog, "proj");
+	shader->color = glGetUniformLocation(prog, "color");
+	shader->pos_attrib = glGetAttribLocation(prog, "pos");
+	shader->size = glGetUniformLocation(prog, "size");
+	shader->position = glGetUniformLocation(prog, "position");
+	shader->radius = glGetUniformLocation(prog, "radius");
+
+	return true;
+}
+
 bool link_tex_program(struct tex_shader *shader,
 		enum fx_tex_shader_source source) {
 	GLchar frag_src[2048];
@@ -133,7 +156,32 @@ bool link_tex_program(struct tex_shader *shader,
 	shader->size = glGetUniformLocation(prog, "size");
 	shader->position = glGetUniformLocation(prog, "position");
 	shader->radius = glGetUniformLocation(prog, "radius");
+	shader->has_titlebar = glGetUniformLocation(prog, "has_titlebar");
 	shader->discard_transparent = glGetUniformLocation(prog, "discard_transparent");
+	shader->dim = glGetUniformLocation(prog, "dim");
+	shader->dim_color = glGetUniformLocation(prog, "dim_color");
+
+	return true;
+}
+
+bool link_rounded_border_corner_program(struct rounded_border_corner_shader *shader) {
+	GLuint prog;
+	shader->program = prog = link_program(rounded_border_corner_frag_src);
+	if (!shader->program) {
+		return false;
+	}
+
+	shader->proj = glGetUniformLocation(prog, "proj");
+	shader->color = glGetUniformLocation(prog, "color");
+	shader->pos_attrib = glGetAttribLocation(prog, "pos");
+	shader->is_top_left = glGetUniformLocation(prog, "is_top_left");
+	shader->is_top_right = glGetUniformLocation(prog, "is_top_right");
+	shader->is_bottom_left = glGetUniformLocation(prog, "is_bottom_left");
+	shader->is_bottom_right = glGetUniformLocation(prog, "is_bottom_right");
+	shader->position = glGetUniformLocation(prog, "position");
+	shader->radius = glGetUniformLocation(prog, "radius");
+	shader->half_size = glGetUniformLocation(prog, "half_size");
+	shader->half_thickness = glGetUniformLocation(prog, "half_thickness");
 
 	return true;
 }
@@ -146,7 +194,6 @@ bool link_stencil_mask_program(struct stencil_mask_shader *shader) {
 	}
 
 	shader->proj = glGetUniformLocation(prog, "proj");
-	shader->color = glGetUniformLocation(prog, "color");
 	shader->pos_attrib = glGetAttribLocation(prog, "pos");
 	shader->position = glGetUniformLocation(prog, "position");
 	shader->half_size = glGetUniformLocation(prog, "half_size");

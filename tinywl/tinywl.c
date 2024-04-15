@@ -5,7 +5,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <time.h>
-#include <scenefx/fx_renderer/fx_renderer.h>
+#include <scenefx/render/fx_renderer/fx_renderer.h>
 #include <scenefx/types/fx/blur_data.h>
 #include <scenefx/types/fx/shadow_data.h>
 #include <scenefx/types/wlr_scene.h>

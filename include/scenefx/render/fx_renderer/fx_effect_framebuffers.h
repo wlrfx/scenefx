@@ -4,8 +4,6 @@
 #include <wlr/types/wlr_output.h>
 #include <wlr/util/addon.h>
 
-#include "render/fx_renderer/fx_renderer.h"
-
 /**
  * Used to add effect framebuffers per output instead of every output sharing
  * them.
@@ -26,7 +24,6 @@ struct fx_effect_framebuffers {
 	bool blur_buffer_dirty;
 };
 
-struct fx_effect_framebuffers *fx_effect_framebuffers_try_get(
-		struct fx_renderer *renderer, struct wlr_output *output);
+struct fx_effect_framebuffers *fx_effect_framebuffers_try_get(struct wlr_output *output);
 
 #endif

@@ -1438,14 +1438,16 @@ static void scene_entry_render(struct render_list_entry *entry, const struct ren
 			pixman_region32_init(&opaque_region);
 
 			bool has_alpha = false;
+			struct wlr_scene_surface *scene_surface;
 			if (scene_buffer->opacity < 1.0) {
 				has_alpha = true;
 				pixman_region32_union_rect(&opaque_region, &opaque_region, 0, 0, 0, 0);
-			} else {
-				struct wlr_scene_surface *scene_surface
-					= wlr_scene_surface_try_from_buffer(scene_buffer);
+			} else if ((scene_surface = wlr_scene_surface_try_from_buffer(scene_buffer))) {
 				has_alpha = !scene_surface->surface->opaque;
 				pixman_region32_copy(&opaque_region, &scene_surface->surface->opaque_region);
+			} else {
+				has_alpha = pixman_region32_not_empty(&opaque);
+				pixman_region32_copy(&opaque_region, &opaque);
 			}
 
 			if (has_alpha) {
@@ -1464,7 +1466,7 @@ static void scene_entry_render(struct render_list_entry *entry, const struct ren
 						.corner_radius = scene_buffer->corner_radius * data->scale,
 						.discard_transparent = false,
 					},
-					.opaque_region = &scene_buffer->opaque_region,
+					.opaque_region = &opaque_region,
 					.use_optimized_blur = scene_buffer->backdrop_blur_optimized,
 					.blur_data = &scene->blur_data,
 					.ignore_transparent = scene_buffer->backdrop_blur_ignore_transparent,

@@ -3,6 +3,7 @@
 	https://gitlab.freedesktop.org/wlroots/wlroots/-/tree/master/render/gles2
 */
 
+#include "render/fx_renderer/shaders.h"
 #define _POSIX_C_SOURCE 199309L
 #include <assert.h>
 #include <drm_fourcc.h>
@@ -20,10 +21,11 @@
 #include <wlr/util/log.h>
 
 #include "render/egl.h"
+#include "scenefx/render/pass.h"
 #include "render/pixel_format.h"
 #include "render/fx_renderer/util.h"
 #include "render/fx_renderer/fx_renderer.h"
-#include "scenefx/fx_renderer/fx_renderer.h"
+#include "scenefx/render/fx_renderer/fx_renderer.h"
 #include "render/fx_renderer/matrix.h"
 #include "util/time.h"
 
@@ -453,6 +455,8 @@ static void fx_renderer_destroy(struct wlr_renderer *wlr_renderer) {
 
 static struct wlr_render_pass *begin_buffer_pass(struct wlr_renderer *wlr_renderer,
 		struct wlr_buffer *wlr_buffer, const struct wlr_buffer_pass_options *options) {
+	struct fx_renderer *renderer = fx_get_renderer(wlr_renderer);
+	renderer->basic_renderer = true;
 	struct fx_gles_render_pass *pass =
 		fx_renderer_begin_buffer_pass(wlr_renderer, wlr_buffer, NULL, options);
 	if (!pass) {
@@ -638,6 +642,33 @@ static bool link_shaders(struct fx_renderer *renderer) {
 		wlr_log(WLR_ERROR, "Could not link quad shader");
 		goto error;
 	}
+
+	// rounded quad fragment shaders
+	if (!link_quad_round_program(&renderer->shaders.quad_round, SHADER_SOURCE_QUAD_ROUND)) {
+		wlr_log(WLR_ERROR, "Could not link quad shader");
+		goto error;
+	}
+	// rounded quad fragment shaders
+	if (!link_quad_round_program(&renderer->shaders.quad_round_tl, SHADER_SOURCE_QUAD_ROUND_TOP_LEFT)) {
+		wlr_log(WLR_ERROR, "Could not link quad shader");
+		goto error;
+	}
+	// rounded quad fragment shaders
+	if (!link_quad_round_program(&renderer->shaders.quad_round_tr, SHADER_SOURCE_QUAD_ROUND_TOP_RIGHT)) {
+		wlr_log(WLR_ERROR, "Could not link quad shader");
+		goto error;
+	}
+	// rounded quad fragment shaders
+	if (!link_quad_round_program(&renderer->shaders.quad_round_bl, SHADER_SOURCE_QUAD_ROUND_BOTTOM_LEFT)) {
+		wlr_log(WLR_ERROR, "Could not link quad shader");
+		goto error;
+	}
+	// rounded quad fragment shaders
+	if (!link_quad_round_program(&renderer->shaders.quad_round_br, SHADER_SOURCE_QUAD_ROUND_BOTTOM_RIGHT)) {
+		wlr_log(WLR_ERROR, "Could not link quad shader");
+		goto error;
+	}
+
 	// fragment shaders
 	if (!link_tex_program(&renderer->shaders.tex_rgba, SHADER_SOURCE_TEXTURE_RGBA)) {
 		wlr_log(WLR_ERROR, "Could not link tex_RGBA shader");
@@ -649,6 +680,12 @@ static bool link_shaders(struct fx_renderer *renderer) {
 	}
 	if (!link_tex_program(&renderer->shaders.tex_ext, SHADER_SOURCE_TEXTURE_EXTERNAL)) {
 		wlr_log(WLR_ERROR, "Could not link tex_EXTERNAL shader");
+		goto error;
+	}
+
+	// border corner shader
+	if (!link_rounded_border_corner_program(&renderer->shaders.rounded_border_corner)) {
+		wlr_log(WLR_ERROR, "Could not link rounded border corner shader");
 		goto error;
 	}
 
@@ -681,9 +718,15 @@ static bool link_shaders(struct fx_renderer *renderer) {
 
 error:
 	glDeleteProgram(renderer->shaders.quad.program);
+	glDeleteProgram(renderer->shaders.quad_round.program);
+	glDeleteProgram(renderer->shaders.quad_round_tl.program);
+	glDeleteProgram(renderer->shaders.quad_round_tr.program);
+	glDeleteProgram(renderer->shaders.quad_round_bl.program);
+	glDeleteProgram(renderer->shaders.quad_round_br.program);
 	glDeleteProgram(renderer->shaders.tex_rgba.program);
 	glDeleteProgram(renderer->shaders.tex_rgbx.program);
 	glDeleteProgram(renderer->shaders.tex_ext.program);
+	glDeleteProgram(renderer->shaders.rounded_border_corner.program);
 	glDeleteProgram(renderer->shaders.stencil_mask.program);
 	glDeleteProgram(renderer->shaders.box_shadow.program);
 	glDeleteProgram(renderer->shaders.blur1.program);
@@ -815,8 +858,6 @@ struct wlr_renderer *fx_renderer_create_egl(struct wlr_egl *egl) {
 	if (!link_shaders(renderer)) {
 		goto error;
 	}
-
-	renderer->blur_buffer_dirty = false;
 
 	pop_fx_debug(renderer);
 

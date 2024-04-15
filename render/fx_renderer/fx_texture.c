@@ -5,6 +5,7 @@
 #include <wlr/util/log.h>
 #include <drm_fourcc.h>
 
+#include "scenefx/render/fx_renderer/fx_renderer.h"
 #include "render/fx_renderer/fx_renderer.h"
 #include "render/pixel_format.h"
 #include "render/egl.h"

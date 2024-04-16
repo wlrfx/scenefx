@@ -119,6 +119,7 @@ static const char *reset_status_str(GLenum status) {
 	}
 }
 
+// TODO: Deprecate all older rendering functions?
 static bool fx_renderer_begin(struct wlr_renderer *wlr_renderer, uint32_t width,
 		uint32_t height) {
 	struct fx_renderer *renderer =
@@ -140,8 +141,6 @@ static bool fx_renderer_begin(struct wlr_renderer *wlr_renderer, uint32_t width,
 	renderer->viewport_width = width;
 	renderer->viewport_height = height;
 
-	pixman_region32_init(&renderer->blur_padding_region);
-
 	// refresh projection matrix
 	matrix_projection(renderer->projection, width, height,
 		WL_OUTPUT_TRANSFORM_FLIPPED_180);
@@ -157,8 +156,7 @@ static bool fx_renderer_begin(struct wlr_renderer *wlr_renderer, uint32_t width,
 }
 
 static void fx_renderer_end(struct wlr_renderer *wlr_renderer) {
-	struct fx_renderer *renderer = fx_get_renderer_in_context(wlr_renderer);
-	pixman_region32_fini(&renderer->blur_padding_region);
+	// no-op
 }
 
 static void fx_renderer_clear(struct wlr_renderer *wlr_renderer,

@@ -84,9 +84,11 @@ static bool render_pass_submit(struct wlr_render_pass *wlr_pass) {
 	pop_fx_debug(renderer);
 
 	wlr_buffer_unlock(pass->buffer->buffer);
+	if (pass->output) {
+		struct fx_effect_framebuffers *fbos = fx_effect_framebuffers_try_get(pass->output);
+		pixman_region32_fini(&fbos->blur_padding_region);
+	}
 	free(pass);
-
-	pixman_region32_fini(&renderer->blur_padding_region);
 
 	return true;
 }
@@ -961,6 +963,8 @@ struct fx_gles_render_pass *fx_renderer_begin_buffer_pass(
 		struct wlr_renderer *wlr_renderer, struct wlr_buffer *wlr_buffer,
 		struct wlr_output *output, const struct wlr_buffer_pass_options *options) {
 	struct fx_renderer *renderer = fx_get_renderer(wlr_renderer);
+	assert(output);
+
 	renderer->basic_renderer = false;
 	if (!wlr_egl_make_current(renderer->egl)) {
 		return NULL;
@@ -977,17 +981,14 @@ struct fx_gles_render_pass *fx_renderer_begin_buffer_pass(
 		return NULL;
 	}
 
-	// Update the buffers if needed
-	struct fx_effect_framebuffers *fbos = NULL;
 	// For per output framebuffers
-	if (output) {
-		fbos = fx_effect_framebuffers_try_get(output);
-		fx_framebuffer_get_or_create_custom(renderer, output, &fbos->blur_saved_pixels_buffer);
-		fx_framebuffer_get_or_create_custom(renderer, output, &fbos->effects_buffer);
-		fx_framebuffer_get_or_create_custom(renderer, output, &fbos->effects_buffer_swapped);
-	}
+	struct fx_effect_framebuffers *fbos = fx_effect_framebuffers_try_get(output);
+	// Update the buffers if needed
+	fx_framebuffer_get_or_create_custom(renderer, output, &fbos->blur_saved_pixels_buffer);
+	fx_framebuffer_get_or_create_custom(renderer, output, &fbos->effects_buffer);
+	fx_framebuffer_get_or_create_custom(renderer, output, &fbos->effects_buffer_swapped);
 
-	pixman_region32_init(&renderer->blur_padding_region);
+	pixman_region32_init(&fbos->blur_padding_region);
 
 	struct fx_gles_render_pass *pass = begin_buffer_pass(buffer, timer);
 	if (!pass) {

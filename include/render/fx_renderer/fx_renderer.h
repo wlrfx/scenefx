@@ -11,6 +11,8 @@
 #include <wlr/util/addon.h>
 #include <wlr/util/box.h>
 
+#include "render/fx_renderer/shaders.h"
+
 struct fx_pixel_format {
 	uint32_t drm_format;
 	// optional field, if empty then internalformat = format
@@ -117,5 +119,73 @@ struct fx_render_timer {
 };
 
 bool wlr_render_timer_is_fx(struct wlr_render_timer *timer);
+
+///
+/// fx_renderer
+///
+
+struct fx_renderer {
+	struct wlr_renderer wlr_renderer;
+
+	float projection[9];
+	struct wlr_egl *egl;
+	int drm_fd;
+
+	const char *exts_str;
+	struct {
+		bool EXT_read_format_bgra;
+		bool KHR_debug;
+		bool OES_egl_image_external;
+		bool OES_egl_image;
+		bool EXT_texture_type_2_10_10_10_REV;
+		bool OES_texture_half_float_linear;
+		bool EXT_texture_norm16;
+		bool EXT_disjoint_timer_query;
+	} exts;
+
+	struct {
+		PFNGLEGLIMAGETARGETTEXTURE2DOESPROC glEGLImageTargetTexture2DOES;
+		PFNGLDEBUGMESSAGECALLBACKKHRPROC glDebugMessageCallbackKHR;
+		PFNGLDEBUGMESSAGECONTROLKHRPROC glDebugMessageControlKHR;
+		PFNGLPOPDEBUGGROUPKHRPROC glPopDebugGroupKHR;
+		PFNGLPUSHDEBUGGROUPKHRPROC glPushDebugGroupKHR;
+		PFNGLEGLIMAGETARGETRENDERBUFFERSTORAGEOESPROC glEGLImageTargetRenderbufferStorageOES;
+		PFNGLGETGRAPHICSRESETSTATUSKHRPROC glGetGraphicsResetStatusKHR;
+		PFNGLGENQUERIESEXTPROC glGenQueriesEXT;
+		PFNGLDELETEQUERIESEXTPROC glDeleteQueriesEXT;
+		PFNGLQUERYCOUNTEREXTPROC glQueryCounterEXT;
+		PFNGLGETQUERYOBJECTIVEXTPROC glGetQueryObjectivEXT;
+		PFNGLGETQUERYOBJECTUI64VEXTPROC glGetQueryObjectui64vEXT;
+		PFNGLGETINTEGER64VEXTPROC glGetInteger64vEXT;
+	} procs;
+
+	struct {
+		struct quad_shader quad;
+		struct quad_round_shader quad_round;
+		struct quad_round_shader quad_round_tl;
+		struct quad_round_shader quad_round_tr;
+		struct quad_round_shader quad_round_bl;
+		struct quad_round_shader quad_round_br;
+		struct tex_shader tex_rgba;
+		struct tex_shader tex_rgbx;
+		struct tex_shader tex_ext;
+		struct box_shadow_shader box_shadow;
+		struct rounded_border_corner_shader rounded_border_corner;
+		struct stencil_mask_shader stencil_mask;
+		struct blur_shader blur1;
+		struct blur_shader blur2;
+		struct blur_effects_shader blur_effects;
+	} shaders;
+
+	struct wl_list buffers; // fx_framebuffer.link
+	struct wl_list textures; // fx_texture.link
+
+	struct fx_framebuffer *current_buffer;
+	uint32_t viewport_width, viewport_height;
+
+	// Set to true when 'wlr_renderer_begin_buffer_pass' is called instead of
+	// our custom 'fx_renderer_begin_buffer_pass' function
+	bool basic_renderer;
+};
 
 #endif

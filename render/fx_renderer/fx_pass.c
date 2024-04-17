@@ -964,7 +964,7 @@ struct fx_gles_render_pass *fx_renderer_begin_buffer_pass(
 		struct wlr_output *output, const struct wlr_buffer_pass_options *options) {
 	struct fx_renderer *renderer = fx_get_renderer(wlr_renderer);
 
-	renderer->basic_renderer = output == NULL;
+	renderer->basic_renderer = (output == NULL);
 	if (!wlr_egl_make_current(renderer->egl)) {
 		return NULL;
 	}

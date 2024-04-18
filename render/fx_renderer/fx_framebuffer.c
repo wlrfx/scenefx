@@ -140,6 +140,7 @@ error_buffer:
 
 void fx_framebuffer_bind(struct fx_framebuffer *fx_buffer) {
 	glBindFramebuffer(GL_FRAMEBUFFER, fx_buffer->fbo);
+	glBindRenderbuffer(GL_RENDERBUFFER, fx_buffer->sb);
 }
 
 void fx_framebuffer_destroy(struct fx_framebuffer *fx_buffer) {

@@ -497,15 +497,15 @@ void fx_render_pass_add_box_shadow(struct fx_gles_render_pass *pass,
 	push_fx_debug(renderer);
 
 	// Init stencil work
-	stencil_mask_init();
+	// stencil_mask_init();
 	// Draw the rounded rect as a mask
-	struct fx_render_stencil_box_options stencil_options = {
-		.box = options->clip_box,
-		.corner_radius = options->corner_radius,
-		.clip = options->clip,
-	};
-	fx_render_pass_add_stencil_mask(pass, &stencil_options);
-	stencil_mask_close(false);
+	// struct fx_render_stencil_box_options stencil_options = {
+	// 	.box = options->clip_box,
+	// 	.corner_radius = options->corner_radius,
+	// 	.clip = options->clip,
+	// };
+	// fx_render_pass_add_stencil_mask(pass, &stencil_options);
+	// stencil_mask_close(false);
 
 	// blending will practically always be needed (unless we have a madman
 	// who uses opaque shadows with zero sigma), so just enable it
@@ -527,7 +527,7 @@ void fx_render_pass_add_box_shadow(struct fx_gles_render_pass *pass,
 
 	glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
 
-	stencil_mask_fini();
+	// stencil_mask_fini();
 
 	pop_fx_debug(renderer);
 }

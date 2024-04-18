@@ -66,21 +66,15 @@
       devShells = forEachSystem (pkgs: {
         default = pkgs.mkShell {
           name = "scenefx-shell";
-
           inputsFrom = [
             self.packages.${pkgs.system}.scenefx
             pkgs.wlroots_0_17
           ];
-
-          nativeBuildInputs = [
-            pkgs.hwdata # for wlroots
-          ];
-
-          shellHook = with pkgs; ''
+          shellHook = ''
             (
-              mkdir -p "$PWD/subprojects"
-              cd "$PWD/subprojects"
-              cp -R --no-preserve=mode,ownership ${wlroots_0_17.src} wlroots
+              # Copy the nix version of wlroots into the project
+              mkdir -p "$PWD/subprojects" && cd "$PWD/subprojects"
+              cp -R --no-preserve=mode,ownership ${pkgs.wlroots_0_17.src} wlroots
             )'';
         };
       });

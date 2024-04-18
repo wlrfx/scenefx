@@ -51,7 +51,9 @@ float hash(vec2 p) {
 
 void main() {
 	vec4 color = texture2D(tex, v_texcoord);
-	color *= brightnessMatrix() * contrastMatrix() * saturationMatrix();
+	// Do *not* transpose the combined matrix when multiplying
+	color = brightnessMatrix() * contrastMatrix() * saturationMatrix() * color;
+
 	float noiseHash = hash(v_texcoord);
 	float noiseAmount = (mod(noiseHash, 1.0) - 0.5);
 	color.rgb += noiseAmount * noise;

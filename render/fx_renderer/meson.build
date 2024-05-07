@@ -6,6 +6,7 @@ elif 'auto' in renderers and get_option('auto_features').disabled()
 endif
 
 wlr_files += files(
+	'matrix.c',
 	'util.c',
 	'shaders.c',
 	'pixel_format.c',
@@ -15,12 +16,6 @@ wlr_files += files(
 	'fx_texture.c',
 	'fx_renderer.c',
 )
-
-if not wlroots_is_sub
-	wlr_files += files([
-		'matrix.c',
-	])
-endif
 
 if 'gles2' in renderers or 'auto' in renderers
 	egl = dependency('egl', required: 'gles2' in renderers)

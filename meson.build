@@ -13,7 +13,7 @@ project(
 
 # When doing a major or minor release, *always* increase soversion. This isn't
 # necessary for bugfix releases. Increasing soversion is required because
-# wlroots never guarantees ABI stability -- only API stability is guaranteed
+# SceneFX never guarantees ABI stability -- only API stability is guaranteed
 # between minor releases.
 soversion = 1
 
@@ -139,8 +139,8 @@ pixman = dependency('pixman-1',
 math = cc.find_library('m')
 rt = cc.find_library('rt')
 
-wlr_files = []
-wlr_deps = [
+scenefx_files = []
+scenefx_deps = [
 	wlroots,
 	wayland_server,
 	drm,
@@ -161,9 +161,9 @@ subdir('include')
 scenefx_inc = include_directories('include')
 
 lib_scenefx = library(
-	meson.project_name(), wlr_files,
+	meson.project_name(), scenefx_files,
 	soversion: soversion.to_string(),
-	dependencies: wlr_deps,
+	dependencies: scenefx_deps,
 	include_directories:  [ scenefx_inc ],
 	install: true,
 )
@@ -171,7 +171,7 @@ lib_scenefx = library(
 
 scenefx = declare_dependency(
 	link_with: lib_scenefx,
-	dependencies: wlr_deps,
+	dependencies: scenefx_deps,
 	include_directories: scenefx_inc,
 )
 

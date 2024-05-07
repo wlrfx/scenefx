@@ -16,7 +16,7 @@ shaders = [
 foreach name : shaders
     output = name.underscorify() + '_src.h'
     var = name.underscorify() + '_src'
-    wlr_files += custom_target(
+    scenefx_files += custom_target(
         output,
         command: [embed, var],
         input: name,

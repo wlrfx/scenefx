@@ -2185,7 +2185,6 @@ bool wlr_scene_output_build_state(struct wlr_scene_output *scene_output,
 		timer->pre_render_duration = timespec_to_nsec(&duration);
 	}
 
-	struct fx_renderer *renderer = fx_get_renderer(output->renderer);
 	struct fx_gles_render_pass *render_pass =
 		fx_renderer_begin_buffer_pass(output->renderer, buffer, output,
 				&(struct wlr_buffer_pass_options) {
@@ -2196,6 +2195,7 @@ bool wlr_scene_output_build_state(struct wlr_scene_output *scene_output,
 		wlr_buffer_unlock(buffer);
 		return false;
 	}
+	struct fx_effect_framebuffers *effect_fbos = render_pass->fx_effect_framebuffers;
 
 	render_data.render_pass = render_pass;
 	pixman_region32_init(&render_data.damage);
@@ -2245,14 +2245,14 @@ bool wlr_scene_output_build_state(struct wlr_scene_output *scene_output,
 					0, 0, output_width, output_height);
 
 			// capture the padding pixels around the blur where artifacts will be drawn
-			pixman_region32_subtract(&renderer->blur_padding_region,
+			pixman_region32_subtract(&effect_fbos->blur_padding_region,
 					&extended_damage, damage);
 			// Combine into the surface damage (we need to redraw the padding area as well)
 			pixman_region32_union(damage, damage, &extended_damage);
 			pixman_region32_fini(&extended_damage);
 
 			// Capture the padding pixels before blur for later use
-			fx_renderer_read_to_buffer(render_pass, &renderer->blur_padding_region,
+			fx_renderer_read_to_buffer(render_pass, &effect_fbos->blur_padding_region,
 					render_pass->fx_effect_framebuffers->blur_saved_pixels_buffer,
 					render_pass->buffer, true);
 		}
@@ -2325,7 +2325,7 @@ bool wlr_scene_output_build_state(struct wlr_scene_output *scene_output,
 	if (!render_pass->fx_effect_framebuffers->blur_buffer_dirty) {
 		// TODO: Investigate blitting instead
 		// Render the saved pixels over the blur artifacts
-		fx_renderer_read_to_buffer(render_pass, &renderer->blur_padding_region,
+		fx_renderer_read_to_buffer(render_pass, &effect_fbos->blur_padding_region,
 				render_pass->buffer,
 				render_pass->fx_effect_framebuffers->blur_saved_pixels_buffer, true);
 	}

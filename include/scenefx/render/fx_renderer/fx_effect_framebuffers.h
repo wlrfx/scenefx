@@ -22,6 +22,9 @@ struct fx_effect_framebuffers {
 	struct fx_framebuffer *effects_buffer_swapped;
 
 	bool blur_buffer_dirty;
+
+	// The region where there's blur
+	pixman_region32_t blur_padding_region;
 };
 
 struct fx_effect_framebuffers *fx_effect_framebuffers_try_get(struct wlr_output *output);

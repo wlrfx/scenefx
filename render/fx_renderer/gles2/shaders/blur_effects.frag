@@ -1,17 +1,13 @@
-#ifdef GL_FRAGMENT_PRECISION_HIGH
 precision highp float;
-#else
-precision mediump float;
-#endif
 
 varying vec2 v_texcoord;
 
 uniform sampler2D tex;
 
-uniform float noise;
 uniform float brightness;
 uniform float contrast;
 uniform float saturation;
+uniform float noise;
 
 mat4 brightnessMatrix() {
 	float b = brightness - 1.0;
@@ -30,31 +26,30 @@ mat4 contrastMatrix() {
 }
 
 mat4 saturationMatrix() {
-	vec3 luminance = vec3(0.3086, 0.6094, 0.0820);
-	float oneMinusSat = 1.0 - saturation;
-	vec3 red = vec3(luminance.x * oneMinusSat);
-	red+= vec3(saturation, 0, 0);
-	vec3 green = vec3(luminance.y * oneMinusSat);
-	green += vec3(0, saturation, 0);
-	vec3 blue = vec3(luminance.z * oneMinusSat);
-	blue += vec3(0, 0, saturation);
+	vec3 luminance = vec3(0.3086, 0.6094, 0.0820) * (1.0 - saturation);
+	vec3 red = vec3(luminance.x);
+	red.x += saturation;
+	vec3 green = vec3(luminance.y);
+	green.y += saturation;
+	vec3 blue = vec3(luminance.z);
+	blue.z += saturation;
 	return mat4(red, 0,
 				green, 0,
 				blue, 0,
 				0, 0, 0, 1);
 }
 
-// Fast generative noise function
-float hash(vec2 p) {
-	return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453);
-}
+float noiseAmount(vec2 p) {
+	vec3 p3 = fract(vec3(p.xyx) * 1689.1984);
+	p3 += dot(p3, p3.yzx + 33.33);
+	float hash = fract((p3.x + p3.y) * p3.z);
+	return (mod(hash, 1.0) - 0.5) * noise;
+};
 
 void main() {
 	vec4 color = texture2D(tex, v_texcoord);
-	color *= brightnessMatrix() * contrastMatrix() * saturationMatrix();
-	float noiseHash = hash(v_texcoord);
-	float noiseAmount = (mod(noiseHash, 1.0) - 0.5);
-	color.rgb += noiseAmount * noise;
-
+	// Do *not* transpose the combined matrix when multiplying
+	color = brightnessMatrix() * contrastMatrix() * saturationMatrix() * color;
+	color.xyz += noiseAmount(v_texcoord);
 	gl_FragColor = color;
 }

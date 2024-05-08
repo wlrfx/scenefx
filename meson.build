@@ -13,7 +13,7 @@ project(
 
 # When doing a major or minor release, *always* increase soversion. This isn't
 # necessary for bugfix releases. Increasing soversion is required because
-# wlroots never guarantees ABI stability -- only API stability is guaranteed
+# SceneFX never guarantees ABI stability -- only API stability is guaranteed
 # between minor releases.
 soversion = 1
 
@@ -92,18 +92,22 @@ wayland_server = dependency('wayland-server',
 	default_options: wayland_project_options,
 )
 
-wlroots_options = [ 'examples=false', 'default_library=static' ]
+wlroots_options = [ 'examples=false' ]
 wlroots_version = ['>=0.17.0', '<0.18.0']
-wlroots_is_sub = subproject(
-	'wlroots',
-	default_options: wlroots_options,
-	required: false,
-	version: wlroots_version,
-).found()
 wlroots = dependency('wlroots',
 	version: wlroots_version,
 	default_options: wlroots_options,
+	required: false,
 )
+if not wlroots.found()
+	wlroots_proj = subproject(
+		'wlroots',
+		default_options: wlroots_options,
+		version: wlroots_version,
+	)
+	wlroots = wlroots_proj.get_variable('wlroots')
+endif
+
 
 drm = dependency('libdrm',
 	version: '>=2.4.114',
@@ -135,8 +139,8 @@ pixman = dependency('pixman-1',
 math = cc.find_library('m')
 rt = cc.find_library('rt')
 
-wlr_files = []
-wlr_deps = [
+scenefx_files = []
+scenefx_deps = [
 	wlroots,
 	wayland_server,
 	drm,
@@ -157,9 +161,9 @@ subdir('include')
 scenefx_inc = include_directories('include')
 
 lib_scenefx = library(
-	meson.project_name(), wlr_files,
+	meson.project_name(), scenefx_files,
 	soversion: soversion.to_string(),
-	dependencies: wlr_deps,
+	dependencies: scenefx_deps,
 	include_directories:  [ scenefx_inc ],
 	install: true,
 )
@@ -167,7 +171,7 @@ lib_scenefx = library(
 
 scenefx = declare_dependency(
 	link_with: lib_scenefx,
-	dependencies: wlr_deps,
+	dependencies: scenefx_deps,
 	include_directories: scenefx_inc,
 )
 

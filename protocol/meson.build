@@ -68,7 +68,7 @@ foreach name, path : protocols
 		output: '@BASENAME@-protocol.c',
 		command: [wayland_scanner, 'private-code', '@INPUT@', '@OUTPUT@'],
 	)
-	wlr_files += code
+	scenefx_files += code
 
 	server_header = custom_target(
 		name.underscorify() + '_server_h',
@@ -76,7 +76,7 @@ foreach name, path : protocols
 		output: '@BASENAME@-protocol.h',
 		command: [wayland_scanner, 'server-header', '@INPUT@', '@OUTPUT@'],
 	)
-	wlr_files += server_header
+	scenefx_files += server_header
 
 	client_header = custom_target(
 		name.underscorify() + '_client_h',

@@ -100,17 +100,16 @@ struct wlr_scene {
 	struct wl_list outputs; // wlr_scene_output.link
 
 	// May be NULL
-	struct wlr_presentation *presentation;
 	struct wlr_linux_dmabuf_v1 *linux_dmabuf_v1;
 
 	// private state
 
-	struct wl_listener presentation_destroy;
 	struct wl_listener linux_dmabuf_v1_destroy;
 
 	enum wlr_scene_debug_damage_option debug_damage_option;
 	bool direct_scanout;
 	bool calculate_visibility;
+	bool highlight_transparent_region;
 };
 
 /** A scene-graph node displaying a single surface. */
@@ -191,6 +190,13 @@ struct wlr_scene_buffer {
 	uint64_t active_outputs;
 	struct wlr_texture *texture;
 	struct wlr_linux_dmabuf_feedback_v1_init_options prev_feedback_options;
+
+	bool own_buffer;
+	int buffer_width, buffer_height;
+	bool buffer_is_opaque;
+
+	struct wl_listener buffer_release;
+	struct wl_listener renderer_destroy;
 };
 
 /** A viewport for an output in the scene-graph */
@@ -209,6 +215,8 @@ struct wlr_scene_output {
 	} events;
 
 	// private state
+
+	pixman_region32_t pending_commit_damage;
 
 	uint8_t index;
 	bool prev_scanout;
@@ -304,15 +312,6 @@ struct wlr_scene_node *wlr_scene_node_at(struct wlr_scene_node *node,
  * Create a new scene-graph.
  */
 struct wlr_scene *wlr_scene_create(void);
-
-/**
- * Handle presentation feedback for all surfaces in the scene, assuming that
- * scene outputs and the scene rendering functions are used.
- *
- * Asserts that a struct wlr_presentation hasn't already been set for the scene.
- */
-void wlr_scene_set_presentation(struct wlr_scene *scene,
-	struct wlr_presentation *presentation);
 
 /**
  * Handles linux_dmabuf_v1 feedback for all surfaces in the scene.
@@ -487,6 +486,14 @@ void wlr_scene_output_set_position(struct wlr_scene_output *scene_output,
 
 struct wlr_scene_output_state_options {
 	struct wlr_scene_timer *timer;
+	struct wlr_color_transform *color_transform;
+
+	/**
+	 * Allows use of a custom swapchain. This can be useful when trying out an
+	 * output configuration. The swapchain dimensions must match the respective
+	 * wlr_output_state or output size if not specified.
+	 */
+	struct wlr_swapchain *swapchain;
 };
 
 /**
@@ -567,7 +574,7 @@ struct wlr_scene_tree *wlr_scene_subsurface_tree_create(
  * A NULL or empty clip will disable clipping
  */
 void wlr_scene_subsurface_tree_set_clip(struct wlr_scene_node *node,
-	struct wlr_box *clip);
+	const struct wlr_box *clip);
 
 /**
  * Add a node displaying an xdg_surface and all of its sub-surfaces to the

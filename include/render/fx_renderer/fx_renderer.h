@@ -13,12 +13,13 @@
 
 #include "render/fx_renderer/shaders.h"
 
+struct fx_framebuffer;
+
 struct fx_pixel_format {
 	uint32_t drm_format;
 	// optional field, if empty then internalformat = format
 	GLint gl_internalformat;
 	GLint gl_format, gl_type;
-	bool has_alpha;
 };
 
 bool is_fx_pixel_format_supported(const struct fx_renderer *renderer,
@@ -26,8 +27,10 @@ bool is_fx_pixel_format_supported(const struct fx_renderer *renderer,
 const struct fx_pixel_format *get_fx_format_from_drm(uint32_t fmt);
 const struct fx_pixel_format *get_fx_format_from_gl(
 	GLint gl_format, GLint gl_type, bool alpha);
-const uint32_t *get_fx_shm_formats(const struct fx_renderer *renderer,
-	size_t *len);
+void get_fx_shm_formats(const struct fx_renderer *renderer,
+ struct wlr_drm_format_set *out);
+
+GLuint fx_framebuffer_get_fbo(struct fx_framebuffer *buffer);
 
 ///
 /// fx_framebuffer
@@ -37,10 +40,12 @@ struct fx_framebuffer {
 	struct wlr_buffer *buffer;
 	struct fx_renderer *renderer;
 	struct wl_list link; // fx_renderer.buffers
+	bool external_only;
 
 	EGLImageKHR image;
 	GLuint rbo;
 	GLuint fbo;
+	GLuint tex;
 	GLuint sb; // Stencil
 
 	struct wlr_addon addon;
@@ -66,21 +71,18 @@ struct fx_texture {
 	struct fx_renderer *fx_renderer;
 	struct wl_list link; // fx_renderer.textures
 
-	// Basically:
-	//   GL_TEXTURE_2D == mutable
-	//   GL_TEXTURE_EXTERNAL_OES == immutable
 	GLuint target;
-	GLuint tex;
 
-	EGLImageKHR image;
+	// If this texture is imported from a buffer, the texture is does not own
+	// these states. These cannot be destroyed along with the texture in this
+	// case.
+	GLuint tex;
+	GLuint fbo;
 
 	bool has_alpha;
 
-	// Only affects target == GL_TEXTURE_2D
-	uint32_t drm_format; // used to interpret upload data
-	// If imported from a wlr_buffer
-	struct wlr_buffer *buffer;
-	struct wlr_addon buffer_addon;
+	uint32_t drm_format; // for mutable textures only, used to interpret upload data
+	struct fx_framebuffer *buffer; // for DMA-BUF imports only
 };
 
 struct fx_texture *fx_get_texture(struct wlr_texture *wlr_texture);
@@ -124,12 +126,26 @@ bool wlr_render_timer_is_fx(struct wlr_render_timer *timer);
 /// fx_renderer
 ///
 
+/**
+ * OpenGL ES 2 renderer.
+ *
+ * Care must be taken to avoid stepping each other's toes with EGL contexts:
+ * the current EGL is global state. The GLES2 renderer operations will save
+ * and restore any previous EGL context when called. A render pass is seen as
+ * a single operation.
+ *
+ * The GLES2 renderer doesn't support arbitrarily nested render passes. It
+ * supports a subset only: after a nested render pass is created, any parent
+ * render pass can't be used before the nested render pass is submitted.
+ */
+
 struct fx_renderer {
 	struct wlr_renderer wlr_renderer;
 
-	float projection[9];
 	struct wlr_egl *egl;
 	int drm_fd;
+
+	struct wlr_drm_format_set shm_texture_formats;
 
 	const char *exts_str;
 	struct {
@@ -179,9 +195,6 @@ struct fx_renderer {
 
 	struct wl_list buffers; // fx_framebuffer.link
 	struct wl_list textures; // fx_texture.link
-
-	struct fx_framebuffer *current_buffer;
-	uint32_t viewport_width, viewport_height;
 
 	// Set to true when 'wlr_renderer_begin_buffer_pass' is called instead of
 	// our custom 'fx_renderer_begin_buffer_pass' function

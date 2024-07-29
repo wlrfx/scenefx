@@ -4,6 +4,8 @@
 #include <stdbool.h>
 #include <wlr/render/pass.h>
 #include <wlr/render/interface.h>
+
+#include "render/egl.h"
 #include "scenefx/types/fx/shadow_data.h"
 
 struct fx_gles_render_pass {
@@ -12,6 +14,7 @@ struct fx_gles_render_pass {
 	struct fx_effect_framebuffers *fx_effect_framebuffers;
 	struct wlr_output *output;
 	float projection_matrix[9];
+	struct wlr_egl_context prev_ctx;
 	struct fx_render_timer *timer;
 };
 

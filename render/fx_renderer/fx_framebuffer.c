@@ -20,6 +20,59 @@ static const struct wlr_addon_interface buffer_addon_impl = {
 	.destroy = handle_buffer_destroy,
 };
 
+GLuint fx_framebuffer_get_fbo(struct fx_framebuffer *buffer) {
+	if (buffer->external_only) {
+		wlr_log(WLR_ERROR, "DMA-BUF format is external-only");
+		return 0;
+	}
+
+	if (buffer->fbo) {
+		 return buffer->fbo;
+	}
+
+	push_fx_debug(buffer->renderer);
+
+	if (!buffer->rbo) {
+		 glGenRenderbuffers(1, &buffer->rbo);
+		 glBindRenderbuffer(GL_RENDERBUFFER, buffer->rbo);
+		 buffer->renderer->procs.glEGLImageTargetRenderbufferStorageOES(GL_RENDERBUFFER,
+				 buffer->image);
+		 glBindRenderbuffer(GL_RENDERBUFFER, 0);
+	}
+
+	glGenFramebuffers(1, &buffer->fbo);
+	glBindFramebuffer(GL_FRAMEBUFFER, buffer->fbo);
+	glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0,
+		 GL_RENDERBUFFER, buffer->rbo);
+	GLenum fb_status = glCheckFramebufferStatus(GL_FRAMEBUFFER);
+	glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+	if (fb_status != GL_FRAMEBUFFER_COMPLETE) {
+		 wlr_log(WLR_ERROR, "Failed to create FBO");
+		 glDeleteFramebuffers(1, &buffer->fbo);
+		 buffer->fbo = 0;
+	}
+
+	// Init stencil buffer
+	glGenRenderbuffers(1, &buffer->sb);
+	glBindRenderbuffer(GL_RENDERBUFFER, buffer->sb);
+	glRenderbufferStorage(GL_RENDERBUFFER, GL_STENCIL_INDEX8,
+			buffer->buffer->width, buffer->buffer->height);
+	glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_STENCIL_ATTACHMENT,
+			GL_RENDERBUFFER, buffer->sb);
+	fb_status = glCheckFramebufferStatus(GL_FRAMEBUFFER);
+
+	if (fb_status != GL_FRAMEBUFFER_COMPLETE) {
+		 wlr_log(WLR_ERROR, "Failed to create FBO");
+		 glDeleteFramebuffers(1, &buffer->fbo);
+		 buffer->sb = 0;
+	}
+
+	pop_fx_debug(buffer->renderer);
+
+	return buffer->fbo;
+}
+
 void fx_framebuffer_get_or_create_custom(struct fx_renderer *renderer,
 		struct wlr_output *output, struct fx_framebuffer **fx_framebuffer) {
 	struct wlr_allocator *allocator = output->allocator;
@@ -49,6 +102,7 @@ void fx_framebuffer_get_or_create_custom(struct fx_renderer *renderer,
 				width, height, &swapchain->format);
 	}
 	*fx_framebuffer = fx_framebuffer_get_or_create(renderer, wlr_buffer);
+	fx_framebuffer_get_fbo(*fx_framebuffer);
 }
 
 struct fx_framebuffer *fx_framebuffer_get_or_create(struct fx_renderer *renderer,
@@ -73,51 +127,11 @@ struct fx_framebuffer *fx_framebuffer_get_or_create(struct fx_renderer *renderer
 		goto error_buffer;
 	}
 
-	bool external_only;
 	buffer->image = wlr_egl_create_image_from_dmabuf(renderer->egl,
-		&dmabuf, &external_only);
+		&dmabuf, &buffer->external_only);
 	if (buffer->image == EGL_NO_IMAGE_KHR) {
 		goto error_buffer;
 	}
-
-	push_fx_debug(renderer);
-
-	glGenRenderbuffers(1, &buffer->rbo);
-	glBindRenderbuffer(GL_RENDERBUFFER, buffer->rbo);
-	renderer->procs.glEGLImageTargetRenderbufferStorageOES(GL_RENDERBUFFER,
-		buffer->image);
-	glBindRenderbuffer(GL_RENDERBUFFER, 0);
-
-	glGenFramebuffers(1, &buffer->fbo);
-	glBindFramebuffer(GL_FRAMEBUFFER, buffer->fbo);
-	glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0,
-		GL_RENDERBUFFER, buffer->rbo);
-	GLenum fb_status = glCheckFramebufferStatus(GL_FRAMEBUFFER);
-	if (fb_status != GL_FRAMEBUFFER_COMPLETE) {
-		wlr_log(WLR_ERROR, "Failed to create FBO");
-		glBindFramebuffer(GL_FRAMEBUFFER, 0);
-		goto error_image;
-	}
-
-	// Init stencil buffer
-	glGenRenderbuffers(1, &buffer->sb);
-	glBindRenderbuffer(GL_RENDERBUFFER, buffer->sb);
-	glRenderbufferStorage(GL_RENDERBUFFER, GL_STENCIL_INDEX8,
-			wlr_buffer->width, wlr_buffer->height);
-	glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_STENCIL_ATTACHMENT,
-			GL_RENDERBUFFER, buffer->sb);
-	fb_status = glCheckFramebufferStatus(GL_FRAMEBUFFER);
-	if (fb_status != GL_FRAMEBUFFER_COMPLETE) {
-		wlr_log(WLR_ERROR,
-				"Stencil buffer incomplete, couldn't create! (FB status: %i)",
-				fb_status);
-		glBindFramebuffer(GL_FRAMEBUFFER, 0);
-		goto error_stencil;
-	}
-
-	glBindFramebuffer(GL_FRAMEBUFFER, 0);
-
-	pop_fx_debug(renderer);
 
 	wlr_addon_init(&buffer->addon, &wlr_buffer->addons, renderer,
 		&buffer_addon_impl);
@@ -129,10 +143,6 @@ struct fx_framebuffer *fx_framebuffer_get_or_create(struct fx_renderer *renderer
 
 	return buffer;
 
-error_stencil:
-	glDeleteRenderbuffers(1, &buffer->sb);
-error_image:
-	wlr_egl_destroy_image(renderer->egl, buffer->image);
 error_buffer:
 	free(buffer);
 	return NULL;
@@ -148,13 +158,14 @@ void fx_framebuffer_destroy(struct fx_framebuffer *fx_buffer) {
 	wlr_addon_finish(&fx_buffer->addon);
 
 	struct wlr_egl_context prev_ctx;
-	wlr_egl_save_context(&prev_ctx);
-	wlr_egl_make_current(fx_buffer->renderer->egl);
+	wlr_egl_make_current(fx_buffer->renderer->egl, &prev_ctx);
 
 	glDeleteFramebuffers(1, &fx_buffer->fbo);
 	fx_buffer->fbo = -1;
 	glDeleteRenderbuffers(1, &fx_buffer->rbo);
 	fx_buffer->rbo = -1;
+	glDeleteTextures(1, &fx_buffer->tex);
+	fx_buffer->tex = -1;
 	glDeleteRenderbuffers(1, &fx_buffer->sb);
 	fx_buffer->sb = -1;
 

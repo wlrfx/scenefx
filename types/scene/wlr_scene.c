@@ -1233,9 +1233,12 @@ static void scene_entry_render(struct render_list_entry *entry, const struct ren
 		return;
 	}
 
+	int x = entry->x - data->logical.x;
+	int y = entry->y - data->logical.y;
+
 	struct wlr_box dst_box = {
-		.x = entry->x - data->logical.x,
-		.y = entry->y - data->logical.y,
+		.x = x,
+		.y = y,
 	};
 	scene_node_get_size(node, &dst_box.width, &dst_box.height);
 	scale_box(&dst_box, data->scale);
@@ -1252,7 +1255,7 @@ static void scene_entry_render(struct render_list_entry *entry, const struct ren
 
 	pixman_region32_t opaque;
 	pixman_region32_init(&opaque);
-	scene_node_opaque_region(node, dst_box.x, dst_box.y, &opaque);
+	scene_node_opaque_region(node, x, y, &opaque);
 	scale_output_damage(&opaque, data->scale);
 	pixman_region32_subtract(&opaque, &render_region, &opaque);
 

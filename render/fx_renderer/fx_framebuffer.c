@@ -27,31 +27,24 @@ GLuint fx_framebuffer_get_fbo(struct fx_framebuffer *buffer) {
 	}
 
 	if (buffer->fbo) {
-		 return buffer->fbo;
+		return buffer->fbo;
 	}
 
 	push_fx_debug(buffer->renderer);
 
 	if (!buffer->rbo) {
-		 glGenRenderbuffers(1, &buffer->rbo);
-		 glBindRenderbuffer(GL_RENDERBUFFER, buffer->rbo);
-		 buffer->renderer->procs.glEGLImageTargetRenderbufferStorageOES(GL_RENDERBUFFER,
-				 buffer->image);
-		 glBindRenderbuffer(GL_RENDERBUFFER, 0);
+		glGenRenderbuffers(1, &buffer->rbo);
+		glBindRenderbuffer(GL_RENDERBUFFER, buffer->rbo);
+		buffer->renderer->procs.glEGLImageTargetRenderbufferStorageOES(GL_RENDERBUFFER,
+				buffer->image);
+		glBindRenderbuffer(GL_RENDERBUFFER, 0);
 	}
 
 	glGenFramebuffers(1, &buffer->fbo);
 	glBindFramebuffer(GL_FRAMEBUFFER, buffer->fbo);
 	glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0,
-		 GL_RENDERBUFFER, buffer->rbo);
+			GL_RENDERBUFFER, buffer->rbo);
 	GLenum fb_status = glCheckFramebufferStatus(GL_FRAMEBUFFER);
-	glBindFramebuffer(GL_FRAMEBUFFER, 0);
-
-	if (fb_status != GL_FRAMEBUFFER_COMPLETE) {
-		 wlr_log(WLR_ERROR, "Failed to create FBO");
-		 glDeleteFramebuffers(1, &buffer->fbo);
-		 buffer->fbo = 0;
-	}
 
 	// Init stencil buffer
 	glGenRenderbuffers(1, &buffer->sb);
@@ -62,10 +55,12 @@ GLuint fx_framebuffer_get_fbo(struct fx_framebuffer *buffer) {
 			GL_RENDERBUFFER, buffer->sb);
 	fb_status = glCheckFramebufferStatus(GL_FRAMEBUFFER);
 
+	glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
 	if (fb_status != GL_FRAMEBUFFER_COMPLETE) {
-		 wlr_log(WLR_ERROR, "Failed to create FBO");
-		 glDeleteFramebuffers(1, &buffer->fbo);
-		 buffer->sb = 0;
+		wlr_log(WLR_ERROR, "Failed to create FBO");
+		glDeleteFramebuffers(1, &buffer->fbo);
+		buffer->fbo = 0;
 	}
 
 	pop_fx_debug(buffer->renderer);

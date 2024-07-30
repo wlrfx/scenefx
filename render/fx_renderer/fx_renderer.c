@@ -54,6 +54,8 @@ static const struct wlr_drm_format_set *fx_get_texture_formats(
 		struct wlr_renderer *wlr_renderer, uint32_t buffer_caps) {
 	struct fx_renderer *renderer = fx_get_renderer(wlr_renderer);
 	if (buffer_caps & WLR_BUFFER_CAP_DMABUF) {
+		return wlr_egl_get_dmabuf_texture_formats(renderer->egl);
+	} else if (buffer_caps & WLR_BUFFER_CAP_DATA_PTR) {
 		return &renderer->shm_texture_formats;
 	} else {
 		return NULL;

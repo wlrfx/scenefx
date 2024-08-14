@@ -1168,51 +1168,6 @@ struct wlr_scene_node *wlr_scene_node_at(struct wlr_scene_node *node,
 	return NULL;
 }
 
-// Some surfaces (mostly GTK 4) decorate their windows with shadows
-// which extends the node size past the actual window size. This gets
-// the actual surface geometry, mostly ignoring CSD decorations
-// but only if we need to.
-static void clip_xdg(struct wlr_scene_node *node,
-		pixman_region32_t *clip, struct wlr_box *dst_box,
-		int x, int y, float scale) {
-	struct wlr_scene_buffer *scene_buffer = NULL;
-	switch (node->type) {
-	default:
-		return;
-	case WLR_SCENE_NODE_BUFFER:
-		scene_buffer = wlr_scene_buffer_from_node(node);
-		break;
-	}
-
-	// Don't clip if the scene buffer doesn't have any effects
-	if (!scene_buffer || (scene_buffer->corner_radius == 0 &&
-				!scene_buffer_has_shadow(&scene_buffer->shadow_data))) {
-		return;
-	}
-
-	struct wlr_scene_surface *scene_surface = wlr_scene_surface_try_from_buffer(scene_buffer);
-	struct wlr_xdg_surface *xdg_surface = NULL;
-	if (scene_surface &&
-			(xdg_surface = wlr_xdg_surface_try_from_wlr_surface(scene_surface->surface))) {
-		struct wlr_box geometry;
-		wlr_xdg_surface_get_geometry(xdg_surface, &geometry);
-		scale_box(&geometry, scale);
-
-		if (dst_box->width > geometry.width) {
-			dst_box->width = geometry.width;
-			dst_box->x = geometry.x + x;
-		}
-		if (dst_box->height > geometry.height) {
-			dst_box->height = geometry.height;
-			dst_box->y = geometry.y + y;
-		}
-
-		pixman_region32_intersect_rect(clip, clip,
-				dst_box->x, dst_box->y,
-				dst_box->width, dst_box->height);
-	}
-}
-
 struct render_list_entry {
 	struct wlr_scene_node *node;
 	bool sent_dmabuf_feedback;
@@ -1243,15 +1198,8 @@ static void scene_entry_render(struct render_list_entry *entry, const struct ren
 	scene_node_get_size(node, &dst_box.width, &dst_box.height);
 	scale_box(&dst_box, data->scale);
 
-	// Tries to clip the node to the xdg geometry size, clipping CSD
-	struct wlr_box xdg_box = dst_box;
-	pixman_region32_t geometry_region; // The actual geometry region excluding CSD
-	pixman_region32_init(&geometry_region);
-	pixman_region32_copy(&geometry_region, &render_region);
-	clip_xdg(node, &geometry_region, &xdg_box, dst_box.x, dst_box.y, data->scale);
-
 	// Shadow box
-	struct wlr_box shadow_box = xdg_box;
+	struct wlr_box shadow_box = dst_box;
 
 	pixman_region32_t opaque;
 	pixman_region32_init(&opaque);
@@ -1260,9 +1208,7 @@ static void scene_entry_render(struct render_list_entry *entry, const struct ren
 	pixman_region32_subtract(&opaque, &render_region, &opaque);
 
 	transform_output_box(&dst_box, data);
-	transform_output_box(&xdg_box, data);
 	transform_output_damage(&render_region, data);
-	transform_output_damage(&geometry_region, data);
 
 	switch (node->type) {
 	case WLR_SCENE_NODE_TREE:
@@ -1312,7 +1258,7 @@ static void scene_entry_render(struct render_list_entry *entry, const struct ren
 
 			struct fx_render_box_shadow_options shadow_options = {
 				.shadow_box = shadow_box,
-				.clip_box = xdg_box,
+				.clip_box = dst_box,
 				.clip = &render_region,
 				.shadow_data = &shadow_data,
 				.corner_radius = scene_buffer->corner_radius * data->scale,
@@ -1326,13 +1272,13 @@ static void scene_entry_render(struct render_list_entry *entry, const struct ren
 				.src_box = scene_buffer->src_box,
 				.dst_box = dst_box,
 				.transform = transform,
-				.clip = &geometry_region, // Render with the smaller region, clipping CSD
+				.clip = &render_region, // Render with the smaller region, clipping CSD
 				.alpha = &scene_buffer->opacity,
 				.filter_mode = scene_buffer->filter_mode,
 				.blend_mode = pixman_region32_not_empty(&opaque) ?
 					WLR_RENDER_BLEND_MODE_PREMULTIPLIED : WLR_RENDER_BLEND_MODE_NONE,
 			},
-			.clip_box = &xdg_box,
+			.clip_box = &dst_box,
 			.corner_radius = scene_buffer->corner_radius * data->scale,
 		};
 
@@ -1347,7 +1293,6 @@ static void scene_entry_render(struct render_list_entry *entry, const struct ren
 	}
 
 	pixman_region32_fini(&opaque);
-	pixman_region32_fini(&geometry_region);
 	pixman_region32_fini(&render_region);
 }
 

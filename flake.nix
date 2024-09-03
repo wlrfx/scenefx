@@ -22,6 +22,7 @@
               cmake
               ninja
               scdoc
+              wayland-scanner
             ];
 
             buildInputs = with pkgs; [

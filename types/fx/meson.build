@@ -1,4 +1,4 @@
-wlr_files += files(
+scenefx_files += files(
 	'shadow_data.c',
 	'blur_data.c',
 )

@@ -44,6 +44,12 @@ struct tinywl_server {
 	struct wlr_allocator *allocator;
 	struct wlr_scene *scene;
 	struct wlr_scene_output_layout *scene_layout;
+	struct {
+		struct wlr_scene_tree *bottom_layer;
+		/** Used for optimized blur. Everything exclusively below gets blurred */
+		struct wlr_scene_blur *blur_layer;
+		struct wlr_scene_tree *toplevel_layer;
+	} layers;
 
 	struct wlr_xdg_shell *xdg_shell;
 	struct wl_listener new_xdg_surface;
@@ -592,6 +598,14 @@ static void output_request_state(struct wl_listener *listener, void *data) {
 	struct tinywl_output *output = wl_container_of(listener, output, request_state);
 	const struct wlr_output_event_request_state *event = data;
 	wlr_output_commit_state(output->wlr_output, event->state);
+
+	/*
+	 * Sets the blur node size to the outputs size. Assumes there's only one
+	 * output. More advanced compositors should either implement per output blur
+	 * nodes or set it to the size of all outputs.
+	 */
+	wlr_scene_blur_set_size(output->server->layers.blur_layer,
+			output->wlr_output->width, output->wlr_output->height);
 }
 
 static void output_destroy(struct wl_listener *listener, void *data) {
@@ -666,6 +680,14 @@ static void server_new_output(struct wl_listener *listener, void *data) {
 		wlr_output);
 	struct wlr_scene_output *scene_output = wlr_scene_output_create(server->scene, wlr_output);
 	wlr_scene_output_layout_add_output(server->scene_layout, l_output, scene_output);
+
+	/*
+	 * Sets the blur node size to the outputs size. Assumes there's only one
+	 * output. More advanced compositors should either implement per output blur
+	 * nodes or set it to the size of all outputs.
+	 */
+	wlr_scene_blur_set_size(output->server->layers.blur_layer,
+			output->wlr_output->width, output->wlr_output->height);
 }
 
 static void iter_xdg_scene_buffers(struct wlr_scene_buffer *buffer, int sx,
@@ -691,7 +713,7 @@ static void iter_xdg_scene_buffers(struct wlr_scene_buffer *buffer, int sx,
 			wlr_scene_buffer_set_shadow_data(buffer, toplevel->shadow_data);
 
 			wlr_scene_buffer_set_backdrop_blur(buffer, true);
-			wlr_scene_buffer_set_backdrop_blur_optimized(buffer, false);
+			wlr_scene_buffer_set_backdrop_blur_optimized(buffer, true);
 			wlr_scene_buffer_set_backdrop_blur_ignore_transparent(buffer, true);
 		}
 	}
@@ -872,7 +894,7 @@ static void server_new_xdg_surface(struct wl_listener *listener, void *data) {
 	toplevel->server = server;
 	toplevel->xdg_toplevel = xdg_surface->toplevel;
 	toplevel->scene_tree = wlr_scene_xdg_surface_create(
-			&toplevel->server->scene->tree, toplevel->xdg_toplevel->base);
+			toplevel->server->layers.toplevel_layer, toplevel->xdg_toplevel->base);
 	toplevel->scene_tree->node.data = toplevel;
 	xdg_surface->data = toplevel->scene_tree;
 
@@ -993,6 +1015,20 @@ int main(int argc, char *argv[]) {
 	 */
 	server.scene = wlr_scene_create();
 	server.scene_layout = wlr_scene_attach_output_layout(server.scene, server.output_layout);
+
+	/* Create all of the basic scene layers */
+	server.layers.bottom_layer = wlr_scene_tree_create(&server.scene->tree);
+	/* Add a bottom rect to demonstrate optimized blur */
+	float bottom_rect_color[4] = { 1, 1, 1, 1 };
+	wlr_scene_rect_create(server.layers.bottom_layer, 200, 200, bottom_rect_color);
+	/* Set the size later */
+	server.layers.blur_layer = wlr_scene_blur_create(&server.scene->tree, 0, 0);
+	server.layers.toplevel_layer = wlr_scene_tree_create(&server.scene->tree);
+	/* Add a top rect that won't get blurred by optimized */
+	float top_rect_color[4] = { 1, 0, 0, 1 };
+	struct wlr_scene_rect *rect = wlr_scene_rect_create(server.layers.toplevel_layer,
+			200, 200, top_rect_color);
+	wlr_scene_node_set_position(&rect->node, 200, 200);
 
 	// blur
 	struct blur_data blur_data = blur_data_get_default();

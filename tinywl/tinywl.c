@@ -89,6 +89,7 @@ struct tinywl_toplevel {
 	struct wlr_scene_tree *scene_tree;
 	struct wl_listener map;
 	struct wl_listener unmap;
+	struct wl_listener commit;
 	struct wl_listener destroy;
 	struct wl_listener request_move;
 	struct wl_listener request_resize;
@@ -436,6 +437,15 @@ static void process_cursor_resize(struct tinywl_server *server, uint32_t time) {
 	int new_width = new_right - new_left;
 	int new_height = new_bottom - new_top;
 	wlr_xdg_toplevel_set_size(toplevel->xdg_toplevel, new_width, new_height);
+
+	// Clip to geometry
+	struct wlr_box clip = {
+		.width = new_width,
+		.height = new_height,
+		.x = geo_box.x,
+		.y = geo_box.y,
+	};
+	wlr_scene_subsurface_tree_set_clip(&toplevel->scene_tree->node, &clip);
 }
 
 static void process_cursor_motion(struct tinywl_server *server, uint32_t time) {
@@ -711,12 +721,39 @@ static void xdg_toplevel_unmap(struct wl_listener *listener, void *data) {
 	wl_list_remove(&toplevel->link);
 }
 
+static void xdg_toplevel_commit(struct wl_listener *listener, void *data) {
+	/* Called when the surface is unmapped, and should no longer be shown. */
+	struct tinywl_toplevel *toplevel = wl_container_of(listener, toplevel, commit);
+	struct wlr_xdg_surface *xdg_surface = toplevel->xdg_toplevel->base;
+
+	if (xdg_surface->initial_commit) {
+		wlr_xdg_surface_schedule_configure(xdg_surface);
+		return;
+	}
+	if (!xdg_surface->surface->mapped) {
+		return;
+	}
+
+	// More advanced comps should check if the size has changed.
+	struct wlr_box new_geo;
+	wlr_xdg_surface_get_geometry(toplevel->xdg_toplevel->base, &new_geo);
+	// Clip to geometry
+	struct wlr_box clip = {
+		.width = new_geo.width,
+		.height = new_geo.height,
+		.x = new_geo.x,
+		.y = new_geo.y,
+	};
+	wlr_scene_subsurface_tree_set_clip(&toplevel->scene_tree->node, &clip);
+}
+
 static void xdg_toplevel_destroy(struct wl_listener *listener, void *data) {
 	/* Called when the xdg_toplevel is destroyed. */
 	struct tinywl_toplevel *toplevel = wl_container_of(listener, toplevel, destroy);
 
 	wl_list_remove(&toplevel->map.link);
 	wl_list_remove(&toplevel->unmap.link);
+	wl_list_remove(&toplevel->commit.link);
 	wl_list_remove(&toplevel->destroy.link);
 	wl_list_remove(&toplevel->request_move.link);
 	wl_list_remove(&toplevel->request_resize.link);
@@ -851,6 +888,8 @@ static void server_new_xdg_surface(struct wl_listener *listener, void *data) {
 	wl_signal_add(&xdg_surface->surface->events.map, &toplevel->map);
 	toplevel->unmap.notify = xdg_toplevel_unmap;
 	wl_signal_add(&xdg_surface->surface->events.unmap, &toplevel->unmap);
+	toplevel->commit.notify = xdg_toplevel_commit;
+	wl_signal_add(&xdg_surface->surface->events.commit, &toplevel->commit);
 	toplevel->destroy.notify = xdg_toplevel_destroy;
 	wl_signal_add(&xdg_surface->events.destroy, &toplevel->destroy);
 

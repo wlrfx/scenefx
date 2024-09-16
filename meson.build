@@ -94,14 +94,14 @@ wayland_server = dependency('wayland-server',
 
 wlroots_options = [ 'examples=false' ]
 wlroots_version = ['>=0.18.0', '<0.19.0']
-wlroots = dependency('wlroots',
+wlroots = dependency('wlroots-0.18',
 	version: wlroots_version,
 	default_options: wlroots_options,
 	required: false,
 )
 if not wlroots.found()
 	wlroots_proj = subproject(
-		'wlroots',
+		'wlroots-0.18',
 		default_options: wlroots_options,
 		version: wlroots_version,
 	)

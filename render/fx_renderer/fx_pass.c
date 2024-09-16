@@ -427,7 +427,7 @@ void fx_render_pass_add_border(struct fx_gles_render_pass *pass,
 	wlr_render_rect_options_get_box(options, pass->buffer->buffer, &box);
 
 	push_fx_debug(renderer);
-	setup_blending(color->a < 1.0 || fx_options->corner_radius > 0 ? WLR_RENDER_BLEND_MODE_NONE : WLR_RENDER_BLEND_MODE_PREMULTIPLIED);
+	setup_blending(color->a < 1.0 || fx_options->corner_radius > 0 ? WLR_RENDER_BLEND_MODE_PREMULTIPLIED : WLR_RENDER_BLEND_MODE_NONE);
 
 	glUseProgram(renderer->shaders.border.program);
 

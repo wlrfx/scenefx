@@ -97,6 +97,7 @@ struct tinywl_toplevel {
 	float opacity;
 	int corner_radius;
 	struct shadow_data shadow_data;
+	struct border_data border_data;
 };
 
 struct tinywl_keyboard {
@@ -590,6 +591,7 @@ static void output_configure_scene(struct wlr_scene_node *node,
 			if (!wlr_subsurface_try_from_wlr_surface(xdg_surface->surface)) {
 				wlr_scene_buffer_set_corner_radius(buffer, toplevel->corner_radius);
 				wlr_scene_buffer_set_shadow_data(buffer, toplevel->shadow_data);
+				wlr_scene_buffer_set_border_data(buffer, toplevel->border_data);
 			}
 		}
 	} else if (node->type == WLR_SCENE_NODE_TREE) {
@@ -858,6 +860,8 @@ static void server_new_xdg_surface(struct wl_listener *listener, void *data) {
 	toplevel->shadow_data = shadow_data_get_default();
 	toplevel->shadow_data.enabled = true;
 	toplevel->shadow_data.color = (struct wlr_render_color) {1.0f, 0.0f, 0.0f, 1.0f};
+	toplevel->border_data.size = 3;
+	toplevel->border_data.color = (struct wlr_render_color) {0.0f, 0.0f, 1.0f, 0.5f};
 
 	/* Listen to the various events it can emit */
 	toplevel->map.notify = xdg_toplevel_map;

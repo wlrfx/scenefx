@@ -3,6 +3,7 @@
 #include <pixman.h>
 #include <stdlib.h>
 #include <scenefx/types/fx/shadow_data.h>
+#include <scenefx/types/fx/border_data.h>
 #include <scenefx/types/wlr_scene.h>
 #include <string.h>
 #include <wlr/backend.h>
@@ -18,7 +19,6 @@
 #include <wlr/render/swapchain.h>
 
 #include "scenefx/render/pass.h"
-#include "scenefx/types/fx/shadow_data.h"
 #include "types/wlr_buffer.h"
 #include "types/wlr_output.h"
 #include "types/wlr_scene.h"
@@ -265,6 +265,10 @@ static void scene_node_opaque_region(struct wlr_scene_node *node, int x, int y,
 			return;
 		}
 
+		if (scene_buffer->border_data.size > 0 && scene_buffer->border_data.color.a < 1.0) {
+			return;
+		}
+
 		if (!buffer_is_opaque(scene_buffer->buffer)) {
 			pixman_region32_copy(opaque, &scene_buffer->opaque_region);
 			pixman_region32_intersect_rect(opaque, opaque, 0, 0, width, height);
@@ -474,21 +478,13 @@ static bool scene_node_update_iterator(struct wlr_scene_node *node,
 		pixman_region32_fini(&opaque);
 	}
 
-	// Expand the nodes visible region by the shadow size
+	// Expand the nodes visible region by the border and shadow size
 	if (node->type == WLR_SCENE_NODE_BUFFER) {
 		struct wlr_scene_buffer *buffer = wlr_scene_buffer_from_node(node);
+		wlr_region_expand(&node->visible, &node->visible, buffer->border_data.size);
 		struct shadow_data *shadow_data = &buffer->shadow_data;
 		if (scene_buffer_has_shadow(shadow_data)) {
-			// Expand towards the damage while also compensating for the x and y
-			// offsets
-			pixman_region32_t shadow;
-			pixman_region32_init(&shadow);
-			pixman_region32_copy(&shadow, &node->visible);
-			wlr_region_expand(&shadow, &shadow, shadow_data->blur_sigma);
-			pixman_region32_translate(&shadow, shadow_data->offset_x, shadow_data->offset_y);
-			pixman_region32_subtract(&shadow, &shadow, &node->visible);
-			pixman_region32_union(&node->visible, &node->visible, &shadow);
-			pixman_region32_fini(&shadow);
+			wlr_region_expand(&node->visible, &node->visible, shadow_data->blur_sigma);
 		}
 	}
 
@@ -656,6 +652,7 @@ struct wlr_scene_buffer *wlr_scene_buffer_create(struct wlr_scene_tree *parent,
 	scene_buffer->opacity = 1;
 	scene_buffer->corner_radius = 0;
 	scene_buffer->shadow_data = shadow_data_get_default();
+	// TODO: scene_buffer->border_data = border_data_get_default();
 
 	scene_node_update(&scene_buffer->node, NULL);
 
@@ -902,6 +899,22 @@ void wlr_scene_buffer_set_shadow_data(struct wlr_scene_buffer *scene_buffer,
 
 	memcpy(&scene_buffer->shadow_data, &shadow_data,
 			sizeof(struct shadow_data));
+	scene_node_update(&scene_buffer->node, NULL);
+}
+
+void wlr_scene_buffer_set_border_data(struct wlr_scene_buffer *scene_buffer,
+		struct border_data border_data) {
+	struct border_data *buff_data = &scene_buffer->border_data;
+	if (buff_data->size == border_data.size &&
+			buff_data->color.r && border_data.color.r &&
+			buff_data->color.g && border_data.color.g &&
+			buff_data->color.b && border_data.color.b &&
+			buff_data->color.a && border_data.color.a) {
+		return;
+	}
+
+	memcpy(&scene_buffer->border_data, &border_data,
+			sizeof(struct border_data));
 	scene_node_update(&scene_buffer->node, NULL);
 }
 
@@ -1198,9 +1211,6 @@ static void scene_entry_render(struct render_list_entry *entry, const struct ren
 	scene_node_get_size(node, &dst_box.width, &dst_box.height);
 	scale_box(&dst_box, data->scale);
 
-	// Shadow box
-	struct wlr_box shadow_box = dst_box;
-
 	pixman_region32_t opaque;
 	pixman_region32_init(&opaque);
 	scene_node_opaque_region(node, x, y, &opaque);
@@ -1247,6 +1257,8 @@ static void scene_entry_render(struct render_list_entry *entry, const struct ren
 
 		// Shadow
 		if (scene_buffer_has_shadow(&scene_buffer->shadow_data)) {
+			struct wlr_box shadow_box = dst_box;
+
 			struct shadow_data shadow_data = scene_buffer->shadow_data;
 			shadow_box.x -= shadow_data.blur_sigma - shadow_data.offset_x;
 			shadow_box.y -= shadow_data.blur_sigma - shadow_data.offset_y;
@@ -1264,6 +1276,28 @@ static void scene_entry_render(struct render_list_entry *entry, const struct ren
 				.corner_radius = scene_buffer->corner_radius * data->scale,
 			};
 			fx_render_pass_add_box_shadow(data->render_pass, &shadow_options);
+		}
+
+		// border
+		if (scene_buffer->border_data.size > 0) {
+			struct border_data border_data = scene_buffer->border_data;
+			border_data.color.a *= scene_buffer->opacity;
+
+			struct fx_render_border_options border_options = {
+				.corner_radius = scene_buffer->corner_radius * data->scale,
+				.border_thickness = border_data.size,
+				.base = (struct wlr_render_rect_options){
+					.box = dst_box,
+					.color = {
+						.r = border_data.color.r,
+						.g = border_data.color.g,
+						.b = border_data.color.b,
+						.a = border_data.color.a,
+					},
+					.clip = &render_region,
+				}
+			};
+			fx_render_pass_add_border(data->render_pass, &border_options);
 		}
 
 		struct fx_render_texture_options tex_options = {

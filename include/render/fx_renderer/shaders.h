@@ -67,22 +67,18 @@ struct tex_shader {
 
 bool link_tex_program(struct tex_shader *shader, enum fx_tex_shader_source source);
 
-struct rounded_border_corner_shader {
+struct border_shader {
 	GLuint program;
 	GLint proj;
 	GLint color;
 	GLint pos_attrib;
-	GLint is_top_left;
-	GLint is_top_right;
-	GLint is_bottom_left;
-	GLint is_bottom_right;
-	GLint position;
 	GLint radius;
-	GLint half_size;
+	GLint window_position;
+	GLint half_window_size;
 	GLint half_thickness;
 };
 
-bool link_rounded_border_corner_program(struct rounded_border_corner_shader *shader);
+bool link_border_program(struct border_shader *shader);
 
 struct box_shadow_shader {
 	GLuint program;

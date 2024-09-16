@@ -58,11 +58,10 @@ struct fx_render_rounded_rect_options {
 	enum corner_location corner_location;
 };
 
-struct fx_render_rounded_border_corner_options {
+struct fx_render_border_options {
 	struct wlr_render_rect_options base;
 	int corner_radius;
 	int border_thickness;
-	enum corner_location corner_location;
 };
 
 struct fx_render_blur_pass_options {
@@ -93,10 +92,10 @@ void fx_render_pass_add_rounded_rect(struct fx_gles_render_pass *render_pass,
 	const struct fx_render_rounded_rect_options *options);
 
 /**
- * Render a border corner.
+ * Render a border.
  */
-void fx_render_pass_add_rounded_border_corner(struct fx_gles_render_pass *render_pass,
-	const struct fx_render_rounded_border_corner_options *options);
+void fx_render_pass_add_border(struct fx_gles_render_pass *render_pass,
+	const struct fx_render_border_options *options);
 
 /**
  * Render a box shadow.

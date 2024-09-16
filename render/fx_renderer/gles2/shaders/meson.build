@@ -5,7 +5,7 @@ shaders = [
     'quad.frag',
     'quad_round.frag',
     'tex.frag',
-    'rounded_border_corner.frag',
+    'border.frag',
     'box_shadow.frag',
     'blur1.frag',
     'blur2.frag',

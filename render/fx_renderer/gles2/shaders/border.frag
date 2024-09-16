@@ -12,7 +12,8 @@ float roundedRectSDF(vec2 center, vec2 size, float radius) {
 }
 
 void main() {
-    float dist = roundedRectSDF(window_position, half_window_size + half_thickness, radius -
+	vec2 center = gl_FragCoord.xy - window_position - half_window_size;
+    float dist = roundedRectSDF(center, half_window_size + half_thickness, radius -
 	half_thickness);
     dist = abs(dist) - half_thickness;
     float blend_amount = smoothstep(-1.0, 1.0, dist);

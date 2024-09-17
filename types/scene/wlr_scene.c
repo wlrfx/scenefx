@@ -1258,6 +1258,7 @@ static void scene_entry_render(struct render_list_entry *entry, const struct ren
 		// Shadow
 		if (scene_buffer_has_shadow(&scene_buffer->shadow_data)) {
 			struct wlr_box shadow_box = dst_box;
+			struct wlr_box window_box = dst_box;
 
 			struct shadow_data shadow_data = scene_buffer->shadow_data;
 			shadow_box.x -= shadow_data.blur_sigma - shadow_data.offset_x;
@@ -1268,9 +1269,14 @@ static void scene_entry_render(struct render_list_entry *entry, const struct ren
 
 			shadow_data.color.a *= scene_buffer->opacity;
 
+			window_box.x -= scene_buffer->border_data.size;
+			window_box.y -= scene_buffer->border_data.size;
+			window_box.width += scene_buffer->border_data.size * 2;
+			window_box.height += scene_buffer->border_data.size * 2;
+
 			struct fx_render_box_shadow_options shadow_options = {
 				.shadow_box = shadow_box,
-				.clip_box = dst_box,
+				.clip_box = window_box,
 				.clip = &render_region,
 				.shadow_data = &shadow_data,
 				.corner_radius = scene_buffer->corner_radius * data->scale,

@@ -7,16 +7,15 @@ uniform vec2 window_position;
 uniform vec2 half_window_size;
 uniform float half_thickness;
 
-float roundedRectSDF(vec2 center, vec2 size, float radius) {
-    return length(max(abs(center) - size + radius, 0.0)) - radius;
+float roundRectSDF() {
+	vec2 half_size = half_window_size;
+	vec2 q = abs(gl_FragCoord.xy - window_position - half_size) - half_size + radius;
+	return min(max(q.x, q.y), 0.0) + length(max(q, 0.0)) - radius;
 }
 
 void main() {
-	vec2 center = gl_FragCoord.xy - window_position - half_window_size;
-    float dist = roundedRectSDF(center, half_window_size + half_thickness, radius -
-	half_thickness);
-    dist = abs(dist) - half_thickness;
-    float blend_amount = smoothstep(-1.0, 1.0, dist);
-    gl_FragColor = mix(v_color, vec4(0.0), blend_amount);
+	float dist = abs(roundRectSDF()) - half_thickness;
+	float blend_amount = smoothstep(-1.0, 1.0, dist);
+	gl_FragColor = mix(v_color, vec4(0.0), blend_amount);
 }
 

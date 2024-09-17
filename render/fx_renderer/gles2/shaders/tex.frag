@@ -43,6 +43,7 @@ vec4 sample_texture() {
 }
 
 float roundRectSDF() {
+	vec2 half_size = size * 0.5;
 	vec2 q = abs(gl_FragCoord.xy - position - half_size) - half_size + radius;
 	return min(max(q.x, q.y), 0.0) + length(max(q, 0.0)) - radius;
 }
@@ -60,3 +61,4 @@ void main() {
 		gl_FragColor = mix(gl_FragColor, vec4(0.0), alpha);
 	}
 }
+

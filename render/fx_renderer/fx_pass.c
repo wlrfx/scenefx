@@ -489,8 +489,7 @@ void fx_render_pass_add_box_shadow(struct fx_gles_render_pass *pass,
 	glUniform2f(renderer->shaders.box_shadow.size, shadow_box.width, shadow_box.height);
 	glUniform2f(renderer->shaders.box_shadow.position, shadow_box.x, shadow_box.y);
 
-	render(&shadow_box, &render_region, renderer->shaders.box_shadow.pos_attrib);
-
+	render(&shadow_box, options->clip, renderer->shaders.box_shadow.pos_attrib);
 	pixman_region32_fini(&render_region);
 
 	glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);

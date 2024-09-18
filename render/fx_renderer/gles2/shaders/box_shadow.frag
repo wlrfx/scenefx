@@ -82,5 +82,5 @@ void main() {
     // get the window alpha so we can render around the window
     float window_alpha = 1.0 - smoothstep(-1.0, 1.0, roundRectSDF((size * 0.5) - blur_sigma, position + blur_sigma, corner_radius));
 
-    gl_FragColor = vec4(v_color.rgb, shadow_alpha - window_alpha);
+    gl_FragColor = vec4(v_color.rgb, shadow_alpha * (1.0 - window_alpha));
 }

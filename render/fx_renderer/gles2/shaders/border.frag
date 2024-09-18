@@ -8,8 +8,8 @@ uniform vec2 half_window_size;
 uniform float half_thickness;
 
 float roundRectSDF() {
-	vec2 half_size = half_window_size;
-	vec2 q = abs(gl_FragCoord.xy - window_position - half_size) - half_size + radius;
+	vec2 center = abs(gl_FragCoord.xy - window_position - half_window_size);
+	vec2 q = abs(center) - half_window_size - half_thickness + radius;
 	return min(max(q.x, q.y), 0.0) + length(max(q, 0.0)) - radius;
 }
 

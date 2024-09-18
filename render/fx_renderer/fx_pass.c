@@ -426,12 +426,18 @@ void fx_render_pass_add_border(struct fx_gles_render_pass *pass,
 	struct wlr_box box;
 	wlr_render_rect_options_get_box(options, pass->buffer->buffer, &box);
 
+	struct wlr_box border_box = box;
+	border_box.x -= fx_options->border_thickness;
+	border_box.y -= fx_options->border_thickness;
+	border_box.width += 2 * fx_options->border_thickness;
+	border_box.height += 2 * fx_options->border_thickness;
+
 	push_fx_debug(renderer);
 	setup_blending(color->a < 1.0 || fx_options->corner_radius > 0 ? WLR_RENDER_BLEND_MODE_PREMULTIPLIED : WLR_RENDER_BLEND_MODE_NONE);
 
 	glUseProgram(renderer->shaders.border.program);
 
-	set_proj_matrix(renderer->shaders.border.proj, pass->projection_matrix, &box);
+	set_proj_matrix(renderer->shaders.border.proj, pass->projection_matrix, &border_box);
 	glUniform4f(renderer->shaders.border.color, color->r, color->g, color->b, color->a);
 
 	glUniform2f(renderer->shaders.border.half_window_size, box.width / 2.0f, box.height / 2.0f);
@@ -439,20 +445,7 @@ void fx_render_pass_add_border(struct fx_gles_render_pass *pass,
 	glUniform1f(renderer->shaders.border.radius, fx_options->corner_radius);
 	glUniform1f(renderer->shaders.border.half_thickness, fx_options->border_thickness / 2.0f);
 
-	pixman_region32_t render_region;
-	pixman_region32_init(&render_region);
-
-	pixman_region32_t inner_region;
-	pixman_region32_init_rect(&inner_region,
-			box.x + fx_options->corner_radius * 0.5,
-			box.y + fx_options->corner_radius * 0.5,
-			fmax(box.width - fx_options->corner_radius, 0),
-			fmax(box.height - fx_options->corner_radius, 0));
-	pixman_region32_subtract(&render_region, options->clip, &inner_region);
-	pixman_region32_fini(&inner_region);
-
-	render(&box, options->clip, renderer->shaders.border.pos_attrib);
-	pixman_region32_fini(&render_region);
+	render(&border_box, options->clip, renderer->shaders.border.pos_attrib);
 
 	pop_fx_debug(renderer);
 }

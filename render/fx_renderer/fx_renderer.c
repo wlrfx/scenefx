@@ -238,7 +238,7 @@ static bool fx_render_subtexture_with_matrix(
 	glUniformMatrix3fv(shader->proj, 1, GL_FALSE, gl_matrix);
 	glUniform1i(shader->tex, 0);
 	glUniform1f(shader->alpha, alpha);
-	glUniform2f(shader->size, box->width, box->height);
+	glUniform2f(shader->half_size, box->width / 2.0, box->height / 2.0);
 	glUniform2f(shader->position, box->x, box->y);
 	glUniform1f(shader->radius, 0);
 	glUniform1f(shader->discard_transparent, false);
@@ -685,11 +685,6 @@ static bool link_shaders(struct fx_renderer *renderer) {
 		goto error;
 	}
 
-	// stencil mask shader
-	if (!link_stencil_mask_program(&renderer->shaders.stencil_mask)) {
-		wlr_log(WLR_ERROR, "Could not link stencil mask shader");
-		goto error;
-	}
 	// box shadow shader
 	if (!link_box_shadow_program(&renderer->shaders.box_shadow)) {
 		wlr_log(WLR_ERROR, "Could not link box shadow shader");
@@ -723,7 +718,6 @@ error:
 	glDeleteProgram(renderer->shaders.tex_rgbx.program);
 	glDeleteProgram(renderer->shaders.tex_ext.program);
 	glDeleteProgram(renderer->shaders.rounded_border_corner.program);
-	glDeleteProgram(renderer->shaders.stencil_mask.program);
 	glDeleteProgram(renderer->shaders.box_shadow.program);
 	glDeleteProgram(renderer->shaders.blur1.program);
 	glDeleteProgram(renderer->shaders.blur2.program);

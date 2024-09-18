@@ -12,7 +12,6 @@
 #include "quad_round_frag_src.h"
 #include "tex_frag_src.h"
 #include "rounded_border_corner_frag_src.h"
-#include "stencil_mask_frag_src.h"
 #include "box_shadow_frag_src.h"
 #include "blur1_frag_src.h"
 #include "blur2_frag_src.h"
@@ -182,22 +181,6 @@ bool link_rounded_border_corner_program(struct rounded_border_corner_shader *sha
 	shader->radius = glGetUniformLocation(prog, "radius");
 	shader->half_size = glGetUniformLocation(prog, "half_size");
 	shader->half_thickness = glGetUniformLocation(prog, "half_thickness");
-
-	return true;
-}
-
-bool link_stencil_mask_program(struct stencil_mask_shader *shader) {
-	GLuint prog;
-	shader->program = prog = link_program(stencil_mask_frag_src);
-	if (!shader->program) {
-		return false;
-	}
-
-	shader->proj = glGetUniformLocation(prog, "proj");
-	shader->pos_attrib = glGetAttribLocation(prog, "pos");
-	shader->position = glGetUniformLocation(prog, "position");
-	shader->half_size = glGetUniformLocation(prog, "half_size");
-	shader->radius = glGetUniformLocation(prog, "radius");
 
 	return true;
 }

@@ -153,7 +153,7 @@ bool link_tex_program(struct tex_shader *shader,
 	shader->alpha = glGetUniformLocation(prog, "alpha");
 	shader->pos_attrib = glGetAttribLocation(prog, "pos");
 	shader->tex_proj = glGetUniformLocation(prog, "tex_proj");
-	shader->size = glGetUniformLocation(prog, "size");
+	shader->half_size = glGetUniformLocation(prog, "half_size");
 	shader->position = glGetUniformLocation(prog, "position");
 	shader->radius = glGetUniformLocation(prog, "radius");
 	shader->has_titlebar = glGetUniformLocation(prog, "has_titlebar");

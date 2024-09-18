@@ -122,6 +122,40 @@ static const struct wlr_render_pass_impl render_pass_impl = {
 /// FX pass functions
 ///
 
+// TODO: REMOVE STENCILING
+
+// Initialize the stenciling work
+static void stencil_mask_init(void) {
+	glClearStencil(0);
+	glClear(GL_STENCIL_BUFFER_BIT);
+	glEnable(GL_STENCIL_TEST);
+
+	glStencilFunc(GL_ALWAYS, 1, 0xFF);
+	glStencilOp(GL_KEEP, GL_KEEP, GL_REPLACE);
+	// Disable writing to color buffer
+	glColorMask(GL_FALSE, GL_FALSE, GL_FALSE, GL_FALSE);
+}
+
+// Close the mask
+static void stencil_mask_close(bool draw_inside_mask) {
+	// Reenable writing to color buffer
+	glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
+	if (draw_inside_mask) {
+		glStencilFunc(GL_EQUAL, 1, 0xFF);
+		glStencilOp(GL_KEEP, GL_KEEP, GL_REPLACE);
+		return;
+	}
+	glStencilFunc(GL_NOTEQUAL, 1, 0xFF);
+	glStencilOp(GL_KEEP, GL_KEEP, GL_KEEP);
+}
+
+// Finish stenciling and clear the buffer
+static void stencil_mask_fini(void) {
+	glClearStencil(0);
+	glClear(GL_STENCIL_BUFFER_BIT);
+	glDisable(GL_STENCIL_TEST);
+}
+
 static void render(const struct wlr_box *box, const pixman_region32_t *clip, GLint attrib) {
 	pixman_region32_t region;
 	pixman_region32_init_rect(&region, box->x, box->y, box->width, box->height);
@@ -211,38 +245,6 @@ static void setup_blending(enum wlr_render_blend_mode mode) {
 	}
 }
 
-// Initialize the stenciling work
-static void stencil_mask_init(void) {
-	glClearStencil(0);
-	glClear(GL_STENCIL_BUFFER_BIT);
-	glEnable(GL_STENCIL_TEST);
-
-	glStencilFunc(GL_ALWAYS, 1, 0xFF);
-	glStencilOp(GL_KEEP, GL_KEEP, GL_REPLACE);
-	// Disable writing to color buffer
-	glColorMask(GL_FALSE, GL_FALSE, GL_FALSE, GL_FALSE);
-}
-
-// Close the mask
-static void stencil_mask_close(bool draw_inside_mask) {
-	// Reenable writing to color buffer
-	glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
-	if (draw_inside_mask) {
-		glStencilFunc(GL_EQUAL, 1, 0xFF);
-		glStencilOp(GL_KEEP, GL_KEEP, GL_REPLACE);
-		return;
-	}
-	glStencilFunc(GL_NOTEQUAL, 1, 0xFF);
-	glStencilOp(GL_KEEP, GL_KEEP, GL_KEEP);
-}
-
-// Finish stenciling and clear the buffer
-static void stencil_mask_fini(void) {
-	glClearStencil(0);
-	glClear(GL_STENCIL_BUFFER_BIT);
-	glDisable(GL_STENCIL_TEST);
-}
-
 // make sure the texture source box does not try and sample outside of the
 // texture
 static void check_tex_src_box(const struct wlr_render_texture_options *options) {
@@ -325,7 +327,7 @@ void fx_render_pass_add_texture(struct fx_gles_render_pass *pass,
 
 	glUniform1i(shader->tex, 0);
 	glUniform1f(shader->alpha, alpha);
-	glUniform2f(shader->size, clip_box->width, clip_box->height);
+	glUniform2f(shader->half_size, (float)clip_box->width / 2.0, (float)clip_box->height / 2.0);
 	glUniform2f(shader->position, clip_box->x, clip_box->y);
 	glUniform1f(shader->radius, fx_options->corner_radius);
 	glUniform1f(shader->has_titlebar, fx_options->has_titlebar);
@@ -449,29 +451,6 @@ void fx_render_pass_add_rounded_border_corner(struct fx_gles_render_pass *pass,
 	pop_fx_debug(renderer);
 }
 
-void fx_render_pass_add_stencil_mask(struct fx_gles_render_pass *pass,
-		const struct fx_render_stencil_box_options *options) {
-
-	struct fx_renderer *renderer = pass->buffer->renderer;
-
-	struct wlr_box box = options->box;
-	assert(box.width > 0 && box.height > 0);
-
-	push_fx_debug(renderer);
-	setup_blending(WLR_RENDER_BLEND_MODE_PREMULTIPLIED);
-
-	glUseProgram(renderer->shaders.stencil_mask.program);
-
-	set_proj_matrix(renderer->shaders.stencil_mask.proj, pass->projection_matrix, &box);
-	glUniform2f(renderer->shaders.stencil_mask.half_size, box.width * 0.5, box.height * 0.5);
-	glUniform2f(renderer->shaders.stencil_mask.position, box.x, box.y);
-	glUniform1f(renderer->shaders.stencil_mask.radius, options->corner_radius);
-
-	render(&box, options->clip, renderer->shaders.stencil_mask.pos_attrib);
-
-	pop_fx_debug(renderer);
-}
-
 void fx_render_pass_add_box_shadow(struct fx_gles_render_pass *pass,
 		const struct fx_render_box_shadow_options *options) {
 	struct fx_renderer *renderer = pass->buffer->renderer;
@@ -480,8 +459,8 @@ void fx_render_pass_add_box_shadow(struct fx_gles_render_pass *pass,
 	const struct wlr_render_color *color = &shadow_data->color;
 	struct wlr_box shadow_box = options->shadow_box;
 	assert(shadow_box.width > 0 && shadow_box.height > 0);
+
 	struct wlr_box surface_box = options->clip_box;
-	float blur_sigma = shadow_data->blur_sigma;
 
 	pixman_region32_t render_region;
 	pixman_region32_init(&render_region);
@@ -497,17 +476,6 @@ void fx_render_pass_add_box_shadow(struct fx_gles_render_pass *pass,
 
 	push_fx_debug(renderer);
 
-	// Init stencil work
-	stencil_mask_init();
-	// Draw the rounded rect as a mask
-	struct fx_render_stencil_box_options stencil_options = {
-		.box = options->clip_box,
-		.corner_radius = options->corner_radius,
-		.clip = options->clip,
-	};
-	fx_render_pass_add_stencil_mask(pass, &stencil_options);
-	stencil_mask_close(false);
-
 	// blending will practically always be needed (unless we have a madman
 	// who uses opaque shadows with zero sigma), so just enable it
 	setup_blending(WLR_RENDER_BLEND_MODE_PREMULTIPLIED);
@@ -517,7 +485,7 @@ void fx_render_pass_add_box_shadow(struct fx_gles_render_pass *pass,
 
 	set_proj_matrix(renderer->shaders.box_shadow.proj, pass->projection_matrix, &shadow_box);
 	glUniform4f(renderer->shaders.box_shadow.color, color->r, color->g, color->b, color->a);
-	glUniform1f(renderer->shaders.box_shadow.blur_sigma, blur_sigma);
+	glUniform1f(renderer->shaders.box_shadow.blur_sigma, shadow_data->blur_sigma);
 	glUniform1f(renderer->shaders.box_shadow.corner_radius, options->corner_radius);
 	glUniform2f(renderer->shaders.box_shadow.size, shadow_box.width, shadow_box.height);
 	glUniform2f(renderer->shaders.box_shadow.position, shadow_box.x, shadow_box.y);
@@ -527,8 +495,6 @@ void fx_render_pass_add_box_shadow(struct fx_gles_render_pass *pass,
 	pixman_region32_fini(&render_region);
 
 	glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
-
-	stencil_mask_fini();
 
 	pop_fx_debug(renderer);
 }

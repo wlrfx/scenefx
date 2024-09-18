@@ -7,7 +7,6 @@ shaders = [
     'tex.frag',
     'rounded_border_corner.frag',
     'box_shadow.frag',
-    'stencil_mask.frag',
     'blur1.frag',
     'blur2.frag',
     'blur_effects.frag',

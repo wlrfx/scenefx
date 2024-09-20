@@ -466,10 +466,10 @@ void fx_render_pass_add_box_shadow(struct fx_gles_render_pass *pass,
 
 	pixman_region32_t inner_region;
 	pixman_region32_init_rect(&inner_region,
-			surface_box.x + options->corner_radius * 0.5,
-			surface_box.y + options->corner_radius * 0.5,
-			fmax(surface_box.width - options->corner_radius, 0),
-			fmax(surface_box.height - options->corner_radius, 0));
+			surface_box.x + options->corner_radius * 0.3,
+			surface_box.y + options->corner_radius * 0.3,
+			fmax(surface_box.width - options->corner_radius * 0.6, 0),
+			fmax(surface_box.height - options->corner_radius * 0.6, 0));
 	pixman_region32_subtract(&render_region, options->clip, &inner_region);
 	pixman_region32_fini(&inner_region);
 
@@ -489,7 +489,8 @@ void fx_render_pass_add_box_shadow(struct fx_gles_render_pass *pass,
 	glUniform2f(renderer->shaders.box_shadow.size, shadow_box.width, shadow_box.height);
 	glUniform2f(renderer->shaders.box_shadow.position, shadow_box.x, shadow_box.y);
 
-	render(&shadow_box, options->clip, renderer->shaders.box_shadow.pos_attrib);
+	// TODO: also account for options->clip
+	render(&shadow_box, &render_region, renderer->shaders.box_shadow.pos_attrib);
 	pixman_region32_fini(&render_region);
 
 	glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);

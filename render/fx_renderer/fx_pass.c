@@ -488,6 +488,8 @@ void fx_render_pass_add_box_shadow(struct fx_gles_render_pass *pass,
 	glUniform1f(renderer->shaders.box_shadow.corner_radius, options->corner_radius);
 	glUniform2f(renderer->shaders.box_shadow.size, shadow_box.width, shadow_box.height);
 	glUniform2f(renderer->shaders.box_shadow.position, shadow_box.x, shadow_box.y);
+	glUniform2f(renderer->shaders.box_shadow.window_half_size, (float)surface_box.width / 2.0, (float)surface_box.height / 2.0);
+	glUniform2f(renderer->shaders.box_shadow.window_position, surface_box.x, surface_box.y);
 
 	render(&shadow_box, options->clip, renderer->shaders.box_shadow.pos_attrib);
 	pixman_region32_fini(&render_region);

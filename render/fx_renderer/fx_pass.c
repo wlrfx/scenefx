@@ -445,7 +445,20 @@ void fx_render_pass_add_border(struct fx_gles_render_pass *pass,
 	glUniform1f(renderer->shaders.border.radius, fx_options->corner_radius);
 	glUniform1f(renderer->shaders.border.half_thickness, fx_options->border_thickness / 2.0f);
 
-	render(&border_box, options->clip, renderer->shaders.border.pos_attrib);
+	pixman_region32_t render_region;
+	pixman_region32_init(&render_region);
+	pixman_region32_t inner_region;
+	pixman_region32_init_rect(&inner_region,
+			box.x + fx_options->corner_radius * 0.3,
+			box.y + fx_options->corner_radius * 0.3,
+			fmax(box.width - fx_options->corner_radius * 0.6, 0),
+			fmax(box.height - fx_options->corner_radius * 0.6, 0));
+	pixman_region32_subtract(&render_region, options->clip, &inner_region);
+	pixman_region32_fini(&inner_region);
+
+	// TODO: account for options->clip
+	render(&border_box, &render_region, renderer->shaders.border.pos_attrib);
+	pixman_region32_fini(&render_region);
 
 	pop_fx_debug(renderer);
 }
@@ -460,18 +473,6 @@ void fx_render_pass_add_box_shadow(struct fx_gles_render_pass *pass,
 	assert(shadow_box.width > 0 && shadow_box.height > 0);
 
 	struct wlr_box surface_box = options->clip_box;
-
-	pixman_region32_t render_region;
-	pixman_region32_init(&render_region);
-
-	pixman_region32_t inner_region;
-	pixman_region32_init_rect(&inner_region,
-			surface_box.x + options->corner_radius * 0.3,
-			surface_box.y + options->corner_radius * 0.3,
-			fmax(surface_box.width - options->corner_radius * 0.6, 0),
-			fmax(surface_box.height - options->corner_radius * 0.6, 0));
-	pixman_region32_subtract(&render_region, options->clip, &inner_region);
-	pixman_region32_fini(&inner_region);
 
 	push_fx_debug(renderer);
 
@@ -490,6 +491,17 @@ void fx_render_pass_add_box_shadow(struct fx_gles_render_pass *pass,
 	glUniform2f(renderer->shaders.box_shadow.position, shadow_box.x, shadow_box.y);
 	glUniform2f(renderer->shaders.box_shadow.window_half_size, (float)surface_box.width / 2.0, (float)surface_box.height / 2.0);
 	glUniform2f(renderer->shaders.box_shadow.window_position, surface_box.x, surface_box.y);
+
+	pixman_region32_t render_region;
+	pixman_region32_init(&render_region);
+	pixman_region32_t inner_region;
+	pixman_region32_init_rect(&inner_region,
+			surface_box.x + options->corner_radius * 0.3,
+			surface_box.y + options->corner_radius * 0.3,
+			fmax(surface_box.width - options->corner_radius * 0.6, 0),
+			fmax(surface_box.height - options->corner_radius * 0.6, 0));
+	pixman_region32_subtract(&render_region, options->clip, &inner_region);
+	pixman_region32_fini(&inner_region);
 
 	// TODO: also account for options->clip
 	render(&shadow_box, &render_region, renderer->shaders.box_shadow.pos_attrib);

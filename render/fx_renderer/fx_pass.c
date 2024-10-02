@@ -488,6 +488,7 @@ void fx_render_pass_add_box_shadow(struct fx_gles_render_pass *pass,
 	glUniform1f(renderer->shaders.box_shadow.blur_sigma, shadow_data->blur_sigma);
 	glUniform1f(renderer->shaders.box_shadow.corner_radius, options->corner_radius);
 	glUniform2f(renderer->shaders.box_shadow.size, shadow_box.width, shadow_box.height);
+	glUniform2f(renderer->shaders.box_shadow.offset, options->shadow_data->offset_x, options->shadow_data->offset_y);
 	glUniform2f(renderer->shaders.box_shadow.position, shadow_box.x, shadow_box.y);
 	glUniform2f(renderer->shaders.box_shadow.window_half_size, (float)surface_box.width / 2.0, (float)surface_box.height / 2.0);
 	glUniform2f(renderer->shaders.box_shadow.window_position, surface_box.x, surface_box.y);

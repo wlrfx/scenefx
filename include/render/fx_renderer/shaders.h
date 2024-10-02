@@ -87,6 +87,7 @@ struct box_shadow_shader {
 	GLint pos_attrib;
 	GLint position;
 	GLint size;
+	GLint offset;
 	GLint blur_sigma;
 	GLint corner_radius;
 	GLint window_position;

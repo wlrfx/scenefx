@@ -176,7 +176,7 @@ bool link_border_program(struct border_shader *shader) {
 	shader->radius = glGetUniformLocation(prog, "radius");
 	shader->window_position = glGetUniformLocation(prog, "window_position");
 	shader->half_window_size = glGetUniformLocation(prog, "half_window_size");
-	shader->half_thickness = glGetUniformLocation(prog, "half_thickness");
+	shader->thickness = glGetUniformLocation(prog, "thickness");
 
 	return true;
 }

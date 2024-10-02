@@ -443,7 +443,7 @@ void fx_render_pass_add_border(struct fx_gles_render_pass *pass,
 	glUniform2f(renderer->shaders.border.half_window_size, box.width / 2.0f, box.height / 2.0f);
 	glUniform2f(renderer->shaders.border.window_position, box.x, box.y);
 	glUniform1f(renderer->shaders.border.radius, fx_options->corner_radius);
-	glUniform1f(renderer->shaders.border.half_thickness, fx_options->border_thickness / 2.0f);
+	glUniform1f(renderer->shaders.border.thickness, fx_options->border_thickness);
 
 	pixman_region32_t render_region;
 	pixman_region32_init(&render_region);

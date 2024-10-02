@@ -75,7 +75,7 @@ struct border_shader {
 	GLint radius;
 	GLint window_position;
 	GLint half_window_size;
-	GLint half_thickness;
+	GLint thickness;
 };
 
 bool link_border_program(struct border_shader *shader);

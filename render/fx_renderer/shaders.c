@@ -11,7 +11,7 @@
 #include "quad_frag_src.h"
 #include "quad_round_frag_src.h"
 #include "tex_frag_src.h"
-#include "rounded_border_corner_frag_src.h"
+#include "border_frag_src.h"
 #include "box_shadow_frag_src.h"
 #include "blur1_frag_src.h"
 #include "blur2_frag_src.h"
@@ -163,9 +163,9 @@ bool link_tex_program(struct tex_shader *shader,
 	return true;
 }
 
-bool link_rounded_border_corner_program(struct rounded_border_corner_shader *shader) {
+bool link_border_program(struct border_shader *shader) {
 	GLuint prog;
-	shader->program = prog = link_program(rounded_border_corner_frag_src);
+	shader->program = prog = link_program(border_frag_src);
 	if (!shader->program) {
 		return false;
 	}
@@ -173,14 +173,10 @@ bool link_rounded_border_corner_program(struct rounded_border_corner_shader *sha
 	shader->proj = glGetUniformLocation(prog, "proj");
 	shader->color = glGetUniformLocation(prog, "color");
 	shader->pos_attrib = glGetAttribLocation(prog, "pos");
-	shader->is_top_left = glGetUniformLocation(prog, "is_top_left");
-	shader->is_top_right = glGetUniformLocation(prog, "is_top_right");
-	shader->is_bottom_left = glGetUniformLocation(prog, "is_bottom_left");
-	shader->is_bottom_right = glGetUniformLocation(prog, "is_bottom_right");
-	shader->position = glGetUniformLocation(prog, "position");
 	shader->radius = glGetUniformLocation(prog, "radius");
-	shader->half_size = glGetUniformLocation(prog, "half_size");
-	shader->half_thickness = glGetUniformLocation(prog, "half_thickness");
+	shader->window_position = glGetUniformLocation(prog, "window_position");
+	shader->half_window_size = glGetUniformLocation(prog, "half_window_size");
+	shader->thickness = glGetUniformLocation(prog, "thickness");
 
 	return true;
 }
@@ -199,6 +195,8 @@ bool link_box_shadow_program(struct box_shadow_shader *shader) {
 	shader->offset = glGetUniformLocation(prog, "offset");
 	shader->blur_sigma = glGetUniformLocation(prog, "blur_sigma");
 	shader->corner_radius = glGetUniformLocation(prog, "corner_radius");
+	shader->window_position = glGetUniformLocation(prog, "window_position");
+	shader->window_half_size = glGetUniformLocation(prog, "window_half_size");
 
 	return true;
 }

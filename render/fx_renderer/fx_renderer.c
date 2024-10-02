@@ -679,9 +679,9 @@ static bool link_shaders(struct fx_renderer *renderer) {
 		goto error;
 	}
 
-	// border corner shader
-	if (!link_rounded_border_corner_program(&renderer->shaders.rounded_border_corner)) {
-		wlr_log(WLR_ERROR, "Could not link rounded border corner shader");
+	// border shader
+	if (!link_border_program(&renderer->shaders.border)) {
+		wlr_log(WLR_ERROR, "Could not link border shader");
 		goto error;
 	}
 
@@ -717,7 +717,7 @@ error:
 	glDeleteProgram(renderer->shaders.tex_rgba.program);
 	glDeleteProgram(renderer->shaders.tex_rgbx.program);
 	glDeleteProgram(renderer->shaders.tex_ext.program);
-	glDeleteProgram(renderer->shaders.rounded_border_corner.program);
+	glDeleteProgram(renderer->shaders.border.program);
 	glDeleteProgram(renderer->shaders.box_shadow.program);
 	glDeleteProgram(renderer->shaders.blur1.program);
 	glDeleteProgram(renderer->shaders.blur2.program);

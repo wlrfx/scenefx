@@ -20,7 +20,6 @@
  */
 
 #include <pixman.h>
-#include "scenefx/types/fx/shadow_data.h"
 #include <time.h>
 #include <wayland-server-core.h>
 #include <wlr/render/wlr_renderer.h>
@@ -28,6 +27,9 @@
 #include <wlr/types/wlr_linux_dmabuf_v1.h>
 #include <wlr/util/addon.h>
 #include <wlr/util/box.h>
+
+#include "scenefx/types/fx/border_data.h"
+#include "scenefx/types/fx/shadow_data.h"
 
 struct wlr_output;
 struct wlr_output_layout;
@@ -179,6 +181,7 @@ struct wlr_scene_buffer {
 	float opacity;
 	int corner_radius;
 	struct shadow_data shadow_data;
+	struct border_data border_data;
 
 	enum wlr_scale_filter_mode filter_mode;
 	struct wlr_fbox src_box;
@@ -461,6 +464,12 @@ void wlr_scene_buffer_set_corner_radius(struct wlr_scene_buffer *scene_buffer,
 */
 void wlr_scene_buffer_set_shadow_data(struct wlr_scene_buffer *scene_buffer,
 		struct shadow_data shadow_data);
+
+/**
+* Sets the border of this buffer
+*/
+void wlr_scene_buffer_set_border_data(struct wlr_scene_buffer *scene_buffer,
+		struct border_data border_data);
 
 /**
  * Calls the buffer's frame_done signal.

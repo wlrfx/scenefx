@@ -93,7 +93,7 @@ wayland_server = dependency('wayland-server',
 )
 
 wlroots_options = [ 'examples=false' ]
-wlroots_version = ['>=0.18.0', '<0.19.0']
+wlroots_version = ['>=0.18.1', '<0.19.0']
 wlroots = dependency('wlroots-0.18',
 	version: wlroots_version,
 	default_options: wlroots_options,

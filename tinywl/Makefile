@@ -1,9 +1,10 @@
-WAYLAND_PROTOCOLS=$(shell pkg-config --variable=pkgdatadir wayland-protocols)
-WAYLAND_SCANNER=$(shell pkg-config --variable=wayland_scanner wayland-scanner)
-LIBS=\
-	 $(shell pkg-config --cflags --libs wlroots) \
-	 $(shell pkg-config --cflags --libs wayland-server) \
-	 $(shell pkg-config --cflags --libs xkbcommon)
+PKG_CONFIG?=pkg-config
+WAYLAND_PROTOCOLS=$(shell $(PKG_CONFIG) --variable=pkgdatadir wayland-protocols)
+WAYLAND_SCANNER=$(shell $(PKG_CONFIG) --variable=wayland_scanner wayland-scanner)
+
+PKGS="wlroots-0.18" wayland-server xkbcommon
+CFLAGS+=$(shell $(PKG_CONFIG) --cflags $(PKGS))
+LIBS=$(shell $(PKG_CONFIG) --libs $(PKGS))
 
 # wayland-scanner is a tool which generates C headers and rigging for Wayland
 # protocols, which are specified in XML. wlroots requires you to rig these up
@@ -12,15 +13,13 @@ xdg-shell-protocol.h:
 	$(WAYLAND_SCANNER) server-header \
 		$(WAYLAND_PROTOCOLS)/stable/xdg-shell/xdg-shell.xml $@
 
-tinywl: tinywl.c xdg-shell-protocol.h
-	$(CC) $(CFLAGS) \
-		-g -Werror -I. \
-		-DWLR_USE_UNSTABLE \
-		-o $@ $< \
-		$(LIBS)
+tinywl.o: tinywl.c xdg-shell-protocol.h
+	$(CC) -g -Werror $(CFLAGS) -I. -DWLR_USE_UNSTABLE -o $@ -c $<
+tinywl: tinywl.o
+	$(CC) $< -g -Werror $(CFLAGS) $(LDFLAGS) $(LIBS) -o $@
 
 clean:
-	rm -f tinywl xdg-shell-protocol.h xdg-shell-protocol.c
+	rm -f tinywl tinywl.o xdg-shell-protocol.h
 
 .DEFAULT_GOAL=tinywl
 .PHONY: clean

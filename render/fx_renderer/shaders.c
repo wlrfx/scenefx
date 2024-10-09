@@ -29,12 +29,6 @@ GLuint compile_shader(GLuint type, const GLchar *src) {
 	glGetShaderiv(shader, GL_COMPILE_STATUS, &ok);
 	if (ok == GL_FALSE) {
 		wlr_log(WLR_ERROR, "Failed to compile shader");
-		GLint maxLength = 0;
-		glGetShaderiv(shader, GL_INFO_LOG_LENGTH, &maxLength);
-
-		char a[maxLength];
-		glGetShaderInfoLog(shader, maxLength, &maxLength, a);
-		printf("%s\n", a);
 		glDeleteShader(shader);
 		shader = 0;
 	}

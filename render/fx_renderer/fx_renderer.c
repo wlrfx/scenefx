@@ -651,7 +651,7 @@ static bool link_shaders(struct fx_renderer *renderer) {
 		goto error;
 	}
 	// rounded quad fragment shaders
-	if (!link_quad_grad_round_program(&renderer->shaders.quad_grad_round_tl, SHADER_SOURCE_QUAD_ROUND_TOP_LEFT, 2)) {
+	if (!link_quad_grad_round_program(&renderer->shaders.quad_grad_round_tl, SHADER_SOURCE_QUAD_ROUND_TOP_LEFT, 16)) {
 		wlr_log(WLR_ERROR, "Could not link quad shader");
 		goto error;
 	}
@@ -718,7 +718,7 @@ static bool link_shaders(struct fx_renderer *renderer) {
 	}
 
 	// border corner shader with gradients
-	if (!link_rounded_grad_border_corner_program(&renderer->shaders.rounded_grad_border_corner, 2)) {
+	if (!link_rounded_grad_border_corner_program(&renderer->shaders.rounded_grad_border_corner, 16)) {
 		wlr_log(WLR_ERROR, "Could not link quad shader");
 		goto error;
 	}

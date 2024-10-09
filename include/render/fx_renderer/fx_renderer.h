@@ -161,16 +161,23 @@ struct fx_renderer {
 
 	struct {
 		struct quad_shader quad;
+		struct quad_grad_shader quad_grad;
 		struct quad_round_shader quad_round;
 		struct quad_round_shader quad_round_tl;
 		struct quad_round_shader quad_round_tr;
 		struct quad_round_shader quad_round_bl;
 		struct quad_round_shader quad_round_br;
+		struct quad_grad_round_shader quad_grad_round;
+		struct quad_grad_round_shader quad_grad_round_tl;
+		struct quad_grad_round_shader quad_grad_round_tr;
+		struct quad_grad_round_shader quad_grad_round_bl;
+		struct quad_grad_round_shader quad_grad_round_br;
 		struct tex_shader tex_rgba;
 		struct tex_shader tex_rgbx;
 		struct tex_shader tex_ext;
 		struct box_shadow_shader box_shadow;
 		struct rounded_border_corner_shader rounded_border_corner;
+		struct rounded_grad_border_corner_shader rounded_grad_border_corner;
 		struct blur_shader blur1;
 		struct blur_shader blur2;
 		struct blur_effects_shader blur_effects;

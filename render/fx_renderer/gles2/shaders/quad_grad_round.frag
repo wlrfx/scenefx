@@ -28,7 +28,7 @@ uniform int count;
 vec4 gradient(){
 	float step;
 
-	vec2 normal = (gl_FragCoord.xy - grad_box)/grad_size;
+	vec2 normal = (gl_FragCoord.xy - grad_box)/size;
 	vec2 uv = normal - origin;
 
 	float rad = radians(degree);
@@ -48,13 +48,18 @@ vec4 gradient(){
 		step = uv.x;
 	}
 
+	if(!blend){
+		float smooth = 1.0/float(count);
+		int ind = int(step/smooth);
+
+		return colors[ind];
+	}
+
 	float smooth = 1.0/float(count - 1);
     int ind = int(step/smooth);
     float at = float(ind)*smooth;
 
-	if(!blend) return colors[ind];
-
-    vec4 color = colors[ind];
+	vec4 color = colors[ind];
     if(ind > 0) color = mix(colors[ind - 1], color, smoothstep(at - smooth, at, step));
     if(ind <= count - 1) color = mix(color, colors[ind + 1], smoothstep(at, at + smooth, step));
 

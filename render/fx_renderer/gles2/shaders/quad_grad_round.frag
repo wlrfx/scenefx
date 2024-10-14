@@ -34,11 +34,12 @@ vec4 gradient(){
 	float rad = radians(degree);
 
 	if(linear){
-		float angle = rad + atan(uv.x, uv.y);
+		uv *= vec2(1.0)/vec2(abs(cos(rad)) + abs(sin(rad)));
 
-		float len = length(uv);
-		uv = vec2(cos(angle) * len, sin(angle) * len) + origin;
-		step = uv.x;
+		vec2 rotated = vec2(uv.x * cos(rad) - uv.y * sin(rad) + origin.x,
+						uv.x * sin(rad) + uv.y * cos(rad) + origin.y);
+
+		step = rotated.x;
 	} else {
 		vec2 uv = normal - origin;
 		uv = vec2(uv.x * cos(rad) - uv.y * sin(rad),
@@ -59,7 +60,7 @@ vec4 gradient(){
     int ind = int(step/smooth);
     float at = float(ind)*smooth;
 
-	vec4 color = colors[ind];
+    vec4 color = colors[ind];
     if(ind > 0) color = mix(colors[ind - 1], color, smoothstep(at - smooth, at, step));
     if(ind <= count - 1) color = mix(color, colors[ind + 1], smoothstep(at, at + smooth, step));
 

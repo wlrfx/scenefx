@@ -80,11 +80,8 @@ void main() {
     // dither the alpha to break up color bands
     shadow_alpha += (random() - 0.5) / 128.0;
 
-    // get the window alpha so we can render around the window
-    float window_alpha = 1.0 - smoothstep(-1.0, 1.0,
-        roundRectSDF((size * 0.5) - blur_sigma,
-            vec2(position.x + blur_sigma - offset.x, position.y + blur_sigma - offset.y),
-            corner_radius));
+    // get the window alpha so we can render around the window (fix pixel gap by adding 0.5 to radius)
+    float window_alpha = 1.0 - smoothstep(-1.0, 1.0, roundRectSDF((size * 0.5) - blur_sigma, position + blur_sigma, corner_radius + 0.5));
 
     gl_FragColor = vec4(v_color.rgb, shadow_alpha) * (1.0 - window_alpha);
 }

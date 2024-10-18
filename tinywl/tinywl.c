@@ -6,7 +6,6 @@
 #include <stdio.h>
 #include <time.h>
 #include <scenefx/render/fx_renderer/fx_renderer.h>
-#include <scenefx/types/fx/shadow_data.h>
 #include <scenefx/types/wlr_scene.h>
 #include <unistd.h>
 #include <wayland-server-core.h>
@@ -96,7 +95,6 @@ struct tinywl_toplevel {
 
 	float opacity;
 	int corner_radius;
-	struct shadow_data shadow_data;
 };
 
 struct tinywl_keyboard {
@@ -589,7 +587,6 @@ static void output_configure_scene(struct wlr_scene_node *node,
 
 			if (!wlr_subsurface_try_from_wlr_surface(xdg_surface->surface)) {
 				wlr_scene_buffer_set_corner_radius(buffer, toplevel->corner_radius);
-				wlr_scene_buffer_set_shadow_data(buffer, toplevel->shadow_data);
 			}
 		}
 	} else if (node->type == WLR_SCENE_NODE_TREE) {
@@ -855,9 +852,6 @@ static void server_new_xdg_surface(struct wl_listener *listener, void *data) {
 	/* Set the scene_nodes decoration data */
 	toplevel->opacity = 1;
 	toplevel->corner_radius = 20;
-	toplevel->shadow_data = shadow_data_get_default();
-	toplevel->shadow_data.enabled = true;
-	toplevel->shadow_data.color = (struct wlr_render_color) {1.0f, 0.0f, 0.0f, 1.0f};
 
 	/* Listen to the various events it can emit */
 	toplevel->map.notify = xdg_toplevel_map;

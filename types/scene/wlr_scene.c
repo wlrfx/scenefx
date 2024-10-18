@@ -46,7 +46,7 @@ struct wlr_scene_buffer *wlr_scene_buffer_from_node(
 }
 
 struct wlr_scene_shadow *wlr_scene_shadow_from_node(struct wlr_scene_node *node) {
-	assert(node->type == WLR_SCENE_NODE_RECT);
+	assert(node->type == WLR_SCENE_NODE_SHADOW);
 	struct wlr_scene_shadow *shadow = wl_container_of(node, shadow, node);
 	return shadow;
 }

@@ -26,7 +26,7 @@ uniform sampler2D tex;
 
 uniform float alpha;
 
-uniform vec2 size;
+uniform vec2 half_size;
 uniform vec2 position;
 uniform float radius;
 uniform bool has_titlebar;
@@ -42,19 +42,21 @@ vec4 sample_texture() {
 #endif
 }
 
+float roundRectSDF() {
+	vec2 q = abs(gl_FragCoord.xy - position - half_size) - half_size + radius;
+	return min(max(q.x, q.y), 0.0) + length(max(q, 0.0)) - radius;
+}
+
 void main() {
 	gl_FragColor = mix(sample_texture(), dim_color, dim) * alpha;
 
-	if (!has_titlebar || gl_FragCoord.y - position.y > radius) {
-		vec2 corner_distance = min(gl_FragCoord.xy - position, size + position - gl_FragCoord.xy);
-		if (max(corner_distance.x, corner_distance.y) < radius) {
-			float d = radius - distance(corner_distance, vec2(radius));
-			float smooth = smoothstep(-1.0, 0.5, d);
-			gl_FragColor = mix(vec4(0), gl_FragColor, smooth);
-		}
-	}
-
 	if (discard_transparent && gl_FragColor.a == 0.0) {
 		discard;
+		return;
+	}
+
+	if (!has_titlebar || gl_FragCoord.y - position.y > radius) {
+		float alpha = smoothstep(-1.0, 1.0, roundRectSDF());
+		gl_FragColor = mix(gl_FragColor, vec4(0.0), alpha);
 	}
 }

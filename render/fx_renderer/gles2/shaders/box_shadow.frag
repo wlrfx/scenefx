@@ -11,6 +11,7 @@ varying vec2 v_texcoord;
 
 uniform vec2 position;
 uniform vec2 size;
+uniform vec2 offset;
 uniform float blur_sigma;
 uniform float corner_radius;
 
@@ -65,15 +66,22 @@ float random() {
     return fract(sin(dot(vec2(12.9898, 78.233), gl_FragCoord.xy)) * 43758.5453);
 }
 
+float roundRectSDF(vec2 half_size, vec2 position, float radius) {
+    vec2 q = abs(gl_FragCoord.xy - position - half_size) - half_size + radius;
+    return min(max(q.x, q.y), 0.0) + length(max(q, 0.0)) - radius;
+}
+
 void main() {
-    float frag_alpha = v_color.a * roundedBoxShadow(
+    float shadow_alpha = v_color.a * roundedBoxShadow(
             position + blur_sigma,
             position + size - blur_sigma,
             gl_FragCoord.xy, blur_sigma * 0.5,
             corner_radius);
-
     // dither the alpha to break up color bands
-    frag_alpha += (random() - 0.5) / 128.0;
+    shadow_alpha += (random() - 0.5) / 128.0;
 
-    gl_FragColor = vec4(v_color.rgb, frag_alpha);
+    // get the window alpha so we can render around the window (fix pixel gap by adding 0.5 to radius)
+    float window_alpha = 1.0 - smoothstep(-1.0, 1.0, roundRectSDF((size * 0.5) - blur_sigma, position + blur_sigma, corner_radius + 0.5));
+
+    gl_FragColor = vec4(v_color.rgb, shadow_alpha) * (1.0 - window_alpha);
 }

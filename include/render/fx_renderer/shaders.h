@@ -56,7 +56,7 @@ struct tex_shader {
 	GLint tex;
 	GLint alpha;
 	GLint pos_attrib;
-	GLint size;
+	GLint half_size;
 	GLint position;
 	GLint radius;
 	GLint has_titlebar;
@@ -84,17 +84,6 @@ struct rounded_border_corner_shader {
 
 bool link_rounded_border_corner_program(struct rounded_border_corner_shader *shader);
 
-struct stencil_mask_shader {
-	GLuint program;
-	GLint proj;
-	GLint pos_attrib;
-	GLint half_size;
-	GLint position;
-	GLint radius;
-};
-
-bool link_stencil_mask_program(struct stencil_mask_shader *shader);
-
 struct box_shadow_shader {
 	GLuint program;
 	GLint proj;
@@ -102,6 +91,7 @@ struct box_shadow_shader {
 	GLint pos_attrib;
 	GLint position;
 	GLint size;
+	GLint offset;
 	GLint blur_sigma;
 	GLint corner_radius;
 };

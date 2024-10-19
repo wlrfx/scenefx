@@ -12,7 +12,6 @@
 #include "quad_round_frag_src.h"
 #include "tex_frag_src.h"
 #include "rounded_border_corner_frag_src.h"
-#include "stencil_mask_frag_src.h"
 #include "box_shadow_frag_src.h"
 #include "blur1_frag_src.h"
 #include "blur2_frag_src.h"
@@ -153,7 +152,7 @@ bool link_tex_program(struct tex_shader *shader,
 	shader->alpha = glGetUniformLocation(prog, "alpha");
 	shader->pos_attrib = glGetAttribLocation(prog, "pos");
 	shader->tex_proj = glGetUniformLocation(prog, "tex_proj");
-	shader->size = glGetUniformLocation(prog, "size");
+	shader->half_size = glGetUniformLocation(prog, "half_size");
 	shader->position = glGetUniformLocation(prog, "position");
 	shader->radius = glGetUniformLocation(prog, "radius");
 	shader->has_titlebar = glGetUniformLocation(prog, "has_titlebar");
@@ -186,22 +185,6 @@ bool link_rounded_border_corner_program(struct rounded_border_corner_shader *sha
 	return true;
 }
 
-bool link_stencil_mask_program(struct stencil_mask_shader *shader) {
-	GLuint prog;
-	shader->program = prog = link_program(stencil_mask_frag_src);
-	if (!shader->program) {
-		return false;
-	}
-
-	shader->proj = glGetUniformLocation(prog, "proj");
-	shader->pos_attrib = glGetAttribLocation(prog, "pos");
-	shader->position = glGetUniformLocation(prog, "position");
-	shader->half_size = glGetUniformLocation(prog, "half_size");
-	shader->radius = glGetUniformLocation(prog, "radius");
-
-	return true;
-}
-
 bool link_box_shadow_program(struct box_shadow_shader *shader) {
 	GLuint prog;
 	shader->program = prog = link_program(box_shadow_frag_src);
@@ -213,6 +196,7 @@ bool link_box_shadow_program(struct box_shadow_shader *shader) {
 	shader->pos_attrib = glGetAttribLocation(prog, "pos");
 	shader->position = glGetUniformLocation(prog, "position");
 	shader->size = glGetUniformLocation(prog, "size");
+	shader->offset = glGetUniformLocation(prog, "offset");
 	shader->blur_sigma = glGetUniformLocation(prog, "blur_sigma");
 	shader->corner_radius = glGetUniformLocation(prog, "corner_radius");
 

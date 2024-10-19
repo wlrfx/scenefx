@@ -1395,7 +1395,8 @@ static void scene_entry_render(struct render_list_entry *entry, const struct ren
 				pixman_region32_copy(&opaque_region, &scene_surface->surface->opaque_region);
 			} else {
 				has_alpha = pixman_region32_not_empty(&opaque);
-				pixman_region32_copy(&opaque_region, &opaque);
+				scene_node_opaque_region(node, x, y, &opaque_region);
+				scale_output_damage(&opaque_region, data->scale);
 			}
 
 			if (has_alpha) {

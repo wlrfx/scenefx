@@ -136,7 +136,7 @@ static void server_handle_new_surface(struct wl_listener *listener,
 	wlr_scene_node_set_position(&surface->border->node, pos, pos);
 
 	surface->shadow = wlr_scene_shadow_create(&server->scene->tree,
-			0, 0, 0, 20.0, (float[4]){ 1.0f, 0.f, 0.f, 1 });
+			0, 0, 0, 20.0, (float[4]){ 1.0f, 0.f, 0.f, 1.0f });
 	wlr_scene_node_set_position(&surface->shadow->node,
 			pos - border_width, pos - border_width);
 

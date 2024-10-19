@@ -252,7 +252,8 @@ static void scene_node_opaque_region(struct wlr_scene_node *node, int x, int y,
 			return;
 		}
 	} else if (node->type == WLR_SCENE_NODE_SHADOW) {
-		// TODO
+		// TODO: test & handle case of blur sigma = 0 and color[3] = 1?
+		return;
 	} else if (node->type == WLR_SCENE_NODE_BUFFER) {
 		struct wlr_scene_buffer *scene_buffer = wlr_scene_buffer_from_node(node);
 

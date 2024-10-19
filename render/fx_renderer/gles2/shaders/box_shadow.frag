@@ -11,7 +11,6 @@ varying vec2 v_texcoord;
 
 uniform vec2 position;
 uniform vec2 size;
-uniform vec2 offset;
 uniform float blur_sigma;
 uniform float corner_radius;
 

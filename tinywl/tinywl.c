@@ -581,8 +581,6 @@ static void output_configure_scene(struct wlr_scene_node *node,
 		if (toplevel &&
 				xdg_surface &&
 				xdg_surface->role == WLR_XDG_SURFACE_ROLE_TOPLEVEL) {
-			// TODO: Be able to set whole decoration_data instead of calling
-			// each individually?
 			wlr_scene_buffer_set_opacity(buffer, toplevel->opacity);
 
 			if (!wlr_subsurface_try_from_wlr_surface(xdg_surface->surface)) {

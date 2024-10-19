@@ -22,6 +22,7 @@
  * New surfaces are stacked on top of the existing ones as they appear. */
 
 static const int border_width = 3;
+static const int corner_radius = 5;
 
 struct server {
 	struct wl_display *display;
@@ -100,9 +101,10 @@ static void surface_handle_commit(struct wl_listener *listener, void *data) {
 	wlr_scene_rect_set_size(surface->border,
 			surface->wlr->current.width + 2 * border_width,
 			surface->wlr->current.height + 2 * border_width);
+
 	wlr_scene_shadow_set_size(surface->shadow,
-			surface->wlr->current.width + 2 * border_width,
-			surface->wlr->current.height + 2 * border_width);
+			surface->wlr->current.width + (2 * border_width + surface->shadow->blur_sigma),
+			surface->wlr->current.height + (2 * border_width + surface->shadow->blur_sigma));
 }
 
 static void surface_handle_destroy(struct wl_listener *listener, void *data) {
@@ -136,12 +138,13 @@ static void server_handle_new_surface(struct wl_listener *listener,
 	wlr_scene_node_set_position(&surface->border->node, pos, pos);
 
 	surface->shadow = wlr_scene_shadow_create(&server->scene->tree,
-			0, 0, 0, 20.0, (float[4]){ 1.0f, 0.f, 0.f, 1.0f });
+			0, 0, corner_radius, 20.0, (float[4]){ 1.0f, 0.f, 0.f, 1.0f });
 	wlr_scene_node_set_position(&surface->shadow->node,
 			pos - border_width, pos - border_width);
 
 	surface->scene_surface =
 		wlr_scene_surface_create(&server->scene->tree, wlr_surface);
+	wlr_scene_buffer_set_corner_radius(surface->scene_surface->buffer, corner_radius);
 
 	wlr_scene_node_set_position(&surface->scene_surface->buffer->node, pos, pos);
 }

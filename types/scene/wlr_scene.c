@@ -43,9 +43,11 @@ struct wlr_scene_rect *wlr_scene_rect_from_node(struct wlr_scene_node *node) {
 	return rect;
 }
 
-struct wlr_scene_blur *wlr_scene_blur_from_node(struct wlr_scene_node *node) {
+struct wlr_scene_optimized_blur *wlr_scene_optimized_blur_from_node(
+		struct wlr_scene_node *node) {
 	assert(node->type == WLR_SCENE_NODE_BLUR);
-	struct wlr_scene_blur *blur_node = wl_container_of(node, blur_node, node);
+	struct wlr_scene_optimized_blur *blur_node =
+		wl_container_of(node, blur_node, node);
 	return blur_node;
 }
 
@@ -656,9 +658,9 @@ void wlr_scene_rect_set_color(struct wlr_scene_rect *rect, const float color[sta
 	scene_node_update(&rect->node, NULL);
 }
 
-struct wlr_scene_blur *wlr_scene_blur_create(struct wlr_scene_tree *parent,
-		int width, int height) {
-	struct wlr_scene_blur *scene_blur = calloc(1, sizeof(*scene_blur));
+struct wlr_scene_optimized_blur *wlr_scene_optimized_blur_create(
+		struct wlr_scene_tree *parent, int width, int height) {
+	struct wlr_scene_optimized_blur *scene_blur = calloc(1, sizeof(*scene_blur));
 	if (scene_blur == NULL) {
 		return NULL;
 	}
@@ -673,8 +675,8 @@ struct wlr_scene_blur *wlr_scene_blur_create(struct wlr_scene_tree *parent,
 	return scene_blur;
 }
 
-void wlr_scene_blur_set_size(struct wlr_scene_blur *blur_node, int width,
-		int height) {
+void wlr_scene_optimized_blur_set_size(struct wlr_scene_optimized_blur *blur_node,
+		int width, int height) {
 	if (blur_node->width == width && blur_node->height == height) {
 		return;
 	}
@@ -1033,7 +1035,8 @@ static void scene_node_get_size(struct wlr_scene_node *node,
 	case WLR_SCENE_NODE_TREE:
 		return;
 	case WLR_SCENE_NODE_BLUR:;
-		struct wlr_scene_blur *scene_blur = wlr_scene_blur_from_node(node);
+		struct wlr_scene_optimized_blur *scene_blur =
+			wlr_scene_optimized_blur_from_node(node);
 		*width = scene_blur->width;
 		*height = scene_blur->height;
 		break;

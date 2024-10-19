@@ -47,7 +47,7 @@ struct tinywl_server {
 	struct {
 		struct wlr_scene_tree *bottom_layer;
 		/** Used for optimized blur. Everything exclusively below gets blurred */
-		struct wlr_scene_blur *blur_layer;
+		struct wlr_scene_optimized_blur *blur_layer;
 		struct wlr_scene_tree *toplevel_layer;
 	} layers;
 
@@ -604,7 +604,7 @@ static void output_request_state(struct wl_listener *listener, void *data) {
 	 * output. More advanced compositors should either implement per output blur
 	 * nodes or set it to the size of all outputs.
 	 */
-	wlr_scene_blur_set_size(output->server->layers.blur_layer,
+	wlr_scene_optimized_blur_set_size(output->server->layers.blur_layer,
 			output->wlr_output->width, output->wlr_output->height);
 }
 
@@ -686,7 +686,7 @@ static void server_new_output(struct wl_listener *listener, void *data) {
 	 * output. More advanced compositors should either implement per output blur
 	 * nodes or set it to the size of all outputs.
 	 */
-	wlr_scene_blur_set_size(output->server->layers.blur_layer,
+	wlr_scene_optimized_blur_set_size(output->server->layers.blur_layer,
 			output->wlr_output->width, output->wlr_output->height);
 }
 
@@ -1022,7 +1022,7 @@ int main(int argc, char *argv[]) {
 	float bottom_rect_color[4] = { 1, 1, 1, 1 };
 	wlr_scene_rect_create(server.layers.bottom_layer, 200, 200, bottom_rect_color);
 	/* Set the size later */
-	server.layers.blur_layer = wlr_scene_blur_create(&server.scene->tree, 0, 0);
+	server.layers.blur_layer = wlr_scene_optimized_blur_create(&server.scene->tree, 0, 0);
 	server.layers.toplevel_layer = wlr_scene_tree_create(&server.scene->tree);
 	/* Add a top rect that won't get blurred by optimized */
 	float top_rect_color[4] = { 1, 0, 0, 1 };

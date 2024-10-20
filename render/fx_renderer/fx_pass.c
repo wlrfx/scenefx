@@ -797,14 +797,14 @@ void fx_render_pass_add_optimized_blur(struct fx_gles_render_pass *pass,
 		return;
 	}
 	struct fx_renderer *renderer = pass->buffer->renderer;
-	struct wlr_box monitor_box = get_monitor_box(pass->output);
+	struct wlr_box dst_box = fx_options->tex_options.base.dst_box;
 
-	pixman_region32_t fake_damage;
-	pixman_region32_init_rect(&fake_damage, 0, 0, monitor_box.width, monitor_box.height);
+	pixman_region32_t clip;
+	pixman_region32_init_rect(&clip,
+			dst_box.x, dst_box.y, dst_box.width, dst_box.height);
 
 	// Render the blur into its own buffer
 	struct fx_render_blur_pass_options blur_options = *fx_options;
-	blur_options.tex_options.base.clip = &fake_damage;
 	blur_options.current_buffer = pass->buffer;
 	struct fx_framebuffer *buffer = get_main_buffer_blur(pass, &blur_options);
 
@@ -813,10 +813,10 @@ void fx_render_pass_add_optimized_blur(struct fx_gles_render_pass *pass,
 			&pass->fx_effect_framebuffers->optimized_blur_buffer);
 
 	// Render the newly blurred content into the blur_buffer
-	fx_renderer_read_to_buffer(pass, &fake_damage,
+	fx_renderer_read_to_buffer(pass, &clip,
 			pass->fx_effect_framebuffers->optimized_blur_buffer, buffer, false);
 
-	pixman_region32_fini(&fake_damage);
+	pixman_region32_fini(&clip);
 
 	pass->fx_effect_framebuffers->blur_buffer_dirty = false;
 }

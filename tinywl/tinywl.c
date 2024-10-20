@@ -6,6 +6,7 @@
 #include <stdio.h>
 #include <time.h>
 #include <scenefx/render/fx_renderer/fx_renderer.h>
+#include <scenefx/types/fx/blur_data.h>
 #include <scenefx/types/fx/shadow_data.h>
 #include <scenefx/types/wlr_scene.h>
 #include <unistd.h>
@@ -43,6 +44,12 @@ struct tinywl_server {
 	struct wlr_allocator *allocator;
 	struct wlr_scene *scene;
 	struct wlr_scene_output_layout *scene_layout;
+	struct {
+		struct wlr_scene_tree *bottom_layer;
+		/** Used for optimized blur. Everything exclusively below gets blurred */
+		struct wlr_scene_optimized_blur *blur_layer;
+		struct wlr_scene_tree *toplevel_layer;
+	} layers;
 
 	struct wlr_xdg_shell *xdg_shell;
 	struct wl_listener new_xdg_surface;
@@ -88,6 +95,7 @@ struct tinywl_toplevel {
 	struct wlr_scene_tree *scene_tree;
 	struct wl_listener map;
 	struct wl_listener unmap;
+	struct wl_listener commit;
 	struct wl_listener destroy;
 	struct wl_listener request_move;
 	struct wl_listener request_resize;
@@ -435,6 +443,15 @@ static void process_cursor_resize(struct tinywl_server *server, uint32_t time) {
 	int new_width = new_right - new_left;
 	int new_height = new_bottom - new_top;
 	wlr_xdg_toplevel_set_size(toplevel->xdg_toplevel, new_width, new_height);
+
+	// Clip to geometry
+	struct wlr_box clip = {
+		.width = new_width,
+		.height = new_height,
+		.x = geo_box.x,
+		.y = geo_box.y,
+	};
+	wlr_scene_subsurface_tree_set_clip(&toplevel->scene_tree->node, &clip);
 }
 
 static void process_cursor_motion(struct tinywl_server *server, uint32_t time) {
@@ -557,50 +574,6 @@ static void server_cursor_frame(struct wl_listener *listener, void *data) {
 	wlr_seat_pointer_notify_frame(server->seat);
 }
 
-static void output_configure_scene(struct wlr_scene_node *node,
-		struct tinywl_toplevel *toplevel) {
-	if (!node->enabled) {
-		return;
-	}
-
-	struct tinywl_toplevel *_toplevel = node->data;
-	if (_toplevel) {
-		toplevel = _toplevel;
-	}
-
-	if (node->type == WLR_SCENE_NODE_BUFFER) {
-		struct wlr_scene_buffer *buffer = wlr_scene_buffer_from_node(node);
-
-		struct wlr_scene_surface * scene_surface =
-			wlr_scene_surface_try_from_buffer(buffer);
-		if (!scene_surface) {
-			return;
-		}
-
-		struct wlr_xdg_surface *xdg_surface =
-			wlr_xdg_surface_try_from_wlr_surface(scene_surface->surface);
-
-		if (toplevel &&
-				xdg_surface &&
-				xdg_surface->role == WLR_XDG_SURFACE_ROLE_TOPLEVEL) {
-			// TODO: Be able to set whole decoration_data instead of calling
-			// each individually?
-			wlr_scene_buffer_set_opacity(buffer, toplevel->opacity);
-
-			if (!wlr_subsurface_try_from_wlr_surface(xdg_surface->surface)) {
-				wlr_scene_buffer_set_corner_radius(buffer, toplevel->corner_radius);
-				wlr_scene_buffer_set_shadow_data(buffer, toplevel->shadow_data);
-			}
-		}
-	} else if (node->type == WLR_SCENE_NODE_TREE) {
-		struct wlr_scene_tree *tree = wl_container_of(node, tree, node);
-		struct wlr_scene_node *node;
-		wl_list_for_each(node, &tree->children, link) {
-			output_configure_scene(node, toplevel);
-		}
-	}
-}
-
 static void output_frame(struct wl_listener *listener, void *data) {
 	/* This function is called every time an output is ready to display a frame,
 	 * generally at the output's refresh rate (e.g. 60Hz). */
@@ -609,8 +582,6 @@ static void output_frame(struct wl_listener *listener, void *data) {
 
 	struct wlr_scene_output *scene_output = wlr_scene_get_scene_output(
 		scene, output->wlr_output);
-
-	output_configure_scene(&scene_output->scene->tree.node, NULL);
 
 	/* Render the scene if needed and commit the output */
 	wlr_scene_output_commit(scene_output, NULL);
@@ -627,6 +598,14 @@ static void output_request_state(struct wl_listener *listener, void *data) {
 	struct tinywl_output *output = wl_container_of(listener, output, request_state);
 	const struct wlr_output_event_request_state *event = data;
 	wlr_output_commit_state(output->wlr_output, event->state);
+
+	/*
+	 * Sets the blur node size to the outputs size. Assumes there's only one
+	 * output. More advanced compositors should either implement per output blur
+	 * nodes or set it to the size of all outputs.
+	 */
+	wlr_scene_optimized_blur_set_size(output->server->layers.blur_layer,
+			output->wlr_output->width, output->wlr_output->height);
 }
 
 static void output_destroy(struct wl_listener *listener, void *data) {
@@ -701,11 +680,51 @@ static void server_new_output(struct wl_listener *listener, void *data) {
 		wlr_output);
 	struct wlr_scene_output *scene_output = wlr_scene_output_create(server->scene, wlr_output);
 	wlr_scene_output_layout_add_output(server->scene_layout, l_output, scene_output);
+
+	/*
+	 * Sets the blur node size to the outputs size. Assumes there's only one
+	 * output. More advanced compositors should either implement per output blur
+	 * nodes or set it to the size of all outputs.
+	 */
+	wlr_scene_optimized_blur_set_size(output->server->layers.blur_layer,
+			output->wlr_output->width, output->wlr_output->height);
+}
+
+static void iter_xdg_scene_buffers(struct wlr_scene_buffer *buffer, int sx,
+								   int sy, void *user_data) {
+	struct tinywl_toplevel *toplevel = user_data;
+
+	struct wlr_scene_surface * scene_surface = wlr_scene_surface_try_from_buffer(buffer);
+	if (!scene_surface) {
+		return;
+	}
+
+	struct wlr_xdg_surface *xdg_surface =
+		wlr_xdg_surface_try_from_wlr_surface(scene_surface->surface);
+	if (toplevel &&
+			xdg_surface &&
+			xdg_surface->role == WLR_XDG_SURFACE_ROLE_TOPLEVEL) {
+		// TODO: Be able to set whole decoration_data instead of calling
+		// each individually?
+		wlr_scene_buffer_set_opacity(buffer, toplevel->opacity);
+
+		if (!wlr_subsurface_try_from_wlr_surface(xdg_surface->surface)) {
+			wlr_scene_buffer_set_corner_radius(buffer, toplevel->corner_radius);
+			wlr_scene_buffer_set_shadow_data(buffer, toplevel->shadow_data);
+
+			wlr_scene_buffer_set_backdrop_blur(buffer, true);
+			wlr_scene_buffer_set_backdrop_blur_optimized(buffer, true);
+			wlr_scene_buffer_set_backdrop_blur_ignore_transparent(buffer, true);
+		}
+	}
 }
 
 static void xdg_toplevel_map(struct wl_listener *listener, void *data) {
 	/* Called when the surface is mapped, or ready to display on-screen. */
 	struct tinywl_toplevel *toplevel = wl_container_of(listener, toplevel, map);
+
+	wlr_scene_node_for_each_buffer(&toplevel->scene_tree->node,
+								   iter_xdg_scene_buffers, toplevel);
 
 	wl_list_insert(&toplevel->server->toplevels, &toplevel->link);
 
@@ -724,12 +743,39 @@ static void xdg_toplevel_unmap(struct wl_listener *listener, void *data) {
 	wl_list_remove(&toplevel->link);
 }
 
+static void xdg_toplevel_commit(struct wl_listener *listener, void *data) {
+	/* Called when the surface is unmapped, and should no longer be shown. */
+	struct tinywl_toplevel *toplevel = wl_container_of(listener, toplevel, commit);
+	struct wlr_xdg_surface *xdg_surface = toplevel->xdg_toplevel->base;
+
+	if (xdg_surface->initial_commit) {
+		wlr_xdg_surface_schedule_configure(xdg_surface);
+		return;
+	}
+	if (!xdg_surface->surface->mapped) {
+		return;
+	}
+
+	// More advanced comps should check if the size has changed.
+	struct wlr_box new_geo;
+	wlr_xdg_surface_get_geometry(toplevel->xdg_toplevel->base, &new_geo);
+	// Clip to geometry
+	struct wlr_box clip = {
+		.width = new_geo.width,
+		.height = new_geo.height,
+		.x = new_geo.x,
+		.y = new_geo.y,
+	};
+	wlr_scene_subsurface_tree_set_clip(&toplevel->scene_tree->node, &clip);
+}
+
 static void xdg_toplevel_destroy(struct wl_listener *listener, void *data) {
 	/* Called when the xdg_toplevel is destroyed. */
 	struct tinywl_toplevel *toplevel = wl_container_of(listener, toplevel, destroy);
 
 	wl_list_remove(&toplevel->map.link);
 	wl_list_remove(&toplevel->unmap.link);
+	wl_list_remove(&toplevel->commit.link);
 	wl_list_remove(&toplevel->destroy.link);
 	wl_list_remove(&toplevel->request_move.link);
 	wl_list_remove(&toplevel->request_resize.link);
@@ -848,7 +894,7 @@ static void server_new_xdg_surface(struct wl_listener *listener, void *data) {
 	toplevel->server = server;
 	toplevel->xdg_toplevel = xdg_surface->toplevel;
 	toplevel->scene_tree = wlr_scene_xdg_surface_create(
-			&toplevel->server->scene->tree, toplevel->xdg_toplevel->base);
+			toplevel->server->layers.toplevel_layer, toplevel->xdg_toplevel->base);
 	toplevel->scene_tree->node.data = toplevel;
 	xdg_surface->data = toplevel->scene_tree;
 
@@ -864,6 +910,8 @@ static void server_new_xdg_surface(struct wl_listener *listener, void *data) {
 	wl_signal_add(&xdg_surface->surface->events.map, &toplevel->map);
 	toplevel->unmap.notify = xdg_toplevel_unmap;
 	wl_signal_add(&xdg_surface->surface->events.unmap, &toplevel->unmap);
+	toplevel->commit.notify = xdg_toplevel_commit;
+	wl_signal_add(&xdg_surface->surface->events.commit, &toplevel->commit);
 	toplevel->destroy.notify = xdg_toplevel_destroy;
 	wl_signal_add(&xdg_surface->events.destroy, &toplevel->destroy);
 
@@ -967,6 +1015,24 @@ int main(int argc, char *argv[]) {
 	 */
 	server.scene = wlr_scene_create();
 	server.scene_layout = wlr_scene_attach_output_layout(server.scene, server.output_layout);
+
+	/* Create all of the basic scene layers */
+	server.layers.bottom_layer = wlr_scene_tree_create(&server.scene->tree);
+	/* Add a bottom rect to demonstrate optimized blur */
+	float bottom_rect_color[4] = { 1, 1, 1, 1 };
+	wlr_scene_rect_create(server.layers.bottom_layer, 200, 200, bottom_rect_color);
+	/* Set the size later */
+	server.layers.blur_layer = wlr_scene_optimized_blur_create(&server.scene->tree, 0, 0);
+	server.layers.toplevel_layer = wlr_scene_tree_create(&server.scene->tree);
+	/* Add a top rect that won't get blurred by optimized */
+	float top_rect_color[4] = { 1, 0, 0, 1 };
+	struct wlr_scene_rect *rect = wlr_scene_rect_create(server.layers.toplevel_layer,
+			200, 200, top_rect_color);
+	wlr_scene_node_set_position(&rect->node, 200, 200);
+
+	// blur
+	struct blur_data blur_data = blur_data_get_default();
+	wlr_scene_set_blur_data(server.scene, blur_data);
 
 	/* Set up xdg-shell version 3. The xdg-shell is a Wayland protocol which is
 	 * used for application windows. For more detail on shells, refer to

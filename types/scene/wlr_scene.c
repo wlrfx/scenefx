@@ -45,7 +45,7 @@ struct wlr_scene_rect *wlr_scene_rect_from_node(struct wlr_scene_node *node) {
 
 struct wlr_scene_optimized_blur *wlr_scene_optimized_blur_from_node(
 		struct wlr_scene_node *node) {
-	assert(node->type == WLR_SCENE_NODE_BLUR);
+	assert(node->type == WLR_SCENE_NODE_OPTIMIZED_BLUR);
 	struct wlr_scene_optimized_blur *blur_node =
 		wl_container_of(node, blur_node, node);
 	return blur_node;
@@ -226,7 +226,7 @@ static bool _scene_nodes_in_box(struct wlr_scene_node *node, struct wlr_box *box
 			}
 		}
 		break;
-	case WLR_SCENE_NODE_BLUR:;
+	case WLR_SCENE_NODE_OPTIMIZED_BLUR:;
 	case WLR_SCENE_NODE_RECT:
 	case WLR_SCENE_NODE_BUFFER:;
 		struct wlr_box node_box = { .x = lx, .y = ly };
@@ -285,7 +285,7 @@ static void scene_node_opaque_region(struct wlr_scene_node *node, int x, int y,
 			pixman_region32_translate(opaque, x, y);
 			return;
 		}
-	} else if (node->type == WLR_SCENE_NODE_BLUR) {
+	} else if (node->type == WLR_SCENE_NODE_OPTIMIZED_BLUR) {
 		// Always transparent
 		return;
 	}
@@ -665,7 +665,7 @@ struct wlr_scene_optimized_blur *wlr_scene_optimized_blur_create(
 		return NULL;
 	}
 	assert(parent);
-	scene_node_init(&scene_blur->node, WLR_SCENE_NODE_BLUR, parent);
+	scene_node_init(&scene_blur->node, WLR_SCENE_NODE_OPTIMIZED_BLUR, parent);
 
 	scene_blur->width = width;
 	scene_blur->height = height;
@@ -1034,7 +1034,7 @@ static void scene_node_get_size(struct wlr_scene_node *node,
 	switch (node->type) {
 	case WLR_SCENE_NODE_TREE:
 		return;
-	case WLR_SCENE_NODE_BLUR:;
+	case WLR_SCENE_NODE_OPTIMIZED_BLUR:;
 		struct wlr_scene_optimized_blur *scene_blur =
 			wlr_scene_optimized_blur_from_node(node);
 		*width = scene_blur->width;
@@ -1243,7 +1243,7 @@ static bool scene_node_at_iterator(struct wlr_scene_node *node,
 				!scene_buffer->point_accepts_input(scene_buffer, &rx, &ry)) {
 			return false;
 		}
-	} else if (node->type == WLR_SCENE_NODE_BLUR) {
+	} else if (node->type == WLR_SCENE_NODE_OPTIMIZED_BLUR) {
 		// Disable interaction
 		return false;
 	}
@@ -1345,7 +1345,7 @@ static void scene_entry_render(struct render_list_entry *entry, const struct ren
 		};
 		fx_render_pass_add_rect(data->render_pass, &rect_options);
 		break;
-	case WLR_SCENE_NODE_BLUR:;
+	case WLR_SCENE_NODE_OPTIMIZED_BLUR:;
 		// Re-render the optimized blur buffer when needed
 		if (scene_buffer_should_blur(data->blur_info.has_blur, &scene->blur_data)
 				&& data->render_pass->fx_effect_framebuffers->blur_buffer_dirty

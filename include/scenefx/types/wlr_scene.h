@@ -57,7 +57,7 @@ enum wlr_scene_node_type {
 	WLR_SCENE_NODE_TREE,
 	WLR_SCENE_NODE_RECT,
 	WLR_SCENE_NODE_BUFFER,
-	WLR_SCENE_NODE_BLUR,
+	WLR_SCENE_NODE_OPTIMIZED_BLUR,
 };
 
 /** A node is an object in the scene. */

@@ -24,7 +24,7 @@ bool blur_data_should_parameters_blur_effects(struct blur_data *blur_data) {
 
 bool blur_data_cmp(struct blur_data *a, struct blur_data *b) {
 	return a->radius == b->radius &&
-		a->num_passes && b->num_passes &&
+		a->num_passes == b->num_passes &&
 		a->noise == b->noise &&
 		a->brightness == b->brightness &&
 		a->contrast == b->contrast &&

@@ -1406,6 +1406,11 @@ static void scene_entry_render(struct render_list_entry *entry, const struct ren
 			}
 
 			if (has_alpha) {
+				// Translate the opaque_region by the potential clipping offset.
+				// Fixes GTK CSD offsetting the opaque_region
+				pixman_region32_translate(&opaque_region,
+						-scene_buffer->src_box.x, -scene_buffer->src_box.y);
+
 				struct fx_render_blur_pass_options blur_options = {
 					.tex_options = {
 						.base = (struct wlr_render_texture_options) {

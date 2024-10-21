@@ -2,6 +2,7 @@
 #include <assert.h>
 #include <getopt.h>
 #include <scenefx/render/fx_renderer/fx_renderer.h>
+#include <scenefx/types/wlr_scene.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -13,7 +14,6 @@
 #include <wlr/render/wlr_renderer.h>
 #include <wlr/types/wlr_compositor.h>
 #include <wlr/types/wlr_output.h>
-#include <wlr/types/wlr_scene.h>
 #include <wlr/types/wlr_xdg_shell.h>
 #include <wlr/util/log.h>
 
@@ -22,6 +22,7 @@
  * New surfaces are stacked on top of the existing ones as they appear. */
 
 static const int border_width = 3;
+static const int corner_radius = 0; // TODO
 
 struct server {
 	struct wl_display *display;
@@ -40,6 +41,7 @@ struct surface {
 	struct wlr_surface *wlr;
 	struct wlr_scene_surface *scene_surface;
 	struct wlr_scene_rect *border;
+	struct wlr_scene_shadow *shadow;
 	struct wl_list link;
 
 	struct wl_listener commit;
@@ -99,12 +101,16 @@ static void surface_handle_commit(struct wl_listener *listener, void *data) {
 	wlr_scene_rect_set_size(surface->border,
 			surface->wlr->current.width + 2 * border_width,
 			surface->wlr->current.height + 2 * border_width);
+	wlr_scene_shadow_set_size(surface->shadow,
+			surface->wlr->current.width + 2 * (surface->shadow->blur_sigma + border_width),
+			surface->wlr->current.height + 2 * (surface->shadow->blur_sigma + border_width));
 }
 
 static void surface_handle_destroy(struct wl_listener *listener, void *data) {
 	struct surface *surface = wl_container_of(listener, surface, destroy);
 	wlr_scene_node_destroy(&surface->scene_surface->buffer->node);
 	wlr_scene_node_destroy(&surface->border->node);
+	wlr_scene_node_destroy(&surface->shadow->node);
 	wl_list_remove(&surface->destroy.link);
 	wl_list_remove(&surface->link);
 	free(surface);
@@ -130,8 +136,15 @@ static void server_handle_new_surface(struct wl_listener *listener,
 			0, 0, (float[4]){ 0.5f, 0.5f, 0.5f, 1 });
 	wlr_scene_node_set_position(&surface->border->node, pos, pos);
 
+	/* Shadow dimensions will be set in surface.commit handler */
+	float blur_sigma = 20.0f;
+	surface->shadow = wlr_scene_shadow_create(&server->scene->tree,
+			0, 0, corner_radius, blur_sigma, (float[4]){ 1.0f, 0.f, 0.f, 1.0f });
+	wlr_scene_node_set_position(&surface->shadow->node,
+			pos - blur_sigma, pos - blur_sigma);
 	surface->scene_surface =
 		wlr_scene_surface_create(&server->scene->tree, wlr_surface);
+	wlr_scene_buffer_set_corner_radius(surface->scene_surface->buffer, corner_radius);
 
 	wlr_scene_node_set_position(&surface->scene_surface->buffer->node,
 			pos + border_width, pos + border_width);

@@ -6,7 +6,6 @@
 #include <stdio.h>
 #include <time.h>
 #include <scenefx/render/fx_renderer/fx_renderer.h>
-#include <scenefx/types/fx/shadow_data.h>
 #include <scenefx/types/wlr_scene.h>
 #include <unistd.h>
 #include <wayland-server-core.h>
@@ -96,7 +95,7 @@ struct tinywl_toplevel {
 
 	float opacity;
 	int corner_radius;
-	struct shadow_data shadow_data;
+	struct wlr_scene_shadow *shadow;
 };
 
 struct tinywl_keyboard {
@@ -583,13 +582,10 @@ static void output_configure_scene(struct wlr_scene_node *node,
 		if (toplevel &&
 				xdg_surface &&
 				xdg_surface->role == WLR_XDG_SURFACE_ROLE_TOPLEVEL) {
-			// TODO: Be able to set whole decoration_data instead of calling
-			// each individually?
 			wlr_scene_buffer_set_opacity(buffer, toplevel->opacity);
 
 			if (!wlr_subsurface_try_from_wlr_surface(xdg_surface->surface)) {
 				wlr_scene_buffer_set_corner_radius(buffer, toplevel->corner_radius);
-				wlr_scene_buffer_set_shadow_data(buffer, toplevel->shadow_data);
 			}
 		}
 	} else if (node->type == WLR_SCENE_NODE_TREE) {
@@ -709,7 +705,9 @@ static void xdg_toplevel_map(struct wl_listener *listener, void *data) {
 
 	wl_list_insert(&toplevel->server->toplevels, &toplevel->link);
 
-	focus_toplevel(toplevel, toplevel->xdg_toplevel->base->surface);
+	struct wlr_surface *surface = toplevel->xdg_toplevel->base->surface;
+	wlr_scene_shadow_set_size(toplevel->shadow, surface->current.width, surface->current.height); // TODO: use get node size?
+	focus_toplevel(toplevel, surface);
 }
 
 static void xdg_toplevel_unmap(struct wl_listener *listener, void *data) {
@@ -786,6 +784,12 @@ static void xdg_toplevel_request_move(
 	 * client, to prevent the client from requesting this whenever they want. */
 	struct tinywl_toplevel *toplevel = wl_container_of(listener, toplevel, request_move);
 	begin_interactive(toplevel, TINYWL_CURSOR_MOVE, 0);
+
+	// TODO
+	struct wlr_box surface_box;
+	wlr_xdg_surface_get_geometry(toplevel->xdg_toplevel->base, &surface_box);
+	wlr_scene_node_set_position(&toplevel->shadow->node, surface_box.x - toplevel->shadow->blur_sigma,
+			surface_box.y - toplevel->shadow->blur_sigma);
 }
 
 static void xdg_toplevel_request_resize(
@@ -855,9 +859,11 @@ static void server_new_xdg_surface(struct wl_listener *listener, void *data) {
 	/* Set the scene_nodes decoration data */
 	toplevel->opacity = 1;
 	toplevel->corner_radius = 20;
-	toplevel->shadow_data = shadow_data_get_default();
-	toplevel->shadow_data.enabled = true;
-	toplevel->shadow_data.color = (struct wlr_render_color) {1.0f, 0.0f, 0.0f, 1.0f};
+
+	float blur_sigma = 20.0f;
+	toplevel->shadow = wlr_scene_shadow_create(&toplevel->server->scene->tree,
+			0, 0, toplevel->corner_radius, blur_sigma, (float[4]){ 1.0f, 0.f, 0.f, 1.0f });
+	wlr_scene_node_set_position(&toplevel->shadow->node, 0 - blur_sigma, 0 - blur_sigma); // TODO: surface pos
 
 	/* Listen to the various events it can emit */
 	toplevel->map.notify = xdg_toplevel_map;

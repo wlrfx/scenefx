@@ -465,12 +465,16 @@ void fx_render_pass_add_box_shadow(struct fx_gles_render_pass *pass,
 	glUseProgram(renderer->shaders.box_shadow.program);
 
 	const struct wlr_render_color *color = &options->color;
+	const struct wlr_box window_box = options->window_box;
 	set_proj_matrix(renderer->shaders.box_shadow.proj, pass->projection_matrix, &box);
 	glUniform4f(renderer->shaders.box_shadow.color, color->r, color->g, color->b, color->a);
 	glUniform1f(renderer->shaders.box_shadow.blur_sigma, options->blur_sigma);
 	glUniform1f(renderer->shaders.box_shadow.corner_radius, options->corner_radius);
 	glUniform2f(renderer->shaders.box_shadow.size, box.width, box.height);
 	glUniform2f(renderer->shaders.box_shadow.position, box.x, box.y);
+	glUniform1f(renderer->shaders.box_shadow.window_corner_radius, options->window_corner_radius);
+	glUniform2f(renderer->shaders.box_shadow.window_half_size, window_box.width / 2, window_box.height / 2);
+	glUniform2f(renderer->shaders.box_shadow.window_position, window_box.x, window_box.y);
 
 	render(&box, options->clip, renderer->shaders.box_shadow.pos_attrib);
 

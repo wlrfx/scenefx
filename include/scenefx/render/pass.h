@@ -43,7 +43,8 @@ struct fx_render_rect_options {
 
 struct fx_render_box_shadow_options {
 	struct wlr_box box;
-	struct wlr_box clip_box;
+	struct wlr_box window_box;
+	int window_corner_radius;
 	/* Clip region, leave NULL to disable clipping */
 	const pixman_region32_t *clip;
 

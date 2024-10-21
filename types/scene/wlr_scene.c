@@ -984,6 +984,25 @@ static void scene_node_get_size(struct wlr_scene_node *node,
 	}
 }
 
+static void scene_node_get_corner_radius(struct wlr_scene_node *node, int *corner_radius) {
+	*corner_radius = 0;
+
+	switch (node->type) {
+	case WLR_SCENE_NODE_TREE:
+		return;
+	case WLR_SCENE_NODE_RECT:;
+		return;
+	case WLR_SCENE_NODE_SHADOW:;
+		struct wlr_scene_shadow *scene_shadow = wlr_scene_shadow_from_node(node);
+		*corner_radius = scene_shadow->corner_radius;
+		break;
+	case WLR_SCENE_NODE_BUFFER:;
+		struct wlr_scene_buffer *scene_buffer = wlr_scene_buffer_from_node(node);
+		*corner_radius = scene_buffer->corner_radius;
+		break;
+	}
+}
+
 static int scale_length(int length, int offset, float scale) {
 	return round((offset + length) * scale) - round(offset * scale);
 }
@@ -1262,8 +1281,26 @@ static void scene_entry_render(struct render_list_entry *entry, const struct ren
 	case WLR_SCENE_NODE_SHADOW:;
 		struct wlr_scene_shadow *scene_shadow = wlr_scene_shadow_from_node(node);
 
+		struct wlr_box window_box;
+		int window_x = 0, window_y = 0, window_width = 0, window_height = 0, window_corner_radius = 0;
+		struct wlr_scene_node *parent_node = wl_container_of(node->link.prev, parent_node, link);
+		if (parent_node->type == WLR_SCENE_NODE_BUFFER || parent_node->type == WLR_SCENE_NODE_RECT) {
+			wlr_scene_node_coords(parent_node, &x, &y);
+			scene_node_get_size(node, &window_width, &window_height);
+			scene_node_get_corner_radius(node, &window_corner_radius);
+			printf("found window box %d, %d: width: %d, height %d\n", window_x, window_y, window_width, window_height);
+		}
+		window_box = (struct wlr_box) {
+		    .x = window_x,
+			.y = window_y,
+			.width = window_width,
+			.height = window_height
+		};
+
 		struct fx_render_box_shadow_options shadow_options = {
 			.box = dst_box,
+			.window_box = window_box,
+			.window_corner_radius = window_corner_radius,
 			.blur_sigma = scene_shadow->blur_sigma,
 			.corner_radius = scene_shadow->corner_radius,
 			.color = {

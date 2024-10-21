@@ -198,6 +198,9 @@ bool link_box_shadow_program(struct box_shadow_shader *shader) {
 	shader->size = glGetUniformLocation(prog, "size");
 	shader->blur_sigma = glGetUniformLocation(prog, "blur_sigma");
 	shader->corner_radius = glGetUniformLocation(prog, "corner_radius");
+	shader->window_position = glGetUniformLocation(prog, "window_position");
+	shader->window_half_size = glGetUniformLocation(prog, "window_half_size");
+	shader->window_corner_radius = glGetUniformLocation(prog, "window_corner_radius");
 
 	return true;
 }

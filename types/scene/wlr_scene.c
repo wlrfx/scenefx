@@ -1283,7 +1283,7 @@ static void scene_entry_render(struct render_list_entry *entry, const struct ren
 
 		struct wlr_box window_box;
 		int window_x = 0, window_y = 0, window_width = 0, window_height = 0, window_corner_radius = 0;
-		struct wlr_scene_node *parent_node = wl_container_of(node->link.prev, parent_node, link);
+		struct wlr_scene_node *parent_node = wl_container_of(node->link.next, parent_node, link);
 		if (parent_node->type == WLR_SCENE_NODE_BUFFER || parent_node->type == WLR_SCENE_NODE_RECT) {
 			wlr_scene_node_coords(parent_node, &x, &y);
 			scene_node_get_size(node, &window_width, &window_height);

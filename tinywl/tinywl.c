@@ -434,6 +434,9 @@ static void process_cursor_resize(struct tinywl_server *server, uint32_t time) {
 	int new_width = new_right - new_left;
 	int new_height = new_bottom - new_top;
 	wlr_xdg_toplevel_set_size(toplevel->xdg_toplevel, new_width, new_height);
+
+	int blur_sigma = toplevel->shadow->blur_sigma;
+	wlr_scene_shadow_set_size(toplevel->shadow, new_width + blur_sigma * 2, new_height + blur_sigma * 2);
 }
 
 static void process_cursor_motion(struct tinywl_server *server, uint32_t time) {
@@ -706,7 +709,9 @@ static void xdg_toplevel_map(struct wl_listener *listener, void *data) {
 	wl_list_insert(&toplevel->server->toplevels, &toplevel->link);
 
 	struct wlr_surface *surface = toplevel->xdg_toplevel->base->surface;
-	wlr_scene_shadow_set_size(toplevel->shadow, surface->current.width, surface->current.height); // TODO: use get node size?
+	int blur_sigma = toplevel->shadow->blur_sigma;
+	wlr_scene_shadow_set_size(toplevel->shadow, surface->current.width + blur_sigma * 2,
+			surface->current.height + blur_sigma * 2); // TODO: use get node size?
 	focus_toplevel(toplevel, surface);
 }
 
@@ -784,12 +789,6 @@ static void xdg_toplevel_request_move(
 	 * client, to prevent the client from requesting this whenever they want. */
 	struct tinywl_toplevel *toplevel = wl_container_of(listener, toplevel, request_move);
 	begin_interactive(toplevel, TINYWL_CURSOR_MOVE, 0);
-
-	// TODO
-	struct wlr_box surface_box;
-	wlr_xdg_surface_get_geometry(toplevel->xdg_toplevel->base, &surface_box);
-	wlr_scene_node_set_position(&toplevel->shadow->node, surface_box.x - toplevel->shadow->blur_sigma,
-			surface_box.y - toplevel->shadow->blur_sigma);
 }
 
 static void xdg_toplevel_request_resize(
@@ -861,9 +860,9 @@ static void server_new_xdg_surface(struct wl_listener *listener, void *data) {
 	toplevel->corner_radius = 20;
 
 	float blur_sigma = 20.0f;
-	toplevel->shadow = wlr_scene_shadow_create(&toplevel->server->scene->tree,
+	toplevel->shadow = wlr_scene_shadow_create(toplevel->scene_tree,
 			0, 0, toplevel->corner_radius, blur_sigma, (float[4]){ 1.0f, 0.f, 0.f, 1.0f });
-	wlr_scene_node_set_position(&toplevel->shadow->node, 0 - blur_sigma, 0 - blur_sigma); // TODO: surface pos
+	wlr_scene_node_set_position(&toplevel->shadow->node, -blur_sigma, 100); // TODO: offset by titlebar height, not 100
 
 	/* Listen to the various events it can emit */
 	toplevel->map.notify = xdg_toplevel_map;

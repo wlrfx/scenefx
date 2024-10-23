@@ -1282,7 +1282,7 @@ static void scene_entry_render(struct render_list_entry *entry, const struct ren
 		struct wlr_scene_shadow *scene_shadow = wlr_scene_shadow_from_node(node);
 
 		// TODO: I AM VERY BAD, FIX ME
-		struct wlr_scene_node *parent_node = wl_container_of(node->link.prev, parent_node, link);
+		struct wlr_scene_node *parent_node = wl_container_of(node->link.prev, parent_node, link); // should be link.next
 		int window_x = 0, window_y = 0, window_width = 0, window_height = 0, window_corner_radius = 0;
 		if (parent_node->type == WLR_SCENE_NODE_BUFFER || parent_node->type == WLR_SCENE_NODE_RECT) {
 			wlr_scene_node_coords(parent_node, &window_x, &window_y);

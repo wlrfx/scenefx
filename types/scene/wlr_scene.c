@@ -1281,21 +1281,30 @@ static void scene_entry_render(struct render_list_entry *entry, const struct ren
 	case WLR_SCENE_NODE_SHADOW:;
 		struct wlr_scene_shadow *scene_shadow = wlr_scene_shadow_from_node(node);
 
-		struct wlr_box window_box;
+		// TODO: I AM VERY BAD, FIX ME
+		struct wlr_scene_node *parent_node = wl_container_of(node->link.prev, parent_node, link);
 		int window_x = 0, window_y = 0, window_width = 0, window_height = 0, window_corner_radius = 0;
-		struct wlr_scene_node *parent_node = wl_container_of(node->link.next, parent_node, link);
 		if (parent_node->type == WLR_SCENE_NODE_BUFFER || parent_node->type == WLR_SCENE_NODE_RECT) {
-			wlr_scene_node_coords(parent_node, &x, &y);
-			scene_node_get_size(node, &window_width, &window_height);
-			scene_node_get_corner_radius(node, &window_corner_radius);
-			printf("found window box %d, %d: width: %d, height %d\n", window_x, window_y, window_width, window_height);
+			wlr_scene_node_coords(parent_node, &window_x, &window_y);
+			scene_node_get_size(parent_node, &window_width, &window_height);
+			scene_node_get_corner_radius(parent_node, &window_corner_radius);
+		} else if (parent_node->type == WLR_SCENE_NODE_TREE) {
+			struct wlr_scene_tree *scene_tree = wlr_scene_tree_from_node(parent_node);
+			struct wlr_scene_node *child;
+			wl_list_for_each(child, &scene_tree->children, link) {
+				wlr_scene_node_coords(child, &window_x, &window_y);
+				scene_node_get_size(child, &window_width, &window_height);
+				scene_node_get_corner_radius(child, &window_corner_radius);
+				break;
+			}
 		}
-		window_box = (struct wlr_box) {
-		    .x = window_x,
+		struct wlr_box window_box = (struct wlr_box) {
+			.x = window_x,
 			.y = window_y,
 			.width = window_width,
 			.height = window_height
 		};
+		printf("%d, %d\n", window_box.width, window_box.height);
 
 		struct fx_render_box_shadow_options shadow_options = {
 			.box = dst_box,

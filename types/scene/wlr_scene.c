@@ -1218,6 +1218,67 @@ struct wlr_scene_node *wlr_scene_node_at(struct wlr_scene_node *node,
 	return NULL;
 }
 
+static void get_tree_geometry(struct wlr_scene_node *node,
+		pixman_region32_t *region, int *max_corner_radius) {
+	if (!node->enabled) {
+		return;
+	}
+
+	if (node->type == WLR_SCENE_NODE_BUFFER || node->type == WLR_SCENE_NODE_RECT) {
+		struct wlr_box child_box = {0};
+		int radius = 0;
+		wlr_scene_node_coords(node, &child_box.x, &child_box.y);
+		scene_node_get_size(node, &child_box.width, &child_box.height);
+		scene_node_get_corner_radius(node, &radius);
+
+		pixman_region32_union_rect(region, region,
+				child_box.x, child_box.y, child_box.width, child_box.height);
+		if (radius > *max_corner_radius) {
+			*max_corner_radius = radius;
+		}
+	} else if (node->type == WLR_SCENE_NODE_TREE) {
+		struct wlr_scene_tree *tree = wlr_scene_tree_from_node(node);
+		struct wlr_scene_node *node;
+		wl_list_for_each(node, &tree->children, link) {
+			// Could possibly be a tree, so look through it as well
+			get_tree_geometry(node, region, max_corner_radius);
+		}
+	}
+}
+
+static void scene_get_next_sibling_geometry(struct wlr_scene_node *node,
+		struct wlr_box *box, int *corner_radius) {
+	assert(box && corner_radius);
+
+	*box = (struct wlr_box) {0};
+	*corner_radius = 0;
+
+	// Don't check if it's the only child in the tree
+	if (node->link.next == node->link.prev) {
+		return;
+	}
+
+	struct wlr_scene_node *sibling_node =
+		wl_container_of(node->link.next, sibling_node, link);
+
+	pixman_region32_t region;
+	pixman_region32_init(&region);
+
+	get_tree_geometry(sibling_node, &region, corner_radius);
+
+	if (pixman_region32_not_empty(&region)) {
+		struct pixman_box32 *region_box = pixman_region32_extents(&region);
+		*box = (struct wlr_box){
+			.x = region_box->x1,
+			.y = region_box->y1,
+			.width = region_box->x2 - region_box->x1,
+			.height = region_box->y2 - region_box->y1,
+		};
+	}
+
+	pixman_region32_fini(&region);
+}
+
 struct render_list_entry {
 	struct wlr_scene_node *node;
 	bool sent_dmabuf_feedback;
@@ -1281,32 +1342,17 @@ static void scene_entry_render(struct render_list_entry *entry, const struct ren
 	case WLR_SCENE_NODE_SHADOW:;
 		struct wlr_scene_shadow *scene_shadow = wlr_scene_shadow_from_node(node);
 
-		// TODO: I AM VERY BAD, FIX ME
-		struct wlr_scene_node *parent_node = wl_container_of(node->link.prev, parent_node, link); // should be link.next
-		int window_x = 0, window_y = 0, window_width = 0, window_height = 0, window_corner_radius = 0;
-		if (parent_node->type == WLR_SCENE_NODE_BUFFER || parent_node->type == WLR_SCENE_NODE_RECT) {
-			wlr_scene_node_coords(parent_node, &window_x, &window_y);
-			scene_node_get_size(parent_node, &window_width, &window_height);
-			scene_node_get_corner_radius(parent_node, &window_corner_radius);
-		} else if (parent_node->type == WLR_SCENE_NODE_TREE) {
-			struct wlr_scene_tree *scene_tree = wlr_scene_tree_from_node(parent_node);
-			struct wlr_scene_node *child;
-			wl_list_for_each(child, &scene_tree->children, link) {
-				wlr_scene_node_coords(child, &window_x, &window_y);
-				scene_node_get_size(child, &window_width, &window_height);
-				scene_node_get_corner_radius(child, &window_corner_radius);
-				break;
-			}
-		}
-		struct wlr_box window_box = (struct wlr_box) {
-			.x = window_x,
-			.y = window_y,
-			.width = window_width,
-			.height = window_height
-		};
+		// Look through the first direct sibling node and get the size of the
+		// node. If the sibling is a tree, get the total size of the whole tree.
+		// Cannot grab the first buffer in the tree due to it potentially being
+		// a CSD surface and not the actual toplevel surface.
+		struct wlr_box window_box;
+		int window_corner_radius;
+		scene_get_next_sibling_geometry(node, &window_box, &window_corner_radius);
 
 		struct fx_render_box_shadow_options shadow_options = {
 			.box = dst_box,
+			// TODO: Use dst_box if larger?
 			.window_box = window_box,
 			.window_corner_radius = window_corner_radius,
 			.blur_sigma = scene_shadow->blur_sigma,

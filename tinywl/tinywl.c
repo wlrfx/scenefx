@@ -84,6 +84,7 @@ struct tinywl_toplevel {
 	struct wl_list link;
 	struct tinywl_server *server;
 	struct wlr_xdg_toplevel *xdg_toplevel;
+	struct wlr_scene_tree *xdg_scene_tree;
 	struct wlr_scene_tree *scene_tree;
 	struct wl_listener map;
 	struct wl_listener unmap;
@@ -706,18 +707,29 @@ static void xdg_toplevel_map(struct wl_listener *listener, void *data) {
 	/* Called when the surface is mapped, or ready to display on-screen. */
 	struct tinywl_toplevel *toplevel = wl_container_of(listener, toplevel, map);
 
+	wlr_scene_node_set_enabled(&toplevel->scene_tree->node, true);
+
 	wl_list_insert(&toplevel->server->toplevels, &toplevel->link);
 
 	struct wlr_surface *surface = toplevel->xdg_toplevel->base->surface;
+
 	int blur_sigma = toplevel->shadow->blur_sigma;
-	wlr_scene_shadow_set_size(toplevel->shadow, surface->current.width + blur_sigma * 2,
-			surface->current.height + blur_sigma * 2); // TODO: use get node size?
+	struct wlr_box geometry;
+	wlr_xdg_surface_get_geometry(toplevel->xdg_toplevel->base, &geometry);
+	wlr_scene_shadow_set_size(toplevel->shadow,
+			geometry.width + blur_sigma * 2,
+			geometry.height + blur_sigma * 2);
+
+	wlr_scene_node_set_position(&toplevel->shadow->node, -blur_sigma, -blur_sigma);
+
 	focus_toplevel(toplevel, surface);
 }
 
 static void xdg_toplevel_unmap(struct wl_listener *listener, void *data) {
 	/* Called when the surface is unmapped, and should no longer be shown. */
 	struct tinywl_toplevel *toplevel = wl_container_of(listener, toplevel, unmap);
+
+	wlr_scene_node_set_enabled(&toplevel->scene_tree->node, false);
 
 	/* Reset the cursor mode if the grabbed toplevel was unmapped. */
 	if (toplevel == toplevel->server->grabbed_toplevel) {
@@ -738,6 +750,8 @@ static void xdg_toplevel_destroy(struct wl_listener *listener, void *data) {
 	wl_list_remove(&toplevel->request_resize.link);
 	wl_list_remove(&toplevel->request_maximize.link);
 	wl_list_remove(&toplevel->request_fullscreen.link);
+
+	wlr_scene_node_destroy(&toplevel->scene_tree->node);
 
 	free(toplevel);
 }
@@ -850,8 +864,9 @@ static void server_new_xdg_surface(struct wl_listener *listener, void *data) {
 	struct tinywl_toplevel *toplevel = calloc(1, sizeof(*toplevel));
 	toplevel->server = server;
 	toplevel->xdg_toplevel = xdg_surface->toplevel;
-	toplevel->scene_tree = wlr_scene_xdg_surface_create(
-			&toplevel->server->scene->tree, toplevel->xdg_toplevel->base);
+	toplevel->scene_tree = wlr_scene_tree_create(&toplevel->server->scene->tree);
+	toplevel->xdg_scene_tree = wlr_scene_xdg_surface_create(
+			toplevel->scene_tree, toplevel->xdg_toplevel->base);
 	toplevel->scene_tree->node.data = toplevel;
 	xdg_surface->data = toplevel->scene_tree;
 
@@ -862,7 +877,8 @@ static void server_new_xdg_surface(struct wl_listener *listener, void *data) {
 	float blur_sigma = 20.0f;
 	toplevel->shadow = wlr_scene_shadow_create(toplevel->scene_tree,
 			0, 0, toplevel->corner_radius, blur_sigma, (float[4]){ 1.0f, 0.f, 0.f, 1.0f });
-	wlr_scene_node_set_position(&toplevel->shadow->node, -blur_sigma, 100); // TODO: offset by titlebar height, not 100
+	// Lower the shadow below the XDG scene tree
+	wlr_scene_node_lower_to_bottom(&toplevel->shadow->node);
 
 	/* Listen to the various events it can emit */
 	toplevel->map.notify = xdg_toplevel_map;

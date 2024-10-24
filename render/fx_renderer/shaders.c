@@ -8,6 +8,7 @@
 // shaders
 #include "GLES2/gl2.h"
 #include "common_vert_src.h"
+#include "gradient_frag_src.h"
 #include "quad_frag_src.h"
 #include "quad_grad_frag_src.h"
 #include "quad_round_frag_src.h"
@@ -120,7 +121,7 @@ bool link_quad_program(struct quad_shader *shader) {
 bool link_quad_grad_program(struct quad_grad_shader *shader, int max_len) {
 	GLchar quad_src[2048];
 	snprintf(quad_src, sizeof(quad_src),
-			"#define LEN %d\n%s", max_len, quad_grad_frag_src);
+			"#define LEN %d\n%s\n%s", max_len, gradient_frag_src, quad_grad_frag_src);
 
 	GLuint prog;
 	shader->program = prog = link_program(quad_src);
@@ -168,7 +169,7 @@ bool link_quad_round_program(struct quad_round_shader *shader, enum fx_rounded_q
 bool link_quad_grad_round_program(struct quad_grad_round_shader *shader, enum fx_rounded_quad_shader_source source, int max_len) {
 	GLchar quad_src[4096];
 	snprintf(quad_src, sizeof(quad_src),
-		"#define SOURCE %d\n#define LEN %d\n%s", source, max_len, quad_grad_round_frag_src);
+		"#define SOURCE %d\n#define LEN %d\n%s\n%s", source, max_len, gradient_frag_src, quad_grad_round_frag_src);
 
 	GLuint prog;
 	shader->program = prog = link_program(quad_src);
@@ -250,7 +251,7 @@ bool link_rounded_border_corner_program(struct rounded_border_corner_shader *sha
 bool link_rounded_grad_border_corner_program(struct rounded_grad_border_corner_shader *shader, int max_len) {
 	GLchar quad_src[4096];
 	snprintf(quad_src, sizeof(quad_src),
-			"#define LEN %d\n%s", max_len, rounded_grad_border_corner_frag_src);
+			"#define LEN %d\n%s\n%s", max_len, gradient_frag_src, rounded_grad_border_corner_frag_src);
 
 	GLuint prog;
 	shader->program = prog = link_program(quad_src);

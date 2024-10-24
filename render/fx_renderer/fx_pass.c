@@ -373,9 +373,9 @@ void fx_render_pass_add_rect_grad(struct fx_gles_render_pass *pass,
 
 	struct fx_renderer *renderer = pass->buffer->renderer;
 
-	if(renderer->shaders.quad_grad.max_len <= fx_options->gradient.count){
+	if (renderer->shaders.quad_grad.max_len <= fx_options->gradient.count) {
 		glDeleteProgram(renderer->shaders.quad_grad.program);
-		if(!link_quad_grad_program(&renderer->shaders.quad_grad, fx_options->gradient.count + 1)){
+		if (!link_quad_grad_program(&renderer->shaders.quad_grad, fx_options->gradient.count + 1)) {
 			wlr_log(WLR_ERROR, "Could not link quad shader after updating max_len to %d. Aborting renderer", fx_options->gradient.count + 1);
 			abort();
 		}
@@ -487,9 +487,9 @@ void fx_render_pass_add_rounded_rect_grad(struct fx_gles_render_pass *pass,
 		abort();
 	}
 
-	if(shader->max_len <= fx_options->gradient.count){
+	if (shader->max_len <= fx_options->gradient.count) {
 		glDeleteProgram(shader->program);
-		if(!link_quad_grad_round_program(shader, corner, fx_options->gradient.count + 1)){
+		if (!link_quad_grad_round_program(shader, corner, fx_options->gradient.count + 1)) {
 			wlr_log(WLR_ERROR, "Could not link quad shader after updating max_len to %d. Aborting renderer", fx_options->gradient.count + 1);
 			abort();
 		}
@@ -563,9 +563,9 @@ void fx_render_pass_add_rounded_grad_border_corner(struct fx_gles_render_pass *p
 
 	struct fx_renderer *renderer = pass->buffer->renderer;
 
-	if(renderer->shaders.rounded_grad_border_corner.max_len <= fx_options->gradient.count){
+	if (renderer->shaders.rounded_grad_border_corner.max_len <= fx_options->gradient.count) {
 		glDeleteProgram(renderer->shaders.rounded_grad_border_corner.program);
-		if(!link_rounded_grad_border_corner_program(&renderer->shaders.rounded_grad_border_corner, fx_options->gradient.count + 1)){
+		if (!link_rounded_grad_border_corner_program(&renderer->shaders.rounded_grad_border_corner, fx_options->gradient.count + 1)) {
 			wlr_log(WLR_ERROR, "Could not link quad shader after updating max_len to %d. Aborting renderer", fx_options->gradient.count + 1);
 			abort();
 		}

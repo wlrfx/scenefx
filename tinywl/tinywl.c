@@ -88,6 +88,7 @@ struct tinywl_toplevel {
 	struct wlr_scene_tree *scene_tree;
 	struct wl_listener map;
 	struct wl_listener unmap;
+	struct wl_listener commit;
 	struct wl_listener destroy;
 	struct wl_listener request_move;
 	struct wl_listener request_resize;
@@ -435,9 +436,6 @@ static void process_cursor_resize(struct tinywl_server *server, uint32_t time) {
 	int new_width = new_right - new_left;
 	int new_height = new_bottom - new_top;
 	wlr_xdg_toplevel_set_size(toplevel->xdg_toplevel, new_width, new_height);
-
-	int blur_sigma = toplevel->shadow->blur_sigma;
-	wlr_scene_shadow_set_size(toplevel->shadow, new_width + blur_sigma * 2, new_height + blur_sigma * 2);
 }
 
 static void process_cursor_motion(struct tinywl_server *server, uint32_t time) {
@@ -739,12 +737,23 @@ static void xdg_toplevel_unmap(struct wl_listener *listener, void *data) {
 	wl_list_remove(&toplevel->link);
 }
 
+static void xdg_toplevel_commit(struct wl_listener *listener, void *data) {
+	struct tinywl_toplevel *toplevel = wl_container_of(listener, toplevel, commit);
+
+	struct wlr_box geometry;
+	wlr_xdg_surface_get_geometry(toplevel->xdg_toplevel->base, &geometry);
+	int blur_sigma = toplevel->shadow->blur_sigma;
+	wlr_scene_shadow_set_size(toplevel->shadow,
+			geometry.width + blur_sigma * 2, geometry.height + blur_sigma * 2);
+}
+
 static void xdg_toplevel_destroy(struct wl_listener *listener, void *data) {
 	/* Called when the xdg_toplevel is destroyed. */
 	struct tinywl_toplevel *toplevel = wl_container_of(listener, toplevel, destroy);
 
 	wl_list_remove(&toplevel->map.link);
 	wl_list_remove(&toplevel->unmap.link);
+	wl_list_remove(&toplevel->commit.link);
 	wl_list_remove(&toplevel->destroy.link);
 	wl_list_remove(&toplevel->request_move.link);
 	wl_list_remove(&toplevel->request_resize.link);
@@ -885,6 +894,8 @@ static void server_new_xdg_surface(struct wl_listener *listener, void *data) {
 	wl_signal_add(&xdg_surface->surface->events.map, &toplevel->map);
 	toplevel->unmap.notify = xdg_toplevel_unmap;
 	wl_signal_add(&xdg_surface->surface->events.unmap, &toplevel->unmap);
+	toplevel->commit.notify = xdg_toplevel_commit;
+	wl_signal_add(&xdg_surface->surface->events.commit, &toplevel->commit);
 	toplevel->destroy.notify = xdg_toplevel_destroy;
 	wl_signal_add(&xdg_surface->events.destroy, &toplevel->destroy);
 

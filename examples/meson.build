@@ -17,7 +17,7 @@ foreach name, info : compositors
 	executable(
 		name,
 		[info.get('src'), extra_src],
-		dependencies: [wlroots, scenefx, libdrm_header, info.get('dep', [])],
+		dependencies: [scenefx, libdrm_header, info.get('dep', [])],
 		build_by_default: get_option('examples'),
 	)
 endforeach

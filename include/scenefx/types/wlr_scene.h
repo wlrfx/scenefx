@@ -20,7 +20,6 @@
  */
 
 #include <pixman.h>
-#include "scenefx/types/fx/shadow_data.h"
 #include <time.h>
 #include <wayland-server-core.h>
 #include <wlr/render/wlr_renderer.h>
@@ -54,6 +53,7 @@ typedef void (*wlr_scene_buffer_iterator_func_t)(
 enum wlr_scene_node_type {
 	WLR_SCENE_NODE_TREE,
 	WLR_SCENE_NODE_RECT,
+	WLR_SCENE_NODE_SHADOW,
 	WLR_SCENE_NODE_BUFFER,
 };
 
@@ -140,6 +140,15 @@ struct wlr_scene_rect {
 	float color[4];
 };
 
+/** A scene-graph node displaying a shadow */
+struct wlr_scene_shadow {
+	struct wlr_scene_node node;
+	int width, height;
+	int corner_radius;
+	float color[4];
+	float blur_sigma;
+};
+
 struct wlr_scene_outputs_update_event {
 	struct wlr_scene_output **active;
 	size_t size;
@@ -178,7 +187,6 @@ struct wlr_scene_buffer {
 
 	float opacity;
 	int corner_radius;
-	struct shadow_data shadow_data;
 
 	enum wlr_scale_filter_mode filter_mode;
 	struct wlr_fbox src_box;
@@ -359,6 +367,12 @@ struct wlr_scene_tree *wlr_scene_tree_from_node(struct wlr_scene_node *node);
 struct wlr_scene_rect *wlr_scene_rect_from_node(struct wlr_scene_node *node);
 
 /**
+ * If this node represents a wlr_scene_shadow, that shadow will be returned. It
+ * is not legal to feed a node that does not represent a wlr_scene_shadow.
+ */
+struct wlr_scene_shadow *wlr_scene_shadow_from_node(struct wlr_scene_node *node);
+
+/**
  * If this buffer is backed by a surface, then the struct wlr_scene_surface is
  * returned. If not, NULL will be returned.
  */
@@ -380,6 +394,33 @@ void wlr_scene_rect_set_size(struct wlr_scene_rect *rect, int width, int height)
  * Change the color of an existing rectangle node.
  */
 void wlr_scene_rect_set_color(struct wlr_scene_rect *rect, const float color[static 4]);
+
+/**
+ * Add a node displaying a shadow to the scene-graph.
+ */
+struct wlr_scene_shadow *wlr_scene_shadow_create(struct wlr_scene_tree *parent,
+		int width, int height, int corner_radius, float blur_sigma,
+		const float color[static 4]);
+
+/**
+ * Change the width and height of an existing shadow node.
+ */
+void wlr_scene_shadow_set_size(struct wlr_scene_shadow *shadow, int width, int height);
+
+/**
+ * Change the corner radius of an existing shadow node.
+ */
+void wlr_scene_shadow_set_corner_radius(struct wlr_scene_shadow *shadow, int corner_radius);
+
+/**
+ * Change the blur_sigma of an existing shadow node.
+ */
+void wlr_scene_shadow_set_blur_sigma(struct wlr_scene_shadow *shadow, float blur_sigma);
+
+/**
+ * Change the color of an existing shadow node.
+ */
+void wlr_scene_shadow_set_color(struct wlr_scene_shadow *shadow, const float color[static 4]);
 
 /**
  * Add a node displaying a buffer to the scene-graph.
@@ -455,12 +496,6 @@ void wlr_scene_buffer_set_filter_mode(struct wlr_scene_buffer *scene_buffer,
 */
 void wlr_scene_buffer_set_corner_radius(struct wlr_scene_buffer *scene_buffer,
 		int radii);
-
-/**
-* Sets the shadow of this buffer
-*/
-void wlr_scene_buffer_set_shadow_data(struct wlr_scene_buffer *scene_buffer,
-		struct shadow_data shadow_data);
 
 /**
  * Calls the buffer's frame_done signal.

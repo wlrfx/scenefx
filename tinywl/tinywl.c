@@ -742,6 +742,8 @@ static void xdg_toplevel_commit(struct wl_listener *listener, void *data) {
 
 	struct wlr_box geometry;
 	wlr_xdg_surface_get_geometry(toplevel->xdg_toplevel->base, &geometry);
+	wlr_scene_subsurface_tree_set_clip(&toplevel->xdg_scene_tree->node, &geometry);
+
 	int blur_sigma = toplevel->shadow->blur_sigma;
 	wlr_scene_shadow_set_size(toplevel->shadow,
 			geometry.width + blur_sigma * 2, geometry.height + blur_sigma * 2);

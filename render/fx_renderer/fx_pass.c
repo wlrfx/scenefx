@@ -475,7 +475,7 @@ void fx_render_pass_add_box_shadow(struct fx_gles_render_pass *pass,
 	// blending will practically always be needed (unless we have a madman
 	// who uses opaque shadows with zero sigma), so just enable it
 	setup_blending(WLR_RENDER_BLEND_MODE_PREMULTIPLIED);
-	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA); // TODO: needed?
+	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
 	glUseProgram(renderer->shaders.box_shadow.program);
 
@@ -492,7 +492,7 @@ void fx_render_pass_add_box_shadow(struct fx_gles_render_pass *pass,
 
 	render(&box, &clip_region, renderer->shaders.box_shadow.pos_attrib);
 
-	glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA); // TODO: needed?
+	glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
 
 	pop_fx_debug(renderer);
 }

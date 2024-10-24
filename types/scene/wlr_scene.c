@@ -1304,7 +1304,6 @@ static void scene_entry_render(struct render_list_entry *entry, const struct ren
 			.width = window_width,
 			.height = window_height
 		};
-		printf("%d, %d\n", window_box.width, window_box.height);
 
 		struct fx_render_box_shadow_options shadow_options = {
 			.box = dst_box,

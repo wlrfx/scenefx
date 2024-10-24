@@ -1183,6 +1183,9 @@ static bool scene_node_at_iterator(struct wlr_scene_node *node,
 				!scene_buffer->point_accepts_input(scene_buffer, &rx, &ry)) {
 			return false;
 		}
+	} else if (node->type == WLR_SCENE_NODE_SHADOW) {
+		// Disable interaction
+		return false;
 	}
 
 	at_data->rx = rx;

@@ -466,8 +466,11 @@ void fx_render_pass_add_box_shadow(struct fx_gles_render_pass *pass,
 		pixman_region32_init_rect(&clip_region, box.x, box.y, box.width, box.height);
 	}
 	pixman_region32_t window_region;
-	pixman_region32_init_rect(&window_region, window_box.x + options->window_corner_radius * 0.3, window_box.y + options->window_corner_radius * 0.3,
-			window_box.width - options->window_corner_radius * 0.6, window_box.height - options->window_corner_radius * 0.6);
+	pixman_region32_init_rect(&window_region,
+			window_box.x + options->window_corner_radius * 0.3,
+			window_box.y + options->window_corner_radius * 0.3,
+			fmax(window_box.width - options->window_corner_radius * 0.6, 0),
+			fmax(window_box.height - options->window_corner_radius * 0.6, 0));
 	pixman_region32_subtract(&clip_region, &clip_region, &window_region);
 	pixman_region32_fini(&window_region);
 

@@ -1472,7 +1472,6 @@ static void scene_entry_render(struct render_list_entry *entry, const struct ren
 						.alpha = &opacity,
 						.blend_mode = WLR_RENDER_BLEND_MODE_NONE,
 						.dst_box = dst_box,
-						.clip = &render_region,
 					},
 					.clip_box = &dst_box,
 					.corner_radius = 0,

@@ -804,6 +804,7 @@ void fx_render_pass_add_optimized_blur(struct fx_gles_render_pass *pass,
 	// Render the blur into its own buffer
 	struct fx_render_blur_pass_options blur_options = *fx_options;
 	blur_options.current_buffer = pass->buffer;
+	blur_options.tex_options.base.clip = &clip;
 	struct fx_framebuffer *buffer = get_main_buffer_blur(pass, &blur_options);
 
 	// Update the optimized blur buffer if invalid

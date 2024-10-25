@@ -11,9 +11,11 @@ varying vec2 v_texcoord;
 
 uniform vec2 position;
 uniform vec2 size;
-uniform vec2 offset;
 uniform float blur_sigma;
 uniform float corner_radius;
+uniform vec2 window_position;
+uniform vec2 window_half_size;
+uniform float window_corner_radius;
 
 float gaussian(float x, float sigma) {
     const float pi = 3.141592653589793;
@@ -80,8 +82,8 @@ void main() {
     // dither the alpha to break up color bands
     shadow_alpha += (random() - 0.5) / 128.0;
 
-    // get the window alpha so we can render around the window (fix pixel gap by adding 0.5 to radius)
-    float window_alpha = 1.0 - smoothstep(-1.0, 1.0, roundRectSDF((size * 0.5) - blur_sigma, position + blur_sigma, corner_radius + 0.5));
+    // get the window alpha so we can render around the window (fix pixel gap by adding 1.0 to radius)
+    float window_alpha = smoothstep(-1.0, 1.0, roundRectSDF(window_half_size, window_position, window_corner_radius + 1.0));
 
-    gl_FragColor = vec4(v_color.rgb, shadow_alpha) * (1.0 - window_alpha);
+    gl_FragColor = vec4(v_color.rgb, shadow_alpha) * window_alpha;
 }

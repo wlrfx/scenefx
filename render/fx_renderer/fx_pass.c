@@ -356,12 +356,16 @@ void fx_render_pass_add_rect(struct fx_gles_render_pass *pass,
 	push_fx_debug(renderer);
 	setup_blending(color->a == 1.0 ? WLR_RENDER_BLEND_MODE_NONE : options->blend_mode);
 
+	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
 	glUseProgram(renderer->shaders.quad.program);
 
 	set_proj_matrix(renderer->shaders.quad.proj, pass->projection_matrix, &box);
 	glUniform4f(renderer->shaders.quad.color, color->r, color->g, color->b, color->a);
 
 	render(&box, options->clip, renderer->shaders.quad.pos_attrib);
+
+	glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
 
 	pop_fx_debug(renderer);
 }
@@ -401,6 +405,8 @@ void fx_render_pass_add_rounded_rect(struct fx_gles_render_pass *pass,
 	push_fx_debug(renderer);
 	setup_blending(WLR_RENDER_BLEND_MODE_PREMULTIPLIED);
 
+	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
 	glUseProgram(shader->program);
 
 	set_proj_matrix(shader->proj, pass->projection_matrix, &box);
@@ -411,6 +417,8 @@ void fx_render_pass_add_rounded_rect(struct fx_gles_render_pass *pass,
 	glUniform1f(shader->radius, fx_options->corner_radius);
 
 	render(&box, options->clip, shader->pos_attrib);
+
+	glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
 
 	pop_fx_debug(renderer);
 }
@@ -429,6 +437,8 @@ void fx_render_pass_add_rounded_border_corner(struct fx_gles_render_pass *pass,
 	push_fx_debug(renderer);
 	setup_blending(WLR_RENDER_BLEND_MODE_PREMULTIPLIED);
 
+	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
 	glUseProgram(renderer->shaders.rounded_border_corner.program);
 
 	set_proj_matrix(renderer->shaders.rounded_border_corner.proj, pass->projection_matrix, &box);
@@ -445,6 +455,8 @@ void fx_render_pass_add_rounded_border_corner(struct fx_gles_render_pass *pass,
 	glUniform1f(renderer->shaders.rounded_border_corner.half_thickness, fx_options->border_thickness / 2.0);
 
 	render(&box, options->clip, renderer->shaders.rounded_border_corner.pos_attrib);
+
+	glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
 
 	pop_fx_debug(renderer);
 }

@@ -46,7 +46,7 @@ void main() {
     float dist = min(max(q.x,q.y), 0.0) + length(max(q, 0.0)) - radius;
     float rect_alpha = v_color.a * 1.0 - smoothstep(-1.0, 1.0, dist);
 
-    float window_alpha = smoothstep(-1.0, 1.0, roundRectSDF(window_half_size, window_position, radius + 0.1)); // pull in radius by 1.0 px
+    float window_alpha = smoothstep(-1.0, 1.0, roundRectSDF(window_half_size, window_position, window_radius + 0.1)); // pull in radius by 1.0 px
 
     gl_FragColor = vec4(v_color.rgb, rect_alpha) * window_alpha;
 }

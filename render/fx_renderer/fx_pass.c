@@ -421,12 +421,13 @@ void fx_render_pass_add_rounded_rect(struct fx_gles_render_pass *pass,
 	set_proj_matrix(shader->proj, pass->projection_matrix, &box);
 	glUniform4f(shader->color, color->r, color->g, color->b, color->a);
 
+	printf("corner radius is %d\n", fx_options->corner_radius);
 	glUniform2f(shader->size, box.width, box.height);
 	glUniform2f(shader->position, box.x, box.y);
 	glUniform1f(shader->radius, fx_options->corner_radius);
 	glUniform2f(shader->window_half_size, window_box.width / 2.0, window_box.height / 2.0);
-	glUniform2f(shader->position, window_box.x, window_box.y);
-	glUniform1f(shader->radius, fx_options->window_corner_radius);
+	glUniform2f(shader->window_position, window_box.x, window_box.y);
+	glUniform1f(shader->window_radius, fx_options->window_corner_radius);
 
 	render(&box, &clip_region, shader->pos_attrib);
 	pixman_region32_fini(&clip_region);

@@ -324,6 +324,7 @@ void fx_render_pass_add_texture(struct fx_gles_render_pass *pass,
 	}
 
 	enum corner_location corners = fx_options->corners;
+	corner_location_transform(fx_options->base.transform, &corners);
 
 	glUniform1i(shader->tex, 0);
 	glUniform1f(shader->alpha, alpha);

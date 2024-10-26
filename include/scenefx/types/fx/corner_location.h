@@ -18,4 +18,7 @@ enum corner_location {
 		| CORNER_LOCATION_BOTTOM_RIGHT,
 };
 
+void corner_location_transform(enum wl_output_transform transform,
+		enum corner_location *corners);
+
 #endif // !TYPES_FX_CORNER_LOCATION_H

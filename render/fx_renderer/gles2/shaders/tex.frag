@@ -29,10 +29,14 @@ uniform float alpha;
 uniform vec2 half_size;
 uniform vec2 position;
 uniform float radius;
-uniform bool has_titlebar;
 uniform bool discard_transparent;
 uniform float dim;
 uniform vec4 dim_color;
+
+uniform bool round_top_left;
+uniform bool round_top_right;
+uniform bool round_bottom_left;
+uniform bool round_bottom_right;
 
 vec4 sample_texture() {
 #if SOURCE == SOURCE_TEXTURE_RGBA || SOURCE == SOURCE_TEXTURE_EXTERNAL
@@ -55,8 +59,26 @@ void main() {
 		return;
 	}
 
-	if (!has_titlebar || gl_FragCoord.y - position.y > radius) {
+	if (round_top_left || round_top_right || round_bottom_left ||
+		round_bottom_right) {
+		vec2 relative_pos = (gl_FragCoord.xy - position);
+		vec2 size = half_size * 2.0;
+
+		// Brachless baby!
+		// Selectively round individual corners
+		float top = step(relative_pos.y - radius, 0.0);
+		float left = step(relative_pos.x - radius, 0.0);
+		float right = step(size.x - radius, relative_pos.x);
+		float bottom = step(size.y - radius, relative_pos.y);
+
+		float top_left = top * left * float(round_top_left);
+		float top_right = top * right * float(round_top_right);
+		float bottom_left = bottom * left * float(round_bottom_left);
+		float bottom_right = bottom * right * float(round_bottom_right);
+		// A value of 1 means that we're allowed to round at this position
+		float round_corners = top_left + top_right + bottom_left + bottom_right;
+
 		float alpha = smoothstep(-1.0, 1.0, roundRectSDF());
-		gl_FragColor = mix(gl_FragColor, vec4(0.0), alpha);
+		gl_FragColor = mix(gl_FragColor, vec4(0.0), alpha * round_corners);
 	}
 }

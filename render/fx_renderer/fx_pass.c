@@ -23,7 +23,7 @@ struct fx_render_texture_options fx_render_texture_options_default(
 		const struct wlr_render_texture_options *base) {
 	struct fx_render_texture_options options = {
 		.corner_radius = 0,
-		.has_titlebar = false,
+		.corners = CORNER_LOCATION_NONE,
 		.discard_transparent = false,
 		.dim = 0.0f,
 		.dim_color = { 1, 1, 1, 1 },
@@ -323,16 +323,25 @@ void fx_render_pass_add_texture(struct fx_gles_render_pass *pass,
 		break;
 	}
 
+	enum corner_location corners = fx_options->corners;
+
 	glUniform1i(shader->tex, 0);
 	glUniform1f(shader->alpha, alpha);
 	glUniform2f(shader->half_size, (float)clip_box->width / 2.0, (float)clip_box->height / 2.0);
 	glUniform2f(shader->position, clip_box->x, clip_box->y);
 	glUniform1f(shader->radius, fx_options->corner_radius);
-	glUniform1f(shader->has_titlebar, fx_options->has_titlebar);
 	glUniform1f(shader->discard_transparent, fx_options->discard_transparent);
 	glUniform1f(shader->dim, fx_options->dim);
 	struct wlr_render_color dim_color = fx_options->dim_color;
 	glUniform4f(shader->dim_color, dim_color.r, dim_color.g, dim_color.b, dim_color.a);
+	glUniform1f(shader->round_top_left,
+			(CORNER_LOCATION_TOP_LEFT & corners) == CORNER_LOCATION_TOP_LEFT);
+	glUniform1f(shader->round_top_right,
+			(CORNER_LOCATION_TOP_RIGHT & corners) == CORNER_LOCATION_TOP_RIGHT);
+	glUniform1f(shader->round_bottom_left,
+			(CORNER_LOCATION_BOTTOM_LEFT & corners) == CORNER_LOCATION_BOTTOM_LEFT);
+	glUniform1f(shader->round_bottom_right,
+			(CORNER_LOCATION_BOTTOM_RIGHT & corners) == CORNER_LOCATION_BOTTOM_RIGHT);
 
 	set_proj_matrix(shader->proj, pass->projection_matrix, &dst_box);
 	set_tex_matrix(shader->tex_proj, options->transform, &src_fbox);
@@ -415,19 +424,19 @@ void fx_render_pass_add_rounded_rect(struct fx_gles_render_pass *pass,
 
 	struct quad_round_shader *shader = NULL;
 	switch (fx_options->corner_location) {
-	case ALL:
+	case CORNER_LOCATION_ALL:
 		shader = &renderer->shaders.quad_round;
 		break;
-	case TOP_LEFT:
+	case CORNER_LOCATION_TOP_LEFT:
 		shader = &renderer->shaders.quad_round_tl;
 		break;
-	case TOP_RIGHT:
+	case CORNER_LOCATION_TOP_RIGHT:
 		shader = &renderer->shaders.quad_round_tr;
 		break;
-	case BOTTOM_LEFT:
+	case CORNER_LOCATION_BOTTOM_LEFT:
 		shader = &renderer->shaders.quad_round_bl;
 		break;
-	case BOTTOM_RIGHT:
+	case CORNER_LOCATION_BOTTOM_RIGHT:
 		shader = &renderer->shaders.quad_round_br;
 		break;
 	default:
@@ -569,10 +578,14 @@ void fx_render_pass_add_rounded_border_corner(struct fx_gles_render_pass *pass,
 	set_proj_matrix(renderer->shaders.rounded_border_corner.proj, pass->projection_matrix, &box);
 	glUniform4f(renderer->shaders.rounded_border_corner.color, color->r, color->g, color->b, color->a);
 
-	glUniform1f(renderer->shaders.rounded_border_corner.is_top_left, fx_options->corner_location == TOP_LEFT);
-	glUniform1f(renderer->shaders.rounded_border_corner.is_top_right, fx_options->corner_location == TOP_RIGHT);
-	glUniform1f(renderer->shaders.rounded_border_corner.is_bottom_left, fx_options->corner_location == BOTTOM_LEFT);
-	glUniform1f(renderer->shaders.rounded_border_corner.is_bottom_right, fx_options->corner_location == BOTTOM_RIGHT);
+	glUniform1f(renderer->shaders.rounded_border_corner.is_top_left,
+			fx_options->corner_location == CORNER_LOCATION_TOP_LEFT);
+	glUniform1f(renderer->shaders.rounded_border_corner.is_top_right,
+			fx_options->corner_location == CORNER_LOCATION_TOP_RIGHT);
+	glUniform1f(renderer->shaders.rounded_border_corner.is_bottom_left,
+			fx_options->corner_location == CORNER_LOCATION_BOTTOM_LEFT);
+	glUniform1f(renderer->shaders.rounded_border_corner.is_bottom_right,
+			fx_options->corner_location == CORNER_LOCATION_BOTTOM_RIGHT);
 
 	glUniform2f(renderer->shaders.rounded_border_corner.position, box.x, box.y);
 	glUniform1f(renderer->shaders.rounded_border_corner.radius, fx_options->corner_radius);

@@ -104,10 +104,13 @@ struct tex_shader {
 	GLint half_size;
 	GLint position;
 	GLint radius;
-	GLint has_titlebar;
 	GLint discard_transparent;
 	GLint dim;
 	GLint dim_color;
+	GLint round_top_left;
+	GLint round_top_right;
+	GLint round_bottom_left;
+	GLint round_bottom_right;
 };
 
 bool link_tex_program(struct tex_shader *shader, enum fx_tex_shader_source source);

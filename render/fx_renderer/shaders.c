@@ -203,7 +203,7 @@ bool link_quad_grad_round_program(struct quad_grad_round_shader *shader, enum fx
 
 bool link_tex_program(struct tex_shader *shader,
 		enum fx_tex_shader_source source) {
-	GLchar frag_src[2048];
+	GLchar frag_src[4096];
 	snprintf(frag_src, sizeof(frag_src),
 		"#define SOURCE %d\n%s", source, tex_frag_src);
 
@@ -221,10 +221,13 @@ bool link_tex_program(struct tex_shader *shader,
 	shader->half_size = glGetUniformLocation(prog, "half_size");
 	shader->position = glGetUniformLocation(prog, "position");
 	shader->radius = glGetUniformLocation(prog, "radius");
-	shader->has_titlebar = glGetUniformLocation(prog, "has_titlebar");
 	shader->discard_transparent = glGetUniformLocation(prog, "discard_transparent");
 	shader->dim = glGetUniformLocation(prog, "dim");
 	shader->dim_color = glGetUniformLocation(prog, "dim_color");
+	shader->round_top_left = glGetUniformLocation(prog, "round_top_left");
+	shader->round_top_right = glGetUniformLocation(prog, "round_top_right");
+	shader->round_bottom_left = glGetUniformLocation(prog, "round_bottom_left");
+	shader->round_bottom_right = glGetUniformLocation(prog, "round_bottom_right");
 
 	return true;
 }

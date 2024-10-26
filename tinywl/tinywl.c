@@ -28,6 +28,8 @@
 #include <wlr/util/log.h>
 #include <xkbcommon/xkbcommon.h>
 
+#define BORDER_THICKNESS 3
+
 /* For brevity's sake, struct members are annotated where they are used. */
 enum tinywl_cursor_mode {
 	TINYWL_CURSOR_PASSTHROUGH,
@@ -98,6 +100,7 @@ struct tinywl_toplevel {
 	float opacity;
 	int corner_radius;
 	struct wlr_scene_shadow *shadow;
+	struct wlr_scene_rect *border;
 };
 
 struct tinywl_keyboard {
@@ -714,11 +717,17 @@ static void xdg_toplevel_map(struct wl_listener *listener, void *data) {
 	int blur_sigma = toplevel->shadow->blur_sigma;
 	struct wlr_box geometry;
 	wlr_xdg_surface_get_geometry(toplevel->xdg_toplevel->base, &geometry);
-	wlr_scene_shadow_set_size(toplevel->shadow,
-			geometry.width + blur_sigma * 2,
-			geometry.height + blur_sigma * 2);
 
-	wlr_scene_node_set_position(&toplevel->shadow->node, -blur_sigma, -blur_sigma);
+	wlr_scene_shadow_set_size(toplevel->shadow,
+			geometry.width + (blur_sigma + BORDER_THICKNESS) * 2,
+			geometry.height + (blur_sigma + BORDER_THICKNESS) * 2);
+	wlr_scene_node_set_position(&toplevel->shadow->node, -blur_sigma - BORDER_THICKNESS,
+			-blur_sigma - BORDER_THICKNESS);
+
+	wlr_scene_rect_set_size(toplevel->border,
+			geometry.width + BORDER_THICKNESS * 2,
+			geometry.height + BORDER_THICKNESS * 2);
+	wlr_scene_node_set_position(&toplevel->border->node, -BORDER_THICKNESS, -BORDER_THICKNESS);
 
 	focus_toplevel(toplevel, surface);
 }
@@ -746,7 +755,13 @@ static void xdg_toplevel_commit(struct wl_listener *listener, void *data) {
 
 	int blur_sigma = toplevel->shadow->blur_sigma;
 	wlr_scene_shadow_set_size(toplevel->shadow,
-			geometry.width + blur_sigma * 2, geometry.height + blur_sigma * 2);
+			geometry.width + (blur_sigma + BORDER_THICKNESS) * 2,
+			geometry.height + (blur_sigma + BORDER_THICKNESS) * 2);
+
+	wlr_scene_rect_set_size(toplevel->border,
+			geometry.width + BORDER_THICKNESS * 2,
+			geometry.height + BORDER_THICKNESS * 2);
+	wlr_scene_node_set_position(&toplevel->border->node, -BORDER_THICKNESS, -BORDER_THICKNESS);
 }
 
 static void xdg_toplevel_destroy(struct wl_listener *listener, void *data) {
@@ -762,6 +777,8 @@ static void xdg_toplevel_destroy(struct wl_listener *listener, void *data) {
 	wl_list_remove(&toplevel->request_maximize.link);
 	wl_list_remove(&toplevel->request_fullscreen.link);
 
+	wlr_scene_node_destroy(&toplevel->border->node);
+	wlr_scene_node_destroy(&toplevel->shadow->node);
 	wlr_scene_node_destroy(&toplevel->scene_tree->node);
 
 	free(toplevel);
@@ -885,10 +902,17 @@ static void server_new_xdg_surface(struct wl_listener *listener, void *data) {
 	toplevel->opacity = 1;
 	toplevel->corner_radius = 20;
 
+	toplevel->border = wlr_scene_rect_create(toplevel->scene_tree, 0, 0,
+			(float[4]){ 1.0f, 0.f, 0.f, 1.0f });
+	wlr_scene_rect_set_corner_radius(toplevel->border, toplevel->corner_radius + BORDER_THICKNESS);
+
 	float blur_sigma = 20.0f;
 	toplevel->shadow = wlr_scene_shadow_create(toplevel->scene_tree,
-			0, 0, toplevel->corner_radius, blur_sigma, (float[4]){ 1.0f, 0.f, 0.f, 1.0f });
-	// Lower the shadow below the XDG scene tree
+			0, 0, toplevel->corner_radius, blur_sigma, (float[4]){ 0.f, 1.0f, 0.f, 1.0f });
+
+	// Lower the border below the XDG scene tree
+	wlr_scene_node_lower_to_bottom(&toplevel->border->node);
+	// Lower the shadow below the border
 	wlr_scene_node_lower_to_bottom(&toplevel->shadow->node);
 
 	/* Listen to the various events it can emit */

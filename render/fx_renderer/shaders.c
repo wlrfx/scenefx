@@ -131,6 +131,9 @@ bool link_quad_round_program(struct quad_round_shader *shader, enum fx_rounded_q
 	shader->size = glGetUniformLocation(prog, "size");
 	shader->position = glGetUniformLocation(prog, "position");
 	shader->radius = glGetUniformLocation(prog, "radius");
+	shader->window_half_size = glGetUniformLocation(prog, "window_half_size");
+	shader->window_position = glGetUniformLocation(prog, "window_position");
+	shader->window_radius = glGetUniformLocation(prog, "window_radius");
 
 	return true;
 }

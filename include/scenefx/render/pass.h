@@ -41,6 +41,15 @@ struct fx_render_rect_options {
 	// TODO: Add effects here in the future
 };
 
+struct fx_render_rounded_rect_options {
+	struct wlr_render_rect_options base;
+	int corner_radius;
+	enum corner_location corner_location;
+
+	struct wlr_box window_box;
+	int window_corner_radius;
+};
+
 struct fx_render_box_shadow_options {
 	struct wlr_box box;
 	struct wlr_box window_box;
@@ -51,12 +60,6 @@ struct fx_render_box_shadow_options {
 	float blur_sigma;
 	int corner_radius;
 	struct wlr_render_color color;
-};
-
-struct fx_render_rounded_rect_options {
-	struct wlr_render_rect_options base;
-	int corner_radius;
-	enum corner_location corner_location;
 };
 
 struct fx_render_rounded_border_corner_options {

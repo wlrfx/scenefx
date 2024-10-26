@@ -138,6 +138,7 @@ struct wlr_scene_rect {
 	struct wlr_scene_node node;
 	int width, height;
 	float color[4];
+	int corner_radius;
 };
 
 /** A scene-graph node displaying a shadow */
@@ -386,9 +387,15 @@ struct wlr_scene_rect *wlr_scene_rect_create(struct wlr_scene_tree *parent,
 		int width, int height, const float color[static 4]);
 
 /**
- * Change the width and height of an existing rectangle node.
+ * change the width and height of an existing rectangle node.
  */
 void wlr_scene_rect_set_size(struct wlr_scene_rect *rect, int width, int height);
+
+/**
+ * change the corner radius of an existing rectangle node.
+ */
+void wlr_scene_rect_set_corner_radius(struct wlr_scene_rect *rect, int corner_radius);
+
 
 /**
  * Change the color of an existing rectangle node.

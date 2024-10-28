@@ -16,7 +16,6 @@
 #include "scenefx/render/fx_renderer/fx_renderer.h"
 #include "scenefx/render/fx_renderer/fx_effect_framebuffers.h"
 #include "scenefx/types/fx/blur_data.h"
-#include "scenefx/types/fx/shadow_data.h"
 
 #define MAX_QUADS 86 // 4kb
 
@@ -609,28 +608,26 @@ void fx_render_pass_add_rounded_grad_border_corner(struct fx_gles_render_pass *p
 void fx_render_pass_add_box_shadow(struct fx_gles_render_pass *pass,
 		const struct fx_render_box_shadow_options *options) {
 	struct fx_renderer *renderer = pass->buffer->renderer;
-	struct shadow_data *shadow_data = options->shadow_data;
 
-	const struct wlr_render_color *color = &shadow_data->color;
-	struct wlr_box shadow_box = options->shadow_box;
-	assert(shadow_box.width > 0 && shadow_box.height > 0);
+	struct wlr_box box = options->box;
+	assert(box.width > 0 && box.height > 0);
 
-	struct wlr_box surface_box = options->clip_box;
+	const struct wlr_box window_box = options->window_box;
 
-	pixman_region32_t render_region;
-	pixman_region32_init(&render_region);
-
-	pixman_region32_t inner_region;
-	pixman_region32_init_rect(&inner_region,
-			surface_box.x + options->corner_radius * 0.3,
-			surface_box.y + options->corner_radius * 0.3,
-			fmax(surface_box.width - options->corner_radius * 0.6, 0),
-			fmax(surface_box.height - options->corner_radius * 0.6, 0));
-	pixman_region32_subtract(&render_region, options->clip, &inner_region);
-	pixman_region32_fini(&inner_region);
+	pixman_region32_t clip_region;
+	if (options->clip) {
+		pixman_region32_init(&clip_region);
+		pixman_region32_copy(&clip_region, options->clip);
+	} else {
+		pixman_region32_init_rect(&clip_region, box.x, box.y, box.width, box.height);
+	}
+	pixman_region32_t window_region;
+	pixman_region32_init_rect(&window_region, window_box.x + options->window_corner_radius * 0.3, window_box.y + options->window_corner_radius * 0.3,
+			window_box.width - options->window_corner_radius * 0.6, window_box.height - options->window_corner_radius * 0.6);
+	pixman_region32_subtract(&clip_region, &clip_region, &window_region);
+	pixman_region32_fini(&window_region);
 
 	push_fx_debug(renderer);
-
 	// blending will practically always be needed (unless we have a madman
 	// who uses opaque shadows with zero sigma), so just enable it
 	setup_blending(WLR_RENDER_BLEND_MODE_PREMULTIPLIED);
@@ -638,17 +635,18 @@ void fx_render_pass_add_box_shadow(struct fx_gles_render_pass *pass,
 
 	glUseProgram(renderer->shaders.box_shadow.program);
 
-	set_proj_matrix(renderer->shaders.box_shadow.proj, pass->projection_matrix, &shadow_box);
+	const struct wlr_render_color *color = &options->color;
+	set_proj_matrix(renderer->shaders.box_shadow.proj, pass->projection_matrix, &box);
 	glUniform4f(renderer->shaders.box_shadow.color, color->r, color->g, color->b, color->a);
-	glUniform1f(renderer->shaders.box_shadow.blur_sigma, shadow_data->blur_sigma);
+	glUniform1f(renderer->shaders.box_shadow.blur_sigma, options->blur_sigma);
 	glUniform1f(renderer->shaders.box_shadow.corner_radius, options->corner_radius);
-	glUniform2f(renderer->shaders.box_shadow.size, shadow_box.width, shadow_box.height);
-	glUniform2f(renderer->shaders.box_shadow.offset, options->shadow_data->offset_x, options->shadow_data->offset_y);
-	glUniform2f(renderer->shaders.box_shadow.position, shadow_box.x, shadow_box.y);
+	glUniform2f(renderer->shaders.box_shadow.size, box.width, box.height);
+	glUniform2f(renderer->shaders.box_shadow.position, box.x, box.y);
+	glUniform1f(renderer->shaders.box_shadow.window_corner_radius, options->window_corner_radius);
+	glUniform2f(renderer->shaders.box_shadow.window_half_size, window_box.width / 2.0, window_box.height / 2.0);
+	glUniform2f(renderer->shaders.box_shadow.window_position, window_box.x, window_box.y);
 
-	// TODO: also account for options->clip
-	render(&shadow_box, &render_region, renderer->shaders.box_shadow.pos_attrib);
-	pixman_region32_fini(&render_region);
+	render(&box, &clip_region, renderer->shaders.box_shadow.pos_attrib);
 
 	glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
 

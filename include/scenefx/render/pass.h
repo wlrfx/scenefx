@@ -4,7 +4,6 @@
 #include <stdbool.h>
 #include <wlr/render/pass.h>
 #include <wlr/render/interface.h>
-#include "scenefx/types/fx/shadow_data.h"
 
 struct fx_gles_render_pass {
 	struct wlr_render_pass base;
@@ -62,13 +61,15 @@ struct fx_render_rect_grad_options {
 };
 
 struct fx_render_box_shadow_options {
-	struct wlr_box shadow_box;
-	struct wlr_box clip_box;
+	struct wlr_box box;
+	struct wlr_box window_box;
+	int window_corner_radius;
 	/* Clip region, leave NULL to disable clipping */
 	const pixman_region32_t *clip;
 
-	struct shadow_data *shadow_data;
+	float blur_sigma;
 	int corner_radius;
+	struct wlr_render_color color;
 };
 
 struct fx_render_rounded_rect_options {

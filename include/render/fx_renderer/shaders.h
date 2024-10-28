@@ -158,9 +158,11 @@ struct box_shadow_shader {
 	GLint pos_attrib;
 	GLint position;
 	GLint size;
-	GLint offset;
 	GLint blur_sigma;
 	GLint corner_radius;
+	GLint window_position;
+	GLint window_half_size;
+	GLint window_corner_radius;
 };
 
 bool link_box_shadow_program(struct box_shadow_shader *shader);

@@ -12,7 +12,7 @@ vec4 gradient(vec4 colors[LEN], int count, vec2 size, vec2 grad_box, vec2 origin
 
 	float rad = radians(degree);
 
-	if(linear){
+	if (linear) {
 		uv *= vec2(1.0)/vec2(abs(cos(rad)) + abs(sin(rad)));
 
 		vec2 rotated = vec2(uv.x * cos(rad) - uv.y * sin(rad) + origin.x,
@@ -28,7 +28,7 @@ vec4 gradient(vec4 colors[LEN], int count, vec2 size, vec2 grad_box, vec2 origin
 		step = uv.x;
 	}
 
-	if(!blend){
+	if (!blend) {
 		float smooth = 1.0/float(count);
 		int ind = int(step/smooth);
 

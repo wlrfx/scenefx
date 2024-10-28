@@ -458,7 +458,6 @@ void fx_render_pass_add_rounded_rect(struct fx_gles_render_pass *pass,
 	set_proj_matrix(shader->proj, pass->projection_matrix, &box);
 	glUniform4f(shader->color, color->r, color->g, color->b, color->a);
 
-	printf("corner radius is %d\n", fx_options->corner_radius);
 	glUniform2f(shader->size, box.width, box.height);
 	glUniform2f(shader->position, box.x, box.y);
 	glUniform1f(shader->radius, fx_options->corner_radius);

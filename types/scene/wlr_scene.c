@@ -1364,9 +1364,9 @@ static void scene_entry_render(struct render_list_entry *entry, const struct ren
 				.window_corner_radius = window_corner_radius,
 			};
 			fx_render_pass_add_rounded_rect(data->render_pass, &rounded_rect_options);
+		} else {
+			fx_render_pass_add_rect(data->render_pass, &rect_options);
 		}
-
-		fx_render_pass_add_rect(data->render_pass, &rect_options);
 		break;
 	case WLR_SCENE_NODE_SHADOW:;
 		struct wlr_scene_shadow *scene_shadow = wlr_scene_shadow_from_node(node);

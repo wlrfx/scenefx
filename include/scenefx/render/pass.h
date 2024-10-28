@@ -67,7 +67,7 @@ struct fx_render_rounded_rect_options {
 
 	struct wlr_box window_box;
 	int window_corner_radius;
-}
+};
 
 struct fx_render_rounded_rect_grad_options {
 	struct wlr_render_rect_options base;

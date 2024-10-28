@@ -26,6 +26,20 @@ struct fx_gles_render_pass *fx_renderer_begin_buffer_pass(struct wlr_renderer *w
 		struct wlr_buffer *wlr_buffer, struct wlr_output *output,
 		const struct wlr_buffer_pass_options *options);
 
+struct fx_gradient {
+	float degree;
+	/* The full area the gradient fit too, for borders use the window size */
+	struct wlr_box range;
+	/* The center of the gradient, {0.5, 0.5} for normal*/
+	float origin[2];
+	/* 1 = Linear, 2 = Conic */
+	int linear;
+	/* Whether or not to blend the colors */
+	int blend;
+	int count;
+	float *colors;
+};
+
 struct fx_render_texture_options {
 	struct wlr_render_texture_options base;
 	const struct wlr_box *clip_box; // Used to clip csd. Ignored if NULL
@@ -41,6 +55,11 @@ struct fx_render_rect_options {
 	// TODO: Add effects here in the future
 };
 
+struct fx_render_rect_grad_options {
+	struct wlr_render_rect_options base;
+	struct fx_gradient gradient;
+};
+
 struct fx_render_rounded_rect_options {
 	struct wlr_render_rect_options base;
 	int corner_radius;
@@ -48,6 +67,28 @@ struct fx_render_rounded_rect_options {
 
 	struct wlr_box window_box;
 	int window_corner_radius;
+}
+
+struct fx_render_rounded_rect_grad_options {
+	struct wlr_render_rect_options base;
+	struct fx_gradient gradient;
+	int corner_radius;
+	enum corner_location corner_location;
+};
+
+struct fx_render_rounded_border_corner_options {
+	struct wlr_render_rect_options base;
+	int corner_radius;
+	int border_thickness;
+	enum corner_location corner_location;
+};
+
+struct fx_render_rounded_grad_border_corner_options {
+	struct wlr_render_rect_options base;
+	struct fx_gradient gradient;
+	int corner_radius;
+	int border_thickness;
+	enum corner_location corner_location;
 };
 
 struct fx_render_box_shadow_options {
@@ -60,13 +101,6 @@ struct fx_render_box_shadow_options {
 	float blur_sigma;
 	int corner_radius;
 	struct wlr_render_color color;
-};
-
-struct fx_render_rounded_border_corner_options {
-	struct wlr_render_rect_options base;
-	int corner_radius;
-	int border_thickness;
-	enum corner_location corner_location;
 };
 
 struct fx_render_blur_pass_options {
@@ -91,6 +125,12 @@ void fx_render_pass_add_rect(struct fx_gles_render_pass *render_pass,
 	const struct fx_render_rect_options *options);
 
 /**
+ * Render a rectangle with a gradient.
+ */
+void fx_render_pass_add_rect_grad(struct fx_gles_render_pass *render_pass,
+	const struct fx_render_rect_grad_options *options);
+
+/**
  * Render a rounded rectangle.
  */
 void fx_render_pass_add_rounded_rect(struct fx_gles_render_pass *render_pass,
@@ -99,8 +139,21 @@ void fx_render_pass_add_rounded_rect(struct fx_gles_render_pass *render_pass,
 /**
  * Render a border corner.
  */
+void fx_render_pass_add_rounded_rect_grad(struct fx_gles_render_pass *render_pass,
+	const struct fx_render_rounded_rect_grad_options *options);
+
+
+/**
+ * Render a border corner.
+ */
 void fx_render_pass_add_rounded_border_corner(struct fx_gles_render_pass *render_pass,
 	const struct fx_render_rounded_border_corner_options *options);
+
+/**
+ * Render a border corner.
+ */
+void fx_render_pass_add_rounded_grad_border_corner(struct fx_gles_render_pass *render_pass,
+	const struct fx_render_rounded_grad_border_corner_options *options);
 
 /**
  * Render a box shadow.

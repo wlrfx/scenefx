@@ -37,6 +37,24 @@ struct quad_shader {
 
 bool link_quad_program(struct quad_shader *shader);
 
+struct quad_grad_shader {
+	int max_len;
+
+	GLuint program;
+	GLint proj;
+	GLint colors;
+	GLint size;
+	GLint degree;
+	GLint grad_box;
+	GLint pos_attrib;
+	GLint linear;
+	GLint origin;
+	GLint count;
+	GLint blend;
+};
+
+bool link_quad_grad_program(struct quad_grad_shader *shader, int max_len);
+
 struct quad_round_shader {
 	GLuint program;
 	GLint proj;
@@ -52,6 +70,29 @@ struct quad_round_shader {
 };
 
 bool link_quad_round_program(struct quad_round_shader *shader, enum fx_rounded_quad_shader_source source);
+
+struct quad_grad_round_shader {
+	GLuint program;
+	GLint proj;
+	GLint color;
+	GLint pos_attrib;
+	GLint size;
+	GLint position;
+	GLint radius;
+
+	GLint colors;
+	GLint grad_size;
+	GLint degree;
+	GLint grad_box;
+	GLint linear;
+	GLint origin;
+	GLint count;
+	GLint blend;
+
+	int max_len;
+};
+
+bool link_quad_grad_round_program(struct quad_grad_round_shader *shader, enum fx_rounded_quad_shader_source source, int max_len);
 
 struct tex_shader {
 	GLuint program;
@@ -87,6 +128,32 @@ struct rounded_border_corner_shader {
 };
 
 bool link_rounded_border_corner_program(struct rounded_border_corner_shader *shader);
+
+struct rounded_grad_border_corner_shader {
+	int max_len;
+	GLuint program;
+	GLint proj;
+	GLint is_top_left;
+	GLint is_top_right;
+	GLint is_bottom_left;
+	GLint is_bottom_right;
+	GLint position;
+	GLint radius;
+	GLint half_size;
+	GLint half_thickness;
+
+	GLint colors;
+	GLint size;
+	GLint degree;
+	GLint grad_box;
+	GLint pos_attrib;
+	GLint linear;
+	GLint origin;
+	GLint count;
+	GLint blend;
+};
+
+bool link_rounded_grad_border_corner_program(struct rounded_grad_border_corner_shader *shader, int max_len);
 
 struct box_shadow_shader {
 	GLuint program;

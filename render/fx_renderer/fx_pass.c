@@ -366,6 +366,43 @@ void fx_render_pass_add_rect(struct fx_gles_render_pass *pass,
 	pop_fx_debug(renderer);
 }
 
+void fx_render_pass_add_rect_grad(struct fx_gles_render_pass *pass,
+		const struct fx_render_rect_grad_options *fx_options) {
+	const struct wlr_render_rect_options *options = &fx_options->base;
+
+	struct fx_renderer *renderer = pass->buffer->renderer;
+
+	if (renderer->shaders.quad_grad.max_len <= fx_options->gradient.count) {
+		glDeleteProgram(renderer->shaders.quad_grad.program);
+		if (!link_quad_grad_program(&renderer->shaders.quad_grad, fx_options->gradient.count + 1)) {
+			wlr_log(WLR_ERROR, "Could not link quad shader after updating max_len to %d. Aborting renderer", fx_options->gradient.count + 1);
+			abort();
+		}
+	}
+
+	struct wlr_box box;
+	wlr_render_rect_options_get_box(options, pass->buffer->buffer, &box);
+
+	push_fx_debug(renderer);
+	setup_blending(options->blend_mode);
+
+	glUseProgram(renderer->shaders.quad_grad.program);
+
+	set_proj_matrix(renderer->shaders.quad_grad.proj, pass->projection_matrix, &box);
+	glUniform4fv(renderer->shaders.quad_grad.colors, fx_options->gradient.count, (GLfloat*)fx_options->gradient.colors);
+	glUniform1i(renderer->shaders.quad_grad.count, fx_options->gradient.count);
+	glUniform2f(renderer->shaders.quad_grad.size, fx_options->gradient.range.width, fx_options->gradient.range.height);
+	glUniform1f(renderer->shaders.quad_grad.degree, fx_options->gradient.degree);
+	glUniform1f(renderer->shaders.quad_grad.linear, fx_options->gradient.linear);
+	glUniform1f(renderer->shaders.quad_grad.blend, fx_options->gradient.blend);
+	glUniform2f(renderer->shaders.quad_grad.grad_box, fx_options->gradient.range.x, fx_options->gradient.range.y);
+	glUniform2f(renderer->shaders.quad_grad.origin, fx_options->gradient.origin[0], fx_options->gradient.origin[1]);
+
+	render(&box, options->clip, renderer->shaders.quad_grad.pos_attrib);
+
+	pop_fx_debug(renderer);
+}
+
 void fx_render_pass_add_rounded_rect(struct fx_gles_render_pass *pass,
 		const struct fx_render_rounded_rect_options *fx_options) {
 	const struct wlr_render_rect_options *options = &fx_options->base;
@@ -415,6 +452,76 @@ void fx_render_pass_add_rounded_rect(struct fx_gles_render_pass *pass,
 	pop_fx_debug(renderer);
 }
 
+void fx_render_pass_add_rounded_rect_grad(struct fx_gles_render_pass *pass,
+		const struct fx_render_rounded_rect_grad_options *fx_options) {
+	const struct wlr_render_rect_options *options = &fx_options->base;
+
+	struct fx_renderer *renderer = pass->buffer->renderer;
+
+	struct quad_grad_round_shader *shader = NULL;
+	enum fx_rounded_quad_shader_source corner;
+	switch (fx_options->corner_location) {
+	case ALL:
+		corner = SHADER_SOURCE_QUAD_ROUND;
+		shader = &renderer->shaders.quad_grad_round;
+		break;
+	case TOP_LEFT:
+		corner = SHADER_SOURCE_QUAD_ROUND_TOP_LEFT;
+		shader = &renderer->shaders.quad_grad_round_tl;
+		break;
+	case TOP_RIGHT:
+		corner = SHADER_SOURCE_QUAD_ROUND_TOP_RIGHT;
+		shader = &renderer->shaders.quad_grad_round_tr;
+		break;
+	case BOTTOM_LEFT:
+		corner = SHADER_SOURCE_QUAD_ROUND_BOTTOM_LEFT;
+		shader = &renderer->shaders.quad_grad_round_bl;
+		break;
+	case BOTTOM_RIGHT:
+		corner = SHADER_SOURCE_QUAD_ROUND_TOP_RIGHT;
+		shader = &renderer->shaders.quad_grad_round_br;
+		break;
+	default:
+		wlr_log(WLR_ERROR, "Invalid Corner Location. Aborting render");
+		abort();
+	}
+
+	if (shader->max_len <= fx_options->gradient.count) {
+		glDeleteProgram(shader->program);
+		if (!link_quad_grad_round_program(shader, corner, fx_options->gradient.count + 1)) {
+			wlr_log(WLR_ERROR, "Could not link quad shader after updating max_len to %d. Aborting renderer", fx_options->gradient.count + 1);
+			abort();
+		}
+	}
+
+	struct wlr_box box;
+	wlr_render_rect_options_get_box(options, pass->buffer->buffer, &box);
+
+	push_fx_debug(renderer);
+	setup_blending(WLR_RENDER_BLEND_MODE_PREMULTIPLIED);
+
+	glUseProgram(shader->program);
+
+	set_proj_matrix(shader->proj, pass->projection_matrix, &box);
+
+	glUniform2f(shader->size, box.width, box.height);
+	glUniform2f(shader->position, box.x, box.y);
+	glUniform1f(shader->radius, fx_options->corner_radius);
+
+	glUniform4fv(shader->colors, fx_options->gradient.count, (GLfloat*)fx_options->gradient.colors);
+	glUniform1i(shader->count, fx_options->gradient.count);
+	glUniform2f(shader->grad_size, fx_options->gradient.range.width, fx_options->gradient.range.height);
+	glUniform1f(shader->degree, fx_options->gradient.degree);
+	glUniform1f(shader->linear, fx_options->gradient.linear);
+	glUniform1f(shader->blend, fx_options->gradient.blend);
+	glUniform2f(shader->grad_box, fx_options->gradient.range.x, fx_options->gradient.range.y);
+	glUniform2f(shader->origin, fx_options->gradient.origin[0], fx_options->gradient.origin[1]);
+
+	render(&box, options->clip, shader->pos_attrib);
+
+	pop_fx_debug(renderer);
+}
+
 void fx_render_pass_add_rounded_border_corner(struct fx_gles_render_pass *pass,
 		const struct fx_render_rounded_border_corner_options *fx_options) {
 	const struct wlr_render_rect_options *options = &fx_options->base;
@@ -445,6 +552,55 @@ void fx_render_pass_add_rounded_border_corner(struct fx_gles_render_pass *pass,
 	glUniform1f(renderer->shaders.rounded_border_corner.half_thickness, fx_options->border_thickness / 2.0);
 
 	render(&box, options->clip, renderer->shaders.rounded_border_corner.pos_attrib);
+
+	pop_fx_debug(renderer);
+}
+
+void fx_render_pass_add_rounded_grad_border_corner(struct fx_gles_render_pass *pass,
+		const struct fx_render_rounded_grad_border_corner_options *fx_options) {
+	const struct wlr_render_rect_options *options = &fx_options->base;
+
+	struct fx_renderer *renderer = pass->buffer->renderer;
+
+	if (renderer->shaders.rounded_grad_border_corner.max_len <= fx_options->gradient.count) {
+		glDeleteProgram(renderer->shaders.rounded_grad_border_corner.program);
+		if (!link_rounded_grad_border_corner_program(&renderer->shaders.rounded_grad_border_corner, fx_options->gradient.count + 1)) {
+			wlr_log(WLR_ERROR, "Could not link quad shader after updating max_len to %d. Aborting renderer", fx_options->gradient.count + 1);
+			abort();
+		}
+	}
+
+	struct wlr_box box;
+	wlr_render_rect_options_get_box(options, pass->buffer->buffer, &box);
+	assert(box.width > 0 && box.width == box.height); // should be a perfect square since we are drawing a circle
+
+	push_fx_debug(renderer);
+	setup_blending(WLR_RENDER_BLEND_MODE_PREMULTIPLIED);
+
+	glUseProgram(renderer->shaders.rounded_grad_border_corner.program);
+
+	set_proj_matrix(renderer->shaders.rounded_grad_border_corner.proj, pass->projection_matrix, &box);
+
+	glUniform1f(renderer->shaders.rounded_grad_border_corner.is_top_left, fx_options->corner_location == TOP_LEFT);
+	glUniform1f(renderer->shaders.rounded_grad_border_corner.is_top_right, fx_options->corner_location == TOP_RIGHT);
+	glUniform1f(renderer->shaders.rounded_grad_border_corner.is_bottom_left, fx_options->corner_location == BOTTOM_LEFT);
+	glUniform1f(renderer->shaders.rounded_grad_border_corner.is_bottom_right, fx_options->corner_location == BOTTOM_RIGHT);
+
+	glUniform2f(renderer->shaders.rounded_grad_border_corner.position, box.x, box.y);
+	glUniform1f(renderer->shaders.rounded_grad_border_corner.radius, fx_options->corner_radius);
+	glUniform2f(renderer->shaders.rounded_grad_border_corner.half_size, box.width / 2.0, box.height / 2.0);
+	glUniform1f(renderer->shaders.rounded_grad_border_corner.half_thickness, fx_options->border_thickness / 2.0);
+
+	glUniform4fv(renderer->shaders.rounded_grad_border_corner.colors, fx_options->gradient.count, (GLfloat*)fx_options->gradient.colors);
+	glUniform1i(renderer->shaders.rounded_grad_border_corner.count, fx_options->gradient.count);
+	glUniform2f(renderer->shaders.rounded_grad_border_corner.size, fx_options->gradient.range.width, fx_options->gradient.range.height);
+	glUniform1f(renderer->shaders.rounded_grad_border_corner.degree, fx_options->gradient.degree);
+	glUniform1f(renderer->shaders.rounded_grad_border_corner.linear, fx_options->gradient.linear);
+	glUniform1f(renderer->shaders.rounded_grad_border_corner.blend, fx_options->gradient.blend);
+	glUniform2f(renderer->shaders.rounded_grad_border_corner.grad_box, fx_options->gradient.range.x, fx_options->gradient.range.y);
+	glUniform2f(renderer->shaders.rounded_grad_border_corner.origin, fx_options->gradient.origin[0], fx_options->gradient.origin[1]);
+
+	render(&box, options->clip, renderer->shaders.rounded_grad_border_corner.pos_attrib);
 
 	pop_fx_debug(renderer);
 }

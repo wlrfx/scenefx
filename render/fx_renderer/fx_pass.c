@@ -407,6 +407,8 @@ void fx_render_pass_add_rounded_rect(struct fx_gles_render_pass *pass,
 		const struct fx_render_rounded_rect_options *fx_options) {
 	const struct wlr_render_rect_options *options = &fx_options->base;
 
+	struct wlr_box box;
+	wlr_render_rect_options_get_box(options, pass->buffer->buffer, &box);
 	assert(box.width > 0 && box.height > 0);
 
 	struct fx_renderer *renderer = pass->buffer->renderer;
@@ -434,8 +436,6 @@ void fx_render_pass_add_rounded_rect(struct fx_gles_render_pass *pass,
 	}
 
 	const struct wlr_render_color *color = &options->color;
-	struct wlr_box box;
-	wlr_render_rect_options_get_box(options, pass->buffer->buffer, &box);
 
 	pixman_region32_t clip_region;
 	if (options->clip) {
@@ -447,8 +447,13 @@ void fx_render_pass_add_rounded_rect(struct fx_gles_render_pass *pass,
 	const struct wlr_box window_box = fx_options->window_box;
 	int window_corner_radius = fx_options->window_corner_radius;
 	pixman_region32_t window_region;
-	pixman_region32_init_rect(&window_region, window_box.x + window_corner_radius * 0.3, window_box.y + window_corner_radius * 0.3,
-			window_box.width - window_corner_radius * 0.6, window_box.height - window_corner_radius * 0.6);
+	pixman_region32_init_rect(
+		&window_region,
+		window_box.x + window_corner_radius * 0.3,
+		window_box.y + window_corner_radius * 0.3,
+		fmax(window_box.width - window_corner_radius * 0.6, 0),
+		fmax(window_box.height - window_corner_radius * 0.6, 0)
+	);
 	pixman_region32_subtract(&clip_region, &clip_region, &window_region);
 	pixman_region32_fini(&window_region);
 
@@ -645,8 +650,13 @@ void fx_render_pass_add_box_shadow(struct fx_gles_render_pass *pass,
 	const struct wlr_box window_box = options->window_box;
 	int window_corner_radius = options->window_corner_radius;
 	pixman_region32_t window_region;
-	pixman_region32_init_rect(&window_region, window_box.x + window_corner_radius * 0.3, window_box.y + window_corner_radius * 0.3,
-			window_box.width - window_corner_radius * 0.6, window_box.height - window_corner_radius * 0.6);
+	pixman_region32_init_rect(
+		&window_region,
+		window_box.x + window_corner_radius * 0.3,
+		window_box.y + window_corner_radius * 0.3,
+		fmax(window_box.width - window_corner_radius * 0.6, 0),
+		fmax(window_box.height - window_corner_radius * 0.6, 0)
+	);
 	pixman_region32_subtract(&clip_region, &clip_region, &window_region);
 	pixman_region32_fini(&window_region);
 

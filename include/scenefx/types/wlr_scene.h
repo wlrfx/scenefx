@@ -387,12 +387,12 @@ struct wlr_scene_rect *wlr_scene_rect_create(struct wlr_scene_tree *parent,
 		int width, int height, const float color[static 4]);
 
 /**
- * change the width and height of an existing rectangle node.
+ * Change the width and height of an existing rectangle node.
  */
 void wlr_scene_rect_set_size(struct wlr_scene_rect *rect, int width, int height);
 
 /**
- * change the corner radius of an existing rectangle node.
+ * Change the corner radius of an existing rectangle node.
  */
 void wlr_scene_rect_set_corner_radius(struct wlr_scene_rect *rect, int corner_radius);
 

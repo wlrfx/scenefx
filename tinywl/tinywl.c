@@ -759,8 +759,6 @@ static void xdg_toplevel_destroy(struct wl_listener *listener, void *data) {
 	wl_list_remove(&toplevel->request_maximize.link);
 	wl_list_remove(&toplevel->request_fullscreen.link);
 
-	wlr_scene_node_destroy(&toplevel->border->node);
-	wlr_scene_node_destroy(&toplevel->shadow->node);
 	wlr_scene_node_destroy(&toplevel->scene_tree->node);
 
 	free(toplevel);

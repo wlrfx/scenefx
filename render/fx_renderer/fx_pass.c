@@ -407,6 +407,8 @@ void fx_render_pass_add_rounded_rect(struct fx_gles_render_pass *pass,
 		const struct fx_render_rounded_rect_options *fx_options) {
 	const struct wlr_render_rect_options *options = &fx_options->base;
 
+	assert(box.width > 0 && box.height > 0);
+
 	struct fx_renderer *renderer = pass->buffer->renderer;
 
 	struct quad_round_shader *shader = NULL;

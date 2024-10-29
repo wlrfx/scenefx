@@ -248,6 +248,10 @@ static void scene_node_opaque_region(struct wlr_scene_node *node, int x, int y,
 
 	if (node->type == WLR_SCENE_NODE_RECT) {
 		struct wlr_scene_rect *scene_rect = wlr_scene_rect_from_node(node);
+		if (scene_rect->corner_radius > 0) {
+			// TODO: this is incorrect
+			return;
+		}
 		if (scene_rect->color[3] != 1) {
 			return;
 		}
@@ -1000,6 +1004,8 @@ static void scene_node_get_corner_radius(struct wlr_scene_node *node, int *corne
 	case WLR_SCENE_NODE_TREE:
 		return;
 	case WLR_SCENE_NODE_RECT:;
+		struct wlr_scene_rect *scene_rect = wlr_scene_rect_from_node(node);
+		*corner_radius = scene_rect->corner_radius;
 		return;
 	case WLR_SCENE_NODE_SHADOW:;
 		struct wlr_scene_shadow *scene_shadow = wlr_scene_shadow_from_node(node);
@@ -1360,6 +1366,7 @@ static void scene_entry_render(struct render_list_entry *entry, const struct ren
 			struct fx_render_rounded_rect_options rounded_rect_options = {
 				.base = rect_options.base,
 				.corner_radius = scene_rect->corner_radius,
+				.corner_location = ALL,
 				.window_box = window_box,
 				.window_corner_radius = window_corner_radius,
 			};

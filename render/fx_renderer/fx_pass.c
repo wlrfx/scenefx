@@ -452,6 +452,7 @@ void fx_render_pass_add_rounded_rect(struct fx_gles_render_pass *pass,
 
 	push_fx_debug(renderer);
 	setup_blending(WLR_RENDER_BLEND_MODE_PREMULTIPLIED);
+	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
 	glUseProgram(shader->program);
 
@@ -467,6 +468,7 @@ void fx_render_pass_add_rounded_rect(struct fx_gles_render_pass *pass,
 
 	render(&box, &clip_region, shader->pos_attrib);
 	pixman_region32_fini(&clip_region);
+	glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
 
 	pop_fx_debug(renderer);
 }

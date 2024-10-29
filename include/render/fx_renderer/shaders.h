@@ -63,6 +63,10 @@ struct quad_round_shader {
 	GLint size;
 	GLint position;
 	GLint radius;
+
+	GLint window_half_size;
+	GLint window_position;
+	GLint window_radius;
 };
 
 bool link_quad_round_program(struct quad_round_shader *shader, enum fx_rounded_quad_shader_source source);

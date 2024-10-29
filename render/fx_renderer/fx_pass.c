@@ -407,6 +407,10 @@ void fx_render_pass_add_rounded_rect(struct fx_gles_render_pass *pass,
 		const struct fx_render_rounded_rect_options *fx_options) {
 	const struct wlr_render_rect_options *options = &fx_options->base;
 
+	struct wlr_box box;
+	wlr_render_rect_options_get_box(options, pass->buffer->buffer, &box);
+	assert(box.width > 0 && box.height > 0);
+
 	struct fx_renderer *renderer = pass->buffer->renderer;
 
 	struct quad_round_shader *shader = NULL;
@@ -432,11 +436,30 @@ void fx_render_pass_add_rounded_rect(struct fx_gles_render_pass *pass,
 	}
 
 	const struct wlr_render_color *color = &options->color;
-	struct wlr_box box;
-	wlr_render_rect_options_get_box(options, pass->buffer->buffer, &box);
+
+	pixman_region32_t clip_region;
+	if (options->clip) {
+		pixman_region32_init(&clip_region);
+		pixman_region32_copy(&clip_region, options->clip);
+	} else {
+		pixman_region32_init_rect(&clip_region, box.x, box.y, box.width, box.height);
+	}
+	const struct wlr_box window_box = fx_options->window_box;
+	int window_corner_radius = fx_options->window_corner_radius;
+	pixman_region32_t window_region;
+	pixman_region32_init_rect(
+		&window_region,
+		window_box.x + window_corner_radius * 0.3,
+		window_box.y + window_corner_radius * 0.3,
+		fmax(window_box.width - window_corner_radius * 0.6, 0),
+		fmax(window_box.height - window_corner_radius * 0.6, 0)
+	);
+	pixman_region32_subtract(&clip_region, &clip_region, &window_region);
+	pixman_region32_fini(&window_region);
 
 	push_fx_debug(renderer);
 	setup_blending(WLR_RENDER_BLEND_MODE_PREMULTIPLIED);
+	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
 	glUseProgram(shader->program);
 
@@ -446,8 +469,13 @@ void fx_render_pass_add_rounded_rect(struct fx_gles_render_pass *pass,
 	glUniform2f(shader->size, box.width, box.height);
 	glUniform2f(shader->position, box.x, box.y);
 	glUniform1f(shader->radius, fx_options->corner_radius);
+	glUniform2f(shader->window_half_size, window_box.width / 2.0, window_box.height / 2.0);
+	glUniform2f(shader->window_position, window_box.x, window_box.y);
+	glUniform1f(shader->window_radius, fx_options->window_corner_radius);
 
-	render(&box, options->clip, shader->pos_attrib);
+	render(&box, &clip_region, shader->pos_attrib);
+	pixman_region32_fini(&clip_region);
+	glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
 
 	pop_fx_debug(renderer);
 }
@@ -612,8 +640,6 @@ void fx_render_pass_add_box_shadow(struct fx_gles_render_pass *pass,
 	struct wlr_box box = options->box;
 	assert(box.width > 0 && box.height > 0);
 
-	const struct wlr_box window_box = options->window_box;
-
 	pixman_region32_t clip_region;
 	if (options->clip) {
 		pixman_region32_init(&clip_region);
@@ -621,9 +647,16 @@ void fx_render_pass_add_box_shadow(struct fx_gles_render_pass *pass,
 	} else {
 		pixman_region32_init_rect(&clip_region, box.x, box.y, box.width, box.height);
 	}
+	const struct wlr_box window_box = options->window_box;
+	int window_corner_radius = options->window_corner_radius;
 	pixman_region32_t window_region;
-	pixman_region32_init_rect(&window_region, window_box.x + options->window_corner_radius * 0.3, window_box.y + options->window_corner_radius * 0.3,
-			window_box.width - options->window_corner_radius * 0.6, window_box.height - options->window_corner_radius * 0.6);
+	pixman_region32_init_rect(
+		&window_region,
+		window_box.x + window_corner_radius * 0.3,
+		window_box.y + window_corner_radius * 0.3,
+		fmax(window_box.width - window_corner_radius * 0.6, 0),
+		fmax(window_box.height - window_corner_radius * 0.6, 0)
+	);
 	pixman_region32_subtract(&clip_region, &clip_region, &window_region);
 	pixman_region32_fini(&window_region);
 
@@ -647,6 +680,7 @@ void fx_render_pass_add_box_shadow(struct fx_gles_render_pass *pass,
 	glUniform2f(renderer->shaders.box_shadow.window_position, window_box.x, window_box.y);
 
 	render(&box, &clip_region, renderer->shaders.box_shadow.pos_attrib);
+	pixman_region32_fini(&clip_region);
 
 	glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
 

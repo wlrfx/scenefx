@@ -1369,7 +1369,7 @@ static void scene_entry_render(struct render_list_entry *entry, const struct ren
 			struct fx_render_rounded_rect_options rounded_rect_options = {
 				.base = rect_options.base,
 				.corner_radius = scene_rect->corner_radius,
-				.corner_location = ALL,
+				.corner_location = CORNER_LOCATION_ALL,
 				.window_box = window_box,
 				.window_corner_radius = window_corner_radius,
 			};

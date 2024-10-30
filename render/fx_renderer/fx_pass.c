@@ -499,23 +499,23 @@ void fx_render_pass_add_rounded_rect_grad(struct fx_gles_render_pass *pass,
 	struct quad_grad_round_shader *shader = NULL;
 	enum fx_rounded_quad_shader_source corner;
 	switch (fx_options->corner_location) {
-	case ALL:
+	case CORNER_LOCATION_ALL:
 		corner = SHADER_SOURCE_QUAD_ROUND;
 		shader = &renderer->shaders.quad_grad_round;
 		break;
-	case TOP_LEFT:
+	case CORNER_LOCATION_TOP_LEFT:
 		corner = SHADER_SOURCE_QUAD_ROUND_TOP_LEFT;
 		shader = &renderer->shaders.quad_grad_round_tl;
 		break;
-	case TOP_RIGHT:
+	case CORNER_LOCATION_TOP_RIGHT:
 		corner = SHADER_SOURCE_QUAD_ROUND_TOP_RIGHT;
 		shader = &renderer->shaders.quad_grad_round_tr;
 		break;
-	case BOTTOM_LEFT:
+	case CORNER_LOCATION_BOTTOM_LEFT:
 		corner = SHADER_SOURCE_QUAD_ROUND_BOTTOM_LEFT;
 		shader = &renderer->shaders.quad_grad_round_bl;
 		break;
-	case BOTTOM_RIGHT:
+	case CORNER_LOCATION_BOTTOM_RIGHT:
 		corner = SHADER_SOURCE_QUAD_ROUND_TOP_RIGHT;
 		shader = &renderer->shaders.quad_grad_round_br;
 		break;
@@ -623,10 +623,10 @@ void fx_render_pass_add_rounded_grad_border_corner(struct fx_gles_render_pass *p
 
 	set_proj_matrix(renderer->shaders.rounded_grad_border_corner.proj, pass->projection_matrix, &box);
 
-	glUniform1f(renderer->shaders.rounded_grad_border_corner.is_top_left, fx_options->corner_location == TOP_LEFT);
-	glUniform1f(renderer->shaders.rounded_grad_border_corner.is_top_right, fx_options->corner_location == TOP_RIGHT);
-	glUniform1f(renderer->shaders.rounded_grad_border_corner.is_bottom_left, fx_options->corner_location == BOTTOM_LEFT);
-	glUniform1f(renderer->shaders.rounded_grad_border_corner.is_bottom_right, fx_options->corner_location == BOTTOM_RIGHT);
+	glUniform1f(renderer->shaders.rounded_grad_border_corner.is_top_left, fx_options->corner_location == CORNER_LOCATION_TOP_LEFT);
+	glUniform1f(renderer->shaders.rounded_grad_border_corner.is_top_right, fx_options->corner_location == CORNER_LOCATION_TOP_RIGHT);
+	glUniform1f(renderer->shaders.rounded_grad_border_corner.is_bottom_left, fx_options->corner_location == CORNER_LOCATION_BOTTOM_LEFT);
+	glUniform1f(renderer->shaders.rounded_grad_border_corner.is_bottom_right, fx_options->corner_location == CORNER_LOCATION_BOTTOM_RIGHT);
 
 	glUniform2f(renderer->shaders.rounded_grad_border_corner.position, box.x, box.y);
 	glUniform1f(renderer->shaders.rounded_grad_border_corner.radius, fx_options->corner_radius);

@@ -46,9 +46,28 @@ vec4 sample_texture() {
 #endif
 }
 
-float roundRectSDF() {
-	vec2 q = abs(gl_FragCoord.xy - position - half_size) - half_size + radius;
-	return min(max(q.x, q.y), 0.0) + length(max(q, 0.0)) - radius;
+float roundRectSDF(vec2 half_size, vec2 position, float radius);
+
+float corner_mask() {
+	vec2 relative_pos = (gl_FragCoord.xy - position);
+	vec2 size = half_size * 2.0;
+
+	// Brachless baby!
+	// Selectively round individual corners
+	float top = step(relative_pos.y - radius, 0.0);
+	float left = step(relative_pos.x - radius, 0.0);
+	float right = step(size.x - radius, relative_pos.x);
+	float bottom = step(size.y - radius, relative_pos.y);
+
+	float top_left = top * left * float(round_top_left);
+	float top_right = top * right * float(round_top_right);
+	float bottom_left = bottom * left * float(round_bottom_left);
+	float bottom_right = bottom * right * float(round_bottom_right);
+	// A value of 1 means that we're allowed to round at this position
+	float round_corners = top_left + top_right + bottom_left + bottom_right;
+
+	float alpha = smoothstep(-1.0, 1.0, roundRectSDF(half_size, position, radius));
+	return alpha * round_corners;
 }
 
 void main() {
@@ -59,26 +78,7 @@ void main() {
 		return;
 	}
 
-	if (round_top_left || round_top_right || round_bottom_left ||
-		round_bottom_right) {
-		vec2 relative_pos = (gl_FragCoord.xy - position);
-		vec2 size = half_size * 2.0;
-
-		// Brachless baby!
-		// Selectively round individual corners
-		float top = step(relative_pos.y - radius, 0.0);
-		float left = step(relative_pos.x - radius, 0.0);
-		float right = step(size.x - radius, relative_pos.x);
-		float bottom = step(size.y - radius, relative_pos.y);
-
-		float top_left = top * left * float(round_top_left);
-		float top_right = top * right * float(round_top_right);
-		float bottom_left = bottom * left * float(round_bottom_left);
-		float bottom_right = bottom * right * float(round_bottom_right);
-		// A value of 1 means that we're allowed to round at this position
-		float round_corners = top_left + top_right + bottom_left + bottom_right;
-
-		float alpha = smoothstep(-1.0, 1.0, roundRectSDF());
-		gl_FragColor = mix(gl_FragColor, vec4(0.0), alpha * round_corners);
+	if (round_top_left || round_top_right || round_bottom_left || round_bottom_right) {
+		gl_FragColor = mix(gl_FragColor, vec4(0.0), corner_mask());
 	}
 }

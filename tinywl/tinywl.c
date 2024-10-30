@@ -592,7 +592,7 @@ static void output_configure_scene(struct wlr_scene_node *node,
 
 			if (!wlr_subsurface_try_from_wlr_surface(xdg_surface->surface)) {
 				wlr_scene_buffer_set_corner_radius(
-						buffer, toplevel->corner_radius, CORNER_LOCATION_ALL);
+						buffer, toplevel->corner_radius, CORNER_LOCATION_BOTTOM);
 			}
 		}
 	} else if (node->type == WLR_SCENE_NODE_TREE) {

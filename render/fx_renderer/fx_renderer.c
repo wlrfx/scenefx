@@ -238,7 +238,7 @@ static bool fx_render_subtexture_with_matrix(
 	glUniformMatrix3fv(shader->proj, 1, GL_FALSE, gl_matrix);
 	glUniform1i(shader->tex, 0);
 	glUniform1f(shader->alpha, alpha);
-	glUniform2f(shader->half_size, box->width / 2.0, box->height / 2.0);
+	glUniform2f(shader->size, box->width, box->height);
 	glUniform2f(shader->position, box->x, box->y);
 	glUniform1f(shader->radius, 0);
 	glUniform1f(shader->discard_transparent, false);

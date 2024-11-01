@@ -328,7 +328,7 @@ void fx_render_pass_add_texture(struct fx_gles_render_pass *pass,
 
 	glUniform1i(shader->tex, 0);
 	glUniform1f(shader->alpha, alpha);
-	glUniform2f(shader->half_size, (float)clip_box->width / 2.0, (float)clip_box->height / 2.0);
+	glUniform2f(shader->size, clip_box->width, clip_box->height);
 	glUniform2f(shader->position, clip_box->x, clip_box->y);
 	glUniform1f(shader->radius, fx_options->corner_radius);
 	glUniform1f(shader->discard_transparent, fx_options->discard_transparent);

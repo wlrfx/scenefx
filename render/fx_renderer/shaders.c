@@ -10,6 +10,7 @@
 #include "common_vert_src.h"
 #include "gradient_frag_src.h"
 #include "round_rect_sdf_frag_src.h"
+#include "corner_alpha_frag_src.h"
 #include "quad_frag_src.h"
 #include "quad_grad_frag_src.h"
 #include "quad_round_frag_src.h"
@@ -204,8 +205,8 @@ bool link_quad_grad_round_program(struct quad_grad_round_shader *shader, enum fx
 
 bool link_tex_program(struct tex_shader *shader, enum fx_tex_shader_source source) {
 	GLchar frag_src[4096];
-	snprintf(frag_src, sizeof(frag_src), "#define SOURCE %d\n%s\n%s", source, tex_frag_src,
-			round_rect_sdf_frag_src);
+	snprintf(frag_src, sizeof(frag_src), "#define SOURCE %d\n%s\n%s\n%s", source,
+			tex_frag_src, corner_alpha_frag_src, round_rect_sdf_frag_src);
 
 	GLuint prog;
 	shader->program = prog = link_program(frag_src);
@@ -218,7 +219,7 @@ bool link_tex_program(struct tex_shader *shader, enum fx_tex_shader_source sourc
 	shader->alpha = glGetUniformLocation(prog, "alpha");
 	shader->pos_attrib = glGetAttribLocation(prog, "pos");
 	shader->tex_proj = glGetUniformLocation(prog, "tex_proj");
-	shader->half_size = glGetUniformLocation(prog, "half_size");
+	shader->size = glGetUniformLocation(prog, "size");
 	shader->position = glGetUniformLocation(prog, "position");
 	shader->radius = glGetUniformLocation(prog, "radius");
 	shader->discard_transparent = glGetUniformLocation(prog, "discard_transparent");

@@ -101,7 +101,7 @@ struct tex_shader {
 	GLint tex;
 	GLint alpha;
 	GLint pos_attrib;
-	GLint half_size;
+	GLint size;
 	GLint position;
 	GLint radius;
 	GLint discard_transparent;

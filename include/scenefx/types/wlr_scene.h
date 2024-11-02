@@ -29,6 +29,7 @@
 #include <wlr/util/box.h>
 
 #include "scenefx/types/fx/blur_data.h"
+#include "scenefx/types/fx/corner_location.h"
 
 struct wlr_output;
 struct wlr_output_layout;
@@ -143,6 +144,7 @@ struct wlr_scene_rect {
 	struct wlr_scene_node node;
 	int width, height;
 	float color[4];
+	int corner_radius;
 };
 
 /** A scene-graph node displaying a shadow */
@@ -200,6 +202,7 @@ struct wlr_scene_buffer {
 	bool backdrop_blur;
 	bool backdrop_blur_optimized;
 	bool backdrop_blur_ignore_transparent;
+	enum corner_location corners;
 
 	float opacity;
 	enum wlr_scale_filter_mode filter_mode;
@@ -408,6 +411,12 @@ struct wlr_scene_rect *wlr_scene_rect_create(struct wlr_scene_tree *parent,
 void wlr_scene_rect_set_size(struct wlr_scene_rect *rect, int width, int height);
 
 /**
+ * Change the corner radius of an existing rectangle node.
+ */
+void wlr_scene_rect_set_corner_radius(struct wlr_scene_rect *rect, int corner_radius);
+
+
+/**
  * Change the color of an existing rectangle node.
  */
 void wlr_scene_rect_set_color(struct wlr_scene_rect *rect, const float color[static 4]);
@@ -533,10 +542,10 @@ void wlr_scene_buffer_set_filter_mode(struct wlr_scene_buffer *scene_buffer,
 	enum wlr_scale_filter_mode filter_mode);
 
 /**
-* Sets the corner radius of this buffer
+* Sets the corner radius and which corners to round of this buffer
 */
 void wlr_scene_buffer_set_corner_radius(struct wlr_scene_buffer *scene_buffer,
-		int radii);
+		int radii, enum corner_location corners);
 
 /**
 * Sets the whether or not the buffer should render backdrop blur

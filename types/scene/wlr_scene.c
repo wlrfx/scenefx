@@ -262,6 +262,10 @@ static void scene_node_opaque_region(struct wlr_scene_node *node, int x, int y,
 
 	if (node->type == WLR_SCENE_NODE_RECT) {
 		struct wlr_scene_rect *scene_rect = wlr_scene_rect_from_node(node);
+		if (scene_rect->corner_radius > 0) {
+			// TODO: this is incorrect
+			return;
+		}
 		if (scene_rect->color[3] != 1) {
 			return;
 		}
@@ -620,6 +624,7 @@ struct wlr_scene_rect *wlr_scene_rect_create(struct wlr_scene_tree *parent,
 	scene_rect->width = width;
 	scene_rect->height = height;
 	memcpy(scene_rect->color, color, sizeof(scene_rect->color));
+	scene_rect->corner_radius = 0;
 
 	scene_node_update(&scene_rect->node, NULL);
 
@@ -642,6 +647,15 @@ void wlr_scene_rect_set_color(struct wlr_scene_rect *rect, const float color[sta
 	}
 
 	memcpy(rect->color, color, sizeof(rect->color));
+	scene_node_update(&rect->node, NULL);
+}
+
+void wlr_scene_rect_set_corner_radius(struct wlr_scene_rect *rect, int corner_radius) {
+	if (rect->corner_radius == corner_radius) {
+		return;
+	}
+
+	rect->corner_radius = corner_radius;
 	scene_node_update(&rect->node, NULL);
 }
 
@@ -758,6 +772,7 @@ struct wlr_scene_buffer *wlr_scene_buffer_create(struct wlr_scene_tree *parent,
 	scene_buffer->backdrop_blur = false;
 	scene_buffer->backdrop_blur_optimized = false;
 	scene_buffer->backdrop_blur_ignore_transparent = true;
+	scene_buffer->corners = CORNER_LOCATION_NONE;
 
 	scene_node_update(&scene_buffer->node, NULL);
 
@@ -979,12 +994,14 @@ void wlr_scene_buffer_set_filter_mode(struct wlr_scene_buffer *scene_buffer,
 }
 
 void wlr_scene_buffer_set_corner_radius(struct wlr_scene_buffer *scene_buffer,
-		int radii) {
-	if (scene_buffer->corner_radius == radii) {
+		int radii, enum corner_location corners) {
+	if (scene_buffer->corner_radius == radii
+			&& scene_buffer->corners == corners) {
 		return;
 	}
 
 	scene_buffer->corner_radius = radii;
+	scene_buffer->corners = corners;
 	scene_node_update(&scene_buffer->node, NULL);
 }
 
@@ -1071,7 +1088,6 @@ static void scene_node_get_size(struct wlr_scene_node *node,
 		*height = scene_rect->height;
 		break;
 	case WLR_SCENE_NODE_SHADOW:;
-		// TODO: compensate for blur_sigma? may not be needed
 		struct wlr_scene_shadow *scene_shadow = wlr_scene_shadow_from_node(node);
 		*width = scene_shadow->width;
 		*height = scene_shadow->height;
@@ -1101,6 +1117,8 @@ static void scene_node_get_corner_radius(struct wlr_scene_node *node, int *corne
 	case WLR_SCENE_NODE_TREE:
 		return;
 	case WLR_SCENE_NODE_RECT:;
+		struct wlr_scene_rect *scene_rect = wlr_scene_rect_from_node(node);
+		*corner_radius = scene_rect->corner_radius;
 		return;
 	case WLR_SCENE_NODE_SHADOW:;
 		struct wlr_scene_shadow *scene_shadow = wlr_scene_shadow_from_node(node);
@@ -1454,7 +1472,25 @@ static void scene_entry_render(struct render_list_entry *entry, const struct ren
 				.clip = &render_region,
 			},
 		};
-		fx_render_pass_add_rect(data->render_pass, &rect_options);
+
+		if (scene_rect->corner_radius) {
+			struct wlr_box window_box;
+			int window_corner_radius;
+			scene_get_next_sibling_geometry(node, &window_box, &window_corner_radius);
+
+			transform_output_box(&window_box, data);
+
+			struct fx_render_rounded_rect_options rounded_rect_options = {
+				.base = rect_options.base,
+				.corner_radius = scene_rect->corner_radius,
+				.corner_location = CORNER_LOCATION_ALL,
+				.window_box = window_box,
+				.window_corner_radius = window_corner_radius,
+			};
+			fx_render_pass_add_rounded_rect(data->render_pass, &rounded_rect_options);
+		} else {
+			fx_render_pass_add_rect(data->render_pass, &rect_options);
+		}
 		break;
 	case WLR_SCENE_NODE_OPTIMIZED_BLUR:;
 		// Re-render the optimized blur buffer when needed
@@ -1591,6 +1627,7 @@ static void scene_entry_render(struct render_list_entry *entry, const struct ren
 					WLR_RENDER_BLEND_MODE_PREMULTIPLIED : WLR_RENDER_BLEND_MODE_NONE,
 			},
 			.clip_box = &dst_box,
+			.corners = scene_buffer->corners,
 			.corner_radius = scene_buffer->corner_radius * data->scale,
 		};
 

@@ -8,10 +8,16 @@
 // shaders
 #include "GLES2/gl2.h"
 #include "common_vert_src.h"
+#include "gradient_frag_src.h"
+#include "round_rect_sdf_frag_src.h"
+#include "corner_alpha_frag_src.h"
 #include "quad_frag_src.h"
+#include "quad_grad_frag_src.h"
 #include "quad_round_frag_src.h"
+#include "quad_grad_round_frag_src.h"
 #include "tex_frag_src.h"
 #include "rounded_border_corner_frag_src.h"
+#include "rounded_grad_border_corner_frag_src.h"
 #include "box_shadow_frag_src.h"
 #include "blur1_frag_src.h"
 #include "blur2_frag_src.h"
@@ -114,10 +120,61 @@ bool link_quad_program(struct quad_shader *shader) {
 	return true;
 }
 
+bool link_quad_grad_program(struct quad_grad_shader *shader, int max_len) {
+	GLchar quad_src[2048];
+	snprintf(quad_src, sizeof(quad_src),
+			"#define LEN %d\n%s\n%s", max_len, quad_grad_frag_src, gradient_frag_src);
+
+	GLuint prog;
+	shader->program = prog = link_program(quad_src);
+	if (!shader->program) {
+		return false;
+	}
+
+	shader->proj = glGetUniformLocation(prog, "proj");
+	shader->pos_attrib = glGetAttribLocation(prog, "pos");
+	shader->size = glGetUniformLocation(prog, "size");
+	shader->colors = glGetUniformLocation(prog, "colors");
+	shader->degree = glGetUniformLocation(prog, "degree");
+	shader->grad_box = glGetUniformLocation(prog, "grad_box");
+	shader->linear = glGetUniformLocation(prog, "linear");
+	shader->origin = glGetUniformLocation(prog, "origin");
+	shader->count = glGetUniformLocation(prog, "count");
+	shader->blend = glGetUniformLocation(prog, "blend");
+
+	shader->max_len = max_len;
+
+	return true;
+}
+
 bool link_quad_round_program(struct quad_round_shader *shader, enum fx_rounded_quad_shader_source source) {
 	GLchar quad_src[2048];
 	snprintf(quad_src, sizeof(quad_src),
-		"#define SOURCE %d\n%s", source, quad_round_frag_src);
+		"#define SOURCE %d\n%s\n%s", source, quad_round_frag_src, round_rect_sdf_frag_src);
+
+	GLuint prog;
+	shader->program = prog = link_program(quad_src);
+	if (!shader->program) {
+		return false;
+	}
+
+	shader->proj = glGetUniformLocation(prog, "proj");
+	shader->color = glGetUniformLocation(prog, "color");
+	shader->pos_attrib = glGetAttribLocation(prog, "pos");
+	shader->size = glGetUniformLocation(prog, "size");
+	shader->position = glGetUniformLocation(prog, "position");
+	shader->radius = glGetUniformLocation(prog, "radius");
+	shader->window_half_size = glGetUniformLocation(prog, "window_half_size");
+	shader->window_position = glGetUniformLocation(prog, "window_position");
+	shader->window_radius = glGetUniformLocation(prog, "window_radius");
+
+	return true;
+}
+
+bool link_quad_grad_round_program(struct quad_grad_round_shader *shader, enum fx_rounded_quad_shader_source source, int max_len) {
+	GLchar quad_src[4096];
+	snprintf(quad_src, sizeof(quad_src),
+		"#define SOURCE %d\n#define LEN %d\n%s\n%s", source, max_len, quad_grad_round_frag_src, gradient_frag_src);
 
 	GLuint prog;
 	shader->program = prog = link_program(quad_src);
@@ -132,14 +189,24 @@ bool link_quad_round_program(struct quad_round_shader *shader, enum fx_rounded_q
 	shader->position = glGetUniformLocation(prog, "position");
 	shader->radius = glGetUniformLocation(prog, "radius");
 
+	shader->grad_size = glGetUniformLocation(prog, "grad_size");
+	shader->colors = glGetUniformLocation(prog, "colors");
+	shader->degree = glGetUniformLocation(prog, "degree");
+	shader->grad_box = glGetUniformLocation(prog, "grad_box");
+	shader->linear = glGetUniformLocation(prog, "linear");
+	shader->origin = glGetUniformLocation(prog, "origin");
+	shader->count = glGetUniformLocation(prog, "count");
+	shader->blend = glGetUniformLocation(prog, "blend");
+
+	shader->max_len = max_len;
+
 	return true;
 }
 
-bool link_tex_program(struct tex_shader *shader,
-		enum fx_tex_shader_source source) {
-	GLchar frag_src[2048];
-	snprintf(frag_src, sizeof(frag_src),
-		"#define SOURCE %d\n%s", source, tex_frag_src);
+bool link_tex_program(struct tex_shader *shader, enum fx_tex_shader_source source) {
+	GLchar frag_src[4096];
+	snprintf(frag_src, sizeof(frag_src), "#define SOURCE %d\n%s\n%s\n%s", source,
+			tex_frag_src, corner_alpha_frag_src, round_rect_sdf_frag_src);
 
 	GLuint prog;
 	shader->program = prog = link_program(frag_src);
@@ -152,13 +219,16 @@ bool link_tex_program(struct tex_shader *shader,
 	shader->alpha = glGetUniformLocation(prog, "alpha");
 	shader->pos_attrib = glGetAttribLocation(prog, "pos");
 	shader->tex_proj = glGetUniformLocation(prog, "tex_proj");
-	shader->half_size = glGetUniformLocation(prog, "half_size");
+	shader->size = glGetUniformLocation(prog, "size");
 	shader->position = glGetUniformLocation(prog, "position");
 	shader->radius = glGetUniformLocation(prog, "radius");
-	shader->has_titlebar = glGetUniformLocation(prog, "has_titlebar");
 	shader->discard_transparent = glGetUniformLocation(prog, "discard_transparent");
 	shader->dim = glGetUniformLocation(prog, "dim");
 	shader->dim_color = glGetUniformLocation(prog, "dim_color");
+	shader->round_top_left = glGetUniformLocation(prog, "round_top_left");
+	shader->round_top_right = glGetUniformLocation(prog, "round_top_right");
+	shader->round_bottom_left = glGetUniformLocation(prog, "round_bottom_left");
+	shader->round_bottom_right = glGetUniformLocation(prog, "round_bottom_right");
 
 	return true;
 }
@@ -185,9 +255,49 @@ bool link_rounded_border_corner_program(struct rounded_border_corner_shader *sha
 	return true;
 }
 
-bool link_box_shadow_program(struct box_shadow_shader *shader) {
+bool link_rounded_grad_border_corner_program(struct rounded_grad_border_corner_shader *shader, int max_len) {
+	GLchar quad_src[4096];
+	snprintf(quad_src, sizeof(quad_src),
+			"#define LEN %d\n%s\n%s", max_len, rounded_grad_border_corner_frag_src, gradient_frag_src);
+
 	GLuint prog;
-	shader->program = prog = link_program(box_shadow_frag_src);
+	shader->program = prog = link_program(quad_src);
+	if (!shader->program) {
+		return false;
+	}
+
+	shader->proj = glGetUniformLocation(prog, "proj");
+	shader->pos_attrib = glGetAttribLocation(prog, "pos");
+	shader->size = glGetUniformLocation(prog, "size");
+	shader->colors = glGetUniformLocation(prog, "colors");
+	shader->degree = glGetUniformLocation(prog, "degree");
+	shader->grad_box = glGetUniformLocation(prog, "grad_box");
+	shader->linear = glGetUniformLocation(prog, "linear");
+	shader->origin = glGetUniformLocation(prog, "origin");
+	shader->count = glGetUniformLocation(prog, "count");
+	shader->blend = glGetUniformLocation(prog, "blend");
+
+	shader->is_top_left = glGetUniformLocation(prog, "is_top_left");
+	shader->is_top_right = glGetUniformLocation(prog, "is_top_right");
+	shader->is_bottom_left = glGetUniformLocation(prog, "is_bottom_left");
+	shader->is_bottom_right = glGetUniformLocation(prog, "is_bottom_right");
+	shader->position = glGetUniformLocation(prog, "position");
+	shader->radius = glGetUniformLocation(prog, "radius");
+	shader->half_size = glGetUniformLocation(prog, "half_size");
+	shader->half_thickness = glGetUniformLocation(prog, "half_thickness");
+
+	shader->max_len = max_len;
+
+	return true;
+}
+
+bool link_box_shadow_program(struct box_shadow_shader *shader) {
+	GLchar shadow_src[4096];
+	snprintf(shadow_src, sizeof(shadow_src), "%s\n%s", box_shadow_frag_src,
+			round_rect_sdf_frag_src);
+
+	GLuint prog;
+	shader->program = prog = link_program(shadow_src);
 	if (!shader->program) {
 		return false;
 	}

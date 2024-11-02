@@ -26,13 +26,17 @@ uniform sampler2D tex;
 
 uniform float alpha;
 
-uniform vec2 half_size;
+uniform vec2 size;
 uniform vec2 position;
 uniform float radius;
-uniform bool has_titlebar;
 uniform bool discard_transparent;
 uniform float dim;
 uniform vec4 dim_color;
+
+uniform bool round_top_left;
+uniform bool round_top_right;
+uniform bool round_bottom_left;
+uniform bool round_bottom_right;
 
 vec4 sample_texture() {
 #if SOURCE == SOURCE_TEXTURE_RGBA || SOURCE == SOURCE_TEXTURE_EXTERNAL
@@ -42,10 +46,8 @@ vec4 sample_texture() {
 #endif
 }
 
-float roundRectSDF() {
-	vec2 q = abs(gl_FragCoord.xy - position - half_size) - half_size + radius;
-	return min(max(q.x, q.y), 0.0) + length(max(q, 0.0)) - radius;
-}
+float corner_alpha(vec2 size, vec2 position, float radius,
+            bool round_tl, bool round_tr, bool round_bl, bool round_br);
 
 void main() {
 	gl_FragColor = mix(sample_texture(), dim_color, dim) * alpha;
@@ -55,8 +57,9 @@ void main() {
 		return;
 	}
 
-	if (!has_titlebar || gl_FragCoord.y - position.y > radius) {
-		float alpha = smoothstep(-1.0, 1.0, roundRectSDF());
-		gl_FragColor = mix(gl_FragColor, vec4(0.0), alpha);
+	if (round_top_left || round_top_right || round_bottom_left || round_bottom_right) {
+		float corner_alpha = corner_alpha(size, position, radius,
+				round_top_left, round_top_right, round_bottom_left, round_bottom_right);
+		gl_FragColor = mix(gl_FragColor, vec4(0.0), corner_alpha);
 	}
 }

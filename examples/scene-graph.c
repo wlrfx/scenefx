@@ -2,6 +2,7 @@
 #include <assert.h>
 #include <getopt.h>
 #include <scenefx/render/fx_renderer/fx_renderer.h>
+#include <scenefx/types/fx/corner_location.h>
 #include <scenefx/types/wlr_scene.h>
 #include <stdbool.h>
 #include <stdio.h>
@@ -144,7 +145,8 @@ static void server_handle_new_surface(struct wl_listener *listener,
 			pos - blur_sigma, pos - blur_sigma);
 	surface->scene_surface =
 		wlr_scene_surface_create(&server->scene->tree, wlr_surface);
-	wlr_scene_buffer_set_corner_radius(surface->scene_surface->buffer, corner_radius);
+	wlr_scene_buffer_set_corner_radius(
+			surface->scene_surface->buffer, corner_radius, CORNER_LOCATION_ALL);
 
 	wlr_scene_node_set_position(&surface->scene_surface->buffer->node,
 			pos + border_width, pos + border_width);

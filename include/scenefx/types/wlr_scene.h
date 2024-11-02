@@ -28,6 +28,8 @@
 #include <wlr/util/addon.h>
 #include <wlr/util/box.h>
 
+#include "scenefx/types/fx/corner_location.h"
+
 struct wlr_output;
 struct wlr_output_layout;
 struct wlr_output_layout_output;
@@ -188,6 +190,7 @@ struct wlr_scene_buffer {
 
 	float opacity;
 	int corner_radius;
+	enum corner_location corners;
 
 	enum wlr_scale_filter_mode filter_mode;
 	struct wlr_fbox src_box;
@@ -499,10 +502,10 @@ void wlr_scene_buffer_set_filter_mode(struct wlr_scene_buffer *scene_buffer,
 	enum wlr_scale_filter_mode filter_mode);
 
 /**
-* Sets the corner radius of this buffer
+* Sets the corner radius and which corners to round of this buffer
 */
 void wlr_scene_buffer_set_corner_radius(struct wlr_scene_buffer *scene_buffer,
-		int radii);
+		int radii, enum corner_location corners);
 
 /**
  * Calls the buffer's frame_done signal.

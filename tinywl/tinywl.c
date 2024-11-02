@@ -6,6 +6,7 @@
 #include <stdio.h>
 #include <time.h>
 #include <scenefx/render/fx_renderer/fx_renderer.h>
+#include <scenefx/types/fx/corner_location.h>
 #include <scenefx/types/wlr_scene.h>
 #include <unistd.h>
 #include <wayland-server-core.h>
@@ -590,7 +591,8 @@ static void output_configure_scene(struct wlr_scene_node *node,
 			wlr_scene_buffer_set_opacity(buffer, toplevel->opacity);
 
 			if (!wlr_subsurface_try_from_wlr_surface(xdg_surface->surface)) {
-				wlr_scene_buffer_set_corner_radius(buffer, toplevel->corner_radius);
+				wlr_scene_buffer_set_corner_radius(
+						buffer, toplevel->corner_radius, CORNER_LOCATION_BOTTOM);
 			}
 		}
 	} else if (node->type == WLR_SCENE_NODE_TREE) {

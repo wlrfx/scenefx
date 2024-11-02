@@ -5,6 +5,8 @@
 #include <wlr/render/pass.h>
 #include <wlr/render/interface.h>
 
+#include "scenefx/types/fx/corner_location.h"
+
 struct fx_gles_render_pass {
 	struct wlr_render_pass base;
 	struct fx_framebuffer *buffer;
@@ -13,8 +15,6 @@ struct fx_gles_render_pass {
 	float projection_matrix[9];
 	struct fx_render_timer *timer;
 };
-
-enum corner_location { TOP_LEFT, TOP_RIGHT, BOTTOM_RIGHT, BOTTOM_LEFT, ALL };
 
 /**
  * Begin a new render pass with the supplied destination buffer.
@@ -43,8 +43,8 @@ struct fx_gradient {
 struct fx_render_texture_options {
 	struct wlr_render_texture_options base;
 	const struct wlr_box *clip_box; // Used to clip csd. Ignored if NULL
+	enum corner_location corners;
 	int corner_radius;
-	bool has_titlebar;
 	bool discard_transparent;
 	float dim;
 	struct wlr_render_color dim_color;

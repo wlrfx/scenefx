@@ -40,6 +40,8 @@ vec2 getCornerDist() {
 #endif
 }
 
+vec4 gradient(vec4 colors[LEN], int count, vec2 size, vec2 grad_box, vec2 origin, float degree, bool linear, bool blend);
+
 void main() {
     vec2 q = getCornerDist();
     float dist = min(max(q.x,q.y), 0.0) + length(max(q, 0.0)) - radius;

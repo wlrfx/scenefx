@@ -20,6 +20,7 @@ uniform vec2 window_half_size;
 uniform vec2 window_position;
 uniform float window_radius;
 
+// TODO: use the corner_mask from the tex shader with roundRectSDF
 vec2 getCornerDist() {
 #if SOURCE == SOURCE_QUAD_ROUND
     vec2 half_size = size * 0.5;
@@ -35,11 +36,7 @@ vec2 getCornerDist() {
 #endif
 }
 
-// TODO: replace above with this function
-float roundRectSDF(vec2 half_size, vec2 position, float radius) {
-    vec2 q = abs(gl_FragCoord.xy - position - half_size) - half_size + radius;
-    return min(max(q.x, q.y), 0.0) + length(max(q, 0.0)) - radius;
-}
+float roundRectSDF(vec2 half_size, vec2 position, float radius);
 
 void main() {
     vec2 q = getCornerDist();

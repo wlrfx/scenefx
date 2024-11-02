@@ -25,6 +25,8 @@ float roundedBoxSDF(vec2 center, vec2 size, float radius) {
     return length(max(abs(center) - size + radius, 0.0)) - radius;
 }
 
+vec4 gradient(vec4 colors[LEN], int count, vec2 size, vec2 grad_box, vec2 origin, float degree, bool linear, bool blend);
+
 void main() {
     vec2 center = gl_FragCoord.xy - position - half_size;
     float distance = roundedBoxSDF(center, half_size - half_thickness, radius + half_thickness);

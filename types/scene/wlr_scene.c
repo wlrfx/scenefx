@@ -1600,6 +1600,7 @@ static void scene_entry_render(struct render_list_entry *entry, const struct ren
 						},
 						.clip_box = &dst_box,
 						.corner_radius = scene_buffer->corner_radius * data->scale,
+						.corners = scene_buffer->corners,
 						.discard_transparent = false,
 					},
 					.opaque_region = &opaque_region,

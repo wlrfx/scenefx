@@ -1007,26 +1007,30 @@ void wlr_scene_buffer_set_corner_radius(struct wlr_scene_buffer *scene_buffer,
 
 void wlr_scene_buffer_set_backdrop_blur(struct wlr_scene_buffer *scene_buffer,
 		bool enabled) {
-	if (scene_buffer->backdrop_blur != enabled) {
-		scene_buffer->backdrop_blur = enabled;
-		wlr_scene_optimized_blur_mark_dirty(scene_node_get_root(&scene_buffer->node), NULL);
+	if (scene_buffer->backdrop_blur == enabled) {
+		return;
 	}
+	scene_buffer->backdrop_blur = enabled;
+	scene_node_update(&scene_buffer->node, NULL);
 }
 
 void wlr_scene_buffer_set_backdrop_blur_optimized(struct wlr_scene_buffer *scene_buffer,
 		bool enabled) {
-	if (scene_buffer->backdrop_blur_optimized != enabled) {
-		scene_buffer->backdrop_blur_optimized = enabled;
-		wlr_scene_optimized_blur_mark_dirty(scene_node_get_root(&scene_buffer->node), NULL);
+	if (scene_buffer->backdrop_blur_optimized == enabled) {
+		return;
 	}
+	scene_buffer->backdrop_blur_optimized = enabled;
+	scene_node_update(&scene_buffer->node, NULL);
 }
 
 void wlr_scene_buffer_set_backdrop_blur_ignore_transparent(
 		struct wlr_scene_buffer *scene_buffer, bool enabled) {
-	if (scene_buffer->backdrop_blur_ignore_transparent != enabled) {
-		scene_buffer->backdrop_blur_ignore_transparent = enabled;
-		wlr_scene_optimized_blur_mark_dirty(scene_node_get_root(&scene_buffer->node), NULL);
+	if (scene_buffer->backdrop_blur_ignore_transparent == enabled) {
+		return;
 	}
+
+	scene_buffer->backdrop_blur_ignore_transparent = enabled;
+	scene_node_update(&scene_buffer->node, NULL);
 }
 
 static void output_optimized_blur_mark_dirty(struct wlr_output *output) {

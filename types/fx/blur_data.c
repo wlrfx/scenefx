@@ -11,7 +11,7 @@ struct blur_data blur_data_get_default(void) {
 	};
 }
 
-bool scene_buffer_should_blur(bool backdrop_blur, struct blur_data *blur_data) {
+bool scene_buffer_is_blur_enabled(bool backdrop_blur, struct blur_data *blur_data) {
 	return backdrop_blur && blur_data->radius > 0 && blur_data->num_passes > 0;
 }
 

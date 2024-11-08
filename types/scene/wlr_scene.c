@@ -1494,7 +1494,7 @@ static void scene_entry_render(struct render_list_entry *entry, const struct ren
 		break;
 	case WLR_SCENE_NODE_OPTIMIZED_BLUR:;
 		// Re-render the optimized blur buffer when needed
-		if (scene_buffer_should_blur(data->blur_info.has_blur, &scene->blur_data)
+		if (scene_buffer_is_blur_enabled(data->blur_info.has_blur, &scene->blur_data)
 				&& data->render_pass->fx_effect_framebuffers->blur_buffer_dirty
 				&& data->blur_info.has_optimized) {
 			const float opacity = 1.0f;
@@ -1563,7 +1563,7 @@ static void scene_entry_render(struct render_list_entry *entry, const struct ren
 		transform = wlr_output_transform_compose(transform, data->transform);
 
 		// Blur
-		if (scene_buffer_should_blur(scene_buffer->backdrop_blur, &scene->blur_data)) {
+		if (scene_buffer_is_blur_enabled(scene_buffer->backdrop_blur, &scene->blur_data)) {
 			pixman_region32_t opaque_region;
 			pixman_region32_init(&opaque_region);
 

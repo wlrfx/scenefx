@@ -1389,6 +1389,8 @@ static void scene_entry_render(struct render_list_entry *entry, const struct ren
 		int window_corner_radius;
 		scene_get_next_sibling_geometry(node, &window_box, &window_corner_radius);
 
+		window_corner_radius *= data->scale;
+		scale_box(&window_box, data->scale);
 		transform_output_box(&window_box, data);
 
 		struct fx_render_box_shadow_options shadow_options = {

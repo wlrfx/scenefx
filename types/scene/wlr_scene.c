@@ -742,7 +742,6 @@ void wlr_scene_optimized_blur_set_size(struct wlr_scene_optimized_blur *blur_nod
 
 	blur_node->width = width;
 	blur_node->height = height;
-	scene_node_update(&blur_node->node, NULL);
 
 	wlr_scene_optimized_blur_mark_dirty(scene_node_get_root(&blur_node->node), blur_node, NULL);
 }

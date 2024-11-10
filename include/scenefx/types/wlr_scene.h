@@ -575,7 +575,7 @@ void wlr_scene_buffer_set_backdrop_blur_ignore_transparent(
  * wallpaper.
  */
 void wlr_scene_optimized_blur_mark_dirty(struct wlr_scene *scene,
-		struct wlr_output *output);
+		struct wlr_scene_optimized_blur *blur_node, struct wlr_output *output);
 
 /**
  * Calls the buffer's frame_done signal.

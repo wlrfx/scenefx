@@ -744,7 +744,7 @@ void wlr_scene_optimized_blur_set_size(struct wlr_scene_optimized_blur *blur_nod
 	blur_node->height = height;
 	scene_node_update(&blur_node->node, NULL);
 
-	wlr_scene_optimized_blur_mark_dirty(scene_node_get_root(&blur_node->node), NULL);
+	wlr_scene_optimized_blur_mark_dirty(scene_node_get_root(&blur_node->node), blur_node, NULL);
 }
 
 struct wlr_scene_buffer *wlr_scene_buffer_create(struct wlr_scene_tree *parent,
@@ -1041,7 +1041,12 @@ static void output_optimized_blur_mark_dirty(struct wlr_output *output) {
 }
 
 void wlr_scene_optimized_blur_mark_dirty(struct wlr_scene *scene,
-		struct wlr_output *output) {
+		struct wlr_scene_optimized_blur *blur_node, struct wlr_output *output) {
+	// Skip re-rendering the optimized blur if the blur node is disabled
+	if (blur_node && !blur_node->node.enabled) {
+		return;
+	}
+
 	// Mark the blur buffers as dirty
 	if (!output) {
 		struct wlr_scene_output *current_output;
@@ -1666,7 +1671,7 @@ void wlr_scene_set_blur_data(struct wlr_scene *scene, struct blur_data blur_data
 	memcpy(&scene->blur_data, &blur_data,
 			sizeof(struct blur_data));
 
-	wlr_scene_optimized_blur_mark_dirty(scene, NULL);
+	wlr_scene_optimized_blur_mark_dirty(scene, NULL, NULL);
 }
 
 static void scene_handle_linux_dmabuf_v1_destroy(struct wl_listener *listener,

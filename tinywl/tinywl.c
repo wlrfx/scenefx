@@ -753,6 +753,10 @@ static void xdg_toplevel_unmap(struct wl_listener *listener, void *data) {
 
 static void xdg_toplevel_commit(struct wl_listener *listener, void *data) {
 	struct tinywl_toplevel *toplevel = wl_container_of(listener, toplevel, commit);
+	struct wlr_xdg_surface *xdg_surface = toplevel->xdg_toplevel->base;
+	if (xdg_surface->initial_commit) {
+		return;
+	}
 
 	struct wlr_box geometry;
 	wlr_xdg_surface_get_geometry(toplevel->xdg_toplevel->base, &geometry);

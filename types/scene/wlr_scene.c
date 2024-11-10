@@ -2343,17 +2343,18 @@ bool wlr_scene_output_build_state(struct wlr_scene_output *scene_output,
 	render_data.blur_info = blur_info;
 	// Expand the damage to compensate for blur
 	if (blur_info.has_blur) {
+		int output_width, output_height;
+		wlr_output_transformed_resolution(output, &output_width, &output_height);
+
 		// Skip the blur artifact prevention if damaging the whole viewport
 		if (render_pass->fx_effect_framebuffers->blur_buffer_dirty) {
 			// Needs to be extended before clearing
 			pixman_region32_union_rect(&render_data.damage, &render_data.damage,
-					0, 0, output->width, output->height);
+					0, 0, output_width, output_height);
 		} else {
 			// copy the surrounding content where the blur would display artifacts
 			// and draw it above the artifacts
 			struct blur_data *blur_data = &scene_output->scene->blur_data;
-			int output_width, output_height;
-			wlr_output_transformed_resolution(output, &output_width, &output_height);
 
 			// ensure that the damage isn't expanding past the output's size
 			int32_t damage_width = damage->extents.x2 - damage->extents.x1;

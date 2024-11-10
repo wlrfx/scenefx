@@ -2094,13 +2094,18 @@ static struct blur_info workspace_get_blur_info(int list_len,
 		switch (node->type) {
 		case WLR_SCENE_NODE_BUFFER:;
 			struct wlr_scene_buffer *scene_buffer = wlr_scene_buffer_from_node(node);
-			struct wlr_scene_surface *scene_surface =
-				wlr_scene_surface_try_from_buffer(scene_buffer);
-			assert(scene_buffer->buffer);
-			if (scene_buffer->backdrop_blur && scene_surface &&
-					!scene_surface->surface->opaque) {
-				int x, y;
-				wlr_scene_node_coords(node, &x, &y);
+			if (!scene_buffer->backdrop_blur) {
+				break;
+			}
+
+			int x, y;
+			wlr_scene_node_coords(node, &x, &y);
+
+			pixman_region32_t opaque_region;
+			pixman_region32_init(&opaque_region);
+			scene_node_opaque_region(node, x, y, &opaque_region);
+			// Add the buffer to the blur_region if it's not fully opaque
+			if (!pixman_region32_not_empty(&opaque_region)) {
 				pixman_region32_union_rect(blur_region, blur_region,
 						(x - scene_output->x) * scene_output->output->scale,
 						(y - scene_output->y) * scene_output->output->scale,
@@ -2110,6 +2115,7 @@ static struct blur_info workspace_get_blur_info(int list_len,
 					has_optimized = true;
 				}
 			}
+			pixman_region32_fini(&opaque_region);
 			break;
 		default:
 			// TODO: Add support for other node types

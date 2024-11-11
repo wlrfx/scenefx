@@ -16,11 +16,15 @@ uniform vec2 size;
 uniform vec2 position;
 uniform float radius;
 
-uniform vec2 window_half_size;
-uniform vec2 window_position;
-uniform float window_radius;
+uniform vec4 colors[LEN];
+uniform vec2 grad_size;
+uniform float degree;
+uniform vec2 grad_box;
+uniform vec2 origin;
+uniform bool linear;
+uniform bool blend;
+uniform int count;
 
-// TODO: use the corner_mask from the tex shader with roundRectSDF
 vec2 getCornerDist() {
 #if SOURCE == SOURCE_QUAD_ROUND
     vec2 half_size = size * 0.5;
@@ -36,14 +40,12 @@ vec2 getCornerDist() {
 #endif
 }
 
-float roundRectSDF(vec2 half_size, vec2 position, float radius);
+vec4 gradient(vec4 colors[LEN], int count, vec2 size, vec2 grad_box, vec2 origin, float degree, bool linear, bool blend);
 
 void main() {
     vec2 q = getCornerDist();
     float dist = min(max(q.x,q.y), 0.0) + length(max(q, 0.0)) - radius;
-    float rect_alpha = v_color.a * 1.0 - smoothstep(-1.0, 1.0, dist);
+    float smoothedAlpha = 1.0 - smoothstep(-1.0, 0.5, dist);
 
-    float window_alpha = smoothstep(-1.0, 1.0, roundRectSDF(window_half_size, window_position, window_radius + 1.0)); // pull in radius by 1.0 px
-
-    gl_FragColor = vec4(v_color.rgb, rect_alpha) * window_alpha;
+    gl_FragColor = mix(vec4(0), gradient(colors, count, size, grad_box, origin, degree, linear, blend), smoothedAlpha);
 }

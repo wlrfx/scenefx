@@ -20,7 +20,6 @@
  */
 
 #include <pixman.h>
-#include "scenefx/types/fx/shadow_data.h"
 #include <time.h>
 #include <wayland-server-core.h>
 #include <wlr/render/wlr_renderer.h>
@@ -28,6 +27,8 @@
 #include <wlr/types/wlr_linux_dmabuf_v1.h>
 #include <wlr/util/addon.h>
 #include <wlr/util/box.h>
+
+#include "scenefx/types/fx/corner_location.h"
 
 struct wlr_output;
 struct wlr_output_layout;
@@ -54,6 +55,7 @@ typedef void (*wlr_scene_buffer_iterator_func_t)(
 enum wlr_scene_node_type {
 	WLR_SCENE_NODE_TREE,
 	WLR_SCENE_NODE_RECT,
+	WLR_SCENE_NODE_SHADOW,
 	WLR_SCENE_NODE_BUFFER,
 };
 
@@ -137,6 +139,16 @@ struct wlr_scene_rect {
 	struct wlr_scene_node node;
 	int width, height;
 	float color[4];
+	int corner_radius;
+};
+
+/** A scene-graph node displaying a shadow */
+struct wlr_scene_shadow {
+	struct wlr_scene_node node;
+	int width, height;
+	int corner_radius;
+	float color[4];
+	float blur_sigma;
 };
 
 struct wlr_scene_outputs_update_event {
@@ -177,7 +189,7 @@ struct wlr_scene_buffer {
 
 	float opacity;
 	int corner_radius;
-	struct shadow_data shadow_data;
+	enum corner_location corners;
 
 	enum wlr_scale_filter_mode filter_mode;
 	struct wlr_fbox src_box;
@@ -358,6 +370,12 @@ struct wlr_scene_tree *wlr_scene_tree_from_node(struct wlr_scene_node *node);
 struct wlr_scene_rect *wlr_scene_rect_from_node(struct wlr_scene_node *node);
 
 /**
+ * If this node represents a wlr_scene_shadow, that shadow will be returned. It
+ * is not legal to feed a node that does not represent a wlr_scene_shadow.
+ */
+struct wlr_scene_shadow *wlr_scene_shadow_from_node(struct wlr_scene_node *node);
+
+/**
  * If this buffer is backed by a surface, then the struct wlr_scene_surface is
  * returned. If not, NULL will be returned.
  */
@@ -376,9 +394,42 @@ struct wlr_scene_rect *wlr_scene_rect_create(struct wlr_scene_tree *parent,
 void wlr_scene_rect_set_size(struct wlr_scene_rect *rect, int width, int height);
 
 /**
+ * Change the corner radius of an existing rectangle node.
+ */
+void wlr_scene_rect_set_corner_radius(struct wlr_scene_rect *rect, int corner_radius);
+
+
+/**
  * Change the color of an existing rectangle node.
  */
 void wlr_scene_rect_set_color(struct wlr_scene_rect *rect, const float color[static 4]);
+
+/**
+ * Add a node displaying a shadow to the scene-graph.
+ */
+struct wlr_scene_shadow *wlr_scene_shadow_create(struct wlr_scene_tree *parent,
+		int width, int height, int corner_radius, float blur_sigma,
+		const float color[static 4]);
+
+/**
+ * Change the width and height of an existing shadow node.
+ */
+void wlr_scene_shadow_set_size(struct wlr_scene_shadow *shadow, int width, int height);
+
+/**
+ * Change the corner radius of an existing shadow node.
+ */
+void wlr_scene_shadow_set_corner_radius(struct wlr_scene_shadow *shadow, int corner_radius);
+
+/**
+ * Change the blur_sigma of an existing shadow node.
+ */
+void wlr_scene_shadow_set_blur_sigma(struct wlr_scene_shadow *shadow, float blur_sigma);
+
+/**
+ * Change the color of an existing shadow node.
+ */
+void wlr_scene_shadow_set_color(struct wlr_scene_shadow *shadow, const float color[static 4]);
 
 /**
  * Add a node displaying a buffer to the scene-graph.
@@ -450,16 +501,10 @@ void wlr_scene_buffer_set_filter_mode(struct wlr_scene_buffer *scene_buffer,
 	enum wlr_scale_filter_mode filter_mode);
 
 /**
-* Sets the corner radius of this buffer
+* Sets the corner radius and which corners to round of this buffer
 */
 void wlr_scene_buffer_set_corner_radius(struct wlr_scene_buffer *scene_buffer,
-		int radii);
-
-/**
-* Sets the shadow of this buffer
-*/
-void wlr_scene_buffer_set_shadow_data(struct wlr_scene_buffer *scene_buffer,
-		struct shadow_data shadow_data);
+		int radii, enum corner_location corners);
 
 /**
  * Calls the buffer's frame_done signal.

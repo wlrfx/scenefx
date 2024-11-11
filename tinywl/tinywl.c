@@ -5,7 +5,7 @@
 #include <stdio.h>
 #include <time.h>
 #include <scenefx/render/fx_renderer/fx_renderer.h>
-#include <scenefx/types/fx/shadow_data.h>
+#include <scenefx/types/fx/corner_location.h>
 #include <scenefx/types/wlr_scene.h>
 #include <unistd.h>
 #include <wayland-server-core.h>
@@ -27,6 +27,8 @@
 #include <wlr/types/wlr_xdg_shell.h>
 #include <wlr/util/log.h>
 #include <xkbcommon/xkbcommon.h>
+
+#define BORDER_THICKNESS 3
 
 /* For brevity's sake, struct members are annotated where they are used. */
 enum tinywl_cursor_mode {
@@ -85,6 +87,7 @@ struct tinywl_toplevel {
 	struct wl_list link;
 	struct tinywl_server *server;
 	struct wlr_xdg_toplevel *xdg_toplevel;
+	struct wlr_scene_tree *xdg_scene_tree;
 	struct wlr_scene_tree *scene_tree;
 	struct wl_listener map;
 	struct wl_listener unmap;
@@ -97,7 +100,8 @@ struct tinywl_toplevel {
 
 	float opacity;
 	int corner_radius;
-	struct shadow_data shadow_data;
+	struct wlr_scene_shadow *shadow;
+	struct wlr_scene_rect *border;
 };
 
 struct tinywl_popup {
@@ -574,7 +578,21 @@ static void xdg_toplevel_commit(struct wl_listener *listener, void *data) {
 		 * configures the xdg_toplevel with 0,0 size to let the client pick the
 		 * dimensions itself. */
 		wlr_xdg_toplevel_set_size(toplevel->xdg_toplevel, 0, 0);
+		return;
 	}
+
+	struct wlr_box geometry;
+	wlr_xdg_surface_get_geometry(toplevel->xdg_toplevel->base, &geometry);
+	wlr_scene_subsurface_tree_set_clip(&toplevel->xdg_scene_tree->node, &geometry);
+
+	int blur_sigma = toplevel->shadow->blur_sigma;
+	wlr_scene_shadow_set_size(toplevel->shadow,
+			geometry.width + (blur_sigma + BORDER_THICKNESS) * 2,
+			geometry.height + (blur_sigma + BORDER_THICKNESS) * 2);
+
+	wlr_scene_rect_set_size(toplevel->border,
+			geometry.width + BORDER_THICKNESS * 2,
+			geometry.height + BORDER_THICKNESS * 2);
 }
 
 static void output_configure_scene(struct wlr_scene_node *node,
@@ -603,13 +621,11 @@ static void output_configure_scene(struct wlr_scene_node *node,
 		if (toplevel &&
 				xdg_surface &&
 				xdg_surface->role == WLR_XDG_SURFACE_ROLE_TOPLEVEL) {
-			// TODO: Be able to set whole decoration_data instead of calling
-			// each individually?
 			wlr_scene_buffer_set_opacity(buffer, toplevel->opacity);
 
 			if (!wlr_subsurface_try_from_wlr_surface(xdg_surface->surface)) {
-				wlr_scene_buffer_set_corner_radius(buffer, toplevel->corner_radius);
-				wlr_scene_buffer_set_shadow_data(buffer, toplevel->shadow_data);
+				wlr_scene_buffer_set_corner_radius(
+						buffer, toplevel->corner_radius, CORNER_LOCATION_BOTTOM);
 			}
 		}
 	} else if (node->type == WLR_SCENE_NODE_TREE) {
@@ -727,6 +743,8 @@ static void xdg_toplevel_map(struct wl_listener *listener, void *data) {
 	/* Called when the surface is mapped, or ready to display on-screen. */
 	struct tinywl_toplevel *toplevel = wl_container_of(listener, toplevel, map);
 
+	wlr_scene_node_set_enabled(&toplevel->scene_tree->node, true);
+
 	wl_list_insert(&toplevel->server->toplevels, &toplevel->link);
 
 	focus_toplevel(toplevel, toplevel->xdg_toplevel->base->surface);
@@ -735,6 +753,8 @@ static void xdg_toplevel_map(struct wl_listener *listener, void *data) {
 static void xdg_toplevel_unmap(struct wl_listener *listener, void *data) {
 	/* Called when the surface is unmapped, and should no longer be shown. */
 	struct tinywl_toplevel *toplevel = wl_container_of(listener, toplevel, unmap);
+
+	wlr_scene_node_set_enabled(&toplevel->scene_tree->node, false);
 
 	/* Reset the cursor mode if the grabbed toplevel was unmapped. */
 	if (toplevel == toplevel->server->grabbed_toplevel) {
@@ -756,6 +776,8 @@ static void xdg_toplevel_destroy(struct wl_listener *listener, void *data) {
 	wl_list_remove(&toplevel->request_resize.link);
 	wl_list_remove(&toplevel->request_maximize.link);
 	wl_list_remove(&toplevel->request_fullscreen.link);
+
+	wlr_scene_node_destroy(&toplevel->scene_tree->node);
 
 	free(toplevel);
 }
@@ -856,17 +878,31 @@ static void server_new_xdg_toplevel(struct wl_listener *listener, void *data) {
 	struct tinywl_toplevel *toplevel = calloc(1, sizeof(*toplevel));
 	toplevel->server = server;
 	toplevel->xdg_toplevel = xdg_toplevel;
-	toplevel->scene_tree =
-		wlr_scene_xdg_surface_create(&toplevel->server->scene->tree, xdg_toplevel->base);
+	toplevel->scene_tree = wlr_scene_tree_create(&toplevel->server->scene->tree);
+	toplevel->xdg_scene_tree = wlr_scene_xdg_surface_create(
+			toplevel->scene_tree, xdg_toplevel->base);
 	toplevel->scene_tree->node.data = toplevel;
 	xdg_toplevel->base->data = toplevel->scene_tree;
 
 	/* Set the scene_nodes decoration data */
 	toplevel->opacity = 1;
 	toplevel->corner_radius = 20;
-	toplevel->shadow_data = shadow_data_get_default();
-	toplevel->shadow_data.enabled = true;
-	toplevel->shadow_data.color = (struct wlr_render_color) {1.0f, 0.0f, 0.0f, 1.0f};
+
+	toplevel->border = wlr_scene_rect_create(toplevel->scene_tree, 0, 0,
+			(float[4]){ 1.0f, 0.f, 0.f, 1.0f });
+	wlr_scene_rect_set_corner_radius(toplevel->border, toplevel->corner_radius + BORDER_THICKNESS);
+	wlr_scene_node_set_position(&toplevel->border->node, -BORDER_THICKNESS, -BORDER_THICKNESS);
+
+	float blur_sigma = 20.0f;
+	toplevel->shadow = wlr_scene_shadow_create(toplevel->scene_tree,
+			0, 0, toplevel->corner_radius, blur_sigma, (float[4]){ 0.f, 1.0f, 0.f, 1.0f });
+	wlr_scene_node_set_position(&toplevel->shadow->node, -BORDER_THICKNESS - blur_sigma,
+			-BORDER_THICKNESS - blur_sigma);
+
+	// Lower the border below the XDG scene tree
+	wlr_scene_node_lower_to_bottom(&toplevel->border->node);
+	// Lower the shadow below the border
+	wlr_scene_node_lower_to_bottom(&toplevel->shadow->node);
 
 	/* Listen to the various events it can emit */
 	toplevel->map.notify = xdg_toplevel_map;
@@ -875,7 +911,6 @@ static void server_new_xdg_toplevel(struct wl_listener *listener, void *data) {
 	wl_signal_add(&xdg_toplevel->base->surface->events.unmap, &toplevel->unmap);
 	toplevel->commit.notify = xdg_toplevel_commit;
 	wl_signal_add(&xdg_toplevel->base->surface->events.commit, &toplevel->commit);
-
 	toplevel->destroy.notify = xdg_toplevel_destroy;
 	wl_signal_add(&xdg_toplevel->events.destroy, &toplevel->destroy);
 

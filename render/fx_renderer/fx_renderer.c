@@ -312,6 +312,38 @@ static bool link_shaders(struct fx_renderer *renderer) {
 		goto error;
 	}
 
+	// quad fragment shader with gradients
+	if (!link_quad_grad_program(&renderer->shaders.quad_grad, 16)) {
+		wlr_log(WLR_ERROR, "Could not link quad shader");
+		goto error;
+	}
+
+	// rounded quad fragment shaders
+	if (!link_quad_grad_round_program(&renderer->shaders.quad_grad_round, SHADER_SOURCE_QUAD_ROUND, 16)) {
+		wlr_log(WLR_ERROR, "Could not link quad shader");
+		goto error;
+	}
+	// rounded quad fragment shaders
+	if (!link_quad_grad_round_program(&renderer->shaders.quad_grad_round_tl, SHADER_SOURCE_QUAD_ROUND_TOP_LEFT, 16)) {
+		wlr_log(WLR_ERROR, "Could not link quad shader");
+		goto error;
+	}
+	// rounded quad fragment shaders
+	if (!link_quad_grad_round_program(&renderer->shaders.quad_grad_round_tr, SHADER_SOURCE_QUAD_ROUND_TOP_RIGHT, 16)) {
+		wlr_log(WLR_ERROR, "Could not link quad shader");
+		goto error;
+	}
+	// rounded quad fragment shaders
+	if (!link_quad_grad_round_program(&renderer->shaders.quad_grad_round_bl, SHADER_SOURCE_QUAD_ROUND_BOTTOM_LEFT, 16)) {
+		wlr_log(WLR_ERROR, "Could not link quad shader");
+		goto error;
+	}
+	// rounded quad fragment shaders
+	if (!link_quad_grad_round_program(&renderer->shaders.quad_grad_round_br, SHADER_SOURCE_QUAD_ROUND_BOTTOM_RIGHT, 16)) {
+		wlr_log(WLR_ERROR, "Could not link quad shader");
+		goto error;
+	}
+
 	// rounded quad fragment shaders
 	if (!link_quad_round_program(&renderer->shaders.quad_round, SHADER_SOURCE_QUAD_ROUND)) {
 		wlr_log(WLR_ERROR, "Could not link quad shader");
@@ -355,6 +387,12 @@ static bool link_shaders(struct fx_renderer *renderer) {
 	// border corner shader
 	if (!link_rounded_border_corner_program(&renderer->shaders.rounded_border_corner)) {
 		wlr_log(WLR_ERROR, "Could not link rounded border corner shader");
+		goto error;
+	}
+
+	// border corner shader with gradients
+	if (!link_rounded_grad_border_corner_program(&renderer->shaders.rounded_grad_border_corner, 16)) {
+		wlr_log(WLR_ERROR, "Could not link quad shader");
 		goto error;
 	}
 

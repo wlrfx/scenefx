@@ -1800,6 +1800,10 @@ static bool construct_render_list_iterator(struct wlr_scene_node *node,
 		return false;
 	}
 
+	// While rendering, the background should always be black. If we see a
+	// black rect, we can ignore rendering everything under the rect, and
+	// unless fractional scale is used even the rect itself (to avoid running
+	// into issues regarding damage region expansion).
 	if (node->type == WLR_SCENE_NODE_RECT && data->calculate_visibility &&
 			(!data->fractional_scale || data->render_list->size == 0)) {
 		struct wlr_scene_rect *rect = wlr_scene_rect_from_node(node);

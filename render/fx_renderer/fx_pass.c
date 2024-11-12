@@ -1,4 +1,3 @@
-#define _POSIX_C_SOURCE 199309L
 #include <stdio.h>
 #include <stdlib.h>
 #include <assert.h>
@@ -6,6 +5,7 @@
 #include <time.h>
 #include <wlr/render/allocator.h>
 #include <wlr/types/wlr_matrix.h>
+#include <wlr/util/transform.h>
 #include <wlr/util/log.h>
 #include <wlr/util/region.h>
 
@@ -81,6 +81,7 @@ static bool render_pass_submit(struct wlr_render_pass *wlr_pass) {
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
 	pop_fx_debug(renderer);
+	wlr_egl_restore_context(&pass->prev_ctx);
 
 	wlr_buffer_unlock(pass->buffer->buffer);
 	if (pass->output) {
@@ -1091,7 +1092,7 @@ static const char *reset_status_str(GLenum status) {
 }
 
 static struct fx_gles_render_pass *begin_buffer_pass(struct fx_framebuffer *buffer,
-		struct fx_render_timer *timer) {
+		struct wlr_egl_context *prev_ctx, struct fx_render_timer *timer) {
 	struct fx_renderer *renderer = buffer->renderer;
 	struct wlr_buffer *wlr_buffer = buffer->buffer;
 
@@ -1104,6 +1105,11 @@ static struct fx_gles_render_pass *begin_buffer_pass(struct fx_framebuffer *buff
 		}
 	}
 
+	GLint fbo = fx_framebuffer_get_fbo(buffer);
+	if (!fbo) {
+		return NULL;
+	}
+
 	struct fx_gles_render_pass *pass = calloc(1, sizeof(*pass));
 	if (pass == NULL) {
 		return NULL;
@@ -1113,12 +1119,13 @@ static struct fx_gles_render_pass *begin_buffer_pass(struct fx_framebuffer *buff
 	wlr_buffer_lock(wlr_buffer);
 	pass->buffer = buffer;
 	pass->timer = timer;
+	pass->prev_ctx = *prev_ctx;
 
 	matrix_projection(pass->projection_matrix, wlr_buffer->width, wlr_buffer->height,
 		WL_OUTPUT_TRANSFORM_FLIPPED_180);
 
 	push_fx_debug(renderer);
-	glBindFramebuffer(GL_FRAMEBUFFER, buffer->fbo);
+	glBindFramebuffer(GL_FRAMEBUFFER, fbo);
 
 	glViewport(0, 0, wlr_buffer->width, wlr_buffer->height);
 	glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
@@ -1134,7 +1141,9 @@ struct fx_gles_render_pass *fx_renderer_begin_buffer_pass(
 	struct fx_renderer *renderer = fx_get_renderer(wlr_renderer);
 
 	renderer->basic_renderer = (output == NULL);
-	if (!wlr_egl_make_current(renderer->egl)) {
+
+	struct wlr_egl_context prev_ctx = {0};
+	if (!wlr_egl_make_current(renderer->egl, &prev_ctx)) {
 		return NULL;
 	}
 
@@ -1161,7 +1170,7 @@ struct fx_gles_render_pass *fx_renderer_begin_buffer_pass(
 		pixman_region32_init(&fbos->blur_padding_region);
 	}
 
-	struct fx_gles_render_pass *pass = begin_buffer_pass(buffer, timer);
+	struct fx_gles_render_pass *pass = begin_buffer_pass(buffer, &prev_ctx, timer);
 	if (!pass) {
 		return NULL;
 	}

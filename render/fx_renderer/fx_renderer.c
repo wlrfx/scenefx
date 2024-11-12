@@ -3,8 +3,6 @@
 	https://gitlab.freedesktop.org/wlroots/wlroots/-/tree/master/render/gles2
 */
 
-#include "render/fx_renderer/shaders.h"
-#define _POSIX_C_SOURCE 199309L
 #include <assert.h>
 #include <drm_fourcc.h>
 #include <GLES2/gl2.h>
@@ -21,20 +19,12 @@
 #include <wlr/util/log.h>
 
 #include "render/egl.h"
-#include "scenefx/render/pass.h"
-#include "render/pixel_format.h"
-#include "render/fx_renderer/util.h"
+#include "render/fx_renderer/shaders.h"
 #include "render/fx_renderer/fx_renderer.h"
+#include "render/fx_renderer/util.h"
 #include "scenefx/render/fx_renderer/fx_renderer.h"
-#include "render/fx_renderer/matrix.h"
+#include "scenefx/render/pass.h"
 #include "util/time.h"
-
-static const GLfloat verts[] = {
-	1, 0, // top right
-	0, 0, // top left
-	1, 1, // bottom right
-	0, 1, // bottom left
-};
 
 static const struct wlr_renderer_impl renderer_impl;
 static const struct wlr_render_timer_impl render_timer_impl;
@@ -50,14 +40,6 @@ struct fx_renderer *fx_get_renderer(
 	return renderer;
 }
 
-static struct fx_renderer *fx_get_renderer_in_context(
-		struct wlr_renderer *wlr_renderer) {
-	struct fx_renderer *renderer = fx_get_renderer(wlr_renderer);
-	assert(wlr_egl_is_current(renderer->egl));
-	assert(renderer->current_buffer != NULL);
-	return renderer;
-}
-
 bool wlr_render_timer_is_fx(struct wlr_render_timer *timer) {
 	return timer->impl == &render_timer_impl;
 }
@@ -68,335 +50,22 @@ struct fx_render_timer *fx_get_render_timer(struct wlr_render_timer *wlr_timer) 
 	return timer;
 }
 
-static bool fx_bind_buffer(struct wlr_renderer *wlr_renderer,
-		struct wlr_buffer *wlr_buffer) {
+static const struct wlr_drm_format_set *fx_get_texture_formats(
+		struct wlr_renderer *wlr_renderer, uint32_t buffer_caps) {
 	struct fx_renderer *renderer = fx_get_renderer(wlr_renderer);
-
-	if (renderer->current_buffer != NULL) {
-		assert(wlr_egl_is_current(renderer->egl));
-
-		push_fx_debug(renderer);
-		glFlush();
-		glBindFramebuffer(GL_FRAMEBUFFER, 0);
-		pop_fx_debug(renderer);
-
-		wlr_buffer_unlock(renderer->current_buffer->buffer);
-		renderer->current_buffer = NULL;
-	}
-
-	if (wlr_buffer == NULL) {
-		wlr_egl_unset_current(renderer->egl);
-		return true;
-	}
-
-	wlr_egl_make_current(renderer->egl);
-
-	struct fx_framebuffer *buffer = fx_framebuffer_get_or_create(renderer, wlr_buffer);
-	if (buffer == NULL) {
-		return false;
-	}
-
-	wlr_buffer_lock(wlr_buffer);
-	renderer->current_buffer = buffer;
-
-	push_fx_debug(renderer);
-	glBindFramebuffer(GL_FRAMEBUFFER, renderer->current_buffer->fbo);
-	pop_fx_debug(renderer);
-
-	return true;
-}
-
-static const char *reset_status_str(GLenum status) {
-	switch (status) {
-	case GL_GUILTY_CONTEXT_RESET_KHR:
-		return "guilty";
-	case GL_INNOCENT_CONTEXT_RESET_KHR:
-		return "innocent";
-	case GL_UNKNOWN_CONTEXT_RESET_KHR:
-		return "unknown";
-	default:
-		return "<invalid>";
-	}
-}
-
-// TODO: Deprecate all older rendering functions?
-static bool fx_renderer_begin(struct wlr_renderer *wlr_renderer, uint32_t width,
-		uint32_t height) {
-	struct fx_renderer *renderer =
-		fx_get_renderer_in_context(wlr_renderer);
-
-	push_fx_debug(renderer);
-
-	if (renderer->procs.glGetGraphicsResetStatusKHR) {
-		GLenum status = renderer->procs.glGetGraphicsResetStatusKHR();
-		if (status != GL_NO_ERROR) {
-			wlr_log(WLR_ERROR, "GPU reset (%s)", reset_status_str(status));
-			wl_signal_emit_mutable(&wlr_renderer->events.lost, NULL);
-			pop_fx_debug(renderer);
-			return false;
-		}
-	}
-
-	glViewport(0, 0, width, height);
-	renderer->viewport_width = width;
-	renderer->viewport_height = height;
-
-	// refresh projection matrix
-	matrix_projection(renderer->projection, width, height,
-		WL_OUTPUT_TRANSFORM_FLIPPED_180);
-
-	glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
-
-	// XXX: maybe we should save output projection and remove some of the need
-	// for users to sling matricies themselves
-
-	pop_fx_debug(renderer);
-
-	return true;
-}
-
-static void fx_renderer_end(struct wlr_renderer *wlr_renderer) {
-	// no-op
-}
-
-static void fx_renderer_clear(struct wlr_renderer *wlr_renderer,
-		const float color[static 4]) {
-	struct fx_renderer *renderer =
-		fx_get_renderer_in_context(wlr_renderer);
-
-	push_fx_debug(renderer);
-	glClearColor(color[0], color[1], color[2], color[3]);
-	glClearStencil(0);
-	glClear(GL_COLOR_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
-	pop_fx_debug(renderer);
-}
-
-static void fx_renderer_scissor(struct wlr_renderer *wlr_renderer,
-		struct wlr_box *box) {
-	struct fx_renderer *renderer =
-		fx_get_renderer_in_context(wlr_renderer);
-
-	push_fx_debug(renderer);
-	if (box != NULL) {
-		glScissor(box->x, box->y, box->width, box->height);
-		glEnable(GL_SCISSOR_TEST);
+	if (buffer_caps & WLR_BUFFER_CAP_DMABUF) {
+		return wlr_egl_get_dmabuf_texture_formats(renderer->egl);
+	} else if (buffer_caps & WLR_BUFFER_CAP_DATA_PTR) {
+		return &renderer->shm_texture_formats;
 	} else {
-		glDisable(GL_SCISSOR_TEST);
+		return NULL;
 	}
-	pop_fx_debug(renderer);
-}
-
-static bool fx_render_subtexture_with_matrix(
-		struct wlr_renderer *wlr_renderer, struct wlr_texture *wlr_texture,
-		const struct wlr_fbox *box, const float matrix[static 9],
-		float alpha) {
-	struct fx_renderer *renderer = fx_get_renderer_in_context(wlr_renderer);
-	struct fx_texture *texture = fx_get_texture(wlr_texture);
-	assert(texture->fx_renderer == renderer);
-
-	struct tex_shader *shader = NULL;
-
-	switch (texture->target) {
-	case GL_TEXTURE_2D:
-		if (texture->has_alpha) {
-			shader = &renderer->shaders.tex_rgba;
-		} else {
-			shader = &renderer->shaders.tex_rgbx;
-		}
-		break;
-	case GL_TEXTURE_EXTERNAL_OES:
-		// EGL_EXT_image_dma_buf_import_modifiers requires
-		// GL_OES_EGL_image_external
-		assert(renderer->exts.OES_egl_image_external);
-		shader = &renderer->shaders.tex_ext;
-		break;
-	default:
-		wlr_log(WLR_ERROR, "Aborting render");
-		abort();
-	}
-
-	float gl_matrix[9];
-	wlr_matrix_multiply(gl_matrix, renderer->projection, matrix);
-
-	push_fx_debug(renderer);
-
-	if (!texture->has_alpha && alpha == 1.0) {
-		glDisable(GL_BLEND);
-	} else {
-		glEnable(GL_BLEND);
-	}
-
-	glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
-
-	glActiveTexture(GL_TEXTURE0);
-	glBindTexture(texture->target, texture->tex);
-
-	glTexParameteri(texture->target, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-
-	glUseProgram(shader->program);
-
-	glUniformMatrix3fv(shader->proj, 1, GL_FALSE, gl_matrix);
-	glUniform1i(shader->tex, 0);
-	glUniform1f(shader->alpha, alpha);
-	glUniform2f(shader->size, box->width, box->height);
-	glUniform2f(shader->position, box->x, box->y);
-	glUniform1f(shader->radius, 0);
-	glUniform1f(shader->discard_transparent, false);
-
-	float tex_matrix[9];
-	wlr_matrix_identity(tex_matrix);
-	wlr_matrix_translate(tex_matrix, box->x / texture->wlr_texture.width,
-		box->y / texture->wlr_texture.height);
-	wlr_matrix_scale(tex_matrix, box->width / texture->wlr_texture.width,
-		box->height / texture->wlr_texture.height);
-	glUniformMatrix3fv(shader->tex_proj, 1, GL_FALSE, tex_matrix);
-
-	glVertexAttribPointer(shader->pos_attrib, 2, GL_FLOAT, GL_FALSE, 0, verts);
-
-	glEnableVertexAttribArray(shader->pos_attrib);
-
-	glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
-
-	glDisableVertexAttribArray(shader->pos_attrib);
-
-	glBindTexture(texture->target, 0);
-
-	pop_fx_debug(renderer);
-	return true;
-}
-
-static void fx_render_quad_with_matrix(struct wlr_renderer *wlr_renderer,
-		const float color[static 4], const float matrix[static 9]) {
-	struct fx_renderer *renderer = fx_get_renderer_in_context(wlr_renderer);
-
-	float gl_matrix[9];
-	wlr_matrix_multiply(gl_matrix, renderer->projection, matrix);
-
-	push_fx_debug(renderer);
-
-	if (color[3] == 1.0) {
-		glDisable(GL_BLEND);
-	} else {
-		glEnable(GL_BLEND);
-	}
-
-	glUseProgram(renderer->shaders.quad.program);
-
-	glUniformMatrix3fv(renderer->shaders.quad.proj, 1, GL_FALSE, gl_matrix);
-	glUniform4f(renderer->shaders.quad.color, color[0], color[1], color[2], color[3]);
-
-	glVertexAttribPointer(renderer->shaders.quad.pos_attrib, 2, GL_FLOAT, GL_FALSE,
-			0, verts);
-
-	glEnableVertexAttribArray(renderer->shaders.quad.pos_attrib);
-
-	glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
-
-	glDisableVertexAttribArray(renderer->shaders.quad.pos_attrib);
-
-	pop_fx_debug(renderer);
-}
-
-static const uint32_t *fx_get_shm_texture_formats(
-		struct wlr_renderer *wlr_renderer, size_t *len) {
-	struct fx_renderer *renderer = fx_get_renderer(wlr_renderer);
-	return get_fx_shm_formats(renderer, len);
-}
-
-static const struct wlr_drm_format_set *fx_get_dmabuf_texture_formats(
-		struct wlr_renderer *wlr_renderer) {
-	struct fx_renderer *renderer = fx_get_renderer(wlr_renderer);
-	return wlr_egl_get_dmabuf_texture_formats(renderer->egl);
 }
 
 static const struct wlr_drm_format_set *fx_get_render_formats(
 		struct wlr_renderer *wlr_renderer) {
 	struct fx_renderer *renderer = fx_get_renderer(wlr_renderer);
 	return wlr_egl_get_dmabuf_render_formats(renderer->egl);
-}
-
-static uint32_t fx_preferred_read_format(
-		struct wlr_renderer *wlr_renderer) {
-	struct fx_renderer *renderer =
-		fx_get_renderer_in_context(wlr_renderer);
-
-	push_fx_debug(renderer);
-
-	GLint gl_format = -1, gl_type = -1, alpha_size = -1;
-	glGetIntegerv(GL_IMPLEMENTATION_COLOR_READ_FORMAT, &gl_format);
-	glGetIntegerv(GL_IMPLEMENTATION_COLOR_READ_TYPE, &gl_type);
-	glGetIntegerv(GL_ALPHA_BITS, &alpha_size);
-
-	pop_fx_debug(renderer);
-
-	const struct fx_pixel_format *fmt =
-		get_fx_format_from_gl(gl_format, gl_type, alpha_size > 0);
-	if (fmt != NULL) {
-		return fmt->drm_format;
-	}
-
-	if (renderer->exts.EXT_read_format_bgra) {
-		return DRM_FORMAT_XRGB8888;
-	}
-	return DRM_FORMAT_XBGR8888;
-}
-
-static bool fx_read_pixels(struct wlr_renderer *wlr_renderer,
-		uint32_t drm_format, uint32_t stride,
-		uint32_t width, uint32_t height, uint32_t src_x, uint32_t src_y,
-		uint32_t dst_x, uint32_t dst_y, void *data) {
-	struct fx_renderer *renderer =
-		fx_get_renderer_in_context(wlr_renderer);
-
-	const struct fx_pixel_format *fmt =
-		get_fx_format_from_drm(drm_format);
-	if (fmt == NULL || !is_fx_pixel_format_supported(renderer, fmt)) {
-		wlr_log(WLR_ERROR, "Cannot read pixels: unsupported pixel format 0x%"PRIX32, drm_format);
-		return false;
-	}
-
-	if (fmt->gl_format == GL_BGRA_EXT && !renderer->exts.EXT_read_format_bgra) {
-		wlr_log(WLR_ERROR,
-			"Cannot read pixels: missing GL_EXT_read_format_bgra extension");
-		return false;
-	}
-
-	const struct wlr_pixel_format_info *drm_fmt =
-		drm_get_pixel_format_info(fmt->drm_format);
-	assert(drm_fmt);
-	if (pixel_format_info_pixels_per_block(drm_fmt) != 1) {
-		wlr_log(WLR_ERROR, "Cannot read pixels: block formats are not supported");
-		return false;
-	}
-
-	push_fx_debug(renderer);
-
-	// Make sure any pending drawing is finished before we try to read it
-	glFinish();
-
-	glGetError(); // Clear the error flag
-
-	unsigned char *p = (unsigned char *)data + dst_y * stride;
-	glPixelStorei(GL_PACK_ALIGNMENT, 1);
-	uint32_t pack_stride = pixel_format_info_min_stride(drm_fmt, width);
-	if (pack_stride == stride && dst_x == 0) {
-		// Under these particular conditions, we can read the pixels with only
-		// one glReadPixels call
-
-		glReadPixels(src_x, src_y, width, height, fmt->gl_format, fmt->gl_type, p);
-	} else {
-		// Unfortunately GLES2 doesn't support GL_PACK_ROW_LENGTH, so we have to read
-		// the lines out row by row
-		for (size_t i = 0; i < height; ++i) {
-			uint32_t y = src_y + i;
-			glReadPixels(src_x, y, width, 1, fmt->gl_format,
-				fmt->gl_type, p + i * stride + dst_x * drm_fmt->bytes_per_block);
-		}
-	}
-
-	pop_fx_debug(renderer);
-
-	return glGetError() == GL_NO_ERROR;
 }
 
 static int fx_get_drm_fd(struct wlr_renderer *wlr_renderer) {
@@ -410,23 +79,19 @@ static int fx_get_drm_fd(struct wlr_renderer *wlr_renderer) {
 	return renderer->drm_fd;
 }
 
-static uint32_t fx_get_render_buffer_caps(struct wlr_renderer *wlr_renderer) {
-	return WLR_BUFFER_CAP_DMABUF;
-}
-
 static void fx_renderer_destroy(struct wlr_renderer *wlr_renderer) {
 	struct fx_renderer *renderer = fx_get_renderer(wlr_renderer);
 
-	wlr_egl_make_current(renderer->egl);
-
-	struct fx_framebuffer *fx_buffer, *fx_buffer_tmp;
-	wl_list_for_each_safe(fx_buffer, fx_buffer_tmp, &renderer->buffers, link) {
-		fx_framebuffer_destroy(fx_buffer);
-	}
+	wlr_egl_make_current(renderer->egl, NULL);
 
 	struct fx_texture *tex, *tex_tmp;
 	wl_list_for_each_safe(tex, tex_tmp, &renderer->textures, link) {
 		fx_texture_destroy(tex);
+	}
+
+	struct fx_framebuffer *buffer, *buffer_tmp;
+	wl_list_for_each_safe(buffer, buffer_tmp, &renderer->buffers, link) {
+		fx_framebuffer_destroy(buffer);
 	}
 
 	push_fx_debug(renderer);
@@ -443,6 +108,8 @@ static void fx_renderer_destroy(struct wlr_renderer *wlr_renderer) {
 
 	wlr_egl_unset_current(renderer->egl);
 	wlr_egl_destroy(renderer->egl);
+
+	wlr_drm_format_set_finish(&renderer->shm_texture_formats);
 
 	if (renderer->drm_fd >= 0) {
 		close(renderer->drm_fd);
@@ -461,6 +128,26 @@ static struct wlr_render_pass *begin_buffer_pass(struct wlr_renderer *wlr_render
 	return &pass->base;
 }
 
+GLuint fx_renderer_get_buffer_fbo(struct wlr_renderer *wlr_renderer,
+		struct wlr_buffer *wlr_buffer) {
+	struct fx_renderer *renderer = fx_get_renderer(wlr_renderer);
+	GLuint fbo = 0;
+
+	struct wlr_egl_context prev_ctx = {0};
+	if (!wlr_egl_make_current(renderer->egl, &prev_ctx)) {
+		return 0;
+	}
+
+	struct fx_framebuffer *buffer = fx_framebuffer_get_or_create(renderer, wlr_buffer);
+	if (buffer) {
+		fbo = fx_framebuffer_get_fbo(buffer);
+	}
+
+	wlr_egl_restore_context(&prev_ctx);
+	return fbo;
+}
+
+
 static struct wlr_render_timer *fx_render_timer_create(struct wlr_renderer *wlr_renderer) {
 	struct fx_renderer *renderer = fx_get_renderer(wlr_renderer);
 	if (!renderer->exts.EXT_disjoint_timer_query) {
@@ -476,8 +163,7 @@ static struct wlr_render_timer *fx_render_timer_create(struct wlr_renderer *wlr_
 	timer->renderer = renderer;
 
 	struct wlr_egl_context prev_ctx;
-	wlr_egl_save_context(&prev_ctx);
-	wlr_egl_make_current(renderer->egl);
+	wlr_egl_make_current(renderer->egl, &prev_ctx);
 	renderer->procs.glGenQueriesEXT(1, &timer->id);
 	wlr_egl_restore_context(&prev_ctx);
 
@@ -489,8 +175,7 @@ static int fx_get_render_time(struct wlr_render_timer *wlr_timer) {
 	struct fx_renderer *renderer = timer->renderer;
 
 	struct wlr_egl_context prev_ctx;
-	wlr_egl_save_context(&prev_ctx);
-	wlr_egl_make_current(renderer->egl);
+	wlr_egl_make_current(renderer->egl, &prev_ctx);
 
 	GLint64 disjoint;
 	renderer->procs.glGetInteger64vEXT(GL_GPU_DISJOINT_EXT, &disjoint);
@@ -524,8 +209,7 @@ static void fx_render_timer_destroy(struct wlr_render_timer *wlr_timer) {
 	struct fx_renderer *renderer = timer->renderer;
 
 	struct wlr_egl_context prev_ctx;
-	wlr_egl_save_context(&prev_ctx);
-	wlr_egl_make_current(renderer->egl);
+	wlr_egl_make_current(renderer->egl, &prev_ctx);
 	renderer->procs.glDeleteQueriesEXT(1, &timer->id);
 	wlr_egl_restore_context(&prev_ctx);
 	free(timer);
@@ -533,20 +217,9 @@ static void fx_render_timer_destroy(struct wlr_render_timer *wlr_timer) {
 
 static const struct wlr_renderer_impl renderer_impl = {
 	.destroy = fx_renderer_destroy,
-	.bind_buffer = fx_bind_buffer,
-	.begin = fx_renderer_begin,
-	.end = fx_renderer_end,
-	.clear = fx_renderer_clear,
-	.scissor = fx_renderer_scissor,
-	.render_subtexture_with_matrix = fx_render_subtexture_with_matrix,
-	.render_quad_with_matrix = fx_render_quad_with_matrix,
-	.get_shm_texture_formats = fx_get_shm_texture_formats,
-	.get_dmabuf_texture_formats = fx_get_dmabuf_texture_formats,
+	.get_texture_formats = fx_get_texture_formats,
 	.get_render_formats = fx_get_render_formats,
-	.preferred_read_format = fx_preferred_read_format,
-	.read_pixels = fx_read_pixels,
 	.get_drm_fd = fx_get_drm_fd,
-	.get_render_buffer_caps = fx_get_render_buffer_caps,
 	.texture_from_buffer = fx_texture_from_buffer,
 	.begin_buffer_pass = begin_buffer_pass,
 	.render_timer_create = fx_render_timer_create,
@@ -765,7 +438,7 @@ error:
 }
 
 struct wlr_renderer *fx_renderer_create_egl(struct wlr_egl *egl) {
-	if (!wlr_egl_make_current(egl)) {
+	if (!wlr_egl_make_current(egl, NULL)) {
 		return NULL;
 	}
 
@@ -779,7 +452,8 @@ struct wlr_renderer *fx_renderer_create_egl(struct wlr_egl *egl) {
 	if (renderer == NULL) {
 		return NULL;
 	}
-	wlr_renderer_init(&renderer->wlr_renderer, &renderer_impl);
+	wlr_renderer_init(&renderer->wlr_renderer, &renderer_impl, WLR_BUFFER_CAP_DMABUF);
+	renderer->wlr_renderer.features.output_color_transform = false;
 
 	wl_list_init(&renderer->buffers);
 	wl_list_init(&renderer->textures);
@@ -896,6 +570,8 @@ struct wlr_renderer *fx_renderer_create_egl(struct wlr_egl *egl) {
 	wlr_log(WLR_INFO, "FX RENDERER: Shaders Initialized Successfully");
 
 	wlr_egl_unset_current(renderer->egl);
+
+	get_fx_shm_formats(renderer, &renderer->shm_texture_formats);
 
 	return &renderer->wlr_renderer;
 

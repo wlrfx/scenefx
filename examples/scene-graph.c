@@ -1,4 +1,3 @@
-#define _POSIX_C_SOURCE 200112L
 #include <assert.h>
 #include <getopt.h>
 #include <scenefx/render/fx_renderer/fx_renderer.h>
@@ -94,7 +93,7 @@ static void server_handle_new_output(struct wl_listener *listener, void *data) {
 	wlr_output_commit_state(wlr_output, &state);
 	wlr_output_state_finish(&state);
 
-	wlr_output_create_global(wlr_output);
+	wlr_output_create_global(wlr_output, server->display);
 }
 
 static void surface_handle_commit(struct wl_listener *listener, void *data) {
@@ -176,7 +175,7 @@ int main(int argc, char *argv[]) {
 	struct server server = {0};
 	server.surface_offset = 0;
 	server.display = wl_display_create();
-	server.backend = wlr_backend_autocreate(server.display, NULL);
+	server.backend = wlr_backend_autocreate(wl_display_get_event_loop(server.display), NULL);
 	server.scene = wlr_scene_create();
 
 	server.renderer = fx_renderer_create(server.backend);

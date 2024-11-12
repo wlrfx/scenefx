@@ -5,22 +5,22 @@ project(
 	license: 'MIT',
 	meson_version: '>=0.59.0',
 	default_options: [
-		'c_std=c11',
+		'c_std=' + (meson.version().version_compare('>=1.3.0') ? 'c23,c11' : 'c11'),
 		'warning_level=2',
 		'werror=true',
 	],
 )
 
-# When doing a major or minor release, *always* increase soversion. This isn't
-# necessary for bugfix releases. Increasing soversion is required because
-# SceneFX never guarantees ABI stability -- only API stability is guaranteed
-# between minor releases.
-soversion = 1
+version = meson.project_version().split('-')[0]
+version_major = version.split('.')[0]
+version_minor = version.split('.')[1]
+versioned_name = '@0@-@1@.@2@'.format(meson.project_name(), version_major, version_minor)
 
 little_endian = target_machine.endian() == 'little'
 big_endian = target_machine.endian() == 'big'
 
 add_project_arguments([
+	'-D_POSIX_C_SOURCE=200809L',
 	'-DWLR_USE_UNSTABLE',
 	'-DWLR_LITTLE_ENDIAN=@0@'.format(little_endian.to_int()),
 	'-DWLR_BIG_ENDIAN=@0@'.format(big_endian.to_int()),
@@ -42,7 +42,7 @@ add_project_arguments(cc.get_supported_arguments([
 	'-Woverflow',
 	'-Wmissing-prototypes',
 	'-Walloca',
-
+'-O',
 	'-Wno-missing-braces',
 	'-Wno-missing-field-initializers',
 	'-Wno-unused-parameter',
@@ -87,13 +87,13 @@ endif
 
 wayland_project_options = ['tests=false', 'documentation=false']
 wayland_server = dependency('wayland-server',
-	version: '>=1.22',
+	version: '>=1.23',
 	fallback: 'wayland',
 	default_options: wayland_project_options,
 )
 
 wlroots_options = [ 'examples=false' ]
-wlroots_version = ['>=0.17.0', '<0.18.0']
+wlroots_version = ['>=0.18.1', '<0.19.0']
 wlroots = dependency('wlroots',
 	version: wlroots_version,
 	default_options: wlroots_options,
@@ -110,23 +110,10 @@ endif
 
 
 drm = dependency('libdrm',
-	version: '>=2.4.114',
+	version: '>=2.4.122',
 	fallback: 'libdrm',
 	default_options: [
-		'intel=disabled',
-		'radeon=disabled',
-		'amdgpu=disabled',
-		'nouveau=disabled',
-		'vmwgfx=disabled',
-		'omap=disabled',
-		'exynos=disabled',
-		'freedreno=disabled',
-		'tegra=disabled',
-		'vc4=disabled',
-		'etnaviv=disabled',
-		'cairo-tests=disabled',
-		'man-pages=disabled',
-		'valgrind=disabled',
+		'auto_features=disabled',
 		'tests=false',
 	],
 )
@@ -161,8 +148,7 @@ subdir('include')
 scenefx_inc = include_directories('include')
 
 lib_scenefx = library(
-	meson.project_name(), scenefx_files,
-	soversion: soversion.to_string(),
+	versioned_name, scenefx_files,
 	dependencies: scenefx_deps,
 	include_directories:  [ scenefx_inc ],
 	install: true,
@@ -175,7 +161,7 @@ scenefx = declare_dependency(
 	include_directories: scenefx_inc,
 )
 
-meson.override_dependency('scenefx', scenefx)
+meson.override_dependency(versioned_name, scenefx)
 
 if get_option('examples')
 	subdir('examples')
@@ -183,9 +169,12 @@ if get_option('examples')
 endif
 
 pkgconfig = import('pkgconfig')
-pkgconfig.generate(lib_scenefx,
+pkgconfig.generate(
+	lib_scenefx,
+	name: versioned_name,
 	version: meson.project_version(),
 	filebase: meson.project_name(),
 	name: meson.project_name(),
 	description: 'Wlroots effects library',
+	subdirs: versioned_name,
 )

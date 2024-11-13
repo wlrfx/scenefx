@@ -6,7 +6,7 @@
     let
       mkPackages = pkgs: {
         scenefx = pkgs.callPackage (
-          { wlroots_0_17, ... }:
+          { wlroots_0_18, ... }:
           pkgs.stdenv.mkDerivation {
             pname = "scenefx";
             version = "0.1.0-git";
@@ -33,7 +33,7 @@
               mesa # gbm
               wayland # wayland-server
               wayland-protocols
-              wlroots_0_17
+              wlroots_0_18
             ];
 
             meta = with pkgs.lib; {
@@ -69,13 +69,13 @@
           name = "scenefx-shell";
           inputsFrom = [
             self.packages.${pkgs.system}.scenefx
-            pkgs.wlroots_0_17
+            pkgs.wlroots_0_18
           ];
           shellHook = ''
             (
               # Copy the nix version of wlroots into the project
               mkdir -p "$PWD/subprojects" && cd "$PWD/subprojects"
-              cp -R --no-preserve=mode,ownership ${pkgs.wlroots_0_17.src} wlroots
+              cp -R --no-preserve=mode,ownership ${pkgs.wlroots_0_18.src} wlroots
             )'';
         };
       });

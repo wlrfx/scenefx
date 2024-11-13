@@ -19,6 +19,20 @@ scenefx_files += files(
 
 if 'gles2' in renderers or 'auto' in renderers
 	egl = dependency('egl', required: 'gles2' in renderers)
+	if egl.found()
+		eglext_version = cc.get_define(
+			'EGL_EGLEXT_VERSION',
+			dependencies: egl,
+			prefix: '#include <EGL/eglext.h>',
+		).to_int()
+		if eglext_version < 20210604
+			egl = dependency(
+				'',
+				required: 'gles2' in renderers,
+				not_found_message: 'EGL headers too old',
+			)
+		endif
+	endif
 	gbm = dependency('gbm', required: 'gles2' in renderers)
 	glesv2 = dependency('glesv2', required: 'gles2' in renderers)
 

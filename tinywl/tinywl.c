@@ -662,6 +662,8 @@ static void output_frame(struct wl_listener *listener, void *data) {
 	struct wlr_scene_output *scene_output = wlr_scene_get_scene_output(
 		scene, output->wlr_output);
 
+	output_configure_scene(&scene_output->scene->tree.node, NULL);
+
 	/* Render the scene if needed and commit the output */
 	wlr_scene_output_commit(scene_output, NULL);
 
@@ -939,7 +941,7 @@ static void server_new_xdg_toplevel(struct wl_listener *listener, void *data) {
 	/* Allocate a tinywl_toplevel for this surface */
 	struct tinywl_toplevel *toplevel = calloc(1, sizeof(*toplevel));
 	toplevel->server = server;
-	toplevel->xdg_toplevel = xdg_surface->toplevel;
+	toplevel->xdg_toplevel = xdg_toplevel;
 	toplevel->scene_tree = wlr_scene_tree_create(toplevel->server->layers.toplevel_layer);
 	toplevel->xdg_scene_tree = wlr_scene_xdg_surface_create(
 			toplevel->scene_tree, xdg_toplevel->base);
@@ -1135,10 +1137,6 @@ int main(int argc, char *argv[]) {
 	struct wlr_scene_rect *rect = wlr_scene_rect_create(server.layers.toplevel_layer,
 			200, 200, top_rect_color);
 	wlr_scene_node_set_position(&rect->node, 200, 200);
-
-	// blur
-	struct blur_data blur_data = blur_data_get_default();
-	wlr_scene_set_blur_data(server.scene, blur_data);
 
 	/* Set up xdg-shell version 3. The xdg-shell is a Wayland protocol which is
 	 * used for application windows. For more detail on shells, refer to

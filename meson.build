@@ -101,7 +101,7 @@ wlroots = dependency('wlroots',
 )
 if not wlroots.found()
 	wlroots_proj = subproject(
-		'wlroots-0.18',
+		'wlroots',
 		default_options: wlroots_options,
 		version: wlroots_version,
 	)

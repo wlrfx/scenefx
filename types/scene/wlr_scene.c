@@ -811,6 +811,18 @@ void wlr_scene_shadow_set_color(struct wlr_scene_shadow *shadow, const float col
 	scene_node_update(&shadow->node, NULL);
 }
 
+void wlr_scene_set_blur_data(struct wlr_scene *scene, struct blur_data blur_data) {
+	struct blur_data *buff_data = &scene->blur_data;
+	if (blur_data_cmp(buff_data, &blur_data)) {
+		return;
+	}
+
+	memcpy(&scene->blur_data, &blur_data,
+			sizeof(struct blur_data));
+
+	wlr_scene_optimized_blur_mark_dirty(scene, NULL, NULL);
+}
+
 struct wlr_scene_optimized_blur *wlr_scene_optimized_blur_create(
 		struct wlr_scene_tree *parent, int width, int height) {
 	struct wlr_scene_optimized_blur *scene_blur = calloc(1, sizeof(*scene_blur));

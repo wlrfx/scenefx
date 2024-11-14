@@ -1138,6 +1138,10 @@ int main(int argc, char *argv[]) {
 			200, 200, top_rect_color);
 	wlr_scene_node_set_position(&rect->node, 200, 200);
 
+	// blur
+	struct blur_data blur_data = blur_data_get_default();
+	wlr_scene_set_blur_data(server.scene, blur_data);
+
 	/* Set up xdg-shell version 3. The xdg-shell is a Wayland protocol which is
 	 * used for application windows. For more detail on shells, refer to
 	 * https://drewdevault.com/2018/07/29/Wayland-shells.html.

@@ -15,6 +15,8 @@ struct blur_data {
 
 struct blur_data blur_data_get_default(void);
 
+bool scene_buffer_is_blur_enabled(bool backdrop_blur, struct blur_data *blur_data);
+
 bool blur_data_should_parameters_blur_effects(struct blur_data *blur_data);
 
 bool blur_data_cmp(struct blur_data *a, struct blur_data *b);

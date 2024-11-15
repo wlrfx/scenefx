@@ -28,6 +28,7 @@
 #include <wlr/util/addon.h>
 #include <wlr/util/box.h>
 
+#include "scenefx/types/fx/blur_data.h"
 #include "scenefx/types/fx/corner_location.h"
 
 struct wlr_output;
@@ -57,6 +58,7 @@ enum wlr_scene_node_type {
 	WLR_SCENE_NODE_RECT,
 	WLR_SCENE_NODE_SHADOW,
 	WLR_SCENE_NODE_BUFFER,
+	WLR_SCENE_NODE_OPTIMIZED_BLUR,
 };
 
 /** A node is an object in the scene. */
@@ -112,6 +114,8 @@ struct wlr_scene {
 	bool direct_scanout;
 	bool calculate_visibility;
 	bool highlight_transparent_region;
+
+	struct blur_data blur_data;
 };
 
 /** A scene-graph node displaying a single surface. */
@@ -151,6 +155,12 @@ struct wlr_scene_shadow {
 	float blur_sigma;
 };
 
+/** A scene-graph node telling SceneFX to render the optimized blur */
+struct wlr_scene_optimized_blur {
+	struct wlr_scene_node node;
+	int width, height;
+};
+
 struct wlr_scene_outputs_update_event {
 	struct wlr_scene_output **active;
 	size_t size;
@@ -187,10 +197,13 @@ struct wlr_scene_buffer {
 	 */
 	struct wlr_scene_output *primary_output;
 
-	float opacity;
 	int corner_radius;
+	bool backdrop_blur;
+	bool backdrop_blur_optimized;
+	bool backdrop_blur_ignore_transparent;
 	enum corner_location corners;
 
+	float opacity;
 	enum wlr_scale_filter_mode filter_mode;
 	struct wlr_fbox src_box;
 	int dst_width, dst_height;
@@ -325,6 +338,10 @@ struct wlr_scene_node *wlr_scene_node_at(struct wlr_scene_node *node,
  */
 struct wlr_scene *wlr_scene_create(void);
 
+
+/** Sets the global blur parameters */
+void wlr_scene_set_blur_data(struct wlr_scene *scene, struct blur_data blur_data);
+
 /**
  * Handles linux_dmabuf_v1 feedback for all surfaces in the scene.
  *
@@ -432,6 +449,30 @@ void wlr_scene_shadow_set_blur_sigma(struct wlr_scene_shadow *shadow, float blur
 void wlr_scene_shadow_set_color(struct wlr_scene_shadow *shadow, const float color[static 4]);
 
 /**
+ * If this node represents a wlr_scene_optimized_blur node, that node will
+ * be returned. It is not legal to feed a node that does not represent
+ * a wlr_scene_optimized_blur.
+ */
+struct wlr_scene_optimized_blur *wlr_scene_optimized_blur_from_node(
+		struct wlr_scene_node *node);
+
+/**
+ * Add a node indicating to the renderer to render optimized blur to the scene-graph.
+ * NOTE: Has to be positioned where to draw the optimized blur. This allows
+ * for unique effects like only blurring half of the output.
+ */
+struct wlr_scene_optimized_blur *wlr_scene_optimized_blur_create(struct wlr_scene_tree *parent,
+		int width, int height);
+
+/**
+ * Change the width and height of an existing blur node.
+ * This calls `wlr_scene_optimized_blur_mark_dirty` as well
+ */
+void wlr_scene_optimized_blur_set_size(struct wlr_scene_optimized_blur *blur_node,
+		int width, int height);
+
+
+/**
  * Add a node displaying a buffer to the scene-graph.
  *
  * If the buffer is NULL, this node will not be displayed.
@@ -505,6 +546,36 @@ void wlr_scene_buffer_set_filter_mode(struct wlr_scene_buffer *scene_buffer,
 */
 void wlr_scene_buffer_set_corner_radius(struct wlr_scene_buffer *scene_buffer,
 		int radii, enum corner_location corners);
+
+/**
+* Sets the whether or not the buffer should render backdrop blur
+*/
+void wlr_scene_buffer_set_backdrop_blur(struct wlr_scene_buffer *scene_buffer,
+		bool enabled);
+
+/**
+* Sets the whether the backdrop blur should use optimized blur or not
+*/
+void wlr_scene_buffer_set_backdrop_blur_optimized(struct wlr_scene_buffer *scene_buffer,
+		bool enabled);
+
+/**
+* Sets the whether the backdrop blur should not render in fully transparent
+* segments.
+*/
+void wlr_scene_buffer_set_backdrop_blur_ignore_transparent(
+		struct wlr_scene_buffer *scene_buffer, bool enabled);
+
+/**
+ * Tells the renderer to re-render the optimized blur for the specified output.
+ * A NULL output will re-render the optimized blur on every output.
+ * This is very expensive so should only be called when needed.
+ *
+ * An example use would be to call this when a "static" node changes, like a
+ * wallpaper.
+ */
+void wlr_scene_optimized_blur_mark_dirty(struct wlr_scene *scene,
+		struct wlr_scene_optimized_blur *blur_node, struct wlr_output *output);
 
 /**
  * Calls the buffer's frame_done signal.

@@ -1491,7 +1491,7 @@ static void get_tree_geometry(struct wlr_scene_node *node,
 }
 
 static void scene_get_next_sibling_geometry(struct wlr_scene_node *node,
-		struct wlr_box *box, int *corner_radius) {
+		int offset_x, int offset_y, struct wlr_box *box, int *corner_radius) {
 	assert(box && corner_radius);
 
 	*box = (struct wlr_box) {0};
@@ -1513,8 +1513,8 @@ static void scene_get_next_sibling_geometry(struct wlr_scene_node *node,
 	if (pixman_region32_not_empty(&region)) {
 		struct pixman_box32 *region_box = pixman_region32_extents(&region);
 		*box = (struct wlr_box){
-			.x = region_box->x1,
-			.y = region_box->y1,
+			.x = region_box->x1 - offset_x,
+			.y = region_box->y1 - offset_y,
 			.width = region_box->x2 - region_box->x1,
 			.height = region_box->y2 - region_box->y1,
 		};
@@ -1587,7 +1587,8 @@ static void scene_entry_render(struct render_list_entry *entry, const struct ren
 		if (scene_rect->corner_radius) {
 			struct wlr_box window_box;
 			int window_corner_radius;
-			scene_get_next_sibling_geometry(node, &window_box, &window_corner_radius);
+			scene_get_next_sibling_geometry(node, data->logical.x, data->logical.x,
+					&window_box, &window_corner_radius);
 
 			window_corner_radius *= data->scale;
 			scale_box(&window_box, data->scale);
@@ -1640,7 +1641,8 @@ static void scene_entry_render(struct render_list_entry *entry, const struct ren
 		// a CSD surface and not the actual toplevel surface.
 		struct wlr_box window_box;
 		int window_corner_radius;
-		scene_get_next_sibling_geometry(node, &window_box, &window_corner_radius);
+		scene_get_next_sibling_geometry(node, data->logical.x, data->logical.x,
+				&window_box, &window_corner_radius);
 
 		window_corner_radius *= data->scale;
 		scale_box(&window_box, data->scale);

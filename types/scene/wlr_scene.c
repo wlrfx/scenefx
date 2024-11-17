@@ -1588,6 +1588,8 @@ static void scene_entry_render(struct render_list_entry *entry, const struct ren
 			struct wlr_box window_box;
 			int window_corner_radius;
 			scene_get_next_sibling_geometry(node, &window_box, &window_corner_radius);
+			window_box.x -= data->logical.x;
+			window_box.y -= data->logical.y;
 
 			window_corner_radius *= data->scale;
 			scale_box(&window_box, data->scale);
@@ -1641,6 +1643,8 @@ static void scene_entry_render(struct render_list_entry *entry, const struct ren
 		struct wlr_box window_box;
 		int window_corner_radius;
 		scene_get_next_sibling_geometry(node, &window_box, &window_corner_radius);
+		window_box.x -= data->logical.x;
+		window_box.y -= data->logical.y;
 
 		window_corner_radius *= data->scale;
 		scale_box(&window_box, data->scale);

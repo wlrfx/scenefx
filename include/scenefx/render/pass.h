@@ -78,21 +78,6 @@ struct fx_render_rounded_rect_grad_options {
 	enum corner_location corner_location;
 };
 
-struct fx_render_rounded_border_corner_options {
-	struct wlr_render_rect_options base;
-	int corner_radius;
-	int border_thickness;
-	enum corner_location corner_location;
-};
-
-struct fx_render_rounded_grad_border_corner_options {
-	struct wlr_render_rect_options base;
-	struct fx_gradient gradient;
-	int corner_radius;
-	int border_thickness;
-	enum corner_location corner_location;
-};
-
 struct fx_render_box_shadow_options {
 	struct wlr_box box;
 	struct wlr_box window_box;
@@ -139,23 +124,10 @@ void fx_render_pass_add_rounded_rect(struct fx_gles_render_pass *render_pass,
 	const struct fx_render_rounded_rect_options *options);
 
 /**
- * Render a border corner.
+ * Render a rounded rectangle with a gradient.
  */
 void fx_render_pass_add_rounded_rect_grad(struct fx_gles_render_pass *render_pass,
 	const struct fx_render_rounded_rect_grad_options *options);
-
-
-/**
- * Render a border corner.
- */
-void fx_render_pass_add_rounded_border_corner(struct fx_gles_render_pass *render_pass,
-	const struct fx_render_rounded_border_corner_options *options);
-
-/**
- * Render a border corner.
- */
-void fx_render_pass_add_rounded_grad_border_corner(struct fx_gles_render_pass *render_pass,
-	const struct fx_render_rounded_grad_border_corner_options *options);
 
 /**
  * Render a box shadow.

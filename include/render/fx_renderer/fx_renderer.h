@@ -22,13 +22,10 @@ struct fx_pixel_format {
 	GLint gl_format, gl_type;
 };
 
-bool is_fx_pixel_format_supported(const struct fx_renderer *renderer,
-	const struct fx_pixel_format *format);
+bool is_fx_pixel_format_supported(const struct fx_renderer *renderer, const struct fx_pixel_format *format);
 const struct fx_pixel_format *get_fx_format_from_drm(uint32_t fmt);
-const struct fx_pixel_format *get_fx_format_from_gl(
-	GLint gl_format, GLint gl_type, bool alpha);
-void get_fx_shm_formats(const struct fx_renderer *renderer,
- struct wlr_drm_format_set *out);
+const struct fx_pixel_format *get_fx_format_from_gl(GLint gl_format, GLint gl_type, bool alpha);
+void get_fx_shm_formats(const struct fx_renderer *renderer, struct wlr_drm_format_set *out);
 
 GLuint fx_framebuffer_get_fbo(struct fx_framebuffer *buffer);
 
@@ -93,18 +90,18 @@ bool wlr_texture_is_fx(struct wlr_texture *wlr_texture);
 
 bool wlr_renderer_is_fx(struct wlr_renderer *wlr_renderer);
 
-struct fx_render_timer *fx_get_render_timer(
-	struct wlr_render_timer *timer);
-struct fx_texture *fx_get_texture(
-	struct wlr_texture *wlr_texture);
+struct fx_render_timer *fx_get_render_timer(struct wlr_render_timer *timer);
+
+struct fx_texture *fx_get_texture(struct wlr_texture *wlr_texture);
 
 struct wlr_renderer *fx_renderer_create_egl(struct wlr_egl *egl);
 
 struct wlr_egl *wlr_fx_renderer_get_egl(struct wlr_renderer *renderer);
 
-void push_fx_debug_(struct fx_renderer *renderer,
-	const char *file, const char *func);
+void push_fx_debug_(struct fx_renderer *renderer, const char *file, const char *func);
+
 #define push_fx_debug(renderer) push_fx_debug_(renderer, _WLR_FILENAME, __func__)
+
 void pop_fx_debug(struct fx_renderer *renderer);
 
 ///
@@ -192,8 +189,6 @@ struct fx_renderer {
 		struct tex_shader tex_rgbx;
 		struct tex_shader tex_ext;
 		struct box_shadow_shader box_shadow;
-		struct rounded_border_corner_shader rounded_border_corner;
-		struct rounded_grad_border_corner_shader rounded_grad_border_corner;
 		struct blur_shader blur1;
 		struct blur_shader blur2;
 		struct blur_effects_shader blur_effects;

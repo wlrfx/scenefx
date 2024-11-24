@@ -115,49 +115,6 @@ struct tex_shader {
 
 bool link_tex_program(struct tex_shader *shader, enum fx_tex_shader_source source);
 
-struct rounded_border_corner_shader {
-	GLuint program;
-	GLint proj;
-	GLint color;
-	GLint pos_attrib;
-	GLint is_top_left;
-	GLint is_top_right;
-	GLint is_bottom_left;
-	GLint is_bottom_right;
-	GLint position;
-	GLint radius;
-	GLint half_size;
-	GLint half_thickness;
-};
-
-bool link_rounded_border_corner_program(struct rounded_border_corner_shader *shader);
-
-struct rounded_grad_border_corner_shader {
-	int max_len;
-	GLuint program;
-	GLint proj;
-	GLint is_top_left;
-	GLint is_top_right;
-	GLint is_bottom_left;
-	GLint is_bottom_right;
-	GLint position;
-	GLint radius;
-	GLint half_size;
-	GLint half_thickness;
-
-	GLint colors;
-	GLint size;
-	GLint degree;
-	GLint grad_box;
-	GLint pos_attrib;
-	GLint linear;
-	GLint origin;
-	GLint count;
-	GLint blend;
-};
-
-bool link_rounded_grad_border_corner_program(struct rounded_grad_border_corner_shader *shader, int max_len);
-
 struct box_shadow_shader {
 	GLuint program;
 	GLint proj;

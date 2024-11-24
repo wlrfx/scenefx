@@ -384,18 +384,6 @@ static bool link_shaders(struct fx_renderer *renderer) {
 		goto error;
 	}
 
-	// border corner shader
-	if (!link_rounded_border_corner_program(&renderer->shaders.rounded_border_corner)) {
-		wlr_log(WLR_ERROR, "Could not link rounded border corner shader");
-		goto error;
-	}
-
-	// border corner shader with gradients
-	if (!link_rounded_grad_border_corner_program(&renderer->shaders.rounded_grad_border_corner, 16)) {
-		wlr_log(WLR_ERROR, "Could not link quad shader");
-		goto error;
-	}
-
 	// box shadow shader
 	if (!link_box_shadow_program(&renderer->shaders.box_shadow)) {
 		wlr_log(WLR_ERROR, "Could not link box shadow shader");
@@ -425,10 +413,15 @@ error:
 	glDeleteProgram(renderer->shaders.quad_round_tr.program);
 	glDeleteProgram(renderer->shaders.quad_round_bl.program);
 	glDeleteProgram(renderer->shaders.quad_round_br.program);
+	glDeleteProgram(renderer->shaders.quad_grad.program);
+	glDeleteProgram(renderer->shaders.quad_grad_round.program);
+	glDeleteProgram(renderer->shaders.quad_grad_round_tl.program);
+	glDeleteProgram(renderer->shaders.quad_grad_round_tr.program);
+	glDeleteProgram(renderer->shaders.quad_grad_round_bl.program);
+	glDeleteProgram(renderer->shaders.quad_grad_round_br.program);
 	glDeleteProgram(renderer->shaders.tex_rgba.program);
 	glDeleteProgram(renderer->shaders.tex_rgbx.program);
 	glDeleteProgram(renderer->shaders.tex_ext.program);
-	glDeleteProgram(renderer->shaders.rounded_border_corner.program);
 	glDeleteProgram(renderer->shaders.box_shadow.program);
 	glDeleteProgram(renderer->shaders.blur1.program);
 	glDeleteProgram(renderer->shaders.blur2.program);

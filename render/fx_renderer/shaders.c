@@ -16,8 +16,6 @@
 #include "quad_round_frag_src.h"
 #include "quad_grad_round_frag_src.h"
 #include "tex_frag_src.h"
-#include "rounded_border_corner_frag_src.h"
-#include "rounded_grad_border_corner_frag_src.h"
 #include "box_shadow_frag_src.h"
 #include "blur1_frag_src.h"
 #include "blur2_frag_src.h"
@@ -229,64 +227,6 @@ bool link_tex_program(struct tex_shader *shader, enum fx_tex_shader_source sourc
 	shader->round_top_right = glGetUniformLocation(prog, "round_top_right");
 	shader->round_bottom_left = glGetUniformLocation(prog, "round_bottom_left");
 	shader->round_bottom_right = glGetUniformLocation(prog, "round_bottom_right");
-
-	return true;
-}
-
-bool link_rounded_border_corner_program(struct rounded_border_corner_shader *shader) {
-	GLuint prog;
-	shader->program = prog = link_program(rounded_border_corner_frag_src);
-	if (!shader->program) {
-		return false;
-	}
-
-	shader->proj = glGetUniformLocation(prog, "proj");
-	shader->color = glGetUniformLocation(prog, "color");
-	shader->pos_attrib = glGetAttribLocation(prog, "pos");
-	shader->is_top_left = glGetUniformLocation(prog, "is_top_left");
-	shader->is_top_right = glGetUniformLocation(prog, "is_top_right");
-	shader->is_bottom_left = glGetUniformLocation(prog, "is_bottom_left");
-	shader->is_bottom_right = glGetUniformLocation(prog, "is_bottom_right");
-	shader->position = glGetUniformLocation(prog, "position");
-	shader->radius = glGetUniformLocation(prog, "radius");
-	shader->half_size = glGetUniformLocation(prog, "half_size");
-	shader->half_thickness = glGetUniformLocation(prog, "half_thickness");
-
-	return true;
-}
-
-bool link_rounded_grad_border_corner_program(struct rounded_grad_border_corner_shader *shader, int max_len) {
-	GLchar quad_src[4096];
-	snprintf(quad_src, sizeof(quad_src),
-			"#define LEN %d\n%s\n%s", max_len, rounded_grad_border_corner_frag_src, gradient_frag_src);
-
-	GLuint prog;
-	shader->program = prog = link_program(quad_src);
-	if (!shader->program) {
-		return false;
-	}
-
-	shader->proj = glGetUniformLocation(prog, "proj");
-	shader->pos_attrib = glGetAttribLocation(prog, "pos");
-	shader->size = glGetUniformLocation(prog, "size");
-	shader->colors = glGetUniformLocation(prog, "colors");
-	shader->degree = glGetUniformLocation(prog, "degree");
-	shader->grad_box = glGetUniformLocation(prog, "grad_box");
-	shader->linear = glGetUniformLocation(prog, "linear");
-	shader->origin = glGetUniformLocation(prog, "origin");
-	shader->count = glGetUniformLocation(prog, "count");
-	shader->blend = glGetUniformLocation(prog, "blend");
-
-	shader->is_top_left = glGetUniformLocation(prog, "is_top_left");
-	shader->is_top_right = glGetUniformLocation(prog, "is_top_right");
-	shader->is_bottom_left = glGetUniformLocation(prog, "is_bottom_left");
-	shader->is_bottom_right = glGetUniformLocation(prog, "is_bottom_right");
-	shader->position = glGetUniformLocation(prog, "position");
-	shader->radius = glGetUniformLocation(prog, "radius");
-	shader->half_size = glGetUniformLocation(prog, "half_size");
-	shader->half_thickness = glGetUniformLocation(prog, "half_thickness");
-
-	shader->max_len = max_len;
 
 	return true;
 }

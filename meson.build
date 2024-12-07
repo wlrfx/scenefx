@@ -174,7 +174,6 @@ pkgconfig.generate(
 	name: versioned_name,
 	version: meson.project_version(),
 	filebase: meson.project_name(),
-	name: meson.project_name(),
 	description: 'Wlroots effects library',
 	subdirs: versioned_name,
 )

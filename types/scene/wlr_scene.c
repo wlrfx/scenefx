@@ -2421,6 +2421,11 @@ bool wlr_scene_output_build_state(struct wlr_scene_output *scene_output,
 		timer->pre_render_duration = timespec_to_nsec(&duration);
 	}
 
+	// TODO: we need to revisit this, this is a stopgap to ensure we can resume swayfx rebase
+	if (!output->swapchain && !wlr_output_configure_primary_swapchain(output, state, &output->swapchain)) {
+		return false;
+	}
+
 	struct fx_gles_render_pass *render_pass =
 		fx_renderer_begin_buffer_pass(output->renderer, buffer, output,
 				&(struct wlr_buffer_pass_options) {

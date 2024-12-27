@@ -69,9 +69,12 @@ GLuint fx_framebuffer_get_fbo(struct fx_framebuffer *buffer) {
 }
 
 void fx_framebuffer_get_or_create_custom(struct fx_renderer *renderer,
-		struct wlr_output *output, struct fx_framebuffer **fx_framebuffer) {
+		struct wlr_output *output, struct wlr_swapchain *swapchain,
+		struct fx_framebuffer **fx_framebuffer) {
 	struct wlr_allocator *allocator = output->allocator;
-	struct wlr_swapchain *swapchain = output->swapchain;
+	if (!swapchain) {
+		swapchain = output->swapchain;
+	}
 	int width = output->width;
 	int height = output->height;
 	struct wlr_buffer *wlr_buffer = NULL;

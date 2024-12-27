@@ -4,6 +4,7 @@
 #include <stdbool.h>
 #include <wlr/render/pass.h>
 #include <wlr/render/interface.h>
+#include <wlr/render/swapchain.h>
 
 #include "render/egl.h"
 #include "scenefx/types/fx/corner_location.h"
@@ -18,6 +19,12 @@ struct fx_gles_render_pass {
 	struct fx_render_timer *timer;
 };
 
+struct fx_buffer_pass_options {
+	const struct wlr_buffer_pass_options *base;
+
+	struct wlr_swapchain *swapchain;
+};
+
 /**
  * Begin a new render pass with the supplied destination buffer.
  *
@@ -26,7 +33,7 @@ struct fx_gles_render_pass {
  */
 struct fx_gles_render_pass *fx_renderer_begin_buffer_pass(struct wlr_renderer *wlr_renderer,
 		struct wlr_buffer *wlr_buffer, struct wlr_output *output,
-		const struct wlr_buffer_pass_options *options);
+		const struct fx_buffer_pass_options *options);
 
 struct fx_gradient {
 	float degree;

@@ -121,7 +121,10 @@ static void fx_renderer_destroy(struct wlr_renderer *wlr_renderer) {
 static struct wlr_render_pass *begin_buffer_pass(struct wlr_renderer *wlr_renderer,
 		struct wlr_buffer *wlr_buffer, const struct wlr_buffer_pass_options *options) {
 	struct fx_gles_render_pass *pass =
-		fx_renderer_begin_buffer_pass(wlr_renderer, wlr_buffer, NULL, options);
+		fx_renderer_begin_buffer_pass(wlr_renderer, wlr_buffer, NULL, &(struct fx_buffer_pass_options) {
+					.base = options,
+					.swapchain = NULL,
+				});
 	if (!pass) {
 		return NULL;
 	}

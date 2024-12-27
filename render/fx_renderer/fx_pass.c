@@ -926,7 +926,7 @@ void fx_render_pass_add_optimized_blur(struct fx_gles_render_pass *pass,
 	struct fx_framebuffer *buffer = get_main_buffer_blur(pass, &blur_options);
 
 	// Update the optimized blur buffer if invalid
-	fx_framebuffer_get_or_create_custom(renderer, pass->output,
+	fx_framebuffer_get_or_create_custom(renderer, pass->output, NULL,
 			&pass->fx_effect_framebuffers->optimized_blur_buffer);
 
 	// Render the newly blurred content into the blur_buffer
@@ -1051,7 +1051,8 @@ static struct fx_gles_render_pass *begin_buffer_pass(struct fx_framebuffer *buff
 
 struct fx_gles_render_pass *fx_renderer_begin_buffer_pass(
 		struct wlr_renderer *wlr_renderer, struct wlr_buffer *wlr_buffer,
-		struct wlr_output *output, const struct wlr_buffer_pass_options *options) {
+		struct wlr_output *output, const struct fx_buffer_pass_options *fx_options) {
+	const struct wlr_buffer_pass_options *options = fx_options->base;
 	struct fx_renderer *renderer = fx_get_renderer(wlr_renderer);
 
 	renderer->basic_renderer = (output == NULL);
@@ -1077,9 +1078,12 @@ struct fx_gles_render_pass *fx_renderer_begin_buffer_pass(
 	// Update the buffers if needed
 	if (!renderer->basic_renderer) {
 		fbos = fx_effect_framebuffers_try_get(output);
-		fx_framebuffer_get_or_create_custom(renderer, output, &fbos->blur_saved_pixels_buffer);
-		fx_framebuffer_get_or_create_custom(renderer, output, &fbos->effects_buffer);
-		fx_framebuffer_get_or_create_custom(renderer, output, &fbos->effects_buffer_swapped);
+		fx_framebuffer_get_or_create_custom(renderer, output, fx_options->swapchain,
+				&fbos->blur_saved_pixels_buffer);
+		fx_framebuffer_get_or_create_custom(renderer, output, fx_options->swapchain,
+				&fbos->effects_buffer);
+		fx_framebuffer_get_or_create_custom(renderer, output, fx_options->swapchain,
+				&fbos->effects_buffer_swapped);
 
 		pixman_region32_init(&fbos->blur_padding_region);
 	}

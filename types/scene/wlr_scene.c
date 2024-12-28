@@ -843,6 +843,7 @@ struct wlr_scene_optimized_blur *wlr_scene_optimized_blur_create(
 
 void wlr_scene_optimized_blur_set_size(struct wlr_scene_optimized_blur *blur_node,
 		int width, int height) {
+	assert(blur_node);
 	if (blur_node->width == width && blur_node->height == height) {
 		return;
 	}

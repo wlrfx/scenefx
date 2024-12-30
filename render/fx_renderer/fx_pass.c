@@ -244,23 +244,9 @@ static void setup_blending(enum wlr_render_blend_mode mode) {
 	}
 }
 
-// make sure the texture source box does not try and sample outside of the
-// texture
-static void check_tex_src_box(const struct wlr_render_texture_options *options) {
-	if (!wlr_fbox_empty(&options->src_box)) {
-		const struct wlr_fbox *box = &options->src_box;
-		assert(box->x >= 0 && box->y >= 0 &&
-			box->x + box->width <= options->texture->width &&
-			box->y + box->height <= options->texture->height);
-	}
-}
-
 void fx_render_pass_add_texture(struct fx_gles_render_pass *pass,
 		const struct fx_render_texture_options *fx_options) {
 	const struct wlr_render_texture_options *options = &fx_options->base;
-
-	check_tex_src_box(options);
-
 	struct fx_renderer *renderer = pass->buffer->renderer;
 	struct fx_texture *texture = fx_get_texture(options->texture);
 
@@ -634,8 +620,6 @@ static void render_blur_segments(struct fx_gles_render_pass *pass,
 			fx_options->current_buffer->buffer);
 	struct fx_texture *texture = fx_get_texture(options->texture);
 
-	check_tex_src_box(options);
-
 	/*
 	 * Render
 	 */
@@ -703,9 +687,6 @@ static void render_blur_effects(struct fx_gles_render_pass *pass,
 		struct fx_render_blur_pass_options *fx_options) {
 	struct fx_render_texture_options *tex_options = &fx_options->tex_options;
 	struct wlr_render_texture_options *options = &tex_options->base;
-
-	check_tex_src_box(options);
-
 	struct fx_renderer *renderer = pass->buffer->renderer;
 	struct blur_data *blur_data = fx_options->blur_data;
 	struct fx_texture *texture = fx_get_texture(options->texture);

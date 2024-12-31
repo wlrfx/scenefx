@@ -72,7 +72,7 @@ struct fx_render_rect_grad_options {
 struct fx_render_rounded_rect_options {
 	struct wlr_render_rect_options base;
 	int corner_radius;
-	enum corner_location corner_location;
+	enum corner_location corners;
 
 	struct wlr_box window_box;
 	int window_corner_radius;
@@ -82,7 +82,7 @@ struct fx_render_rounded_rect_grad_options {
 	struct wlr_render_rect_options base;
 	struct fx_gradient gradient;
 	int corner_radius;
-	enum corner_location corner_location;
+	enum corner_location corners;
 };
 
 struct fx_render_box_shadow_options {

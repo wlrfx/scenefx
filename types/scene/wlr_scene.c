@@ -20,6 +20,7 @@
 #include "scenefx/render/fx_renderer/fx_renderer.h"
 #include "scenefx/render/pass.h"
 #include "scenefx/types/fx/blur_data.h"
+#include "scenefx/types/fx/corner_location.h"
 #include "types/wlr_buffer.h"
 #include "types/wlr_output.h"
 #include "types/wlr_scene.h"
@@ -664,6 +665,7 @@ struct wlr_scene_rect *wlr_scene_rect_create(struct wlr_scene_tree *parent,
 	scene_rect->height = height;
 	memcpy(scene_rect->color, color, sizeof(scene_rect->color));
 	scene_rect->corner_radius = 0;
+	scene_rect->corners = CORNER_LOCATION_NONE;
 
 	scene_node_update(&scene_rect->node, NULL);
 
@@ -745,12 +747,14 @@ static void scene_buffer_set_texture(struct wlr_scene_buffer *scene_buffer,
 	}
 }
 
-void wlr_scene_rect_set_corner_radius(struct wlr_scene_rect *rect, int corner_radius) {
-	if (rect->corner_radius == corner_radius) {
+void wlr_scene_rect_set_corner_radius(struct wlr_scene_rect *rect, int corner_radius,
+		enum corner_location corners) {
+	if (rect->corner_radius == corner_radius && rect->corners == corners) {
 		return;
 	}
 
 	rect->corner_radius = corner_radius;
+	rect->corners = corners;
 	scene_node_update(&rect->node, NULL);
 }
 
@@ -1586,7 +1590,7 @@ static void scene_entry_render(struct render_list_entry *entry, const struct ren
 			},
 		};
 
-		if (scene_rect->corner_radius) {
+		if (scene_rect->corner_radius && scene_rect->corners != CORNER_LOCATION_NONE) {
 			struct wlr_box window_box;
 			int window_corner_radius;
 			scene_get_next_sibling_geometry(node, &window_box, &window_corner_radius);
@@ -1600,7 +1604,7 @@ static void scene_entry_render(struct render_list_entry *entry, const struct ren
 			struct fx_render_rounded_rect_options rounded_rect_options = {
 				.base = rect_options.base,
 				.corner_radius = scene_rect->corner_radius,
-				.corner_location = CORNER_LOCATION_ALL,
+				.corners = scene_rect->corners,
 				.window_box = window_box,
 				.window_corner_radius = window_corner_radius,
 			};

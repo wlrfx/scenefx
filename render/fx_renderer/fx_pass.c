@@ -411,7 +411,7 @@ void fx_render_pass_add_rounded_rect(struct fx_gles_render_pass *pass,
 	struct fx_renderer *renderer = pass->buffer->renderer;
 
 	struct quad_round_shader *shader = NULL;
-	switch (fx_options->corner_location) {
+	switch (fx_options->corners) {
 	case CORNER_LOCATION_ALL:
 		shader = &renderer->shaders.quad_round;
 		break;
@@ -485,7 +485,7 @@ void fx_render_pass_add_rounded_rect_grad(struct fx_gles_render_pass *pass,
 
 	struct quad_grad_round_shader *shader = NULL;
 	enum fx_rounded_quad_shader_source corner;
-	switch (fx_options->corner_location) {
+	switch (fx_options->corners) {
 	case CORNER_LOCATION_ALL:
 		corner = SHADER_SOURCE_QUAD_ROUND;
 		shader = &renderer->shaders.quad_grad_round;

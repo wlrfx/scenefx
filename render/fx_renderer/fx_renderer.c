@@ -568,6 +568,7 @@ struct wlr_renderer *fx_renderer_create_egl(struct wlr_egl *egl) {
 	wlr_egl_unset_current(renderer->egl);
 
 	get_fx_shm_formats(renderer, &renderer->shm_texture_formats);
+	printf("made renderer\n");
 
 	return &renderer->wlr_renderer;
 

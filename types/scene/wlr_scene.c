@@ -1602,16 +1602,15 @@ static void scene_entry_render(struct render_list_entry *entry, const struct ren
 			window_box.x -= data->logical.x;
 			window_box.y -= data->logical.y;
 
-			window_corner_radius *= data->scale;
 			scale_box(&window_box, data->scale);
 			transform_output_box(&window_box, data);
 
 			struct fx_render_rounded_rect_options rounded_rect_options = {
 				.base = rect_options.base,
-				.corner_radius = scene_rect->corner_radius,
+				.corner_radius = scene_rect->corner_radius * data->scale,
 				.corners = scene_rect->corners,
 				.window_box = window_box,
-				.window_corner_radius = window_corner_radius,
+				.window_corner_radius = window_corner_radius * data->scale,
 			};
 			fx_render_pass_add_rounded_rect(data->render_pass, &rounded_rect_options);
 		} else {
@@ -1657,7 +1656,6 @@ static void scene_entry_render(struct render_list_entry *entry, const struct ren
 		window_box.x -= data->logical.x;
 		window_box.y -= data->logical.y;
 
-		window_corner_radius *= data->scale;
 		scale_box(&window_box, data->scale);
 		transform_output_box(&window_box, data);
 
@@ -1665,9 +1663,9 @@ static void scene_entry_render(struct render_list_entry *entry, const struct ren
 			.box = dst_box,
 			// TODO: Use dst_box if larger?
 			.window_box = window_box,
-			.window_corner_radius = window_corner_radius,
+			.window_corner_radius = window_corner_radius * data->scale,
 			.blur_sigma = scene_shadow->blur_sigma,
-			.corner_radius = scene_shadow->corner_radius,
+			.corner_radius = scene_shadow->corner_radius * data->scale,
 			.color = {
 				.r = scene_shadow->color[0],
 				.g = scene_shadow->color[1],

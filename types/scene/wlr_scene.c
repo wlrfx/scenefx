@@ -1508,8 +1508,13 @@ static void scene_get_next_sibling_geometry(struct wlr_scene_node *node,
 		return;
 	}
 
-	struct wlr_scene_node *sibling_node =
-		wl_container_of(node->link.next, sibling_node, link);
+	// Get the nearest sibling that is enabled
+	struct wlr_scene_node *sibling_node;
+	wl_list_for_each(sibling_node, &node->link, link) {
+		if (sibling_node->enabled) {
+			break;
+		}
+	}
 
 	pixman_region32_t region;
 	pixman_region32_init(&region);

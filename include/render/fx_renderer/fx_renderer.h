@@ -7,6 +7,7 @@
 #include <time.h>
 #include <wlr/render/egl.h>
 #include <wlr/render/interface.h>
+#include <wlr/render/swapchain.h>
 #include <wlr/render/wlr_texture.h>
 #include <wlr/util/addon.h>
 #include <wlr/util/box.h>
@@ -50,7 +51,8 @@ struct fx_framebuffer {
 
 /** Should only be used with custom fbs */
 void fx_framebuffer_get_or_create_custom(struct fx_renderer *fx_renderer,
-		struct wlr_output *output, struct fx_framebuffer **fx_buffer);
+		struct wlr_output *output, struct wlr_swapchain *swapchain,
+		struct fx_framebuffer **fx_buffer);
 
 struct fx_framebuffer *fx_framebuffer_get_or_create(struct fx_renderer *renderer,
 		struct wlr_buffer *wlr_buffer);
@@ -176,15 +178,7 @@ struct fx_renderer {
 		struct quad_shader quad;
 		struct quad_grad_shader quad_grad;
 		struct quad_round_shader quad_round;
-		struct quad_round_shader quad_round_tl;
-		struct quad_round_shader quad_round_tr;
-		struct quad_round_shader quad_round_bl;
-		struct quad_round_shader quad_round_br;
 		struct quad_grad_round_shader quad_grad_round;
-		struct quad_grad_round_shader quad_grad_round_tl;
-		struct quad_grad_round_shader quad_grad_round_tr;
-		struct quad_grad_round_shader quad_grad_round_bl;
-		struct quad_grad_round_shader quad_grad_round_br;
 		struct tex_shader tex_rgba;
 		struct tex_shader tex_rgbx;
 		struct tex_shader tex_ext;

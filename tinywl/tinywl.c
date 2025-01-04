@@ -954,7 +954,8 @@ static void server_new_xdg_toplevel(struct wl_listener *listener, void *data) {
 
 	toplevel->border = wlr_scene_rect_create(toplevel->scene_tree, 0, 0,
 			(float[4]){ 1.0f, 0.f, 0.f, 1.0f });
-	wlr_scene_rect_set_corner_radius(toplevel->border, toplevel->corner_radius + BORDER_THICKNESS);
+	wlr_scene_rect_set_corner_radius(toplevel->border,
+			toplevel->corner_radius + BORDER_THICKNESS, CORNER_LOCATION_ALL);
 	wlr_scene_node_set_position(&toplevel->border->node, -BORDER_THICKNESS, -BORDER_THICKNESS);
 
 	float blur_sigma = 20.0f;

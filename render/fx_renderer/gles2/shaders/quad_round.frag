@@ -1,13 +1,3 @@
-#define SOURCE_QUAD_ROUND 1
-#define SOURCE_QUAD_ROUND_TOP_LEFT 2
-#define SOURCE_QUAD_ROUND_TOP_RIGHT 3
-#define SOURCE_QUAD_ROUND_BOTTOM_RIGHT 4
-#define SOURCE_QUAD_ROUND_BOTTOM_LEFT 5
-
-#if !defined(SOURCE)
-#error "Missing shader preamble"
-#endif
-
 precision mediump float;
 varying vec4 v_color;
 varying vec2 v_texcoord;
@@ -20,30 +10,18 @@ uniform vec2 window_half_size;
 uniform vec2 window_position;
 uniform float window_radius;
 
-// TODO: use the corner_mask from the tex shader with roundRectSDF
-vec2 getCornerDist() {
-#if SOURCE == SOURCE_QUAD_ROUND
-    vec2 half_size = size * 0.5;
-    return abs(gl_FragCoord.xy - position - half_size) - half_size + radius;
-#elif SOURCE == SOURCE_QUAD_ROUND_TOP_LEFT
-    return abs(gl_FragCoord.xy - position - size) - size + radius;
-#elif SOURCE == SOURCE_QUAD_ROUND_TOP_RIGHT
-    return abs(gl_FragCoord.xy - position - vec2(0, size.y)) - size + radius;
-#elif SOURCE == SOURCE_QUAD_ROUND_BOTTOM_RIGHT
-    return abs(gl_FragCoord.xy - position) - size + radius;
-#elif SOURCE == SOURCE_QUAD_ROUND_BOTTOM_LEFT
-    return abs(gl_FragCoord.xy - position - vec2(size.x, 0)) - size + radius;
-#endif
-}
+uniform bool round_top_left;
+uniform bool round_top_right;
+uniform bool round_bottom_left;
+uniform bool round_bottom_right;
 
-float roundRectSDF(vec2 half_size, vec2 position, float radius);
+float corner_alpha(vec2 size, vec2 position, float radius,
+            bool round_tl, bool round_tr, bool round_bl, bool round_br);
 
 void main() {
-    vec2 q = getCornerDist();
-    float dist = min(max(q.x,q.y), 0.0) + length(max(q, 0.0)) - radius;
-    float rect_alpha = v_color.a * 1.0 - smoothstep(-1.0, 1.0, dist);
+    float corner_alpha = corner_alpha(size, position, radius,
+            round_top_left, round_top_right, round_bottom_left, round_bottom_right);
+    float window_alpha = 1.0; // TODO: smoothstep(-1.0, 1.0, roundRectSDF(window_half_size, window_position, window_radius + 1.0)); // pull in radius by 1.0 px
 
-    float window_alpha = smoothstep(-1.0, 1.0, roundRectSDF(window_half_size, window_position, window_radius + 1.0)); // pull in radius by 1.0 px
-
-    gl_FragColor = vec4(v_color.rgb, rect_alpha) * window_alpha;
+    gl_FragColor = mix(v_color, vec4(0.0), corner_alpha) * window_alpha;
 }

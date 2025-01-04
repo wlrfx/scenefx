@@ -1,5 +1,6 @@
 #include <assert.h>
 #include <pixman.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <scenefx/types/wlr_scene.h>
 #include <string.h>
@@ -19,6 +20,7 @@
 #include "scenefx/render/fx_renderer/fx_renderer.h"
 #include "scenefx/render/pass.h"
 #include "scenefx/types/fx/blur_data.h"
+#include "scenefx/types/fx/corner_location.h"
 #include "types/wlr_buffer.h"
 #include "types/wlr_output.h"
 #include "types/wlr_scene.h"
@@ -663,6 +665,7 @@ struct wlr_scene_rect *wlr_scene_rect_create(struct wlr_scene_tree *parent,
 	scene_rect->height = height;
 	memcpy(scene_rect->color, color, sizeof(scene_rect->color));
 	scene_rect->corner_radius = 0;
+	scene_rect->corners = CORNER_LOCATION_NONE;
 
 	scene_node_update(&scene_rect->node, NULL);
 
@@ -744,12 +747,14 @@ static void scene_buffer_set_texture(struct wlr_scene_buffer *scene_buffer,
 	}
 }
 
-void wlr_scene_rect_set_corner_radius(struct wlr_scene_rect *rect, int corner_radius) {
-	if (rect->corner_radius == corner_radius) {
+void wlr_scene_rect_set_corner_radius(struct wlr_scene_rect *rect, int corner_radius,
+		enum corner_location corners) {
+	if (rect->corner_radius == corner_radius && rect->corners == corners) {
 		return;
 	}
 
 	rect->corner_radius = corner_radius;
+	rect->corners = corners;
 	scene_node_update(&rect->node, NULL);
 }
 
@@ -842,6 +847,7 @@ struct wlr_scene_optimized_blur *wlr_scene_optimized_blur_create(
 
 void wlr_scene_optimized_blur_set_size(struct wlr_scene_optimized_blur *blur_node,
 		int width, int height) {
+	assert(blur_node);
 	if (blur_node->width == width && blur_node->height == height) {
 		return;
 	}
@@ -1502,8 +1508,13 @@ static void scene_get_next_sibling_geometry(struct wlr_scene_node *node,
 		return;
 	}
 
-	struct wlr_scene_node *sibling_node =
-		wl_container_of(node->link.next, sibling_node, link);
+	// Get the nearest sibling that is enabled
+	struct wlr_scene_node *sibling_node;
+	wl_list_for_each(sibling_node, &node->link, link) {
+		if (sibling_node->enabled) {
+			break;
+		}
+	}
 
 	pixman_region32_t region;
 	pixman_region32_init(&region);
@@ -1584,23 +1595,22 @@ static void scene_entry_render(struct render_list_entry *entry, const struct ren
 			},
 		};
 
-		if (scene_rect->corner_radius) {
+		if (scene_rect->corner_radius && scene_rect->corners != CORNER_LOCATION_NONE) {
 			struct wlr_box window_box;
 			int window_corner_radius;
 			scene_get_next_sibling_geometry(node, &window_box, &window_corner_radius);
 			window_box.x -= data->logical.x;
 			window_box.y -= data->logical.y;
 
-			window_corner_radius *= data->scale;
 			scale_box(&window_box, data->scale);
 			transform_output_box(&window_box, data);
 
 			struct fx_render_rounded_rect_options rounded_rect_options = {
 				.base = rect_options.base,
-				.corner_radius = scene_rect->corner_radius,
-				.corner_location = CORNER_LOCATION_ALL,
+				.corner_radius = scene_rect->corner_radius * data->scale,
+				.corners = scene_rect->corners,
 				.window_box = window_box,
-				.window_corner_radius = window_corner_radius,
+				.window_corner_radius = window_corner_radius * data->scale,
 			};
 			fx_render_pass_add_rounded_rect(data->render_pass, &rounded_rect_options);
 		} else {
@@ -1646,7 +1656,6 @@ static void scene_entry_render(struct render_list_entry *entry, const struct ren
 		window_box.x -= data->logical.x;
 		window_box.y -= data->logical.y;
 
-		window_corner_radius *= data->scale;
 		scale_box(&window_box, data->scale);
 		transform_output_box(&window_box, data);
 
@@ -1654,9 +1663,9 @@ static void scene_entry_render(struct render_list_entry *entry, const struct ren
 			.box = dst_box,
 			// TODO: Use dst_box if larger?
 			.window_box = window_box,
-			.window_corner_radius = window_corner_radius,
+			.window_corner_radius = window_corner_radius * data->scale,
 			.blur_sigma = scene_shadow->blur_sigma,
-			.corner_radius = scene_shadow->corner_radius,
+			.corner_radius = scene_shadow->corner_radius * data->scale,
 			.color = {
 				.r = scene_shadow->color[0],
 				.g = scene_shadow->color[1],
@@ -2423,9 +2432,12 @@ bool wlr_scene_output_build_state(struct wlr_scene_output *scene_output,
 
 	struct fx_gles_render_pass *render_pass =
 		fx_renderer_begin_buffer_pass(output->renderer, buffer, output,
-				&(struct wlr_buffer_pass_options) {
-					.timer = timer ? timer->render_timer : NULL,
-					.color_transform = options->color_transform,
+				&(struct fx_buffer_pass_options) {
+					.base = &(struct wlr_buffer_pass_options){
+						.timer = timer ? timer->render_timer : NULL,
+						.color_transform = options->color_transform,
+					},
+					.swapchain = swapchain,
 				}
 			);
 	if (render_pass == NULL) {

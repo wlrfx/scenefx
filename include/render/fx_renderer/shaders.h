@@ -20,14 +20,6 @@ enum fx_tex_shader_source {
 	SHADER_SOURCE_TEXTURE_EXTERNAL = 3,
 };
 
-enum fx_rounded_quad_shader_source {
-	SHADER_SOURCE_QUAD_ROUND = 1,
-	SHADER_SOURCE_QUAD_ROUND_TOP_LEFT = 2,
-	SHADER_SOURCE_QUAD_ROUND_TOP_RIGHT = 3,
-	SHADER_SOURCE_QUAD_ROUND_BOTTOM_RIGHT = 4,
-	SHADER_SOURCE_QUAD_ROUND_BOTTOM_LEFT = 5,
-};
-
 struct quad_shader {
 	GLuint program;
 	GLint proj;
@@ -67,9 +59,14 @@ struct quad_round_shader {
 	GLint window_half_size;
 	GLint window_position;
 	GLint window_radius;
+
+	GLint round_top_left;
+	GLint round_top_right;
+	GLint round_bottom_left;
+	GLint round_bottom_right;
 };
 
-bool link_quad_round_program(struct quad_round_shader *shader, enum fx_rounded_quad_shader_source source);
+bool link_quad_round_program(struct quad_round_shader *shader);
 
 struct quad_grad_round_shader {
 	GLuint program;
@@ -89,10 +86,15 @@ struct quad_grad_round_shader {
 	GLint count;
 	GLint blend;
 
+	GLint round_top_left;
+	GLint round_top_right;
+	GLint round_bottom_left;
+	GLint round_bottom_right;
+
 	int max_len;
 };
 
-bool link_quad_grad_round_program(struct quad_grad_round_shader *shader, enum fx_rounded_quad_shader_source source, int max_len);
+bool link_quad_grad_round_program(struct quad_grad_round_shader *shader, int max_len);
 
 struct tex_shader {
 	GLuint program;
@@ -107,6 +109,7 @@ struct tex_shader {
 	GLint discard_transparent;
 	GLint dim;
 	GLint dim_color;
+
 	GLint round_top_left;
 	GLint round_top_right;
 	GLint round_bottom_left;

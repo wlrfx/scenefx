@@ -1,13 +1,3 @@
-#define SOURCE_QUAD_ROUND 1
-#define SOURCE_QUAD_ROUND_TOP_LEFT 2
-#define SOURCE_QUAD_ROUND_TOP_RIGHT 3
-#define SOURCE_QUAD_ROUND_BOTTOM_RIGHT 4
-#define SOURCE_QUAD_ROUND_BOTTOM_LEFT 5
-
-#if !defined(SOURCE)
-#error "Missing shader preamble"
-#endif
-
 precision mediump float;
 varying vec4 v_color;
 varying vec2 v_texcoord;
@@ -25,27 +15,20 @@ uniform bool linear;
 uniform bool blend;
 uniform int count;
 
-vec2 getCornerDist() {
-#if SOURCE == SOURCE_QUAD_ROUND
-    vec2 half_size = size * 0.5;
-    return abs(gl_FragCoord.xy - position - half_size) - half_size + radius;
-#elif SOURCE == SOURCE_QUAD_ROUND_TOP_LEFT
-    return abs(gl_FragCoord.xy - position - size) - size + radius;
-#elif SOURCE == SOURCE_QUAD_ROUND_TOP_RIGHT
-    return abs(gl_FragCoord.xy - position - vec2(0, size.y)) - size + radius;
-#elif SOURCE == SOURCE_QUAD_ROUND_BOTTOM_RIGHT
-    return abs(gl_FragCoord.xy - position) - size + radius;
-#elif SOURCE == SOURCE_QUAD_ROUND_BOTTOM_LEFT
-    return abs(gl_FragCoord.xy - position - vec2(size.x, 0)) - size + radius;
-#endif
-}
+uniform bool round_top_left;
+uniform bool round_top_right;
+uniform bool round_bottom_left;
+uniform bool round_bottom_right;
 
 vec4 gradient(vec4 colors[LEN], int count, vec2 size, vec2 grad_box, vec2 origin, float degree, bool linear, bool blend);
 
-void main() {
-    vec2 q = getCornerDist();
-    float dist = min(max(q.x,q.y), 0.0) + length(max(q, 0.0)) - radius;
-    float smoothedAlpha = 1.0 - smoothstep(-1.0, 0.5, dist);
+float corner_alpha(vec2 size, vec2 position, float radius,
+            bool round_tl, bool round_tr, bool round_bl, bool round_br);
 
-    gl_FragColor = mix(vec4(0), gradient(colors, count, size, grad_box, origin, degree, linear, blend), smoothedAlpha);
+// TODO:
+void main() {
+    float rect_alpha = v_color.a * corner_alpha(size, position, radius,
+            round_top_left, round_top_right, round_bottom_left, round_bottom_right);
+
+    gl_FragColor = mix(vec4(0), gradient(colors, count, size, grad_box, origin, degree, linear, blend), rect_alpha);
 }

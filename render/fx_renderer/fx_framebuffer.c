@@ -80,9 +80,6 @@ void fx_framebuffer_get_or_create_custom(struct fx_renderer *renderer,
 	struct wlr_buffer *wlr_buffer = NULL;
 
 	if (*fx_framebuffer == NULL) {
-		if (swapchain == NULL) {
-			printf("swapchain is null\n");
-		}
 		wlr_buffer = wlr_allocator_create_buffer(allocator, width, height,
 				&swapchain->format);
 		if (wlr_buffer == NULL) {

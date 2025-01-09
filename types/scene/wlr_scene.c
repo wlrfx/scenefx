@@ -21,12 +21,14 @@
 #include "scenefx/render/pass.h"
 #include "scenefx/types/fx/blur_data.h"
 #include "scenefx/types/fx/corner_location.h"
+#include "scenefx/types/fx/hole_data.h"
 #include "types/wlr_buffer.h"
 #include "types/wlr_output.h"
 #include "types/wlr_scene.h"
 #include "util/array.h"
 #include "util/env.h"
 #include "util/time.h"
+#include "wlr/util/box.h"
 
 #define HIGHLIGHT_DAMAGE_FADEOUT_TIME 250
 
@@ -666,6 +668,7 @@ struct wlr_scene_rect *wlr_scene_rect_create(struct wlr_scene_tree *parent,
 	memcpy(scene_rect->color, color, sizeof(scene_rect->color));
 	scene_rect->corner_radius = 0;
 	scene_rect->corners = CORNER_LOCATION_NONE;
+	scene_rect->hole_data = hole_data_get_default();
 
 	scene_node_update(&scene_rect->node, NULL);
 
@@ -758,6 +761,16 @@ void wlr_scene_rect_set_corner_radius(struct wlr_scene_rect *rect, int corner_ra
 	scene_node_update(&rect->node, NULL);
 }
 
+void wlr_scene_rect_set_hole_data(struct wlr_scene_rect *rect, struct hole_data hole_data) {
+	if (rect->hole_data.corner_radius == hole_data.corner_radius &&
+			wlr_box_equal(&rect->hole_data.size, &hole_data.size)) {
+		return;
+	}
+
+	rect->hole_data = hole_data;
+	scene_node_update(&rect->node, NULL);
+}
+
 struct wlr_scene_shadow *wlr_scene_shadow_create(struct wlr_scene_tree *parent,
 		int width, int height, int corner_radius, float blur_sigma,
 		const float color [static 4]) {
@@ -773,6 +786,7 @@ struct wlr_scene_shadow *wlr_scene_shadow_create(struct wlr_scene_tree *parent,
 	scene_shadow->corner_radius = corner_radius;
 	scene_shadow->blur_sigma = blur_sigma;
 	memcpy(scene_shadow->color, color, sizeof(scene_shadow->color));
+	scene_shadow->hole_data = hole_data_get_default();
 
 	scene_node_update(&scene_shadow->node, NULL);
 
@@ -813,6 +827,17 @@ void wlr_scene_shadow_set_color(struct wlr_scene_shadow *shadow, const float col
 	}
 
 	memcpy(shadow->color, color, sizeof(shadow->color));
+	scene_node_update(&shadow->node, NULL);
+}
+
+void wlr_scene_shadow_set_hole_data(struct wlr_scene_shadow *shadow,
+		struct hole_data hole_data) {
+	if (shadow->hole_data.corner_radius == hole_data.corner_radius &&
+			wlr_box_equal(&shadow->hole_data.size, &hole_data.size)) {
+		return;
+	}
+
+	shadow->hole_data = hole_data;
 	scene_node_update(&shadow->node, NULL);
 }
 
@@ -1226,29 +1251,6 @@ static void scene_node_get_size(struct wlr_scene_node *node,
 	}
 }
 
-static void scene_node_get_corner_radius(struct wlr_scene_node *node, int *corner_radius) {
-	*corner_radius = 0;
-
-	switch (node->type) {
-	case WLR_SCENE_NODE_TREE:
-		return;
-	case WLR_SCENE_NODE_RECT:;
-		struct wlr_scene_rect *scene_rect = wlr_scene_rect_from_node(node);
-		*corner_radius = scene_rect->corner_radius;
-		return;
-	case WLR_SCENE_NODE_SHADOW:;
-		struct wlr_scene_shadow *scene_shadow = wlr_scene_shadow_from_node(node);
-		*corner_radius = scene_shadow->corner_radius;
-		break;
-	case WLR_SCENE_NODE_BUFFER:;
-		struct wlr_scene_buffer *scene_buffer = wlr_scene_buffer_from_node(node);
-		*corner_radius = scene_buffer->corner_radius;
-		break;
-	case WLR_SCENE_NODE_OPTIMIZED_BLUR:
-		return;
-	}
-}
-
 static int scale_length(int length, int offset, float scale) {
 	return round((offset + length) * scale) - round(offset * scale);
 }
@@ -1468,72 +1470,6 @@ struct wlr_scene_node *wlr_scene_node_at(struct wlr_scene_node *node,
 	return NULL;
 }
 
-static void get_tree_geometry(struct wlr_scene_node *node,
-		pixman_region32_t *region, int *max_corner_radius) {
-	if (!node->enabled) {
-		return;
-	}
-
-	if (node->type == WLR_SCENE_NODE_BUFFER || node->type == WLR_SCENE_NODE_RECT) {
-		struct wlr_box child_box = {0};
-		int radius = 0;
-		wlr_scene_node_coords(node, &child_box.x, &child_box.y);
-		scene_node_get_size(node, &child_box.width, &child_box.height);
-		scene_node_get_corner_radius(node, &radius);
-
-		pixman_region32_union_rect(region, region,
-				child_box.x, child_box.y, child_box.width, child_box.height);
-		if (radius > *max_corner_radius) {
-			*max_corner_radius = radius;
-		}
-	} else if (node->type == WLR_SCENE_NODE_TREE) {
-		struct wlr_scene_tree *tree = wlr_scene_tree_from_node(node);
-		struct wlr_scene_node *node;
-		wl_list_for_each(node, &tree->children, link) {
-			// Could possibly be a tree, so look through it as well
-			get_tree_geometry(node, region, max_corner_radius);
-		}
-	}
-}
-
-static void scene_get_next_sibling_geometry(struct wlr_scene_node *node,
-		struct wlr_box *box, int *corner_radius) {
-	assert(box && corner_radius);
-
-	*box = (struct wlr_box) {0};
-	*corner_radius = 0;
-
-	// Don't check if it's the only child in the tree
-	if (node->link.next == node->link.prev) {
-		return;
-	}
-
-	// Get the nearest sibling that is enabled
-	struct wlr_scene_node *sibling_node;
-	wl_list_for_each(sibling_node, &node->link, link) {
-		if (sibling_node->enabled) {
-			break;
-		}
-	}
-
-	pixman_region32_t region;
-	pixman_region32_init(&region);
-
-	get_tree_geometry(sibling_node, &region, corner_radius);
-
-	if (pixman_region32_not_empty(&region)) {
-		struct pixman_box32 *region_box = pixman_region32_extents(&region);
-		*box = (struct wlr_box){
-			.x = region_box->x1,
-			.y = region_box->y1,
-			.width = region_box->x2 - region_box->x1,
-			.height = region_box->y2 - region_box->y1,
-		};
-	}
-
-	pixman_region32_fini(&region);
-}
-
 struct render_list_entry {
 	struct wlr_scene_node *node;
 	bool sent_dmabuf_feedback;
@@ -1596,21 +1532,29 @@ static void scene_entry_render(struct render_list_entry *entry, const struct ren
 		};
 
 		if (scene_rect->corner_radius && scene_rect->corners != CORNER_LOCATION_NONE) {
-			struct wlr_box window_box;
-			int window_corner_radius;
-			scene_get_next_sibling_geometry(node, &window_box, &window_corner_radius);
-			window_box.x -= data->logical.x;
-			window_box.y -= data->logical.y;
+			struct wlr_box hole_box = scene_rect->hole_data.size;
+			int hole_corner_radius = scene_rect->hole_data.corner_radius;
 
-			scale_box(&window_box, data->scale);
-			transform_output_box(&window_box, data);
+			// Compensation
+			int node_x, node_y;
+			wlr_scene_node_coords(node, &node_x, &node_y);
+			hole_box.x += node_x - node->x;
+			hole_box.y += node_y - node->y;
+
+			hole_box.x -= data->logical.x;
+			hole_box.y -= data->logical.y;
+
+			scale_box(&hole_box, data->scale);
+			transform_output_box(&hole_box, data);
 
 			struct fx_render_rounded_rect_options rounded_rect_options = {
 				.base = rect_options.base,
 				.corner_radius = scene_rect->corner_radius * data->scale,
 				.corners = scene_rect->corners,
-				.window_box = window_box,
-				.window_corner_radius = window_corner_radius * data->scale,
+				.hole_data = {
+					.size = hole_box,
+					.corner_radius = hole_corner_radius * data->scale,
+				},
 			};
 			fx_render_pass_add_rounded_rect(data->render_pass, &rounded_rect_options);
 		} else {
@@ -1646,24 +1590,26 @@ static void scene_entry_render(struct render_list_entry *entry, const struct ren
 	case WLR_SCENE_NODE_SHADOW:;
 		struct wlr_scene_shadow *scene_shadow = wlr_scene_shadow_from_node(node);
 
-		// Look through the first direct sibling node and get the size of the
-		// node. If the sibling is a tree, get the total size of the whole tree.
-		// Cannot grab the first buffer in the tree due to it potentially being
-		// a CSD surface and not the actual toplevel surface.
-		struct wlr_box window_box;
-		int window_corner_radius;
-		scene_get_next_sibling_geometry(node, &window_box, &window_corner_radius);
-		window_box.x -= data->logical.x;
-		window_box.y -= data->logical.y;
+		struct wlr_box hole_box = scene_shadow->hole_data.size;
+		int hole_corner_radius = scene_shadow->hole_data.corner_radius;
 
-		scale_box(&window_box, data->scale);
-		transform_output_box(&window_box, data);
+		// Compensation
+		int node_x, node_y;
+		wlr_scene_node_coords(node, &node_x, &node_y);
+		hole_box.x += node_x - node->x;
+		hole_box.y += node_y - node->y;
+
+		hole_box.x -= data->logical.x;
+		hole_box.y -= data->logical.y;
+		scale_box(&hole_box, data->scale);
+		transform_output_box(&hole_box, data);
 
 		struct fx_render_box_shadow_options shadow_options = {
 			.box = dst_box,
-			// TODO: Use dst_box if larger?
-			.window_box = window_box,
-			.window_corner_radius = window_corner_radius * data->scale,
+			.hole_data = {
+				.size = hole_box,
+				.corner_radius = hole_corner_radius * data->scale,
+			},
 			.blur_sigma = scene_shadow->blur_sigma,
 			.corner_radius = scene_shadow->corner_radius * data->scale,
 			.color = {

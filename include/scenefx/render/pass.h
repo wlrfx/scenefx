@@ -8,6 +8,7 @@
 
 #include "render/egl.h"
 #include "scenefx/types/fx/corner_location.h"
+#include "scenefx/types/fx/hole_data.h"
 
 struct fx_gles_render_pass {
 	struct wlr_render_pass base;
@@ -74,8 +75,7 @@ struct fx_render_rounded_rect_options {
 	int corner_radius;
 	enum corner_location corners;
 
-	struct wlr_box window_box;
-	int window_corner_radius;
+	struct hole_data hole_data;
 };
 
 struct fx_render_rounded_rect_grad_options {
@@ -87,8 +87,7 @@ struct fx_render_rounded_rect_grad_options {
 
 struct fx_render_box_shadow_options {
 	struct wlr_box box;
-	struct wlr_box window_box;
-	int window_corner_radius;
+	struct hole_data hole_data;
 	/* Clip region, leave NULL to disable clipping */
 	const pixman_region32_t *clip;
 

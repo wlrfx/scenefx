@@ -30,6 +30,7 @@
 
 #include "scenefx/types/fx/blur_data.h"
 #include "scenefx/types/fx/corner_location.h"
+#include "scenefx/types/fx/hole_data.h"
 
 struct wlr_output;
 struct wlr_output_layout;
@@ -145,6 +146,8 @@ struct wlr_scene_rect {
 	float color[4];
 	int corner_radius;
 	enum corner_location corners;
+
+	struct hole_data hole_data;
 };
 
 /** A scene-graph node displaying a shadow */
@@ -154,6 +157,8 @@ struct wlr_scene_shadow {
 	int corner_radius;
 	float color[4];
 	float blur_sigma;
+
+	struct hole_data hole_data;
 };
 
 /** A scene-graph node telling SceneFX to render the optimized blur */
@@ -418,6 +423,12 @@ void wlr_scene_rect_set_corner_radius(struct wlr_scene_rect *rect, int corner_ra
 		enum corner_location corners);
 
 /**
+ * TODO:
+ */
+void wlr_scene_rect_set_hole_data(struct wlr_scene_rect *rect,
+		struct hole_data hole_data);
+
+/**
  * Change the color of an existing rectangle node.
  */
 void wlr_scene_rect_set_color(struct wlr_scene_rect *rect, const float color[static 4]);
@@ -448,6 +459,12 @@ void wlr_scene_shadow_set_blur_sigma(struct wlr_scene_shadow *shadow, float blur
  * Change the color of an existing shadow node.
  */
 void wlr_scene_shadow_set_color(struct wlr_scene_shadow *shadow, const float color[static 4]);
+
+/**
+ * TODO:
+ */
+void wlr_scene_shadow_set_hole_data(struct wlr_scene_shadow *shadow,
+		struct hole_data hole_data);
 
 /**
  * If this node represents a wlr_scene_optimized_blur node, that node will

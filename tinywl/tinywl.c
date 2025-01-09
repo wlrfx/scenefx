@@ -7,6 +7,7 @@
 #include <scenefx/render/fx_renderer/fx_renderer.h>
 #include <scenefx/types/fx/blur_data.h>
 #include <scenefx/types/fx/corner_location.h>
+#include <scenefx/types/fx/hole_data.h>
 #include <scenefx/types/wlr_scene.h>
 #include <unistd.h>
 #include <wayland-server-core.h>
@@ -605,6 +606,15 @@ static void xdg_toplevel_commit(struct wl_listener *listener, void *data) {
 	wlr_scene_shadow_set_size(toplevel->shadow,
 			geometry.width + (blur_sigma + BORDER_THICKNESS) * 2,
 			geometry.height + (blur_sigma + BORDER_THICKNESS) * 2);
+	wlr_scene_shadow_set_hole_data(toplevel->shadow, (struct hole_data) {
+			.corner_radius = toplevel->corner_radius,
+			.size = {
+				.x = 0,
+				.y = 0,
+				.width = geometry.width,
+				.height = geometry.height,
+			}
+	});
 
 	wlr_scene_rect_set_size(toplevel->border,
 			geometry.width + BORDER_THICKNESS * 2,

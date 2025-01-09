@@ -422,16 +422,18 @@ void fx_render_pass_add_rounded_rect(struct fx_gles_render_pass *pass,
 	}
 	const struct wlr_box hole_box = fx_options->hole_data.size;
 	int hole_corner_radius = fx_options->hole_data.corner_radius;
-	pixman_region32_t window_region;
-	pixman_region32_init_rect(
-		&window_region,
-		hole_box.x + hole_corner_radius * 0.3,
-		hole_box.y + hole_corner_radius * 0.3,
-		fmax(hole_box.width - hole_corner_radius * 0.6, 0),
-		fmax(hole_box.height - hole_corner_radius * 0.6, 0)
-	);
-	pixman_region32_subtract(&clip_region, &clip_region, &window_region);
-	pixman_region32_fini(&window_region);
+	if (!wlr_box_empty(&hole_box)) {
+		pixman_region32_t window_region;
+		pixman_region32_init_rect(
+			&window_region,
+			hole_box.x + hole_corner_radius * 0.3,
+			hole_box.y + hole_corner_radius * 0.3,
+			fmax(hole_box.width - hole_corner_radius * 0.6, 0),
+			fmax(hole_box.height - hole_corner_radius * 0.6, 0)
+		);
+		pixman_region32_subtract(&clip_region, &clip_region, &window_region);
+		pixman_region32_fini(&window_region);
+	}
 
 	push_fx_debug(renderer);
 	setup_blending(WLR_RENDER_BLEND_MODE_PREMULTIPLIED);
@@ -534,16 +536,18 @@ void fx_render_pass_add_box_shadow(struct fx_gles_render_pass *pass,
 	}
 	const struct wlr_box hole_box = options->hole_data.size;
 	int hole_corner_radius = options->hole_data.corner_radius;
-	pixman_region32_t window_region;
-	pixman_region32_init_rect(
-		&window_region,
-		hole_box.x + hole_corner_radius * 0.3,
-		hole_box.y + hole_corner_radius * 0.3,
-		fmax(hole_box.width - hole_corner_radius * 0.6, 0),
-		fmax(hole_box.height - hole_corner_radius * 0.6, 0)
-	);
-	pixman_region32_subtract(&clip_region, &clip_region, &window_region);
-	pixman_region32_fini(&window_region);
+	if (!wlr_box_empty(&hole_box)) {
+		pixman_region32_t window_region;
+		pixman_region32_init_rect(
+			&window_region,
+			hole_box.x + hole_corner_radius * 0.3,
+			hole_box.y + hole_corner_radius * 0.3,
+			fmax(hole_box.width - hole_corner_radius * 0.6, 0),
+			fmax(hole_box.height - hole_corner_radius * 0.6, 0)
+		);
+		pixman_region32_subtract(&clip_region, &clip_region, &window_region);
+		pixman_region32_fini(&window_region);
+	}
 
 	push_fx_debug(renderer);
 	// blending will practically always be needed (unless we have a madman

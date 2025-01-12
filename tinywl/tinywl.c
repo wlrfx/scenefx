@@ -602,23 +602,26 @@ static void xdg_toplevel_commit(struct wl_listener *listener, void *data) {
 	wlr_xdg_surface_get_geometry(toplevel->xdg_toplevel->base, &geometry);
 	wlr_scene_subsurface_tree_set_clip(&toplevel->xdg_scene_tree->node, &geometry);
 
-	int blur_sigma = toplevel->shadow->blur_sigma;
-	wlr_scene_shadow_set_size(toplevel->shadow,
-			geometry.width + (blur_sigma + BORDER_THICKNESS) * 2,
-			geometry.height + (blur_sigma + BORDER_THICKNESS) * 2);
-	wlr_scene_shadow_set_hole_data(toplevel->shadow, (struct hole_data) {
+	int border_width = geometry.width + (BORDER_THICKNESS * 2);
+	int border_height = geometry.height + (BORDER_THICKNESS * 2);
+
+	// technically we dont actually need the hole here since optimized blur would
+	// hide the border + shadow, but we do here to show compositors how to implement it
+
+	wlr_scene_rect_set_size(toplevel->border, border_width, border_height);
+	wlr_scene_rect_set_hole_data(toplevel->border, (struct hole_data) {
 			.corner_radius = toplevel->corner_radius,
-			.size = {
-				.x = 0,
-				.y = 0,
-				.width = geometry.width,
-				.height = geometry.height,
-			}
+			.size = { 0, 0, geometry.width, geometry.height }
 	});
 
-	wlr_scene_rect_set_size(toplevel->border,
-			geometry.width + BORDER_THICKNESS * 2,
-			geometry.height + BORDER_THICKNESS * 2);
+	int blur_sigma = toplevel->shadow->blur_sigma;
+	wlr_scene_shadow_set_size(toplevel->shadow,
+			border_width + (blur_sigma * 2),
+			border_height + (blur_sigma * 2));
+	wlr_scene_shadow_set_hole_data(toplevel->shadow, (struct hole_data) {
+			.corner_radius = toplevel->corner_radius + BORDER_THICKNESS,
+			.size = { -BORDER_THICKNESS, -BORDER_THICKNESS, border_width, border_height }
+	});
 }
 
 static void output_configure_scene(struct wlr_scene_node *node,

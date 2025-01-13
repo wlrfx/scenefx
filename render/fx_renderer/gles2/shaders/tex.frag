@@ -50,16 +50,12 @@ float corner_alpha(vec2 size, vec2 position, float radius,
             bool round_tl, bool round_tr, bool round_bl, bool round_br);
 
 void main() {
-	gl_FragColor = mix(sample_texture(), dim_color, dim) * alpha;
+	float corner_alpha = corner_alpha(size, position, radius,
+			round_top_left, round_top_right, round_bottom_left, round_bottom_right);
+	gl_FragColor = mix(mix(sample_texture(), dim_color, dim) * alpha, vec4(0.0), corner_alpha);
 
 	if (discard_transparent && gl_FragColor.a == 0.0) {
 		discard;
 		return;
-	}
-
-	if (round_top_left || round_top_right || round_bottom_left || round_bottom_right) {
-		float corner_alpha = corner_alpha(size, position, radius,
-				round_top_left, round_top_right, round_bottom_left, round_bottom_right);
-		gl_FragColor = mix(gl_FragColor, vec4(0.0), corner_alpha);
 	}
 }

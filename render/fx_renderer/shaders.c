@@ -213,8 +213,8 @@ bool link_quad_grad_round_program(struct quad_grad_round_shader *shader, int max
 
 bool link_tex_program(struct tex_shader *shader, enum fx_tex_shader_source source) {
 	GLchar frag_src[4096];
-	snprintf(frag_src, sizeof(frag_src), "#define SOURCE %d\n%s\n%s\n%s", source,
-			tex_frag_src, corner_alpha_frag_src, round_rect_sdf_frag_src);
+	snprintf(frag_src, sizeof(frag_src), "#define SOURCE %d\n%s\n%s\n", source,
+			tex_frag_src, corner_alpha_frag_src);
 
 	GLuint prog;
 	shader->program = prog = link_program(frag_src);

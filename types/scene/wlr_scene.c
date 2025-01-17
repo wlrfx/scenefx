@@ -763,10 +763,15 @@ void wlr_scene_rect_set_corner_radius(struct wlr_scene_rect *rect, int corner_ra
 
 void wlr_scene_rect_set_hole_data(struct wlr_scene_rect *rect, struct hole_data hole_data) {
 	if (rect->hole_data.corner_radius == hole_data.corner_radius &&
+			rect->hole_data.corners == hole_data.corners &&
 			wlr_box_equal(&rect->hole_data.size, &hole_data.size)) {
 		return;
 	}
 
+	if (hole_data.corner_radius && hole_data.corners == CORNER_LOCATION_NONE) {
+		wlr_log(WLR_ERROR, "Applying corner radius without specifying which"
+				" corners to round for rect: %p", rect);
+	}
 	rect->hole_data = hole_data;
 	scene_node_update(&rect->node, NULL);
 }
@@ -833,10 +838,15 @@ void wlr_scene_shadow_set_color(struct wlr_scene_shadow *shadow, const float col
 void wlr_scene_shadow_set_hole_data(struct wlr_scene_shadow *shadow,
 		struct hole_data hole_data) {
 	if (shadow->hole_data.corner_radius == hole_data.corner_radius &&
+			shadow->hole_data.corners == hole_data.corners &&
 			wlr_box_equal(&shadow->hole_data.size, &hole_data.size)) {
 		return;
 	}
 
+	if (hole_data.corner_radius && hole_data.corners == CORNER_LOCATION_NONE) {
+		wlr_log(WLR_ERROR, "Applying corner radius without specifying which"
+				" corners to round for shadow: %p", shadow);
+	}
 	shadow->hole_data = hole_data;
 	scene_node_update(&shadow->node, NULL);
 }
@@ -1554,6 +1564,7 @@ static void scene_entry_render(struct render_list_entry *entry, const struct ren
 				.hole_data = {
 					.size = hole_box,
 					.corner_radius = hole_corner_radius * data->scale,
+					.corners = scene_rect->hole_data.corners,
 				},
 			};
 			fx_render_pass_add_rounded_rect(data->render_pass, &rounded_rect_options);
@@ -1609,6 +1620,7 @@ static void scene_entry_render(struct render_list_entry *entry, const struct ren
 			.hole_data = {
 				.size = hole_box,
 				.corner_radius = hole_corner_radius * data->scale,
+				.corners = scene_shadow->hole_data.corners,
 			},
 			.blur_sigma = scene_shadow->blur_sigma,
 			.corner_radius = scene_shadow->corner_radius * data->scale,

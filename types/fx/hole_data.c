@@ -4,6 +4,7 @@
 struct hole_data hole_data_get_default(void) {
 	return (struct hole_data) {
 		.corner_radius = 0,
+		.corners = CORNER_LOCATION_NONE,
 		.size = (struct wlr_box) {0},
 	};
 }

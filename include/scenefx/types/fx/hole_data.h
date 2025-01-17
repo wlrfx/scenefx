@@ -9,7 +9,7 @@
 struct hole_data {
 	struct wlr_box size;
 	int corner_radius;
-	// TODO: Add corner_location?
+	enum corner_location corners;
 };
 
 struct hole_data hole_data_get_default(void);

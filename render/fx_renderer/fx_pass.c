@@ -426,16 +426,16 @@ void fx_render_pass_add_rounded_rect(struct fx_gles_render_pass *pass,
 	int hole_corner_radius = hole_corners != CORNER_LOCATION_NONE ?
 		fx_options->hole_data.corner_radius : 0;
 	if (!wlr_box_empty(&hole_box)) {
-		pixman_region32_t window_region;
+		pixman_region32_t user_clip_region;
 		pixman_region32_init_rect(
-			&window_region,
+			&user_clip_region,
 			hole_box.x + hole_corner_radius * 0.3,
 			hole_box.y + hole_corner_radius * 0.3,
 			fmax(hole_box.width - hole_corner_radius * 0.6, 0),
 			fmax(hole_box.height - hole_corner_radius * 0.6, 0)
 		);
-		pixman_region32_subtract(&clip_region, &clip_region, &window_region);
-		pixman_region32_fini(&window_region);
+		pixman_region32_subtract(&clip_region, &clip_region, &user_clip_region);
+		pixman_region32_fini(&user_clip_region);
 	}
 
 	push_fx_debug(renderer);
@@ -452,16 +452,16 @@ void fx_render_pass_add_rounded_rect(struct fx_gles_render_pass *pass,
 	glUniform2f(shader.size, box.width, box.height);
 	glUniform2f(shader.position, box.x, box.y);
 	glUniform1f(shader.radius, fx_options->corner_radius);
-	glUniform2f(shader.window_size, hole_box.width, hole_box.height);
-	glUniform2f(shader.window_position, hole_box.x, hole_box.y);
-	glUniform1f(shader.window_radius, fx_options->hole_data.corner_radius);
-	glUniform1f(shader.window_round_top_left,
+	glUniform2f(shader.clip_size, hole_box.width, hole_box.height);
+	glUniform2f(shader.clip_position, hole_box.x, hole_box.y);
+	glUniform1f(shader.clip_corner_radius, fx_options->hole_data.corner_radius);
+	glUniform1f(shader.clip_round_top_left,
 			(CORNER_LOCATION_TOP_LEFT & hole_corners) == CORNER_LOCATION_TOP_LEFT);
-	glUniform1f(shader.window_round_top_right,
+	glUniform1f(shader.clip_round_top_right,
 			(CORNER_LOCATION_TOP_RIGHT & hole_corners) == CORNER_LOCATION_TOP_RIGHT);
-	glUniform1f(shader.window_round_bottom_left,
+	glUniform1f(shader.clip_round_bottom_left,
 			(CORNER_LOCATION_BOTTOM_LEFT & hole_corners) == CORNER_LOCATION_BOTTOM_LEFT);
-	glUniform1f(shader.window_round_bottom_right,
+	glUniform1f(shader.clip_round_bottom_right,
 			(CORNER_LOCATION_BOTTOM_RIGHT & hole_corners) == CORNER_LOCATION_BOTTOM_RIGHT);
 
 	glUniform1f(shader.round_top_left,
@@ -551,16 +551,16 @@ void fx_render_pass_add_box_shadow(struct fx_gles_render_pass *pass,
 	int hole_corner_radius = hole_corners != CORNER_LOCATION_NONE ?
 		options->hole_data.corner_radius : 0;
 	if (!wlr_box_empty(&hole_box)) {
-		pixman_region32_t window_region;
+		pixman_region32_t user_clip_region;
 		pixman_region32_init_rect(
-			&window_region,
+			&user_clip_region,
 			hole_box.x + hole_corner_radius * 0.3,
 			hole_box.y + hole_corner_radius * 0.3,
 			fmax(hole_box.width - hole_corner_radius * 0.6, 0),
 			fmax(hole_box.height - hole_corner_radius * 0.6, 0)
 		);
-		pixman_region32_subtract(&clip_region, &clip_region, &window_region);
-		pixman_region32_fini(&window_region);
+		pixman_region32_subtract(&clip_region, &clip_region, &user_clip_region);
+		pixman_region32_fini(&user_clip_region);
 	}
 
 	push_fx_debug(renderer);
@@ -578,18 +578,18 @@ void fx_render_pass_add_box_shadow(struct fx_gles_render_pass *pass,
 	glUniform1f(renderer->shaders.box_shadow.corner_radius, options->corner_radius);
 	glUniform2f(renderer->shaders.box_shadow.size, box.width, box.height);
 	glUniform2f(renderer->shaders.box_shadow.position, box.x, box.y);
-	glUniform1f(renderer->shaders.box_shadow.window_corner_radius, hole_corner_radius);
-	glUniform2f(renderer->shaders.box_shadow.window_size, hole_box.width, hole_box.height);
-	glUniform1f(renderer->shaders.box_shadow.window_round_top_left,
+	glUniform1f(renderer->shaders.box_shadow.clip_corner_radius, hole_corner_radius);
+	glUniform2f(renderer->shaders.box_shadow.clip_size, hole_box.width, hole_box.height);
+	glUniform1f(renderer->shaders.box_shadow.clip_round_top_left,
 			(CORNER_LOCATION_TOP_LEFT & hole_corners) == CORNER_LOCATION_TOP_LEFT);
-	glUniform1f(renderer->shaders.box_shadow.window_round_top_right,
+	glUniform1f(renderer->shaders.box_shadow.clip_round_top_right,
 			(CORNER_LOCATION_TOP_RIGHT & hole_corners) == CORNER_LOCATION_TOP_RIGHT);
-	glUniform1f(renderer->shaders.box_shadow.window_round_bottom_left,
+	glUniform1f(renderer->shaders.box_shadow.clip_round_bottom_left,
 			(CORNER_LOCATION_BOTTOM_LEFT & hole_corners) == CORNER_LOCATION_BOTTOM_LEFT);
-	glUniform1f(renderer->shaders.box_shadow.window_round_bottom_right,
+	glUniform1f(renderer->shaders.box_shadow.clip_round_bottom_right,
 			(CORNER_LOCATION_BOTTOM_RIGHT & hole_corners) == CORNER_LOCATION_BOTTOM_RIGHT);
 
-	glUniform2f(renderer->shaders.box_shadow.window_position, hole_box.x, hole_box.y);
+	glUniform2f(renderer->shaders.box_shadow.clip_position, hole_box.x, hole_box.y);
 
 	render(&box, &clip_region, renderer->shaders.box_shadow.pos_attrib);
 	pixman_region32_fini(&clip_region);

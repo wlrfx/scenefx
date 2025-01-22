@@ -5,7 +5,6 @@ shaders = [
 	'gradient.frag',
     'round_rect_sdf.frag',
     'corner_alpha.frag',
-    'hole_alpha.frag',
     'quad.frag',
     'quad_grad.frag',
     'quad_round.frag',

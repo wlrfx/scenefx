@@ -6,8 +6,8 @@
 #include <time.h>
 #include <scenefx/render/fx_renderer/fx_renderer.h>
 #include <scenefx/types/fx/blur_data.h>
+#include <scenefx/types/fx/clipped_region.h>
 #include <scenefx/types/fx/corner_location.h>
-#include <scenefx/types/fx/hole_data.h>
 #include <scenefx/types/wlr_scene.h>
 #include <unistd.h>
 #include <wayland-server-core.h>
@@ -609,7 +609,7 @@ static void xdg_toplevel_commit(struct wl_listener *listener, void *data) {
 	// hide the border + shadow, but we do here to show compositors how to implement it
 
 	wlr_scene_rect_set_size(toplevel->border, border_width, border_height);
-	wlr_scene_rect_set_hole_data(toplevel->border, (struct hole_data) {
+	wlr_scene_rect_set_clipped_region(toplevel->border, (struct clipped_region) {
 			.corner_radius = toplevel->corner_radius,
 			.size = { 0, 0, geometry.width, geometry.height }
 	});
@@ -618,7 +618,7 @@ static void xdg_toplevel_commit(struct wl_listener *listener, void *data) {
 	wlr_scene_shadow_set_size(toplevel->shadow,
 			border_width + (blur_sigma * 2),
 			border_height + (blur_sigma * 2));
-	wlr_scene_shadow_set_hole_data(toplevel->shadow, (struct hole_data) {
+	wlr_scene_shadow_set_clipped_region(toplevel->shadow, (struct clipped_region) {
 			.corner_radius = toplevel->corner_radius + BORDER_THICKNESS,
 			.size = { -BORDER_THICKNESS, -BORDER_THICKNESS, border_width, border_height }
 	});

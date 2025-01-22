@@ -20,8 +20,8 @@
 #include "scenefx/render/fx_renderer/fx_renderer.h"
 #include "scenefx/render/pass.h"
 #include "scenefx/types/fx/blur_data.h"
+#include "scenefx/types/fx/clipped_region.h"
 #include "scenefx/types/fx/corner_location.h"
-#include "scenefx/types/fx/hole_data.h"
 #include "types/wlr_buffer.h"
 #include "types/wlr_output.h"
 #include "types/wlr_scene.h"
@@ -668,7 +668,7 @@ struct wlr_scene_rect *wlr_scene_rect_create(struct wlr_scene_tree *parent,
 	memcpy(scene_rect->color, color, sizeof(scene_rect->color));
 	scene_rect->corner_radius = 0;
 	scene_rect->corners = CORNER_LOCATION_NONE;
-	scene_rect->hole_data = hole_data_get_default();
+	scene_rect->clipped_region = clipped_region_get_default();
 
 	scene_node_update(&scene_rect->node, NULL);
 
@@ -761,18 +761,19 @@ void wlr_scene_rect_set_corner_radius(struct wlr_scene_rect *rect, int corner_ra
 	scene_node_update(&rect->node, NULL);
 }
 
-void wlr_scene_rect_set_hole_data(struct wlr_scene_rect *rect, struct hole_data hole_data) {
-	if (rect->hole_data.corner_radius == hole_data.corner_radius &&
-			rect->hole_data.corners == hole_data.corners &&
-			wlr_box_equal(&rect->hole_data.size, &hole_data.size)) {
+void wlr_scene_rect_set_clipped_region(struct wlr_scene_rect *rect,
+		struct clipped_region clipped_region) {
+	if (rect->clipped_region.corner_radius == clipped_region.corner_radius &&
+			rect->clipped_region.corners == clipped_region.corners &&
+			wlr_box_equal(&rect->clipped_region.size, &clipped_region.size)) {
 		return;
 	}
 
-	if (hole_data.corner_radius && hole_data.corners == CORNER_LOCATION_NONE) {
+	if (clipped_region.corner_radius && clipped_region.corners == CORNER_LOCATION_NONE) {
 		wlr_log(WLR_ERROR, "Applying corner radius without specifying which"
 				" corners to round for rect: %p", rect);
 	}
-	rect->hole_data = hole_data;
+	rect->clipped_region = clipped_region;
 	scene_node_update(&rect->node, NULL);
 }
 
@@ -791,7 +792,7 @@ struct wlr_scene_shadow *wlr_scene_shadow_create(struct wlr_scene_tree *parent,
 	scene_shadow->corner_radius = corner_radius;
 	scene_shadow->blur_sigma = blur_sigma;
 	memcpy(scene_shadow->color, color, sizeof(scene_shadow->color));
-	scene_shadow->hole_data = hole_data_get_default();
+	scene_shadow->clipped_region = clipped_region_get_default();
 
 	scene_node_update(&scene_shadow->node, NULL);
 
@@ -835,19 +836,19 @@ void wlr_scene_shadow_set_color(struct wlr_scene_shadow *shadow, const float col
 	scene_node_update(&shadow->node, NULL);
 }
 
-void wlr_scene_shadow_set_hole_data(struct wlr_scene_shadow *shadow,
-		struct hole_data hole_data) {
-	if (shadow->hole_data.corner_radius == hole_data.corner_radius &&
-			shadow->hole_data.corners == hole_data.corners &&
-			wlr_box_equal(&shadow->hole_data.size, &hole_data.size)) {
+void wlr_scene_shadow_set_clipped_region(struct wlr_scene_shadow *shadow,
+		struct clipped_region clipped_region) {
+	if (shadow->clipped_region.corner_radius == clipped_region.corner_radius &&
+			shadow->clipped_region.corners == clipped_region.corners &&
+			wlr_box_equal(&shadow->clipped_region.size, &clipped_region.size)) {
 		return;
 	}
 
-	if (hole_data.corner_radius && hole_data.corners == CORNER_LOCATION_NONE) {
+	if (clipped_region.corner_radius && clipped_region.corners == CORNER_LOCATION_NONE) {
 		wlr_log(WLR_ERROR, "Applying corner radius without specifying which"
 				" corners to round for shadow: %p", shadow);
 	}
-	shadow->hole_data = hole_data;
+	shadow->clipped_region = clipped_region;
 	scene_node_update(&shadow->node, NULL);
 }
 
@@ -1542,29 +1543,29 @@ static void scene_entry_render(struct render_list_entry *entry, const struct ren
 		};
 
 		if (scene_rect->corner_radius && scene_rect->corners != CORNER_LOCATION_NONE) {
-			struct wlr_box hole_box = scene_rect->hole_data.size;
-			int hole_corner_radius = scene_rect->hole_data.corner_radius;
+			struct wlr_box clipped_region_box = scene_rect->clipped_region.size;
+			int clipped_region_corner_radius = scene_rect->clipped_region.corner_radius;
 
 			// Compensation
 			int node_x, node_y;
 			wlr_scene_node_coords(node, &node_x, &node_y);
-			hole_box.x += node_x - node->x;
-			hole_box.y += node_y - node->y;
+			clipped_region_box.x += node_x - node->x;
+			clipped_region_box.y += node_y - node->y;
 
-			hole_box.x -= data->logical.x;
-			hole_box.y -= data->logical.y;
+			clipped_region_box.x -= data->logical.x;
+			clipped_region_box.y -= data->logical.y;
 
-			scale_box(&hole_box, data->scale);
-			transform_output_box(&hole_box, data);
+			scale_box(&clipped_region_box, data->scale);
+			transform_output_box(&clipped_region_box, data);
 
 			struct fx_render_rounded_rect_options rounded_rect_options = {
 				.base = rect_options.base,
 				.corner_radius = scene_rect->corner_radius * data->scale,
 				.corners = scene_rect->corners,
-				.hole_data = {
-					.size = hole_box,
-					.corner_radius = hole_corner_radius * data->scale,
-					.corners = scene_rect->hole_data.corners,
+				.clipped_region = {
+					.size = clipped_region_box,
+					.corner_radius = clipped_region_corner_radius * data->scale,
+					.corners = scene_rect->clipped_region.corners,
 				},
 			};
 			fx_render_pass_add_rounded_rect(data->render_pass, &rounded_rect_options);
@@ -1601,26 +1602,26 @@ static void scene_entry_render(struct render_list_entry *entry, const struct ren
 	case WLR_SCENE_NODE_SHADOW:;
 		struct wlr_scene_shadow *scene_shadow = wlr_scene_shadow_from_node(node);
 
-		struct wlr_box hole_box = scene_shadow->hole_data.size;
-		int hole_corner_radius = scene_shadow->hole_data.corner_radius;
+		struct wlr_box clipped_region_box = scene_shadow->clipped_region.size;
+		int clipped_region_corner_radius = scene_shadow->clipped_region.corner_radius;
 
 		// Compensation
 		int node_x, node_y;
 		wlr_scene_node_coords(node, &node_x, &node_y);
-		hole_box.x += node_x - node->x;
-		hole_box.y += node_y - node->y;
+		clipped_region_box.x += node_x - node->x;
+		clipped_region_box.y += node_y - node->y;
 
-		hole_box.x -= data->logical.x;
-		hole_box.y -= data->logical.y;
-		scale_box(&hole_box, data->scale);
-		transform_output_box(&hole_box, data);
+		clipped_region_box.x -= data->logical.x;
+		clipped_region_box.y -= data->logical.y;
+		scale_box(&clipped_region_box, data->scale);
+		transform_output_box(&clipped_region_box, data);
 
 		struct fx_render_box_shadow_options shadow_options = {
 			.box = dst_box,
-			.hole_data = {
-				.size = hole_box,
-				.corner_radius = hole_corner_radius * data->scale,
-				.corners = scene_shadow->hole_data.corners,
+			.clipped_region = {
+				.size = clipped_region_box,
+				.corner_radius = clipped_region_corner_radius * data->scale,
+				.corners = scene_shadow->clipped_region.corners,
 			},
 			.blur_sigma = scene_shadow->blur_sigma,
 			.corner_radius = scene_shadow->corner_radius * data->scale,

@@ -423,7 +423,10 @@ void wlr_scene_rect_set_corner_radius(struct wlr_scene_rect *rect, int corner_ra
 		enum corner_location corners);
 
 /**
- * TODO:
+ * Sets the region where to clip the rect.
+ *
+ * For there to be corner rounding of the clipped region, the corner radius and
+ * corners must be non-zero.
  */
 void wlr_scene_rect_set_clipped_region(struct wlr_scene_rect *rect,
 		struct clipped_region clipped_region);
@@ -461,7 +464,10 @@ void wlr_scene_shadow_set_blur_sigma(struct wlr_scene_shadow *shadow, float blur
 void wlr_scene_shadow_set_color(struct wlr_scene_shadow *shadow, const float color[static 4]);
 
 /**
- * TODO:
+ * Sets the region where to clip the shadow.
+ *
+ * For there to be corner rounding of the clipped region, the corner radius and
+ * corners must be non-zero.
  */
 void wlr_scene_shadow_set_clipped_region(struct wlr_scene_shadow *shadow,
 		struct clipped_region clipped_region);

@@ -22,8 +22,6 @@ uniform bool round_bottom_right;
 float corner_alpha(vec2 size, vec2 position, float radius,
             bool round_tl, bool round_tr, bool round_bl, bool round_br);
 
-float roundRectSDF(vec2 half_size, vec2 position, float radius);
-
 void main() {
     float quad_corner_alpha = corner_alpha(size, position,
             radius, round_top_left, round_top_right, round_bottom_left, round_bottom_right);

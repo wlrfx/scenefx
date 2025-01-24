@@ -75,8 +75,6 @@ float random() {
 float corner_alpha(vec2 size, vec2 position, float radius,
             bool round_tl, bool round_tr, bool round_bl, bool round_br);
 
-float roundRectSDF(vec2 half_size, vec2 position, float radius);
-
 void main() {
     float shadow_alpha = v_color.a * roundedBoxShadow(
             position + blur_sigma,

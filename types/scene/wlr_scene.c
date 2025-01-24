@@ -666,7 +666,7 @@ struct wlr_scene_rect *wlr_scene_rect_create(struct wlr_scene_tree *parent,
 	memcpy(scene_rect->color, color, sizeof(scene_rect->color));
 	scene_rect->corner_radius = 0;
 	scene_rect->corners = CORNER_LOCATION_NONE;
-	scene_rect->accepts_input = false;
+	scene_rect->accepts_input = true;
 
 	scene_node_update(&scene_rect->node, NULL);
 
@@ -1432,7 +1432,7 @@ static bool scene_node_at_iterator(struct wlr_scene_node *node,
 		}
 	} else if (node->type == WLR_SCENE_NODE_RECT) {
 		struct wlr_scene_rect *rect = wlr_scene_rect_from_node(node);
-		if (rect->accepts_input) {
+		if (!rect->accepts_input) {
 			return false;
 		}
 	} else if (node->type == WLR_SCENE_NODE_SHADOW

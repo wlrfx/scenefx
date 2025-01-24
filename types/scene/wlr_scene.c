@@ -766,7 +766,7 @@ void wlr_scene_rect_set_clipped_region(struct wlr_scene_rect *rect,
 		struct clipped_region clipped_region) {
 	if (rect->clipped_region.corner_radius == clipped_region.corner_radius &&
 			rect->clipped_region.corners == clipped_region.corners &&
-			wlr_box_equal(&rect->clipped_region.size, &clipped_region.size)) {
+			wlr_box_equal(&rect->clipped_region.area, &clipped_region.area)) {
 		return;
 	}
 
@@ -841,7 +841,7 @@ void wlr_scene_shadow_set_clipped_region(struct wlr_scene_shadow *shadow,
 		struct clipped_region clipped_region) {
 	if (shadow->clipped_region.corner_radius == clipped_region.corner_radius &&
 			shadow->clipped_region.corners == clipped_region.corners &&
-			wlr_box_equal(&shadow->clipped_region.size, &clipped_region.size)) {
+			wlr_box_equal(&shadow->clipped_region.area, &clipped_region.area)) {
 		return;
 	}
 
@@ -1549,7 +1549,7 @@ static void scene_entry_render(struct render_list_entry *entry, const struct ren
 		};
 
 		if (scene_rect->corner_radius && scene_rect->corners != CORNER_LOCATION_NONE) {
-			struct wlr_box clipped_region_box = scene_rect->clipped_region.size;
+			struct wlr_box clipped_region_box = scene_rect->clipped_region.area;
 			int clipped_region_corner_radius = scene_rect->clipped_region.corner_radius;
 
 			// Compensation
@@ -1569,7 +1569,7 @@ static void scene_entry_render(struct render_list_entry *entry, const struct ren
 				.corner_radius = scene_rect->corner_radius * data->scale,
 				.corners = scene_rect->corners,
 				.clipped_region = {
-					.size = clipped_region_box,
+					.area = clipped_region_box,
 					.corner_radius = clipped_region_corner_radius * data->scale,
 					.corners = scene_rect->clipped_region.corners,
 				},
@@ -1608,7 +1608,7 @@ static void scene_entry_render(struct render_list_entry *entry, const struct ren
 	case WLR_SCENE_NODE_SHADOW:;
 		struct wlr_scene_shadow *scene_shadow = wlr_scene_shadow_from_node(node);
 
-		struct wlr_box clipped_region_box = scene_shadow->clipped_region.size;
+		struct wlr_box clipped_region_box = scene_shadow->clipped_region.area;
 		int clipped_region_corner_radius = scene_shadow->clipped_region.corner_radius;
 
 		// Compensation
@@ -1625,7 +1625,7 @@ static void scene_entry_render(struct render_list_entry *entry, const struct ren
 		struct fx_render_box_shadow_options shadow_options = {
 			.box = dst_box,
 			.clipped_region = {
-				.size = clipped_region_box,
+				.area = clipped_region_box,
 				.corner_radius = clipped_region_corner_radius * data->scale,
 				.corners = scene_shadow->clipped_region.corners,
 			},

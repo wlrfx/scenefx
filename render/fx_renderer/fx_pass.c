@@ -421,7 +421,7 @@ void fx_render_pass_add_rounded_rect(struct fx_gles_render_pass *pass,
 	} else {
 		pixman_region32_init_rect(&clip_region, box.x, box.y, box.width, box.height);
 	}
-	const struct wlr_box clipped_region_box = fx_options->clipped_region.size;
+	const struct wlr_box clipped_region_box = fx_options->clipped_region.area;
 	enum corner_location clipped_region_corners = fx_options->clipped_region.corners;
 	int clipped_region_corner_radius = clipped_region_corners != CORNER_LOCATION_NONE ?
 		fx_options->clipped_region.corner_radius : 0;
@@ -544,7 +544,7 @@ void fx_render_pass_add_box_shadow(struct fx_gles_render_pass *pass,
 	} else {
 		pixman_region32_init_rect(&clip_region, box.x, box.y, box.width, box.height);
 	}
-	const struct wlr_box clipped_region_box = options->clipped_region.size;
+	const struct wlr_box clipped_region_box = options->clipped_region.area;
 	enum corner_location clipped_region_corners = options->clipped_region.corners;
 	int clipped_region_corner_radius = clipped_region_corners != CORNER_LOCATION_NONE ?
 		options->clipped_region.corner_radius : 0;

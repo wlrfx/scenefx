@@ -6,7 +6,7 @@
 #include "scenefx/types/fx/corner_location.h"
 
 struct clipped_region {
-	struct wlr_box size;
+	struct wlr_box area;
 	int corner_radius;
 	enum corner_location corners;
 };

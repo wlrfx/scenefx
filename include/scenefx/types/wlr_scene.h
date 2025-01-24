@@ -145,6 +145,8 @@ struct wlr_scene_rect {
 	float color[4];
 	int corner_radius;
 	enum corner_location corners;
+
+	bool accepts_input;
 };
 
 /** A scene-graph node displaying a shadow */

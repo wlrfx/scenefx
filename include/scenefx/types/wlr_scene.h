@@ -147,6 +147,7 @@ struct wlr_scene_rect {
 	int corner_radius;
 	enum corner_location corners;
 
+	bool accepts_input;
 	struct clipped_region clipped_region;
 };
 

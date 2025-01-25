@@ -55,8 +55,6 @@ struct fx_render_texture_options {
 	enum corner_location corners;
 	int corner_radius;
 	bool discard_transparent;
-	float dim;
-	struct wlr_render_color dim_color;
 };
 
 struct fx_render_rect_options {

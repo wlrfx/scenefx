@@ -25,12 +25,14 @@ static bool fx_effect_framebuffers_assign(struct wlr_output *output,
 
 struct fx_effect_framebuffers *fx_effect_framebuffers_try_get(struct wlr_output *output) {
 	struct fx_effect_framebuffers *fbos = NULL;
+	if (!output) {
+		return NULL;
+	}
 
 	struct wlr_addon *addon = wlr_addon_find(&output->addons, output,
 			&fbos_addon_impl);
 	if (!addon) {
 		goto create_new;
-		return NULL;
 	}
 
 	if (!(fbos = wl_container_of(addon, fbos, addon))) {
@@ -42,14 +44,15 @@ create_new:;
 	fbos = calloc(1, sizeof(*fbos));
 	if (!fbos) {
 		wlr_log(WLR_ERROR, "Could not allocate a fx_effect_framebuffers");
-		abort();
+		return NULL;
 	}
 	fbos->blur_buffer_dirty = false;
 
 	if (!fx_effect_framebuffers_assign(output, fbos)) {
 		wlr_log(WLR_ERROR, "Could not assign fx_effect_framebuffers to output: '%s'",
 				output->name);
-		abort();
+		free(fbos);
+		return NULL;
 	}
 	return fbos;
 }

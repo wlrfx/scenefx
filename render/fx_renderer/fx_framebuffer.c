@@ -70,9 +70,18 @@ GLuint fx_framebuffer_get_fbo(struct fx_framebuffer *buffer) {
 
 void fx_framebuffer_get_or_create_custom(struct fx_renderer *renderer,
 		struct wlr_output *output, struct wlr_swapchain *swapchain,
-		struct fx_framebuffer **fx_framebuffer) {
+		struct fx_framebuffer **fx_framebuffer, bool *failed) {
+	if (*failed) {
+		return;
+	}
+
 	struct wlr_allocator *allocator = output->allocator;
 	if (!swapchain) {
+		if (!output->swapchain) {
+			wlr_log(WLR_ERROR, "Failed to allocate buffer, no swapchain");
+			*failed = true;
+			return;
+		}
 		swapchain = output->swapchain;
 	}
 	int width = output->width;
@@ -84,6 +93,7 @@ void fx_framebuffer_get_or_create_custom(struct fx_renderer *renderer,
 				&swapchain->format);
 		if (wlr_buffer == NULL) {
 			wlr_log(WLR_ERROR, "Failed to allocate buffer");
+			*failed = true;
 			return;
 		}
 	} else {

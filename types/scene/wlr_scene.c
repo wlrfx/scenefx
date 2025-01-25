@@ -695,6 +695,24 @@ void wlr_scene_rect_set_color(struct wlr_scene_rect *rect, const float color[sta
 	scene_node_update(&rect->node, NULL);
 }
 
+void wlr_scene_rect_set_backdrop_blur(struct wlr_scene_rect *rect,
+		bool enabled) {
+	if (rect->backdrop_blur == enabled) {
+		return;
+	}
+	rect->backdrop_blur = enabled;
+	scene_node_update(&rect->node, NULL);
+}
+
+void wlr_scene_rect_set_backdrop_blur_optimized(struct wlr_scene_rect *rect,
+		bool enabled) {
+	if (rect->backdrop_blur_optimized == enabled) {
+		return;
+	}
+	rect->backdrop_blur_optimized = enabled;
+	scene_node_update(&rect->node, NULL);
+}
+
 static void scene_buffer_handle_buffer_release(struct wl_listener *listener,
 		void *data) {
 	struct wlr_scene_buffer *scene_buffer =

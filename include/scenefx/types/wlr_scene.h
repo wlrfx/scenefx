@@ -146,6 +146,8 @@ struct wlr_scene_rect {
 	float color[4];
 	int corner_radius;
 	enum corner_location corners;
+	bool backdrop_blur;
+	bool backdrop_blur_optimized;
 
 	bool accepts_input;
 	struct clipped_region clipped_region;
@@ -436,6 +438,18 @@ void wlr_scene_rect_set_clipped_region(struct wlr_scene_rect *rect,
  * Change the color of an existing rectangle node.
  */
 void wlr_scene_rect_set_color(struct wlr_scene_rect *rect, const float color[static 4]);
+
+/**
+* Sets the whether or not the buffer should render backdrop blur
+*/
+void wlr_scene_rect_set_backdrop_blur(struct wlr_scene_rect *rect,
+		bool enabled);
+
+/**
+* Sets the whether the backdrop blur should use optimized blur or not
+*/
+void wlr_scene_rect_set_backdrop_blur_optimized(struct wlr_scene_rect *rect,
+		bool enabled);
 
 /**
  * Add a node displaying a shadow to the scene-graph.

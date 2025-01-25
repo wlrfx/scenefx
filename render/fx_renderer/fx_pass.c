@@ -26,8 +26,6 @@ struct fx_render_texture_options fx_render_texture_options_default(
 		.corner_radius = 0,
 		.corners = CORNER_LOCATION_NONE,
 		.discard_transparent = false,
-		.dim = 0.0f,
-		.dim_color = { 1, 1, 1, 1 },
 		.clip_box = NULL,
 	};
 	memcpy(&options.base, base, sizeof(*base));
@@ -291,8 +289,7 @@ void fx_render_pass_add_texture(struct fx_gles_render_pass *pass,
 	bool has_alpha = texture->has_alpha
 		|| alpha < 1.0
 		|| fx_options->corner_radius > 0
-		|| fx_options->discard_transparent
-		|| (fx_options->dim && fx_options->dim_color.a < 1.0);
+		|| fx_options->discard_transparent;
 	setup_blending(!has_alpha ? WLR_RENDER_BLEND_MODE_NONE : options->blend_mode);
 
 	glUseProgram(shader->program);
@@ -320,9 +317,6 @@ void fx_render_pass_add_texture(struct fx_gles_render_pass *pass,
 	glUniform2f(shader->position, clip_box->x, clip_box->y);
 	glUniform1f(shader->radius, fx_options->corner_radius);
 	glUniform1f(shader->discard_transparent, fx_options->discard_transparent);
-	glUniform1f(shader->dim, fx_options->dim);
-	struct wlr_render_color dim_color = fx_options->dim_color;
-	glUniform4f(shader->dim_color, dim_color.r, dim_color.g, dim_color.b, dim_color.a);
 	glUniform1f(shader->round_top_left,
 			(CORNER_LOCATION_TOP_LEFT & corners) == CORNER_LOCATION_TOP_LEFT);
 	glUniform1f(shader->round_top_right,

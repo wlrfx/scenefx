@@ -107,8 +107,6 @@ struct tex_shader {
 	GLint position;
 	GLint radius;
 	GLint discard_transparent;
-	GLint dim;
-	GLint dim_color;
 
 	GLint round_top_left;
 	GLint round_top_right;

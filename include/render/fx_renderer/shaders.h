@@ -56,9 +56,13 @@ struct quad_round_shader {
 	GLint position;
 	GLint radius;
 
-	GLint window_half_size;
-	GLint window_position;
-	GLint window_radius;
+	GLint clip_size;
+	GLint clip_position;
+	GLint clip_corner_radius;
+	GLint clip_round_top_left;
+	GLint clip_round_top_right;
+	GLint clip_round_bottom_left;
+	GLint clip_round_bottom_right;
 
 	GLint round_top_left;
 	GLint round_top_right;
@@ -125,9 +129,14 @@ struct box_shadow_shader {
 	GLint size;
 	GLint blur_sigma;
 	GLint corner_radius;
-	GLint window_position;
-	GLint window_half_size;
-	GLint window_corner_radius;
+
+	GLint clip_position;
+	GLint clip_size;
+	GLint clip_corner_radius;
+	GLint clip_round_top_left;
+	GLint clip_round_top_right;
+	GLint clip_round_bottom_left;
+	GLint clip_round_bottom_right;
 };
 
 bool link_box_shadow_program(struct box_shadow_shader *shader);

@@ -9,7 +9,6 @@
 #include "GLES2/gl2.h"
 #include "common_vert_src.h"
 #include "gradient_frag_src.h"
-#include "round_rect_sdf_frag_src.h"
 #include "corner_alpha_frag_src.h"
 #include "quad_frag_src.h"
 #include "quad_grad_frag_src.h"
@@ -147,8 +146,8 @@ bool link_quad_grad_program(struct quad_grad_shader *shader, int max_len) {
 
 bool link_quad_round_program(struct quad_round_shader *shader) {
 	GLchar quad_src[4096];
-	snprintf(quad_src, sizeof(quad_src), "%s\n%s\n%s", quad_round_frag_src,
-		corner_alpha_frag_src, round_rect_sdf_frag_src);
+	snprintf(quad_src, sizeof(quad_src), "%s\n%s", quad_round_frag_src,
+		corner_alpha_frag_src);
 
 	GLuint prog;
 	shader->program = prog = link_program(quad_src);
@@ -162,9 +161,13 @@ bool link_quad_round_program(struct quad_round_shader *shader) {
 	shader->size = glGetUniformLocation(prog, "size");
 	shader->position = glGetUniformLocation(prog, "position");
 	shader->radius = glGetUniformLocation(prog, "radius");
-	shader->window_half_size = glGetUniformLocation(prog, "window_half_size");
-	shader->window_position = glGetUniformLocation(prog, "window_position");
-	shader->window_radius = glGetUniformLocation(prog, "window_radius");
+	shader->clip_size = glGetUniformLocation(prog, "clip_size");
+	shader->clip_position = glGetUniformLocation(prog, "clip_position");
+	shader->clip_corner_radius = glGetUniformLocation(prog, "clip_corner_radius");
+	shader->clip_round_top_left = glGetUniformLocation(prog, "clip_round_top_left");
+	shader->clip_round_top_right = glGetUniformLocation(prog, "clip_round_top_right");
+	shader->clip_round_bottom_left = glGetUniformLocation(prog, "clip_round_bottom_left");
+	shader->clip_round_bottom_right = glGetUniformLocation(prog, "clip_round_bottom_right");
 
 	shader->round_top_left = glGetUniformLocation(prog, "round_top_left");
 	shader->round_top_right = glGetUniformLocation(prog, "round_top_right");
@@ -176,8 +179,8 @@ bool link_quad_round_program(struct quad_round_shader *shader) {
 
 bool link_quad_grad_round_program(struct quad_grad_round_shader *shader, int max_len) {
 	GLchar quad_src[4096];
-	snprintf(quad_src, sizeof(quad_src), "#define LEN %d\n%s\n%s\n%s\n%s", max_len, quad_grad_round_frag_src,
-			 gradient_frag_src, corner_alpha_frag_src, round_rect_sdf_frag_src);
+	snprintf(quad_src, sizeof(quad_src), "#define LEN %d\n%s\n%s\n%s", max_len, quad_grad_round_frag_src,
+			 gradient_frag_src, corner_alpha_frag_src);
 
 	GLuint prog;
 	shader->program = prog = link_program(quad_src);
@@ -240,9 +243,9 @@ bool link_tex_program(struct tex_shader *shader, enum fx_tex_shader_source sourc
 }
 
 bool link_box_shadow_program(struct box_shadow_shader *shader) {
-	GLchar shadow_src[4096];
+	GLchar shadow_src[8192];
 	snprintf(shadow_src, sizeof(shadow_src), "%s\n%s", box_shadow_frag_src,
-			round_rect_sdf_frag_src);
+		corner_alpha_frag_src);
 
 	GLuint prog;
 	shader->program = prog = link_program(shadow_src);
@@ -256,9 +259,13 @@ bool link_box_shadow_program(struct box_shadow_shader *shader) {
 	shader->size = glGetUniformLocation(prog, "size");
 	shader->blur_sigma = glGetUniformLocation(prog, "blur_sigma");
 	shader->corner_radius = glGetUniformLocation(prog, "corner_radius");
-	shader->window_position = glGetUniformLocation(prog, "window_position");
-	shader->window_half_size = glGetUniformLocation(prog, "window_half_size");
-	shader->window_corner_radius = glGetUniformLocation(prog, "window_corner_radius");
+	shader->clip_position = glGetUniformLocation(prog, "clip_position");
+	shader->clip_size = glGetUniformLocation(prog, "clip_size");
+	shader->clip_corner_radius = glGetUniformLocation(prog, "clip_corner_radius");
+	shader->clip_round_top_left = glGetUniformLocation(prog, "clip_round_top_left");
+	shader->clip_round_top_right = glGetUniformLocation(prog, "clip_round_top_right");
+	shader->clip_round_bottom_left = glGetUniformLocation(prog, "clip_round_bottom_left");
+	shader->clip_round_bottom_right = glGetUniformLocation(prog, "clip_round_bottom_right");
 
 	return true;
 }

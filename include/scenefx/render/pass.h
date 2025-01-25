@@ -7,6 +7,7 @@
 #include <wlr/render/swapchain.h>
 
 #include "render/egl.h"
+#include "scenefx/types/fx/clipped_region.h"
 #include "scenefx/types/fx/corner_location.h"
 
 struct fx_gles_render_pass {
@@ -72,8 +73,7 @@ struct fx_render_rounded_rect_options {
 	int corner_radius;
 	enum corner_location corners;
 
-	struct wlr_box window_box;
-	int window_corner_radius;
+	struct clipped_region clipped_region;
 };
 
 struct fx_render_rounded_rect_grad_options {
@@ -85,8 +85,7 @@ struct fx_render_rounded_rect_grad_options {
 
 struct fx_render_box_shadow_options {
 	struct wlr_box box;
-	struct wlr_box window_box;
-	int window_corner_radius;
+	struct clipped_region clipped_region;
 	/* Clip region, leave NULL to disable clipping */
 	const pixman_region32_t *clip;
 

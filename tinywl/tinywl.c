@@ -611,6 +611,7 @@ static void xdg_toplevel_commit(struct wl_listener *listener, void *data) {
 	wlr_scene_rect_set_size(toplevel->border, border_width, border_height);
 	wlr_scene_rect_set_clipped_region(toplevel->border, (struct clipped_region) {
 			.corner_radius = toplevel->corner_radius,
+			.corners = CORNER_LOCATION_ALL,
 			.area = { 0, 0, geometry.width, geometry.height }
 	});
 
@@ -620,6 +621,7 @@ static void xdg_toplevel_commit(struct wl_listener *listener, void *data) {
 			border_height + (blur_sigma * 2));
 	wlr_scene_shadow_set_clipped_region(toplevel->shadow, (struct clipped_region) {
 			.corner_radius = toplevel->corner_radius + BORDER_THICKNESS,
+			.corners = CORNER_LOCATION_ALL,
 			.area = { -BORDER_THICKNESS, -BORDER_THICKNESS, border_width, border_height }
 	});
 }

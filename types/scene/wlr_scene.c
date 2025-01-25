@@ -670,6 +670,8 @@ struct wlr_scene_rect *wlr_scene_rect_create(struct wlr_scene_tree *parent,
 	scene_rect->corners = CORNER_LOCATION_NONE;
 	scene_rect->accepts_input = true;
 	scene_rect->clipped_region = clipped_region_get_default();
+	scene_rect->backdrop_blur = false;
+	scene_rect->backdrop_blur_optimized = false;
 
 	scene_node_update(&scene_rect->node, NULL);
 
@@ -1553,6 +1555,10 @@ static void scene_entry_render(struct render_list_entry *entry, const struct ren
 	case WLR_SCENE_NODE_RECT:;
 		struct wlr_scene_rect *scene_rect = wlr_scene_rect_from_node(node);
 
+		// blur
+		if (scene_rect->backdrop_blur && is_scene_blur_enabled(&scene->blur_data)) {
+		}
+
 		struct fx_render_rect_options rect_options = {
 			.base = {
 				.box = dst_box,
@@ -1599,7 +1605,7 @@ static void scene_entry_render(struct render_list_entry *entry, const struct ren
 		break;
 	case WLR_SCENE_NODE_OPTIMIZED_BLUR:;
 		// Re-render the optimized blur buffer when needed
-		if (scene_buffer_is_blur_enabled(data->blur_info.has_blur, &scene->blur_data)
+		if (data->blur_info.has_blur && is_scene_blur_enabled(&scene->blur_data)
 				&& data->render_pass->fx_effect_framebuffers->blur_buffer_dirty
 				&& data->blur_info.has_optimized) {
 			const float opacity = 1.0f;
@@ -1674,7 +1680,7 @@ static void scene_entry_render(struct render_list_entry *entry, const struct ren
 		transform = wlr_output_transform_compose(transform, data->transform);
 
 		// Blur
-		if (scene_buffer_is_blur_enabled(scene_buffer->backdrop_blur, &scene->blur_data)) {
+		if (scene_buffer->backdrop_blur && is_scene_blur_enabled(&scene->blur_data)) {
 			pixman_region32_t opaque_region;
 			pixman_region32_init(&opaque_region);
 

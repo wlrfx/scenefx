@@ -1556,7 +1556,9 @@ static void scene_entry_render(struct render_list_entry *entry, const struct ren
 		struct wlr_scene_rect *scene_rect = wlr_scene_rect_from_node(node);
 
 		// blur
-		if (scene_rect->backdrop_blur && is_scene_blur_enabled(&scene->blur_data)) {
+		if (scene_rect->color[3] < 1.0 && scene_rect->backdrop_blur &&
+			is_scene_blur_enabled(&scene->blur_data)) {
+			printf("blur stub\n");
 		}
 
 		struct fx_render_rect_options rect_options = {

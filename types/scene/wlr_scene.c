@@ -670,6 +670,8 @@ struct wlr_scene_rect *wlr_scene_rect_create(struct wlr_scene_tree *parent,
 	scene_rect->corners = CORNER_LOCATION_NONE;
 	scene_rect->accepts_input = true;
 	scene_rect->clipped_region = clipped_region_get_default();
+	scene_rect->backdrop_blur = false;
+	scene_rect->backdrop_blur_optimized = false;
 
 	scene_node_update(&scene_rect->node, NULL);
 
@@ -692,6 +694,24 @@ void wlr_scene_rect_set_color(struct wlr_scene_rect *rect, const float color[sta
 	}
 
 	memcpy(rect->color, color, sizeof(rect->color));
+	scene_node_update(&rect->node, NULL);
+}
+
+void wlr_scene_rect_set_backdrop_blur(struct wlr_scene_rect *rect,
+		bool enabled) {
+	if (rect->backdrop_blur == enabled) {
+		return;
+	}
+	rect->backdrop_blur = enabled;
+	scene_node_update(&rect->node, NULL);
+}
+
+void wlr_scene_rect_set_backdrop_blur_optimized(struct wlr_scene_rect *rect,
+		bool enabled) {
+	if (rect->backdrop_blur_optimized == enabled) {
+		return;
+	}
+	rect->backdrop_blur_optimized = enabled;
 	scene_node_update(&rect->node, NULL);
 }
 
@@ -1535,6 +1555,47 @@ static void scene_entry_render(struct render_list_entry *entry, const struct ren
 	case WLR_SCENE_NODE_RECT:;
 		struct wlr_scene_rect *scene_rect = wlr_scene_rect_from_node(node);
 
+		// blur
+		bool has_alpha = pixman_region32_not_empty(&opaque);
+		if (has_alpha && scene_rect->backdrop_blur &&
+				is_scene_blur_enabled(&scene->blur_data)) {
+			pixman_region32_t opaque_region;
+			pixman_region32_init(&opaque_region);
+			scene_node_opaque_region(node, x, y, &opaque_region);
+			scale_output_damage(&opaque_region, data->scale);
+			float alpha = 1.0;
+
+			struct fx_render_blur_pass_options blur_options = {
+				.tex_options = {
+					.base = (struct wlr_render_texture_options) {
+						.texture = NULL,
+						.src_box = (struct wlr_fbox){0},
+						.dst_box = dst_box,
+						.transform = WL_OUTPUT_TRANSFORM_NORMAL,
+						.clip = &render_region,
+						.alpha = &alpha, // TODO: should this be configurable?
+										 // Borked when not 1.0, probably due to
+										 // lack of premultiplication in the
+										 // frag shader
+						.filter_mode = WLR_SCALE_FILTER_BILINEAR,
+						.blend_mode = WLR_RENDER_BLEND_MODE_PREMULTIPLIED,
+					},
+					.clip_box = &dst_box,
+					.corner_radius = scene_rect->corner_radius * data->scale,
+					.corners = scene_rect->corners,
+					.discard_transparent = false,
+				},
+				.opaque_region = &opaque_region,
+				.use_optimized_blur = scene_rect->backdrop_blur_optimized,
+				.blur_data = &scene->blur_data,
+				.ignore_transparent = false,
+			};
+			// Render the actual blur behind the surface
+			fx_render_pass_add_blur(data->render_pass, &blur_options);
+
+			pixman_region32_fini(&opaque_region);
+		}
+
 		struct fx_render_rect_options rect_options = {
 			.base = {
 				.box = dst_box,
@@ -1581,7 +1642,7 @@ static void scene_entry_render(struct render_list_entry *entry, const struct ren
 		break;
 	case WLR_SCENE_NODE_OPTIMIZED_BLUR:;
 		// Re-render the optimized blur buffer when needed
-		if (scene_buffer_is_blur_enabled(data->blur_info.has_blur, &scene->blur_data)
+		if (data->blur_info.has_blur && is_scene_blur_enabled(&scene->blur_data)
 				&& data->render_pass->fx_effect_framebuffers->blur_buffer_dirty
 				&& data->blur_info.has_optimized) {
 			const float opacity = 1.0f;
@@ -1656,7 +1717,7 @@ static void scene_entry_render(struct render_list_entry *entry, const struct ren
 		transform = wlr_output_transform_compose(transform, data->transform);
 
 		// Blur
-		if (scene_buffer_is_blur_enabled(scene_buffer->backdrop_blur, &scene->blur_data)) {
+		if (scene_buffer->backdrop_blur && is_scene_blur_enabled(&scene->blur_data)) {
 			pixman_region32_t opaque_region;
 			pixman_region32_init(&opaque_region);
 

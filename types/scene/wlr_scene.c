@@ -1547,6 +1547,9 @@ static void scene_entry_render(struct render_list_entry *entry, const struct ren
 	transform_output_box(&dst_box, data);
 	transform_output_damage(&render_region, data);
 
+	enum wl_output_transform node_transform =
+		wlr_output_transform_compose(WL_OUTPUT_TRANSFORM_NORMAL, data->transform);
+
 	struct wlr_scene *scene = data->output->scene;
 	switch (node->type) {
 	case WLR_SCENE_NODE_TREE:
@@ -1554,6 +1557,9 @@ static void scene_entry_render(struct render_list_entry *entry, const struct ren
 		break;
 	case WLR_SCENE_NODE_RECT:;
 		struct wlr_scene_rect *scene_rect = wlr_scene_rect_from_node(node);
+		enum corner_location rect_corners = scene_rect->corners;
+
+		corner_location_transform(node_transform, &rect_corners);
 
 		// blur
 		bool has_alpha = pixman_region32_not_empty(&opaque);
@@ -1582,7 +1588,7 @@ static void scene_entry_render(struct render_list_entry *entry, const struct ren
 					},
 					.clip_box = &dst_box,
 					.corner_radius = scene_rect->corner_radius * data->scale,
-					.corners = scene_rect->corners,
+					.corners = rect_corners,
 					.discard_transparent = false,
 				},
 				.opaque_region = &opaque_region,
@@ -1609,9 +1615,10 @@ static void scene_entry_render(struct render_list_entry *entry, const struct ren
 			},
 		};
 
-		if (scene_rect->corner_radius && scene_rect->corners != CORNER_LOCATION_NONE) {
+		if (scene_rect->corner_radius && rect_corners != CORNER_LOCATION_NONE) {
 			struct wlr_box clipped_region_box = scene_rect->clipped_region.area;
 			int clipped_region_corner_radius = scene_rect->clipped_region.corner_radius;
+			enum corner_location clipped_corners = scene_rect->clipped_region.corners;
 
 			// Compensation
 			int node_x, node_y;
@@ -1624,15 +1631,16 @@ static void scene_entry_render(struct render_list_entry *entry, const struct ren
 
 			scale_box(&clipped_region_box, data->scale);
 			transform_output_box(&clipped_region_box, data);
+			corner_location_transform(node_transform, &clipped_corners);
 
 			struct fx_render_rounded_rect_options rounded_rect_options = {
 				.base = rect_options.base,
 				.corner_radius = scene_rect->corner_radius * data->scale,
-				.corners = scene_rect->corners,
+				.corners = rect_corners,
 				.clipped_region = {
 					.area = clipped_region_box,
 					.corner_radius = clipped_region_corner_radius * data->scale,
-					.corners = scene_rect->clipped_region.corners,
+					.corners = clipped_corners,
 				},
 			};
 			fx_render_pass_add_rounded_rect(data->render_pass, &rounded_rect_options);
@@ -1671,6 +1679,7 @@ static void scene_entry_render(struct render_list_entry *entry, const struct ren
 
 		struct wlr_box clipped_region_box = scene_shadow->clipped_region.area;
 		int clipped_region_corner_radius = scene_shadow->clipped_region.corner_radius;
+		enum corner_location clipped_corners = scene_shadow->clipped_region.corners;
 
 		// Compensation
 		int node_x, node_y;
@@ -1682,13 +1691,14 @@ static void scene_entry_render(struct render_list_entry *entry, const struct ren
 		clipped_region_box.y -= data->logical.y;
 		scale_box(&clipped_region_box, data->scale);
 		transform_output_box(&clipped_region_box, data);
+		corner_location_transform(node_transform, &clipped_corners);
 
 		struct fx_render_box_shadow_options shadow_options = {
 			.box = dst_box,
 			.clipped_region = {
 				.area = clipped_region_box,
 				.corner_radius = clipped_region_corner_radius * data->scale,
-				.corners = scene_shadow->clipped_region.corners,
+				.corners = clipped_corners,
 			},
 			.blur_sigma = scene_shadow->blur_sigma,
 			.corner_radius = scene_shadow->corner_radius * data->scale,
@@ -1704,6 +1714,7 @@ static void scene_entry_render(struct render_list_entry *entry, const struct ren
 		break;
 	case WLR_SCENE_NODE_BUFFER:;
 		struct wlr_scene_buffer *scene_buffer = wlr_scene_buffer_from_node(node);
+		enum corner_location buffer_corners = scene_buffer->corners;
 
 		struct wlr_texture *texture = scene_buffer_get_texture(scene_buffer,
 			data->output->output->renderer);
@@ -1715,6 +1726,7 @@ static void scene_entry_render(struct render_list_entry *entry, const struct ren
 		enum wl_output_transform transform =
 			wlr_output_transform_invert(scene_buffer->transform);
 		transform = wlr_output_transform_compose(transform, data->transform);
+		corner_location_transform(transform, &buffer_corners);
 
 		// Blur
 		if (scene_buffer->backdrop_blur && is_scene_blur_enabled(&scene->blur_data)) {
@@ -1744,7 +1756,7 @@ static void scene_entry_render(struct render_list_entry *entry, const struct ren
 						},
 						.clip_box = &dst_box,
 						.corner_radius = scene_buffer->corner_radius * data->scale,
-						.corners = scene_buffer->corners,
+						.corners = buffer_corners,
 						.discard_transparent = false,
 					},
 					.opaque_region = &opaque_region,
@@ -1773,7 +1785,7 @@ static void scene_entry_render(struct render_list_entry *entry, const struct ren
 					WLR_RENDER_BLEND_MODE_PREMULTIPLIED : WLR_RENDER_BLEND_MODE_NONE,
 			},
 			.clip_box = &dst_box,
-			.corners = scene_buffer->corners,
+			.corners = buffer_corners,
 			.corner_radius = scene_buffer->corner_radius * data->scale,
 		};
 

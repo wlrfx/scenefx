@@ -71,7 +71,6 @@ struct fx_render_rect_grad_options {
 struct fx_render_rounded_rect_options {
 	struct wlr_render_rect_options base;
 	int corner_radius;
-	enum wl_output_transform transform;
 	enum corner_location corners;
 
 	struct clipped_region clipped_region;
@@ -81,7 +80,6 @@ struct fx_render_rounded_rect_grad_options {
 	struct wlr_render_rect_options base;
 	struct fx_gradient gradient;
 	int corner_radius;
-	enum wl_output_transform transform;
 	enum corner_location corners;
 };
 

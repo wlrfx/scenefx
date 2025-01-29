@@ -1621,15 +1621,9 @@ static void scene_entry_render(struct render_list_entry *entry, const struct ren
 			int clipped_region_corner_radius = scene_rect->clipped_region.corner_radius;
 			enum corner_location clipped_corners = scene_rect->clipped_region.corners;
 
-			// Compensation
-			int node_x, node_y;
-			wlr_scene_node_coords(node, &node_x, &node_y);
 			// Node relative -> Root relative
-			clipped_region_box.x += node_x;
-			clipped_region_box.y += node_y;
-			// Output relative
-			clipped_region_box.x -= data->logical.x;
-			clipped_region_box.y -= data->logical.y;
+			clipped_region_box.x += x;
+			clipped_region_box.y += y;
 
 			scale_box(&clipped_region_box, data->scale);
 			transform_output_box(&clipped_region_box, data);
@@ -1683,15 +1677,9 @@ static void scene_entry_render(struct render_list_entry *entry, const struct ren
 		int clipped_region_corner_radius = scene_shadow->clipped_region.corner_radius;
 		enum corner_location clipped_corners = scene_shadow->clipped_region.corners;
 
-		// Compensation
-		int node_x, node_y;
-		wlr_scene_node_coords(node, &node_x, &node_y);
 		// Node relative -> Root relative
-		clipped_region_box.x += node_x;
-		clipped_region_box.y += node_y;
-		// Output relative
-		clipped_region_box.x -= data->logical.x;
-		clipped_region_box.y -= data->logical.y;
+		clipped_region_box.x += x;
+		clipped_region_box.y += y;
 
 		scale_box(&clipped_region_box, data->scale);
 		transform_output_box(&clipped_region_box, data);

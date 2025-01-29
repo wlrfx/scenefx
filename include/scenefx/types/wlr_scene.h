@@ -430,6 +430,8 @@ void wlr_scene_rect_set_corner_radius(struct wlr_scene_rect *rect, int corner_ra
  *
  * For there to be corner rounding of the clipped region, the corner radius and
  * corners must be non-zero.
+ *
+ * NOTE: The positioning is node-relative.
  */
 void wlr_scene_rect_set_clipped_region(struct wlr_scene_rect *rect,
 		struct clipped_region clipped_region);
@@ -483,6 +485,8 @@ void wlr_scene_shadow_set_color(struct wlr_scene_shadow *shadow, const float col
  *
  * For there to be corner rounding of the clipped region, the corner radius and
  * corners must be non-zero.
+ *
+ * NOTE: The positioning is node-relative.
  */
 void wlr_scene_shadow_set_clipped_region(struct wlr_scene_shadow *shadow,
 		struct clipped_region clipped_region);

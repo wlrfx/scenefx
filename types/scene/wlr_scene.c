@@ -1624,9 +1624,10 @@ static void scene_entry_render(struct render_list_entry *entry, const struct ren
 			// Compensation
 			int node_x, node_y;
 			wlr_scene_node_coords(node, &node_x, &node_y);
-			clipped_region_box.x += node_x - node->x;
-			clipped_region_box.y += node_y - node->y;
-
+			// Node relative -> Root relative
+			clipped_region_box.x += node_x;
+			clipped_region_box.y += node_y;
+			// Output relative
 			clipped_region_box.x -= data->logical.x;
 			clipped_region_box.y -= data->logical.y;
 
@@ -1685,11 +1686,13 @@ static void scene_entry_render(struct render_list_entry *entry, const struct ren
 		// Compensation
 		int node_x, node_y;
 		wlr_scene_node_coords(node, &node_x, &node_y);
-		clipped_region_box.x += node_x - node->x;
-		clipped_region_box.y += node_y - node->y;
-
+		// Node relative -> Root relative
+		clipped_region_box.x += node_x;
+		clipped_region_box.y += node_y;
+		// Output relative
 		clipped_region_box.x -= data->logical.x;
 		clipped_region_box.y -= data->logical.y;
+
 		scale_box(&clipped_region_box, data->scale);
 		transform_output_box(&clipped_region_box, data);
 		corner_location_transform(node_transform, &clipped_corners);

@@ -1615,7 +1615,8 @@ static void scene_entry_render(struct render_list_entry *entry, const struct ren
 			},
 		};
 
-		if (scene_rect->corner_radius && rect_corners != CORNER_LOCATION_NONE) {
+		if (!wlr_box_empty(&scene_rect->clipped_region.area)
+				|| (scene_rect->corner_radius && rect_corners != CORNER_LOCATION_NONE)) {
 			struct wlr_box clipped_region_box = scene_rect->clipped_region.area;
 			int clipped_region_corner_radius = scene_rect->clipped_region.corner_radius;
 			enum corner_location clipped_corners = scene_rect->clipped_region.corners;

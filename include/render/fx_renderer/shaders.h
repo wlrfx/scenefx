@@ -25,6 +25,14 @@ struct quad_shader {
 	GLint proj;
 	GLint color;
 	GLint pos_attrib;
+
+	GLint clip_size;
+	GLint clip_position;
+	GLint clip_corner_radius;
+	GLint clip_round_top_left;
+	GLint clip_round_top_right;
+	GLint clip_round_bottom_left;
+	GLint clip_round_bottom_right;
 };
 
 bool link_quad_program(struct quad_shader *shader);

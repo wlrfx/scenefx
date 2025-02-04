@@ -37,6 +37,11 @@ struct fx_render_rect_options fx_render_rect_options_default(
 		const struct wlr_render_rect_options *base) {
 	struct fx_render_rect_options options = {
 		.base = *base,
+		.clipped_region = {
+			.area = { .0, .0, .0, .0 },
+			.corner_radius = 0,
+			.corners = CORNER_LOCATION_NONE,
+		},
 	};
 	return options;
 }
@@ -345,13 +350,51 @@ void fx_render_pass_add_rect(struct fx_gles_render_pass *pass,
 	struct wlr_box box;
 	wlr_render_rect_options_get_box(options, pass->buffer->buffer, &box);
 
-	push_fx_debug(renderer);
-	setup_blending(color->a == 1.0 ? WLR_RENDER_BLEND_MODE_NONE : options->blend_mode);
+	pixman_region32_t clip_region;
+	if (options->clip) {
+		pixman_region32_init(&clip_region);
+		pixman_region32_copy(&clip_region, options->clip);
+	} else {
+		pixman_region32_init_rect(&clip_region, box.x, box.y, box.width, box.height);
+	}
+	const struct wlr_box clipped_region_box = fx_options->clipped_region.area;
+	enum corner_location clipped_region_corners = fx_options->clipped_region.corners;
+	int clipped_region_corner_radius = clipped_region_corners != CORNER_LOCATION_NONE ?
+		fx_options->clipped_region.corner_radius : 0;
+	if (!wlr_box_empty(&clipped_region_box)) {
+		pixman_region32_t user_clip_region;
+		pixman_region32_init_rect(
+			&user_clip_region,
+			clipped_region_box.x + clipped_region_corner_radius * 0.3,
+			clipped_region_box.y + clipped_region_corner_radius * 0.3,
+			fmax(clipped_region_box.width - clipped_region_corner_radius * 0.6, 0),
+			fmax(clipped_region_box.height - clipped_region_corner_radius * 0.6, 0)
+		);
+		pixman_region32_subtract(&clip_region, &clip_region, &user_clip_region);
+		pixman_region32_fini(&user_clip_region);
 
-	glUseProgram(renderer->shaders.quad.program);
+		push_fx_debug(renderer);
+		setup_blending(options->blend_mode);
+	} else {
+		push_fx_debug(renderer);
+		setup_blending(color->a == 1.0 ? WLR_RENDER_BLEND_MODE_NONE : options->blend_mode);
+	}
 
-	set_proj_matrix(renderer->shaders.quad.proj, pass->projection_matrix, &box);
-	glUniform4f(renderer->shaders.quad.color, color->r, color->g, color->b, color->a);
+	struct quad_shader shader = renderer->shaders.quad;
+	glUseProgram(shader.program);
+	set_proj_matrix(shader.proj, pass->projection_matrix, &box);
+	glUniform4f(shader.color, color->r, color->g, color->b, color->a);
+	glUniform2f(shader.clip_size, clipped_region_box.width, clipped_region_box.height);
+	glUniform2f(shader.clip_position, clipped_region_box.x, clipped_region_box.y);
+	glUniform1f(shader.clip_corner_radius, fx_options->clipped_region.corner_radius);
+	glUniform1f(shader.clip_round_top_left,
+			(CORNER_LOCATION_TOP_LEFT & clipped_region_corners) == CORNER_LOCATION_TOP_LEFT);
+	glUniform1f(shader.clip_round_top_right,
+			(CORNER_LOCATION_TOP_RIGHT & clipped_region_corners) == CORNER_LOCATION_TOP_RIGHT);
+	glUniform1f(shader.clip_round_bottom_left,
+			(CORNER_LOCATION_BOTTOM_LEFT & clipped_region_corners) == CORNER_LOCATION_BOTTOM_LEFT);
+	glUniform1f(shader.clip_round_bottom_right,
+			(CORNER_LOCATION_BOTTOM_RIGHT & clipped_region_corners) == CORNER_LOCATION_BOTTOM_RIGHT);
 
 	render(&box, options->clip, renderer->shaders.quad.pos_attrib);
 

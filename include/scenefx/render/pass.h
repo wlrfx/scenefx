@@ -60,7 +60,7 @@ struct fx_render_texture_options {
 
 struct fx_render_rect_options {
 	struct wlr_render_rect_options base;
-	// TODO: Add effects here in the future
+	struct clipped_region clipped_region;
 };
 
 struct fx_render_rect_grad_options {
@@ -72,7 +72,6 @@ struct fx_render_rounded_rect_options {
 	struct wlr_render_rect_options base;
 	int corner_radius;
 	enum corner_location corners;
-
 	struct clipped_region clipped_region;
 };
 

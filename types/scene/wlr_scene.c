@@ -1602,6 +1602,18 @@ static void scene_entry_render(struct render_list_entry *entry, const struct ren
 			pixman_region32_fini(&opaque_region);
 		}
 
+		struct wlr_box rect_clipped_region_box = scene_rect->clipped_region.area;
+		int rect_clipped_region_corner_radius = scene_rect->clipped_region.corner_radius;
+		enum corner_location rect_clipped_corners = scene_rect->clipped_region.corners;
+
+		// Node relative -> Root relative
+		rect_clipped_region_box.x += x;
+		rect_clipped_region_box.y += y;
+
+		scale_box(&rect_clipped_region_box, data->scale);
+		transform_output_box(&rect_clipped_region_box, data);
+		corner_location_transform(node_transform, &rect_clipped_corners);
+
 		struct fx_render_rect_options rect_options = {
 			.base = {
 				.box = dst_box,
@@ -1613,35 +1625,19 @@ static void scene_entry_render(struct render_list_entry *entry, const struct ren
 				},
 				.clip = &render_region,
 			},
+			.clipped_region = {
+				.area = rect_clipped_region_box,
+				.corner_radius = rect_clipped_region_corner_radius * data->scale,
+				.corners = rect_clipped_corners,
+			},
 		};
 
 		if (scene_rect->corner_radius && rect_corners != CORNER_LOCATION_NONE) {
-			struct wlr_box clipped_region_box = scene_rect->clipped_region.area;
-			int clipped_region_corner_radius = scene_rect->clipped_region.corner_radius;
-			enum corner_location clipped_corners = scene_rect->clipped_region.corners;
-
-			// Compensation
-			int node_x, node_y;
-			wlr_scene_node_coords(node, &node_x, &node_y);
-			clipped_region_box.x += node_x - node->x;
-			clipped_region_box.y += node_y - node->y;
-
-			clipped_region_box.x -= data->logical.x;
-			clipped_region_box.y -= data->logical.y;
-
-			scale_box(&clipped_region_box, data->scale);
-			transform_output_box(&clipped_region_box, data);
-			corner_location_transform(node_transform, &clipped_corners);
-
 			struct fx_render_rounded_rect_options rounded_rect_options = {
 				.base = rect_options.base,
 				.corner_radius = scene_rect->corner_radius * data->scale,
 				.corners = rect_corners,
-				.clipped_region = {
-					.area = clipped_region_box,
-					.corner_radius = clipped_region_corner_radius * data->scale,
-					.corners = clipped_corners,
-				},
+				.clipped_region = rect_options.clipped_region,
 			};
 			fx_render_pass_add_rounded_rect(data->render_pass, &rounded_rect_options);
 		} else {
@@ -1677,28 +1673,24 @@ static void scene_entry_render(struct render_list_entry *entry, const struct ren
 	case WLR_SCENE_NODE_SHADOW:;
 		struct wlr_scene_shadow *scene_shadow = wlr_scene_shadow_from_node(node);
 
-		struct wlr_box clipped_region_box = scene_shadow->clipped_region.area;
-		int clipped_region_corner_radius = scene_shadow->clipped_region.corner_radius;
-		enum corner_location clipped_corners = scene_shadow->clipped_region.corners;
+		struct wlr_box shadow_clipped_region_box = scene_shadow->clipped_region.area;
+		int shadow_clipped_region_corner_radius = scene_shadow->clipped_region.corner_radius;
+		enum corner_location shadow_clipped_corners = scene_shadow->clipped_region.corners;
 
-		// Compensation
-		int node_x, node_y;
-		wlr_scene_node_coords(node, &node_x, &node_y);
-		clipped_region_box.x += node_x - node->x;
-		clipped_region_box.y += node_y - node->y;
+		// Node relative -> Root relative
+		shadow_clipped_region_box.x += x;
+		shadow_clipped_region_box.y += y;
 
-		clipped_region_box.x -= data->logical.x;
-		clipped_region_box.y -= data->logical.y;
-		scale_box(&clipped_region_box, data->scale);
-		transform_output_box(&clipped_region_box, data);
-		corner_location_transform(node_transform, &clipped_corners);
+		scale_box(&shadow_clipped_region_box, data->scale);
+		transform_output_box(&shadow_clipped_region_box, data);
+		corner_location_transform(node_transform, &shadow_clipped_corners);
 
 		struct fx_render_box_shadow_options shadow_options = {
 			.box = dst_box,
 			.clipped_region = {
-				.area = clipped_region_box,
-				.corner_radius = clipped_region_corner_radius * data->scale,
-				.corners = clipped_corners,
+				.area = shadow_clipped_region_box,
+				.corner_radius = shadow_clipped_region_corner_radius * data->scale,
+				.corners = shadow_clipped_corners,
 			},
 			.blur_sigma = scene_shadow->blur_sigma,
 			.corner_radius = scene_shadow->corner_radius * data->scale,

@@ -104,8 +104,12 @@ void load_gl_proc(void *proc_ptr, const char *name) {
 // Shaders
 
 bool link_quad_program(struct quad_shader *shader) {
+	GLchar quad_src[4096];
+	snprintf(quad_src, sizeof(quad_src), "%s\n%s", quad_frag_src,
+		corner_alpha_frag_src);
+
 	GLuint prog;
-	shader->program = prog = link_program(quad_frag_src);
+	shader->program = prog = link_program(quad_src);
 	if (!shader->program) {
 		return false;
 	}
@@ -113,6 +117,13 @@ bool link_quad_program(struct quad_shader *shader) {
 	shader->proj = glGetUniformLocation(prog, "proj");
 	shader->color = glGetUniformLocation(prog, "color");
 	shader->pos_attrib = glGetAttribLocation(prog, "pos");
+	shader->clip_size = glGetUniformLocation(prog, "clip_size");
+	shader->clip_position = glGetUniformLocation(prog, "clip_position");
+	shader->clip_corner_radius = glGetUniformLocation(prog, "clip_corner_radius");
+	shader->clip_round_top_left = glGetUniformLocation(prog, "clip_round_top_left");
+	shader->clip_round_top_right = glGetUniformLocation(prog, "clip_round_top_right");
+	shader->clip_round_bottom_left = glGetUniformLocation(prog, "clip_round_bottom_left");
+	shader->clip_round_bottom_right = glGetUniformLocation(prog, "clip_round_bottom_right");
 
 	return true;
 }

@@ -20,7 +20,7 @@ float corner_alpha(vec2 size, vec2 position, float radius,
 
 void main() {
     // Clipping
-    float clip_corner_alpha = corner_alpha(clip_size, clip_position, clip_corner_radius,
+    float clip_corner_alpha = corner_alpha(clip_size - 1.0, clip_position + 0.5, clip_corner_radius,
             clip_round_top_left, clip_round_top_right,
             clip_round_bottom_left, clip_round_bottom_right);
 

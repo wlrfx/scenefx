@@ -84,7 +84,7 @@ void main() {
     // dither the alpha to break up color bands
     shadow_alpha += (random() - 0.5) / 128.0;
 
-    float clip_corner_alpha = corner_alpha(clip_size, clip_position,
+    float clip_corner_alpha = corner_alpha(clip_size - 1.0, clip_position + 0.5,
             clip_corner_radius,
             clip_round_top_left, clip_round_top_right,
             clip_round_bottom_left, clip_round_bottom_right);

@@ -27,7 +27,7 @@ void main() {
             radius, round_top_left, round_top_right, round_bottom_left, round_bottom_right);
 
     // Clipping
-    float clip_corner_alpha = corner_alpha(clip_size, clip_position, clip_corner_radius,
+    float clip_corner_alpha = corner_alpha(clip_size - 1.0, clip_position + 0.5, clip_corner_radius,
             clip_round_top_left, clip_round_top_right,
             clip_round_bottom_left, clip_round_bottom_right);
     // Make sure that there are corners to round, sets the window alpha to 1.0

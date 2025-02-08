@@ -44,12 +44,17 @@ vec4 sample_texture() {
 #endif
 }
 
-float corner_alpha(vec2 size, vec2 position, float radius,
-            bool round_tl, bool round_tr, bool round_bl, bool round_br);
+float corner_alpha(vec2 size, vec2 position, float round_tl, float round_tr, float round_bl, float round_br);
 
 void main() {
-	float corner_alpha = corner_alpha(size, position, radius,
-			round_top_left, round_top_right, round_bottom_left, round_bottom_right);
+    float corner_alpha = corner_alpha(
+        size,
+        position,
+        float(round_top_left) * radius,
+        float(round_top_right) * radius,
+        float(round_bottom_left) * radius,
+        float(round_bottom_right) * radius
+    );
 	gl_FragColor = mix(sample_texture() * alpha, vec4(0.0), corner_alpha);
 
 	if (discard_transparent && gl_FragColor.a == 0.0) {

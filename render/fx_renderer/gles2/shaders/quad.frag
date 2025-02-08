@@ -15,14 +15,18 @@ uniform bool clip_round_top_right;
 uniform bool clip_round_bottom_left;
 uniform bool clip_round_bottom_right;
 
-float corner_alpha(vec2 size, vec2 position, float radius,
-            bool round_tl, bool round_tr, bool round_bl, bool round_br);
+float corner_alpha(vec2 size, vec2 position, float radius_tl, float radius_tr, float radius_bl, float radius_br);
 
 void main() {
     // Clipping
-    float clip_corner_alpha = corner_alpha(clip_size - 1.0, clip_position + 0.5, clip_corner_radius,
-            clip_round_top_left, clip_round_top_right,
-            clip_round_bottom_left, clip_round_bottom_right);
+    float clip_corner_alpha = corner_alpha(
+        clip_size - 1.0,
+        clip_position + 0.5,
+        float(clip_round_top_left) * clip_corner_radius,
+        float(clip_round_top_right) * clip_corner_radius,
+        float(clip_round_bottom_left) * clip_corner_radius,
+        float(clip_round_bottom_right) * clip_corner_radius
+    );
 
     float base_case = float(clip_round_top_left) + float(clip_round_top_right)
             + float(clip_round_bottom_left) + float(clip_round_bottom_right);

@@ -22,13 +22,19 @@ uniform bool round_bottom_right;
 
 vec4 gradient(vec4 colors[LEN], int count, vec2 size, vec2 grad_box, vec2 origin, float degree, bool linear, bool blend);
 
-float corner_alpha(vec2 size, vec2 position, float radius,
-            bool round_tl, bool round_tr, bool round_bl, bool round_br);
+float corner_alpha(vec2 size, vec2 position, float round_tl, float round_tr, float round_bl, float round_br);
 
 // TODO:
 void main() {
-    float rect_alpha = v_color.a * corner_alpha(size, position, radius,
-            round_top_left, round_top_right, round_bottom_left, round_bottom_right);
+    float quad_corner_alpha = corner_alpha(
+        size,
+        position,
+        float(round_top_left) * radius,
+        float(round_top_right) * radius,
+        float(round_bottom_left) * radius,
+        float(round_bottom_right) * radius
+    );
+    float rect_alpha = v_color.a * quad_corner_alpha;
 
     gl_FragColor = mix(vec4(0), gradient(colors, count, size, grad_box, origin, degree, linear, blend), rect_alpha);
 }

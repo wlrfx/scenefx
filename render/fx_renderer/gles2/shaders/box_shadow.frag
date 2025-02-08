@@ -72,8 +72,7 @@ float random() {
     return fract(sin(dot(vec2(12.9898, 78.233), gl_FragCoord.xy)) * 43758.5453);
 }
 
-float corner_alpha(vec2 size, vec2 position, float radius,
-            bool round_tl, bool round_tr, bool round_bl, bool round_br);
+float corner_alpha(vec2 size, vec2 position, float round_tl, float round_tr, float round_bl, float round_br);
 
 void main() {
     float shadow_alpha = v_color.a * roundedBoxShadow(
@@ -84,10 +83,16 @@ void main() {
     // dither the alpha to break up color bands
     shadow_alpha += (random() - 0.5) / 128.0;
 
-    float clip_corner_alpha = corner_alpha(clip_size - 1.0, clip_position + 0.5,
-            clip_corner_radius,
-            clip_round_top_left, clip_round_top_right,
-            clip_round_bottom_left, clip_round_bottom_right);
+    // Clipping
+    float clip_corner_alpha = corner_alpha(
+        clip_size - 1.0,
+        clip_position + 0.5,
+        float(clip_round_top_left) * clip_corner_radius,
+        float(clip_round_top_right) * clip_corner_radius,
+        float(clip_round_bottom_left) * clip_corner_radius,
+        float(clip_round_bottom_right) * clip_corner_radius
+    );
+
     // Make sure that there are corners to round, sets the window alpha to 1.0
     // if window CORNER_LOCATION_NONE or window radius is 0.
     float base_case = float(clip_round_top_left) + float(clip_round_top_right)

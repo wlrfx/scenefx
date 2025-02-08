@@ -11,7 +11,7 @@ float corner_alpha(vec2 size, vec2 position, float radius_tl, float radius_tr, f
 	vec2 bottom_right = abs(relative_pos) - size + radius_br;
 
 	float dist = max(
-		max(get_dist(top_left, radius_tl), get_dist(top_right, radius_tl)),
+		max(get_dist(top_left, radius_tl), get_dist(top_right, radius_tr)),
 		max(get_dist(bottom_left, radius_bl), get_dist(bottom_right, radius_br))
 	);
 

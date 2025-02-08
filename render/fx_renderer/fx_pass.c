@@ -396,7 +396,8 @@ void fx_render_pass_add_rect(struct fx_gles_render_pass *pass,
 	glUniform1f(shader.clip_round_bottom_right,
 			(CORNER_LOCATION_BOTTOM_RIGHT & clipped_region_corners) == CORNER_LOCATION_BOTTOM_RIGHT);
 
-	render(&box, options->clip, renderer->shaders.quad.pos_attrib);
+	render(&box, &clip_region, renderer->shaders.quad.pos_attrib);
+	pixman_region32_fini(&clip_region);
 
 	pop_fx_debug(renderer);
 }

@@ -1569,7 +1569,11 @@ static void scene_entry_render(struct render_list_entry *entry, const struct ren
 			pixman_region32_init(&opaque_region);
 			scene_node_opaque_region(node, x, y, &opaque_region);
 			scale_output_damage(&opaque_region, data->scale);
-			float alpha = 1.0;
+
+			/* TODO: should this be configurable? Borked when not 1.0, probably due to
+			   lack of premultiplication in the frag shader
+			*/
+			float blur_alpha = 1.0;
 
 			struct fx_render_blur_pass_options blur_options = {
 				.tex_options = {
@@ -1579,10 +1583,7 @@ static void scene_entry_render(struct render_list_entry *entry, const struct ren
 						.dst_box = dst_box,
 						.transform = WL_OUTPUT_TRANSFORM_NORMAL,
 						.clip = &render_region,
-						.alpha = &alpha, // TODO: should this be configurable?
-										 // Borked when not 1.0, probably due to
-										 // lack of premultiplication in the
-										 // frag shader
+						.alpha = &blur_alpha,
 						.filter_mode = WLR_SCALE_FILTER_BILINEAR,
 						.blend_mode = WLR_RENDER_BLEND_MODE_PREMULTIPLIED,
 					},
@@ -1735,6 +1736,8 @@ static void scene_entry_render(struct render_list_entry *entry, const struct ren
 				pixman_region32_translate(&opaque_region,
 						-scene_buffer->src_box.x, -scene_buffer->src_box.y);
 
+				// TODO: should I be configurable? We should probably move blur to a node
+				float blur_alpha = 1.0;
 				struct fx_render_blur_pass_options blur_options = {
 					.tex_options = {
 						.base = (struct wlr_render_texture_options) {
@@ -1743,7 +1746,7 @@ static void scene_entry_render(struct render_list_entry *entry, const struct ren
 							.dst_box = dst_box,
 							.transform = WL_OUTPUT_TRANSFORM_NORMAL,
 							.clip = &render_region, // Render with the smaller region, clipping CSD
-							.alpha = &scene_buffer->opacity,
+							.alpha = &blur_alpha,
 							.filter_mode = WLR_SCALE_FILTER_BILINEAR,
 						},
 						.clip_box = &dst_box,

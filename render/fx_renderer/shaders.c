@@ -173,10 +173,10 @@ bool link_quad_grad_program(struct quad_grad_shader *shader, GLint client_versio
 	shader->colors = glGetUniformLocation(prog, "colors");
 	shader->degree = glGetUniformLocation(prog, "degree");
 	shader->grad_box = glGetUniformLocation(prog, "grad_box");
-	shader->linear = glGetUniformLocation(prog, "linear");
+	shader->is_linear = glGetUniformLocation(prog, "is_linear");
 	shader->origin = glGetUniformLocation(prog, "origin");
 	shader->count = glGetUniformLocation(prog, "count");
-	shader->blend = glGetUniformLocation(prog, "blend");
+	shader->should_blend = glGetUniformLocation(prog, "should_blend");
 
 	shader->max_len = max_len;
 
@@ -254,10 +254,10 @@ bool link_quad_grad_round_program(struct quad_grad_round_shader *shader, GLint c
 	shader->colors = glGetUniformLocation(prog, "colors");
 	shader->degree = glGetUniformLocation(prog, "degree");
 	shader->grad_box = glGetUniformLocation(prog, "grad_box");
-	shader->linear = glGetUniformLocation(prog, "linear");
+	shader->is_linear = glGetUniformLocation(prog, "is_linear");
 	shader->origin = glGetUniformLocation(prog, "origin");
 	shader->count = glGetUniformLocation(prog, "count");
-	shader->blend = glGetUniformLocation(prog, "blend");
+	shader->should_blend = glGetUniformLocation(prog, "should_blend");
 
 	shader->max_len = max_len;
 

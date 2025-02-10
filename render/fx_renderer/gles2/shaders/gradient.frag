@@ -1,4 +1,5 @@
-vec4 gradient(vec4 colors[LEN], int count, vec2 size, vec2 grad_box, vec2 origin, float degree, bool linear, bool blend) {
+vec4 gradient(vec4 colors[LEN], int count, vec2 size, vec2 grad_box,
+		vec2 origin, float degree, bool is_linear, bool should_blend) {
 	float step;
 
 	vec2 normal = (gl_FragCoord.xy - grad_box)/size;
@@ -6,7 +7,7 @@ vec4 gradient(vec4 colors[LEN], int count, vec2 size, vec2 grad_box, vec2 origin
 
 	float rad = radians(degree);
 
-	if (linear) {
+	if (is_linear) {
 		uv *= vec2(1.0)/vec2(abs(cos(rad)) + abs(sin(rad)));
 
 		vec2 rotated = vec2(uv.x * cos(rad) - uv.y * sin(rad) + origin.x,
@@ -22,9 +23,9 @@ vec4 gradient(vec4 colors[LEN], int count, vec2 size, vec2 grad_box, vec2 origin
 		step = uv.x;
 	}
 
-	if (!blend) {
-		float smooth_fac = 1.0/float(count);
-		int ind = int(step/smooth_fac);
+	if (!should_blend) {
+		float smooth = 1.0/float(count);
+		int ind = int(step/smooth);
 
 		return colors[ind];
 	}
@@ -39,3 +40,4 @@ vec4 gradient(vec4 colors[LEN], int count, vec2 size, vec2 grad_box, vec2 origin
 
 	return color;
 }
+

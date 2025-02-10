@@ -9,6 +9,7 @@
 #include "render/egl.h"
 #include "scenefx/types/fx/clipped_region.h"
 #include "scenefx/types/fx/corner_location.h"
+#include "scenefx/types/fx/gradient.h"
 
 struct fx_gles_render_pass {
 	struct wlr_render_pass base;
@@ -38,20 +39,6 @@ struct fx_gles_render_pass *fx_renderer_begin_buffer_pass(struct wlr_renderer *w
 		struct wlr_buffer *wlr_buffer, struct wlr_output *output,
 		const struct fx_buffer_pass_options *options);
 
-struct fx_gradient {
-	float degree;
-	/* The full area the gradient fit too, for borders use the window size */
-	struct wlr_box range;
-	/* The center of the gradient, {0.5, 0.5} for normal*/
-	float origin[2];
-	/* 1 = Linear, 2 = Conic */
-	int linear;
-	/* Whether or not to blend the colors */
-	int blend;
-	int count;
-	float *colors;
-};
-
 struct fx_render_texture_options {
 	struct wlr_render_texture_options base;
 	const struct wlr_box *clip_box; // Used to clip csd. Ignored if NULL
@@ -66,8 +53,8 @@ struct fx_render_rect_options {
 };
 
 struct fx_render_rect_grad_options {
-	struct wlr_render_rect_options base;
-	struct fx_gradient gradient;
+	struct fx_render_rect_options rect_options;
+	struct gradient gradient;
 };
 
 struct fx_render_rounded_rect_options {
@@ -78,10 +65,8 @@ struct fx_render_rounded_rect_options {
 };
 
 struct fx_render_rounded_rect_grad_options {
-	struct wlr_render_rect_options base;
-	struct fx_gradient gradient;
-	int corner_radius;
-	enum corner_location corners;
+	struct fx_render_rounded_rect_options rounded_rect_options;
+	struct gradient gradient;
 };
 
 struct fx_render_box_shadow_options {

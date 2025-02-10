@@ -1133,26 +1133,34 @@ int main(int argc, char *argv[]) {
 
 	/* Create all of the basic scene layers */
 	server.layers.bottom_layer = wlr_scene_tree_create(&server.scene->tree);
+
 	/* Add a bottom rect to demonstrate optimized blur */
 	float bottom_rect_color[4] = { 1, 1, 1, 1 };
 	wlr_scene_rect_create(server.layers.bottom_layer, 200, 200, bottom_rect_color);
+	/*
+	wlr_scene_rect_set_gradient(
+		bottom_rect,
+		(struct gradient) {
+			.degree = 0.0,
+			.range = (struct wlr_box) {
+			},
+			.origin = {},
+			.is_linear = true,
+			.should_blend = true,
+			.count = 0,
+			.colors = {},
+		}
+	);
+	*/
+
 	/* Set the size later */
 	server.layers.blur_layer = wlr_scene_optimized_blur_create(&server.scene->tree, 0, 0);
 	server.layers.toplevel_layer = wlr_scene_tree_create(&server.scene->tree);
+
 	/* Add a top rect that won't get blurred by optimized */
 	float top_rect_color[4] = { 1, 0, 0, 1 };
 	struct wlr_scene_rect *rect = wlr_scene_rect_create(server.layers.toplevel_layer,
 			200, 200, top_rect_color);
-	wlr_scene_rect_set_clipped_region(rect, (struct clipped_region) {
-			.corner_radius = 12,
-			.corners = CORNER_LOCATION_TOP,
-			.area = {
-				.x = 50,
-				.y = 50,
-				.width = 100,
-				.height = 100,
-			},
-	});
 	wlr_scene_node_set_position(&rect->node, 200, 200);
 
 	/* Set up xdg-shell version 3. The xdg-shell is a Wayland protocol which is

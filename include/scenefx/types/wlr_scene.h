@@ -31,6 +31,7 @@
 #include "scenefx/types/fx/blur_data.h"
 #include "scenefx/types/fx/clipped_region.h"
 #include "scenefx/types/fx/corner_location.h"
+#include "scenefx/types/fx/gradient.h"
 
 struct wlr_output;
 struct wlr_output_layout;
@@ -91,6 +92,11 @@ enum wlr_scene_debug_damage_option {
 	WLR_SCENE_DEBUG_DAMAGE_HIGHLIGHT
 };
 
+enum wlr_scene_rect_fill_type {
+    SOLID_COLOR,
+	GRADIENT,
+};
+
 /** A sub-tree in the scene-graph. */
 struct wlr_scene_tree {
 	struct wlr_scene_node node;
@@ -146,13 +152,18 @@ struct wlr_scene_surface {
 struct wlr_scene_rect {
 	struct wlr_scene_node node;
 	int width, height;
-	float color[4];
 	int corner_radius;
 	enum corner_location corners;
 	bool backdrop_blur;
 	bool backdrop_blur_optimized;
 	float backdrop_blur_strength;
 	float backdrop_blur_alpha;
+
+	union {
+		float color[4];
+		struct gradient gradient;
+	};
+	enum wlr_scene_rect_fill_type fill_type;
 
 	bool accepts_input;
 	struct clipped_region clipped_region;
@@ -525,6 +536,11 @@ void wlr_scene_rect_set_clipped_region(struct wlr_scene_rect *rect,
  * The color argument must be a premultiplied color value.
  */
 void wlr_scene_rect_set_color(struct wlr_scene_rect *rect, const float color[static 4]);
+
+/**
+ * Change the gradient of an existing rectangle node.
+ */
+void wlr_scene_rect_set_gradient(struct wlr_scene_rect *rect, const struct gradient gradient);
 
 /**
 * Sets whether or not the buffer should render backdrop blur

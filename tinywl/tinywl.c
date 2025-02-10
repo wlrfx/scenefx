@@ -1136,22 +1136,25 @@ int main(int argc, char *argv[]) {
 
 	/* Add a bottom rect to demonstrate optimized blur */
 	float bottom_rect_color[4] = { 1, 1, 1, 1 };
-	wlr_scene_rect_create(server.layers.bottom_layer, 200, 200, bottom_rect_color);
-	/*
+	struct wlr_scene_rect *bottom_rect = wlr_scene_rect_create(server.layers.bottom_layer,
+			200, 200, bottom_rect_color);
 	wlr_scene_rect_set_gradient(
 		bottom_rect,
 		(struct gradient) {
 			.degree = 0.0,
 			.range = (struct wlr_box) {
+				.x = 0,
+				.y = 0,
+				.width = 200,
+				.height = 200,
 			},
-			.origin = {},
+			.origin = { 0.5, 0.5 },
 			.is_linear = true,
 			.should_blend = true,
-			.count = 0,
-			.colors = {},
+			.count = 1,
+			.colors = bottom_rect_color,
 		}
 	);
-	*/
 
 	/* Set the size later */
 	server.layers.blur_layer = wlr_scene_optimized_blur_create(&server.scene->tree, 0, 0);

@@ -1467,9 +1467,10 @@ static bool scene_node_at_iterator(struct wlr_scene_node *node,
 		struct wlr_scene_rect *rect = wlr_scene_rect_from_node(node);
 		if (!rect->accepts_input) {
 			return false;
-		} else if (!wlr_box_empty(&rect->clipped_region.area)) {
-			// Check if inside clipped region
-			return !wlr_box_contains_point(&rect->clipped_region.area, rx, ry);
+		} else if (!wlr_box_empty(&rect->clipped_region.area)
+				&& wlr_box_contains_point(&rect->clipped_region.area, rx, ry)) {
+			// Inside clipped region
+			return false;
 		}
 	} else if (node->type == WLR_SCENE_NODE_SHADOW
 			|| node->type == WLR_SCENE_NODE_OPTIMIZED_BLUR) {

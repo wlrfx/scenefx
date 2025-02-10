@@ -7,10 +7,8 @@ struct gradient {
     float origin[2]; //  center of the gradient, { 0.5, 0.5 } for normal
     bool is_linear; // else is conic
     float should_blend;
-
     int count;
     float *colors;
 };
-
 
 #endif // TYPES_FX_GRADIENT_H

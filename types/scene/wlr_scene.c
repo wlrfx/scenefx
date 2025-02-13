@@ -2032,7 +2032,7 @@ static bool scene_node_invisible(struct wlr_scene_node *node) {
 
 		return shadow->color[3] == 0.f;
 	} else if (node->type == WLR_SCENE_NODE_OPTIMIZED_BLUR) {
-		return false;
+		return true;
 	} else if (node->type == WLR_SCENE_NODE_BUFFER) {
 		struct wlr_scene_buffer *buffer = wlr_scene_buffer_from_node(node);
 

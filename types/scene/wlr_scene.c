@@ -2255,6 +2255,12 @@ static bool scene_output_has_blur(int list_len,
 				apply_blur_region(node, scene_output, blur_region);
 			}
 			break;
+		case WLR_SCENE_NODE_RECT:;
+			struct wlr_scene_rect *scene_rect = wlr_scene_rect_from_node(node);
+			if (scene_rect->backdrop_blur) {
+				apply_blur_region(node, scene_output, blur_region);
+			}
+			break;
 		default:
 			// TODO: Add support for other node types
 			break;

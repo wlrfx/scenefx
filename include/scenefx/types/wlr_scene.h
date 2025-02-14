@@ -168,6 +168,8 @@ struct wlr_scene_shadow {
 struct wlr_scene_optimized_blur {
 	struct wlr_scene_node node;
 	int width, height;
+
+	bool dirty;
 };
 
 struct wlr_scene_outputs_update_event {
@@ -514,6 +516,14 @@ struct wlr_scene_optimized_blur *wlr_scene_optimized_blur_create(struct wlr_scen
 void wlr_scene_optimized_blur_set_size(struct wlr_scene_optimized_blur *blur_node,
 		int width, int height);
 
+/**
+ * Tells the renderer to re-render the optimized blur.
+ * This is very expensive so should only be called when needed.
+ *
+ * An example use would be to call this when a "static" node changes, like a
+ * wallpaper.
+ */
+void wlr_scene_optimized_blur_mark_dirty(struct wlr_scene_optimized_blur *blur_node);
 
 /**
  * Add a node displaying a buffer to the scene-graph.
@@ -608,17 +618,6 @@ void wlr_scene_buffer_set_backdrop_blur_optimized(struct wlr_scene_buffer *scene
 */
 void wlr_scene_buffer_set_backdrop_blur_ignore_transparent(
 		struct wlr_scene_buffer *scene_buffer, bool enabled);
-
-/**
- * Tells the renderer to re-render the optimized blur for the specified output.
- * A NULL output will re-render the optimized blur on every output.
- * This is very expensive so should only be called when needed.
- *
- * An example use would be to call this when a "static" node changes, like a
- * wallpaper.
- */
-void wlr_scene_optimized_blur_mark_dirty(struct wlr_scene *scene,
-		struct wlr_scene_optimized_blur *blur_node, struct wlr_output *output);
 
 /**
  * Calls the buffer's frame_done signal.

@@ -147,7 +147,7 @@ void fx_render_pass_add_blur(struct fx_gles_render_pass *pass,
 /**
  * Render optimized blur.
  */
-void fx_render_pass_add_optimized_blur(struct fx_gles_render_pass *pass,
+bool fx_render_pass_add_optimized_blur(struct fx_gles_render_pass *pass,
 		struct fx_render_blur_pass_options *fx_options);
 
 /**

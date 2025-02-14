@@ -919,12 +919,12 @@ damage_finish:
 	pixman_region32_fini(&translucent_region);
 }
 
-void fx_render_pass_add_optimized_blur(struct fx_gles_render_pass *pass,
+bool fx_render_pass_add_optimized_blur(struct fx_gles_render_pass *pass,
 		struct fx_render_blur_pass_options *fx_options) {
 	if (pass->buffer->renderer->basic_renderer) {
 		wlr_log(WLR_ERROR, "Please use 'fx_renderer_begin_buffer_pass' instead of "
 				"'wlr_renderer_begin_buffer_pass' to use advanced effects");
-		return;
+		return false;
 	}
 	struct fx_renderer *renderer = pass->buffer->renderer;
 	struct wlr_box dst_box = fx_options->tex_options.base.dst_box;
@@ -950,10 +950,10 @@ void fx_render_pass_add_optimized_blur(struct fx_gles_render_pass *pass,
 	// Render the newly blurred content into the blur_buffer
 	fx_renderer_read_to_buffer(pass, &clip,
 			pass->fx_effect_framebuffers->optimized_blur_buffer, buffer, false);
-	pass->fx_effect_framebuffers->blur_buffer_dirty = false;
 
 finish:
 	pixman_region32_fini(&clip);
+	return !failed;
 }
 
 void fx_renderer_read_to_buffer(struct fx_gles_render_pass *pass,

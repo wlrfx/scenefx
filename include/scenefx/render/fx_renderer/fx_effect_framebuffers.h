@@ -21,8 +21,6 @@ struct fx_effect_framebuffers {
 	// Swap buffer used for effects
 	struct fx_framebuffer *effects_buffer_swapped;
 
-	bool blur_buffer_dirty;
-
 	// The region where there's blur
 	pixman_region32_t blur_padding_region;
 };

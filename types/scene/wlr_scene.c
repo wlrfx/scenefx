@@ -543,6 +543,17 @@ static bool scene_node_update_iterator(struct wlr_scene_node *node,
 		int lx, int ly, void *_data) {
 	struct scene_update_data *data = _data;
 
+	if (node->type == WLR_SCENE_NODE_OPTIMIZED_BLUR) {
+		struct wlr_scene_optimized_blur *scene_blur = wlr_scene_optimized_blur_from_node(node);
+		if (scene_blur->dirty) {
+			data->optimized_blur_dirty = true;
+			// Restore the visible region back to default for the nodes below
+			// the optimized blur node
+			pixman_region32_clear(data->visible);
+			pixman_region32_copy(data->visible, data->update_region);
+		}
+	}
+
 	struct wlr_box box = { .x = lx, .y = ly };
 	scene_node_get_size(node, &box.width, &box.height);
 
@@ -551,7 +562,7 @@ static bool scene_node_update_iterator(struct wlr_scene_node *node,
 	pixman_region32_intersect_rect(&node->visible, &node->visible,
 		lx, ly, box.width, box.height);
 
-	if (data->calculate_visibility) {
+	if (data->calculate_visibility && !data->optimized_blur_dirty) {
 		pixman_region32_t opaque;
 		pixman_region32_init(&opaque);
 		scene_node_opaque_region(node, lx, ly, &opaque);
@@ -613,6 +624,7 @@ static void scene_update_region(struct wlr_scene *scene,
 		.update_region = update_region,
 		.outputs = &scene->outputs,
 		.calculate_visibility = scene->calculate_visibility,
+		.optimized_blur_dirty = false,
 	};
 
 	struct pixman_box32 *region_box = pixman_region32_extents(update_region);
@@ -2041,7 +2053,7 @@ static bool scene_node_invisible(struct wlr_scene_node *node) {
 
 		return shadow->color[3] == 0.f;
 	} else if (node->type == WLR_SCENE_NODE_OPTIMIZED_BLUR) {
-		return true;
+		return false;
 	} else if (node->type == WLR_SCENE_NODE_BUFFER) {
 		struct wlr_scene_buffer *buffer = wlr_scene_buffer_from_node(node);
 

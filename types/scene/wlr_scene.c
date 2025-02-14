@@ -276,6 +276,19 @@ static void scene_node_opaque_region(struct wlr_scene_node *node, int x, int y,
 		if (scene_rect->color[3] != 1) {
 			return;
 		}
+		if (!wlr_box_empty(&scene_rect->clipped_region.area)) {
+			pixman_region32_fini(opaque);
+			pixman_region32_init_rect(opaque, x, y, width, height);
+
+			// Subtract the clipped region from a otherwise fully opaque rect
+			struct wlr_box *clipped = &scene_rect->clipped_region.area;
+			pixman_region32_t clipped_region;
+			pixman_region32_init_rect(&clipped_region, clipped->x + x, clipped->y + y,
+					clipped->width, clipped->height);
+			pixman_region32_subtract(opaque, opaque, &clipped_region);
+			pixman_region32_fini(&clipped_region);
+			return;
+		}
 	} else if (node->type == WLR_SCENE_NODE_SHADOW) {
 		// TODO: test & handle case of blur sigma = 0 and color[3] = 1?
 		return;

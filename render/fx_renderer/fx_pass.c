@@ -872,6 +872,9 @@ void fx_render_pass_add_blur(struct fx_gles_render_pass *pass,
 
 	struct fx_framebuffer *buffer = pass->fx_effect_framebuffers->optimized_blur_buffer;
 	if (!buffer || !fx_options->use_optimized_blur) {
+		if (!buffer) {
+			wlr_log(WLR_ERROR, "Warning: Failed to use optimized blur");
+		}
 		pixman_region32_translate(&translucent_region, dst_box.x, dst_box.y);
 		pixman_region32_intersect(&translucent_region, &translucent_region, options->clip);
 

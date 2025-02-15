@@ -2249,18 +2249,17 @@ static void apply_blur_region(struct wlr_scene_node *node,
 	scene_node_opaque_region(node, x, y, &opaque_region);
 	// Add the buffer to the blur_region if it's not fully opaque
 	if (!pixman_region32_not_empty(&opaque_region)) {
-		struct wlr_box dst_box = {
+		struct wlr_box node_box = {
 			.x = x,
 			.y = y,
 		};
-		scene_node_get_size(node, &dst_box.width, &dst_box.height);
-		scale_box(&dst_box, scene_output->output->scale);
+		scene_node_get_size(node, &node_box.width, &node_box.height);
+		scale_box(&node_box, scene_output->output->scale);
 
 		pixman_region32_union_rect(blur_region, blur_region,
-				(x - scene_output->x) * scene_output->output->scale,
-				(y - scene_output->y) * scene_output->output->scale,
-				dst_box.width * scene_output->output->scale,
-				dst_box.height * scene_output->output->scale);
+				node_box.x - scene_output->x,
+				node_box.y - scene_output->y,
+				node_box.width, node_box.height);
 	}
 	pixman_region32_fini(&opaque_region);
 }

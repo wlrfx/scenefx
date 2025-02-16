@@ -46,7 +46,6 @@ create_new:;
 		wlr_log(WLR_ERROR, "Could not allocate a fx_effect_framebuffers");
 		return NULL;
 	}
-	fbos->blur_buffer_dirty = false;
 
 	if (!fx_effect_framebuffers_assign(output, fbos)) {
 		wlr_log(WLR_ERROR, "Could not assign fx_effect_framebuffers to output: '%s'",

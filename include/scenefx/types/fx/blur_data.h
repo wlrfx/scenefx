@@ -6,7 +6,7 @@
 
 struct blur_data {
 	int num_passes;
-	int radius;
+	float radius;
 	float noise;
 	float brightness;
 	float contrast;

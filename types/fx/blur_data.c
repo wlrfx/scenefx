@@ -2,7 +2,7 @@
 
 struct blur_data blur_data_get_default(void) {
 	return (struct blur_data) {
-		.radius = 5,
+		.radius = 5.0f,
 		.num_passes = 3,
 		.noise = 0.02,
 		.brightness = 0.9,

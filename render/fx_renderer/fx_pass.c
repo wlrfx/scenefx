@@ -1,3 +1,4 @@
+#include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <assert.h>
@@ -828,11 +829,23 @@ static void render_blur_effects(struct fx_gles_render_pass *pass,
 	wlr_texture_destroy(options->texture);
 }
 
+static void compute_blur_data(struct blur_data *blur_data,
+		struct blur_data *ref_blur_data, const float *alpha) {
+	const float slice = 1.0 / ref_blur_data->num_passes;
+
+	// Lowering num_passes by one requires doubling the radius to keep the same
+	// blur
+	blur_data->num_passes = fmin(ceilf(*alpha / slice), ref_blur_data->num_passes);
+	blur_data->radius = ref_blur_data->radius * *alpha * pow(2, ref_blur_data->num_passes - blur_data->num_passes);
+}
+
 // Blurs the main_buffer content and returns the blurred framebuffer
 static struct fx_framebuffer *get_main_buffer_blur(struct fx_gles_render_pass *pass,
 		struct fx_render_blur_pass_options *fx_options) {
 	struct fx_renderer *renderer = pass->buffer->renderer;
-	struct blur_data *blur_data = fx_options->blur_data;
+	struct blur_data blur_data = *fx_options->blur_data;
+	compute_blur_data(&blur_data, fx_options->blur_data, fx_options->tex_options.base.alpha);
+	fx_options->blur_data = &blur_data;
 	struct wlr_box monitor_box = get_monitor_box(pass->output);
 
 	pixman_region32_t damage;
@@ -841,7 +854,7 @@ static struct fx_framebuffer *get_main_buffer_blur(struct fx_gles_render_pass *p
 	wlr_region_transform(&damage, &damage, fx_options->tex_options.base.transform,
 			monitor_box.width, monitor_box.height);
 
-	wlr_region_expand(&damage, &damage, blur_data_calc_size(fx_options->blur_data));
+	wlr_region_expand(&damage, &damage, blur_data_calc_size(&blur_data));
 
 	// damage region will be scaled, make a temp
 	pixman_region32_t scaled_damage;
@@ -860,13 +873,13 @@ static struct fx_framebuffer *get_main_buffer_blur(struct fx_gles_render_pass *p
 	fx_options->tex_options.base.filter_mode = WLR_SCALE_FILTER_BILINEAR;
 
 	// Downscale
-	for (int i = 0; i < blur_data->num_passes; ++i) {
+	for (int i = 0; i < blur_data.num_passes; ++i) {
 		wlr_region_scale(&scaled_damage, &damage, 1.0f / (1 << (i + 1)));
 		render_blur_segments(pass, fx_options, &renderer->shaders.blur1);
 	}
 
 	// Upscale
-	for (int i = blur_data->num_passes - 1; i >= 0; --i) {
+	for (int i = blur_data.num_passes - 1; i >= 0; --i) {
 		// when upsampling we make the region twice as big
 		wlr_region_scale(&scaled_damage, &damage, 1.0f / (1 << i));
 		render_blur_segments(pass, fx_options, &renderer->shaders.blur2);
@@ -875,7 +888,7 @@ static struct fx_framebuffer *get_main_buffer_blur(struct fx_gles_render_pass *p
 	pixman_region32_fini(&scaled_damage);
 
 	// Render additional blur effects like saturation, noise, contrast, etc...
-	if (blur_data_should_parameters_blur_effects(blur_data)
+	if (blur_data_should_parameters_blur_effects(&blur_data)
 			&& pixman_region32_not_empty(&damage)) {
 		if (fx_options->current_buffer == pass->fx_effect_framebuffers->effects_buffer) {
 			fx_framebuffer_bind(pass->fx_effect_framebuffers->effects_buffer_swapped);
@@ -957,6 +970,7 @@ void fx_render_pass_add_blur(struct fx_gles_render_pass *pass,
 	}
 
 	// Draw the blurred texture
+	const float blur_alpha = 1.0;
 	tex_options->base.dst_box = get_monitor_box(pass->output);
 	tex_options->base.src_box = (struct wlr_fbox) {
 		.x = 0,
@@ -965,6 +979,7 @@ void fx_render_pass_add_blur(struct fx_gles_render_pass *pass,
 		.height = buffer->buffer->height,
 	};
 	tex_options->base.texture = &blur_texture->wlr_texture;
+	tex_options->base.alpha = &blur_alpha;
 	fx_render_pass_add_texture(pass, tex_options);
 
 	wlr_texture_destroy(&blur_texture->wlr_texture);

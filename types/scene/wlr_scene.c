@@ -1846,11 +1846,6 @@ static void scene_entry_render(struct render_list_entry *entry, const struct ren
 			scene_node_opaque_region(node, x, y, &opaque_region);
 			logical_to_buffer_coords(&opaque_region, data, false);
 
-			/* TODO: should this be configurable? Borked when not 1.0, probably due to
-			   lack of premultiplication in the frag shader
-			*/
-			float blur_alpha = 1.0;
-
 			struct fx_render_blur_pass_options blur_options = {
 				.tex_options = {
 					.base = (struct wlr_render_texture_options) {
@@ -1859,7 +1854,7 @@ static void scene_entry_render(struct render_list_entry *entry, const struct ren
 						.dst_box = dst_box,
 						.transform = WL_OUTPUT_TRANSFORM_NORMAL,
 						.clip = &render_region,
-						.alpha = &blur_alpha,
+						.alpha = &scene_rect->color[3],
 						.filter_mode = WLR_SCALE_FILTER_BILINEAR,
 						.blend_mode = WLR_RENDER_BLEND_MODE_PREMULTIPLIED,
 					},
@@ -2031,8 +2026,6 @@ static void scene_entry_render(struct render_list_entry *entry, const struct ren
 				pixman_region32_translate(&opaque_region,
 						-scene_buffer->src_box.x, -scene_buffer->src_box.y);
 
-				// TODO: should I be configurable? We should probably move blur to a node
-				float blur_alpha = 1.0;
 				struct fx_render_blur_pass_options blur_options = {
 					.tex_options = {
 						.base = (struct wlr_render_texture_options) {
@@ -2041,7 +2034,7 @@ static void scene_entry_render(struct render_list_entry *entry, const struct ren
 							.dst_box = dst_box,
 							.transform = WL_OUTPUT_TRANSFORM_NORMAL,
 							.clip = &render_region, // Render with the smaller region, clipping CSD
-							.alpha = &blur_alpha,
+							.alpha = &scene_buffer->opacity,
 							.filter_mode = WLR_SCALE_FILTER_BILINEAR,
 						},
 						.clip_box = &dst_box,
@@ -2061,6 +2054,7 @@ static void scene_entry_render(struct render_list_entry *entry, const struct ren
 			pixman_region32_fini(&opaque_region);
 		}
 
+		float testing_fixed_alpha = 1.0;
 		struct fx_render_texture_options tex_options = {
 			.base = (struct wlr_render_texture_options){
 				.texture = texture,
@@ -2068,7 +2062,8 @@ static void scene_entry_render(struct render_list_entry *entry, const struct ren
 				.dst_box = dst_box,
 				.transform = transform,
 				.clip = &render_region, // Render with the smaller region, clipping CSD
-				.alpha = &scene_buffer->opacity,
+				// .alpha = &scene_buffer->opacity,
+				.alpha = &testing_fixed_alpha, // TODO: Remove, only for testing
 				.filter_mode = scene_buffer->filter_mode,
 				.blend_mode = !data->output->scene->calculate_visibility ||
 					!pixman_region32_empty(&opaque) ?

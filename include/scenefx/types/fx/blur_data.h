@@ -23,6 +23,6 @@ bool blur_data_cmp(struct blur_data *a, struct blur_data *b);
 
 int blur_data_calc_size(struct blur_data *blur_data);
 
-void blur_data_apply_alpha(struct blur_data *blur_data, float alpha);
+void blur_data_apply_alpha(struct blur_data *blur_data, const float *alpha);
 
 #endif

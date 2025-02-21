@@ -2054,7 +2054,6 @@ static void scene_entry_render(struct render_list_entry *entry, const struct ren
 			pixman_region32_fini(&opaque_region);
 		}
 
-		float testing_fixed_alpha = 1.0;
 		struct fx_render_texture_options tex_options = {
 			.base = (struct wlr_render_texture_options){
 				.texture = texture,
@@ -2062,8 +2061,7 @@ static void scene_entry_render(struct render_list_entry *entry, const struct ren
 				.dst_box = dst_box,
 				.transform = transform,
 				.clip = &render_region, // Render with the smaller region, clipping CSD
-				// .alpha = &scene_buffer->opacity,
-				.alpha = &testing_fixed_alpha, // TODO: Remove, only for testing
+				.alpha = &scene_buffer->opacity,
 				.filter_mode = scene_buffer->filter_mode,
 				.blend_mode = !data->output->scene->calculate_visibility ||
 					!pixman_region32_empty(&opaque) ?
@@ -2970,7 +2968,7 @@ bool wlr_scene_output_build_state(struct wlr_scene_output *scene_output,
 			// No need to compensate for blur artifacts when the damage spans
 			// the whole output
 			whole_output_blur_damaged = true;
-		}else {
+		} else {
 			// copy the surrounding content where the blur would display artifacts
 			// and draw it above the artifacts
 			pixman_region32_t extended_damage;

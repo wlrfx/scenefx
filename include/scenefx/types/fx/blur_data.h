@@ -6,7 +6,7 @@
 
 struct blur_data {
 	int num_passes;
-	int radius;
+	float radius;
 	float noise;
 	float brightness;
 	float contrast;
@@ -22,5 +22,7 @@ bool blur_data_should_parameters_blur_effects(struct blur_data *blur_data);
 bool blur_data_cmp(struct blur_data *a, struct blur_data *b);
 
 int blur_data_calc_size(struct blur_data *blur_data);
+
+void blur_data_apply_alpha(struct blur_data *blur_data, const float *alpha);
 
 #endif

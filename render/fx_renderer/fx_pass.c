@@ -931,8 +931,10 @@ void fx_render_pass_add_blur(struct fx_gles_render_pass *pass,
 		goto damage_finish;
 	}
 
+	const float *tex_alpha = fx_options->tex_options.base.alpha;
+	bool has_alpha = tex_alpha && *tex_alpha < 1.0;
 	struct fx_framebuffer *buffer = pass->fx_effect_framebuffers->optimized_blur_buffer;
-	if (!buffer || !fx_options->use_optimized_blur) {
+	if (!buffer || !fx_options->use_optimized_blur || has_alpha) {
 		if (!buffer) {
 			wlr_log(WLR_ERROR, "Warning: Failed to use optimized blur");
 		}
@@ -942,7 +944,15 @@ void fx_render_pass_add_blur(struct fx_gles_render_pass *pass,
 		// Render the blur into its own buffer
 		struct fx_render_blur_pass_options blur_options = *fx_options;
 		blur_options.tex_options.base.clip = &translucent_region;
-		blur_options.current_buffer = pass->buffer;
+		if (fx_options->use_optimized_blur && has_alpha
+				// If the optimized blur hasn't been rendered yet
+				&& pass->fx_effect_framebuffers->optimized_no_blur_buffer) {
+			// Re-blur the saved non-blurred version of the optimized blur.
+			// Isn't as efficient as just using the optimized blur buffer
+			blur_options.current_buffer = pass->fx_effect_framebuffers->optimized_no_blur_buffer;
+		} else {
+			blur_options.current_buffer = pass->buffer;
+		}
 		buffer = get_main_buffer_blur(pass, &blur_options);
 	}
 	struct wlr_texture *wlr_texture =
@@ -1009,6 +1019,8 @@ bool fx_render_pass_add_optimized_blur(struct fx_gles_render_pass *pass,
 	bool failed = false;
 	fx_framebuffer_get_or_create_custom(renderer, pass->output, NULL,
 			&pass->fx_effect_framebuffers->optimized_blur_buffer, &failed);
+	fx_framebuffer_get_or_create_custom(renderer, pass->output, NULL,
+			&pass->fx_effect_framebuffers->optimized_no_blur_buffer, &failed);
 	if (failed) {
 		goto finish;
 	}
@@ -1016,6 +1028,10 @@ bool fx_render_pass_add_optimized_blur(struct fx_gles_render_pass *pass,
 	// Render the newly blurred content into the blur_buffer
 	fx_renderer_read_to_buffer(pass, &clip,
 			pass->fx_effect_framebuffers->optimized_blur_buffer, buffer);
+
+	// Save the current scene pass state
+	fx_renderer_read_to_buffer(pass, &clip,
+			pass->fx_effect_framebuffers->optimized_no_blur_buffer, pass->buffer, false);
 
 finish:
 	pixman_region32_fini(&clip);

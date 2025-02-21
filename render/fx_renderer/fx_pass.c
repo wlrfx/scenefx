@@ -838,7 +838,7 @@ static struct fx_framebuffer *get_main_buffer_blur(struct fx_gles_render_pass *p
 	// We don't want to affect the reference blur_data
 	struct blur_data blur_data = *fx_options->blur_data;
 	fx_options->blur_data = &blur_data;
-	blur_data_apply_alpha(&blur_data, *fx_options->tex_options.base.alpha);
+	blur_data_apply_alpha(&blur_data, fx_options->tex_options.base.alpha);
 
 	pixman_region32_t damage;
 	pixman_region32_init(&damage);

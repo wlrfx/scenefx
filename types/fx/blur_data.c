@@ -26,7 +26,12 @@ int blur_data_calc_size(struct blur_data *blur_data) {
 	return pow(2, blur_data->num_passes + 1) * blur_data->radius;
 }
 
-void blur_data_apply_alpha(struct blur_data *blur_data, float alpha) {
+void blur_data_apply_alpha(struct blur_data *blur_data, const float *a) {
+	if (!a) {
+		return;
+	}
+	float alpha = *a;
+
 	if (alpha >= 1.0f) {
 		return;
 	} else if (alpha <= 0.0f) {

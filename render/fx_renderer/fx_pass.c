@@ -829,24 +829,16 @@ static void render_blur_effects(struct fx_gles_render_pass *pass,
 	wlr_texture_destroy(options->texture);
 }
 
-static void compute_blur_data(struct blur_data *blur_data,
-		struct blur_data *ref_blur_data, const float *alpha) {
-	const float slice = 1.0 / ref_blur_data->num_passes;
-
-	// Lowering num_passes by one requires doubling the radius to keep the same
-	// blur
-	blur_data->num_passes = fmin(ceilf(*alpha / slice), ref_blur_data->num_passes);
-	blur_data->radius = ref_blur_data->radius * *alpha * pow(2, ref_blur_data->num_passes - blur_data->num_passes);
-}
-
 // Blurs the main_buffer content and returns the blurred framebuffer
 static struct fx_framebuffer *get_main_buffer_blur(struct fx_gles_render_pass *pass,
 		struct fx_render_blur_pass_options *fx_options) {
 	struct fx_renderer *renderer = pass->buffer->renderer;
-	struct blur_data blur_data = *fx_options->blur_data;
-	compute_blur_data(&blur_data, fx_options->blur_data, fx_options->tex_options.base.alpha);
-	fx_options->blur_data = &blur_data;
 	struct wlr_box monitor_box = get_monitor_box(pass->output);
+
+	// We don't want to affect the reference blur_data
+	struct blur_data blur_data = *fx_options->blur_data;
+	fx_options->blur_data = &blur_data;
+	blur_data_apply_alpha(&blur_data, *fx_options->tex_options.base.alpha);
 
 	pixman_region32_t damage;
 	pixman_region32_init(&damage);

@@ -21,4 +21,6 @@ bool blur_data_should_parameters_blur_effects(struct blur_data *blur_data);
 
 int blur_data_calc_size(struct blur_data *blur_data);
 
+void blur_data_apply_alpha(struct blur_data *blur_data, float alpha);
+
 #endif

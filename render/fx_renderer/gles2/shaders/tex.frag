@@ -28,13 +28,12 @@ uniform float alpha;
 
 uniform vec2 size;
 uniform vec2 position;
-uniform float radius;
-uniform bool discard_transparent;
+uniform float radius_top_left;
+uniform float radius_top_right;
+uniform float radius_bottom_left;
+uniform float radius_bottom_right;
 
-uniform bool round_top_left;
-uniform bool round_top_right;
-uniform bool round_bottom_left;
-uniform bool round_bottom_right;
+uniform bool discard_transparent;
 
 vec4 sample_texture() {
 #if SOURCE == SOURCE_TEXTURE_RGBA || SOURCE == SOURCE_TEXTURE_EXTERNAL
@@ -50,10 +49,10 @@ void main() {
     float corner_alpha = corner_alpha(
         size,
         position,
-        float(round_top_left) * radius,
-        float(round_top_right) * radius,
-        float(round_bottom_left) * radius,
-        float(round_bottom_right) * radius
+        radius_top_left,
+        radius_top_right,
+        radius_bottom_left,
+        radius_bottom_right
     );
 	gl_FragColor = mix(sample_texture() * alpha, vec4(0.0), corner_alpha);
 

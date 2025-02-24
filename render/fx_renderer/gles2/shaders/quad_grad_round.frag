@@ -4,7 +4,11 @@ varying vec2 v_texcoord;
 
 uniform vec2 size;
 uniform vec2 position;
-uniform float radius;
+
+uniform float radius_top_left;
+uniform float radius_top_right;
+uniform float radius_bottom_left;
+uniform float radius_bottom_right;
 
 uniform vec4 colors[LEN];
 uniform vec2 grad_size;
@@ -15,11 +19,6 @@ uniform bool linear;
 uniform bool blend;
 uniform int count;
 
-uniform bool round_top_left;
-uniform bool round_top_right;
-uniform bool round_bottom_left;
-uniform bool round_bottom_right;
-
 vec4 gradient(vec4 colors[LEN], int count, vec2 size, vec2 grad_box, vec2 origin, float degree, bool linear, bool blend);
 
 float corner_alpha(vec2 size, vec2 position, float round_tl, float round_tr, float round_bl, float round_br);
@@ -29,10 +28,10 @@ void main() {
     float quad_corner_alpha = corner_alpha(
         size,
         position,
-        float(round_top_left) * radius,
-        float(round_top_right) * radius,
-        float(round_bottom_left) * radius,
-        float(round_bottom_right) * radius
+        radius_top_left,
+        radius_top_right,
+        radius_bottom_left,
+        radius_bottom_right
     );
     float rect_alpha = v_color.a * quad_corner_alpha;
 

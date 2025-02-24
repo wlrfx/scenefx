@@ -28,11 +28,10 @@ struct quad_shader {
 
 	GLint clip_size;
 	GLint clip_position;
-	GLint clip_corner_radius;
-	GLint clip_round_top_left;
-	GLint clip_round_top_right;
-	GLint clip_round_bottom_left;
-	GLint clip_round_bottom_right;
+	GLint clip_radius_top_left;
+	GLint clip_radius_top_right;
+	GLint clip_radius_bottom_left;
+	GLint clip_radius_bottom_right;
 };
 
 bool link_quad_program(struct quad_shader *shader);
@@ -62,20 +61,18 @@ struct quad_round_shader {
 	GLint pos_attrib;
 	GLint size;
 	GLint position;
-	GLint radius;
+
+	GLint radius_top_left;
+	GLint radius_top_right;
+	GLint radius_bottom_left;
+	GLint radius_bottom_right;
 
 	GLint clip_size;
 	GLint clip_position;
-	GLint clip_corner_radius;
-	GLint clip_round_top_left;
-	GLint clip_round_top_right;
-	GLint clip_round_bottom_left;
-	GLint clip_round_bottom_right;
-
-	GLint round_top_left;
-	GLint round_top_right;
-	GLint round_bottom_left;
-	GLint round_bottom_right;
+	GLint clip_radius_top_left;
+	GLint clip_radius_top_right;
+	GLint clip_radius_bottom_left;
+	GLint clip_radius_bottom_right;
 };
 
 bool link_quad_round_program(struct quad_round_shader *shader);
@@ -87,7 +84,6 @@ struct quad_grad_round_shader {
 	GLint pos_attrib;
 	GLint size;
 	GLint position;
-	GLint radius;
 
 	GLint colors;
 	GLint grad_size;
@@ -98,10 +94,10 @@ struct quad_grad_round_shader {
 	GLint count;
 	GLint blend;
 
-	GLint round_top_left;
-	GLint round_top_right;
-	GLint round_bottom_left;
-	GLint round_bottom_right;
+	GLint radius_top_left;
+	GLint radius_top_right;
+	GLint radius_bottom_left;
+	GLint radius_bottom_right;
 
 	int max_len;
 };
@@ -117,13 +113,12 @@ struct tex_shader {
 	GLint pos_attrib;
 	GLint size;
 	GLint position;
-	GLint radius;
-	GLint discard_transparent;
+	GLint radius_top_left;
+	GLint radius_top_right;
+	GLint radius_bottom_left;
+	GLint radius_bottom_right;
 
-	GLint round_top_left;
-	GLint round_top_right;
-	GLint round_bottom_left;
-	GLint round_bottom_right;
+	GLint discard_transparent;
 };
 
 bool link_tex_program(struct tex_shader *shader, enum fx_tex_shader_source source);
@@ -140,11 +135,10 @@ struct box_shadow_shader {
 
 	GLint clip_position;
 	GLint clip_size;
-	GLint clip_corner_radius;
-	GLint clip_round_top_left;
-	GLint clip_round_top_right;
-	GLint clip_round_bottom_left;
-	GLint clip_round_bottom_right;
+	GLint clip_radius_top_left;
+	GLint clip_radius_top_right;
+	GLint clip_radius_bottom_left;
+	GLint clip_radius_bottom_right;
 };
 
 bool link_box_shadow_program(struct box_shadow_shader *shader);

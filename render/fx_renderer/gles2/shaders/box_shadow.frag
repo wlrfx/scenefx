@@ -15,11 +15,10 @@ uniform float blur_sigma;
 uniform float corner_radius;
 uniform vec2 clip_position;
 uniform vec2 clip_size;
-uniform float clip_corner_radius;
-uniform bool clip_round_top_left;
-uniform bool clip_round_top_right;
-uniform bool clip_round_bottom_left;
-uniform bool clip_round_bottom_right;
+uniform float clip_radius_top_left;
+uniform float clip_radius_top_right;
+uniform float clip_radius_bottom_left;
+uniform float clip_radius_bottom_right;
 
 float gaussian(float x, float sigma) {
     const float pi = 3.141592653589793;
@@ -87,18 +86,11 @@ void main() {
     float clip_corner_alpha = corner_alpha(
         clip_size - 1.0,
         clip_position + 0.5,
-        float(clip_round_top_left) * clip_corner_radius,
-        float(clip_round_top_right) * clip_corner_radius,
-        float(clip_round_bottom_left) * clip_corner_radius,
-        float(clip_round_bottom_right) * clip_corner_radius
+        clip_radius_top_left,
+        clip_radius_top_right,
+        clip_radius_bottom_left,
+        clip_radius_bottom_right
     );
-
-    // Make sure that there are corners to round, sets the window alpha to 1.0
-    // if window CORNER_LOCATION_NONE or window radius is 0.
-    float base_case = float(clip_round_top_left) + float(clip_round_top_right)
-            + float(clip_round_bottom_left) + float(clip_round_bottom_right);
-    base_case *= step(1.0, clip_corner_radius); // Corner radius is 0
-    clip_corner_alpha = max(clip_corner_alpha, 1.0 - step(1.0, base_case));
 
     gl_FragColor = vec4(v_color.rgb, shadow_alpha) * clip_corner_alpha;
 }

@@ -320,16 +320,15 @@ void fx_render_pass_add_texture(struct fx_gles_render_pass *pass,
 	glUniform1f(shader->alpha, alpha);
 	glUniform2f(shader->size, clip_box->width, clip_box->height);
 	glUniform2f(shader->position, clip_box->x, clip_box->y);
-	glUniform1f(shader->radius, fx_options->corner_radius);
 	glUniform1f(shader->discard_transparent, fx_options->discard_transparent);
-	glUniform1f(shader->round_top_left,
-			(CORNER_LOCATION_TOP_LEFT & corners) == CORNER_LOCATION_TOP_LEFT);
-	glUniform1f(shader->round_top_right,
-			(CORNER_LOCATION_TOP_RIGHT & corners) == CORNER_LOCATION_TOP_RIGHT);
-	glUniform1f(shader->round_bottom_left,
-			(CORNER_LOCATION_BOTTOM_LEFT & corners) == CORNER_LOCATION_BOTTOM_LEFT);
-	glUniform1f(shader->round_bottom_right,
-			(CORNER_LOCATION_BOTTOM_RIGHT & corners) == CORNER_LOCATION_BOTTOM_RIGHT);
+	glUniform1f(shader->radius_top_left, (CORNER_LOCATION_TOP_LEFT & corners) == CORNER_LOCATION_TOP_LEFT ?
+			fx_options->corner_radius : 0);
+	glUniform1f(shader->radius_top_right, (CORNER_LOCATION_TOP_RIGHT & corners) == CORNER_LOCATION_TOP_RIGHT ?
+			fx_options->corner_radius : 0);
+	glUniform1f(shader->radius_bottom_left, (CORNER_LOCATION_BOTTOM_LEFT & corners) == CORNER_LOCATION_BOTTOM_LEFT ?
+			fx_options->corner_radius : 0);
+	glUniform1f(shader->radius_bottom_right, (CORNER_LOCATION_BOTTOM_RIGHT & corners) == CORNER_LOCATION_BOTTOM_RIGHT ?
+			fx_options->corner_radius : 0);
 
 	set_proj_matrix(shader->proj, pass->projection_matrix, &dst_box);
 	set_tex_matrix(shader->tex_proj, options->transform, &src_fbox);
@@ -386,15 +385,14 @@ void fx_render_pass_add_rect(struct fx_gles_render_pass *pass,
 	glUniform4f(shader.color, color->r, color->g, color->b, color->a);
 	glUniform2f(shader.clip_size, clipped_region_box.width, clipped_region_box.height);
 	glUniform2f(shader.clip_position, clipped_region_box.x, clipped_region_box.y);
-	glUniform1f(shader.clip_corner_radius, fx_options->clipped_region.corner_radius);
-	glUniform1f(shader.clip_round_top_left,
-			(CORNER_LOCATION_TOP_LEFT & clipped_region_corners) == CORNER_LOCATION_TOP_LEFT);
-	glUniform1f(shader.clip_round_top_right,
-			(CORNER_LOCATION_TOP_RIGHT & clipped_region_corners) == CORNER_LOCATION_TOP_RIGHT);
-	glUniform1f(shader.clip_round_bottom_left,
-			(CORNER_LOCATION_BOTTOM_LEFT & clipped_region_corners) == CORNER_LOCATION_BOTTOM_LEFT);
-	glUniform1f(shader.clip_round_bottom_right,
-			(CORNER_LOCATION_BOTTOM_RIGHT & clipped_region_corners) == CORNER_LOCATION_BOTTOM_RIGHT);
+	glUniform1f(shader.clip_radius_top_left, (CORNER_LOCATION_TOP_LEFT & clipped_region_corners) == CORNER_LOCATION_TOP_LEFT ?
+			clipped_region_corner_radius : 0);
+	glUniform1f(shader.clip_radius_top_right, (CORNER_LOCATION_TOP_RIGHT & clipped_region_corners) == CORNER_LOCATION_TOP_RIGHT ?
+			clipped_region_corner_radius : 0);
+	glUniform1f(shader.clip_radius_bottom_left, (CORNER_LOCATION_BOTTOM_LEFT & clipped_region_corners) == CORNER_LOCATION_BOTTOM_LEFT ?
+			clipped_region_corner_radius : 0);
+	glUniform1f(shader.clip_radius_bottom_right, (CORNER_LOCATION_BOTTOM_RIGHT & clipped_region_corners) == CORNER_LOCATION_BOTTOM_RIGHT ?
+			clipped_region_corner_radius : 0);
 
 	render(&box, &clip_region, renderer->shaders.quad.pos_attrib);
 	pixman_region32_fini(&clip_region);
@@ -487,27 +485,26 @@ void fx_render_pass_add_rounded_rect(struct fx_gles_render_pass *pass,
 
 	glUniform2f(shader.size, box.width, box.height);
 	glUniform2f(shader.position, box.x, box.y);
-	glUniform1f(shader.radius, fx_options->corner_radius);
 	glUniform2f(shader.clip_size, clipped_region_box.width, clipped_region_box.height);
 	glUniform2f(shader.clip_position, clipped_region_box.x, clipped_region_box.y);
-	glUniform1f(shader.clip_corner_radius, fx_options->clipped_region.corner_radius);
-	glUniform1f(shader.clip_round_top_left,
-			(CORNER_LOCATION_TOP_LEFT & clipped_region_corners) == CORNER_LOCATION_TOP_LEFT);
-	glUniform1f(shader.clip_round_top_right,
-			(CORNER_LOCATION_TOP_RIGHT & clipped_region_corners) == CORNER_LOCATION_TOP_RIGHT);
-	glUniform1f(shader.clip_round_bottom_left,
-			(CORNER_LOCATION_BOTTOM_LEFT & clipped_region_corners) == CORNER_LOCATION_BOTTOM_LEFT);
-	glUniform1f(shader.clip_round_bottom_right,
-			(CORNER_LOCATION_BOTTOM_RIGHT & clipped_region_corners) == CORNER_LOCATION_BOTTOM_RIGHT);
+	glUniform1f(shader.clip_radius_top_left, (CORNER_LOCATION_TOP_LEFT & clipped_region_corners) == CORNER_LOCATION_TOP_LEFT ?
+			clipped_region_corner_radius : 0);
+	glUniform1f(shader.clip_radius_top_right, (CORNER_LOCATION_TOP_RIGHT & clipped_region_corners) == CORNER_LOCATION_TOP_RIGHT ?
+			clipped_region_corner_radius : 0);
+	glUniform1f(shader.clip_radius_bottom_left, (CORNER_LOCATION_BOTTOM_LEFT & clipped_region_corners) == CORNER_LOCATION_BOTTOM_LEFT ?
+			clipped_region_corner_radius : 0);
+	glUniform1f(shader.clip_radius_bottom_right, (CORNER_LOCATION_BOTTOM_RIGHT & clipped_region_corners) == CORNER_LOCATION_BOTTOM_RIGHT ?
+			clipped_region_corner_radius : 0);
 
-	glUniform1f(shader.round_top_left,
-			(CORNER_LOCATION_TOP_LEFT & fx_options->corners) == CORNER_LOCATION_TOP_LEFT);
-	glUniform1f(shader.round_top_right,
-			(CORNER_LOCATION_TOP_RIGHT & fx_options->corners) == CORNER_LOCATION_TOP_RIGHT);
-	glUniform1f(shader.round_bottom_left,
-			(CORNER_LOCATION_BOTTOM_LEFT & fx_options->corners) == CORNER_LOCATION_BOTTOM_LEFT);
-	glUniform1f(shader.round_bottom_right,
-			(CORNER_LOCATION_BOTTOM_RIGHT & fx_options->corners) == CORNER_LOCATION_BOTTOM_RIGHT);
+	enum corner_location corners = fx_options->corners;
+	glUniform1f(shader.radius_top_left, (CORNER_LOCATION_TOP_LEFT & corners) == CORNER_LOCATION_TOP_LEFT ?
+			fx_options->corner_radius : 0);
+	glUniform1f(shader.radius_top_right, (CORNER_LOCATION_TOP_RIGHT & corners) == CORNER_LOCATION_TOP_RIGHT ?
+			fx_options->corner_radius : 0);
+	glUniform1f(shader.radius_bottom_left, (CORNER_LOCATION_BOTTOM_LEFT & corners) == CORNER_LOCATION_BOTTOM_LEFT ?
+			fx_options->corner_radius : 0);
+	glUniform1f(shader.radius_bottom_right, (CORNER_LOCATION_BOTTOM_RIGHT & corners) == CORNER_LOCATION_BOTTOM_RIGHT ?
+			fx_options->corner_radius : 0);
 
 	render(&box, &clip_region, renderer->shaders.quad_round.pos_attrib);
 	pixman_region32_fini(&clip_region);
@@ -542,7 +539,6 @@ void fx_render_pass_add_rounded_rect_grad(struct fx_gles_render_pass *pass,
 
 	glUniform2f(shader.size, box.width, box.height);
 	glUniform2f(shader.position, box.x, box.y);
-	glUniform1f(shader.radius, fx_options->corner_radius);
 
 	glUniform4fv(shader.colors, fx_options->gradient.count, (GLfloat*)fx_options->gradient.colors);
 	glUniform1i(shader.count, fx_options->gradient.count);
@@ -553,14 +549,15 @@ void fx_render_pass_add_rounded_rect_grad(struct fx_gles_render_pass *pass,
 	glUniform2f(shader.grad_box, fx_options->gradient.range.x, fx_options->gradient.range.y);
 	glUniform2f(shader.origin, fx_options->gradient.origin[0], fx_options->gradient.origin[1]);
 
-	glUniform1f(shader.round_top_left,
-			(CORNER_LOCATION_TOP_LEFT & fx_options->corners) == CORNER_LOCATION_TOP_LEFT);
-	glUniform1f(shader.round_top_right,
-			(CORNER_LOCATION_TOP_RIGHT & fx_options->corners) == CORNER_LOCATION_TOP_RIGHT);
-	glUniform1f(shader.round_bottom_left,
-			(CORNER_LOCATION_BOTTOM_LEFT & fx_options->corners) == CORNER_LOCATION_BOTTOM_LEFT);
-	glUniform1f(shader.round_bottom_right,
-			(CORNER_LOCATION_BOTTOM_RIGHT & fx_options->corners) == CORNER_LOCATION_BOTTOM_RIGHT);
+	enum corner_location corners = fx_options->corners;
+	glUniform1f(shader.radius_top_left, (CORNER_LOCATION_TOP_LEFT & corners) == CORNER_LOCATION_TOP_LEFT ?
+			fx_options->corner_radius : 0);
+	glUniform1f(shader.radius_top_right, (CORNER_LOCATION_TOP_RIGHT & corners) == CORNER_LOCATION_TOP_RIGHT ?
+			fx_options->corner_radius : 0);
+	glUniform1f(shader.radius_bottom_left, (CORNER_LOCATION_BOTTOM_LEFT & corners) == CORNER_LOCATION_BOTTOM_LEFT ?
+			fx_options->corner_radius : 0);
+	glUniform1f(shader.radius_bottom_right, (CORNER_LOCATION_BOTTOM_RIGHT & corners) == CORNER_LOCATION_BOTTOM_RIGHT ?
+			fx_options->corner_radius : 0);
 
 	render(&box, options->clip, shader.pos_attrib);
 
@@ -610,19 +607,21 @@ void fx_render_pass_add_box_shadow(struct fx_gles_render_pass *pass,
 	set_proj_matrix(renderer->shaders.box_shadow.proj, pass->projection_matrix, &box);
 	glUniform4f(renderer->shaders.box_shadow.color, color->r, color->g, color->b, color->a);
 	glUniform1f(renderer->shaders.box_shadow.blur_sigma, options->blur_sigma);
-	glUniform1f(renderer->shaders.box_shadow.corner_radius, options->corner_radius);
 	glUniform2f(renderer->shaders.box_shadow.size, box.width, box.height);
 	glUniform2f(renderer->shaders.box_shadow.position, box.x, box.y);
-	glUniform1f(renderer->shaders.box_shadow.clip_corner_radius, clipped_region_corner_radius);
-	glUniform2f(renderer->shaders.box_shadow.clip_size, clipped_region_box.width, clipped_region_box.height);
-	glUniform1f(renderer->shaders.box_shadow.clip_round_top_left,
-			(CORNER_LOCATION_TOP_LEFT & clipped_region_corners) == CORNER_LOCATION_TOP_LEFT);
-	glUniform1f(renderer->shaders.box_shadow.clip_round_top_right,
-			(CORNER_LOCATION_TOP_RIGHT & clipped_region_corners) == CORNER_LOCATION_TOP_RIGHT);
-	glUniform1f(renderer->shaders.box_shadow.clip_round_bottom_left,
-			(CORNER_LOCATION_BOTTOM_LEFT & clipped_region_corners) == CORNER_LOCATION_BOTTOM_LEFT);
-	glUniform1f(renderer->shaders.box_shadow.clip_round_bottom_right,
-			(CORNER_LOCATION_BOTTOM_RIGHT & clipped_region_corners) == CORNER_LOCATION_BOTTOM_RIGHT);
+
+	glUniform1f(renderer->shaders.box_shadow.clip_radius_top_left,
+			(CORNER_LOCATION_TOP_LEFT & clipped_region_corners) == CORNER_LOCATION_TOP_LEFT ?
+			clipped_region_corner_radius : 0);
+	glUniform1f(renderer->shaders.box_shadow.clip_radius_top_right,
+			(CORNER_LOCATION_TOP_RIGHT & clipped_region_corners) == CORNER_LOCATION_TOP_RIGHT ?
+			clipped_region_corner_radius : 0);
+	glUniform1f(renderer->shaders.box_shadow.clip_radius_bottom_left,
+			(CORNER_LOCATION_BOTTOM_LEFT & clipped_region_corners) == CORNER_LOCATION_BOTTOM_LEFT ?
+			clipped_region_corner_radius : 0);
+	glUniform1f(renderer->shaders.box_shadow.clip_radius_bottom_right,
+			(CORNER_LOCATION_BOTTOM_RIGHT & clipped_region_corners) == CORNER_LOCATION_BOTTOM_RIGHT ?
+			clipped_region_corner_radius : 0);
 
 	glUniform2f(renderer->shaders.box_shadow.clip_position, clipped_region_box.x, clipped_region_box.y);
 

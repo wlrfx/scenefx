@@ -836,9 +836,8 @@ static struct fx_framebuffer *get_main_buffer_blur(struct fx_gles_render_pass *p
 	struct wlr_box monitor_box = get_monitor_box(pass->output);
 
 	// We don't want to affect the reference blur_data
-	struct blur_data blur_data = *fx_options->blur_data;
+	struct blur_data blur_data = blur_data_apply_strength(fx_options->blur_data, fx_options->blur_strength);
 	fx_options->blur_data = &blur_data;
-	blur_data_apply_alpha(&blur_data, fx_options->tex_options.base.alpha);
 
 	pixman_region32_t damage;
 	pixman_region32_init(&damage);
@@ -931,10 +930,9 @@ void fx_render_pass_add_blur(struct fx_gles_render_pass *pass,
 		goto damage_finish;
 	}
 
-	const float *tex_alpha = fx_options->tex_options.base.alpha;
-	bool has_alpha = tex_alpha && *tex_alpha < 1.0;
+	const bool has_strength = fx_options->blur_strength < 1.0;
 	struct fx_framebuffer *buffer = pass->fx_effect_framebuffers->optimized_blur_buffer;
-	if (!buffer || !fx_options->use_optimized_blur || has_alpha) {
+	if (!buffer || !fx_options->use_optimized_blur || has_strength) {
 		if (!buffer) {
 			wlr_log(WLR_ERROR, "Warning: Failed to use optimized blur");
 		}
@@ -944,7 +942,7 @@ void fx_render_pass_add_blur(struct fx_gles_render_pass *pass,
 		// Render the blur into its own buffer
 		struct fx_render_blur_pass_options blur_options = *fx_options;
 		blur_options.tex_options.base.clip = &translucent_region;
-		if (fx_options->use_optimized_blur && has_alpha
+		if (fx_options->use_optimized_blur && has_strength
 				// If the optimized blur hasn't been rendered yet
 				&& pass->fx_effect_framebuffers->optimized_no_blur_buffer) {
 			// Re-blur the saved non-blurred version of the optimized blur.
@@ -972,7 +970,6 @@ void fx_render_pass_add_blur(struct fx_gles_render_pass *pass,
 	}
 
 	// Draw the blurred texture
-	const float blur_alpha = 1.0;
 	tex_options->base.dst_box = get_monitor_box(pass->output);
 	tex_options->base.src_box = (struct wlr_fbox) {
 		.x = 0,
@@ -981,7 +978,6 @@ void fx_render_pass_add_blur(struct fx_gles_render_pass *pass,
 		.height = buffer->buffer->height,
 	};
 	tex_options->base.texture = &blur_texture->wlr_texture;
-	tex_options->base.alpha = &blur_alpha;
 	fx_render_pass_add_texture(pass, tex_options);
 
 	wlr_texture_destroy(&blur_texture->wlr_texture);

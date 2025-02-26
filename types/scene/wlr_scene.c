@@ -828,6 +828,8 @@ struct wlr_scene_rect *wlr_scene_rect_create(struct wlr_scene_tree *parent,
 	scene_rect->clipped_region = clipped_region_get_default();
 	scene_rect->backdrop_blur = false;
 	scene_rect->backdrop_blur_optimized = false;
+	scene_rect->backdrop_blur_strength = 1.0f;
+	scene_rect->backdrop_blur_alpha = 1.0f;
 
 	scene_node_update(&scene_rect->node, NULL);
 
@@ -870,6 +872,25 @@ void wlr_scene_rect_set_backdrop_blur_optimized(struct wlr_scene_rect *rect,
 		return;
 	}
 	rect->backdrop_blur_optimized = enabled;
+	scene_node_update(&rect->node, NULL);
+}
+
+void wlr_scene_rect_set_backdrop_blur_strength(struct wlr_scene_rect *rect,
+		float strength) {
+	if (rect->backdrop_blur_strength == strength) {
+		return;
+	}
+	rect->backdrop_blur_strength = strength;
+	scene_node_update(&rect->node, NULL);
+}
+
+void wlr_scene_rect_set_backdrop_blur_alpha(struct wlr_scene_rect *rect,
+		float alpha) {
+	if (rect->backdrop_blur_alpha == alpha) {
+		return;
+	}
+
+	rect->backdrop_blur_alpha = alpha;
 	scene_node_update(&rect->node, NULL);
 }
 
@@ -1205,6 +1226,8 @@ struct wlr_scene_buffer *wlr_scene_buffer_create(struct wlr_scene_tree *parent,
 	scene_buffer->backdrop_blur = false;
 	scene_buffer->backdrop_blur_optimized = false;
 	scene_buffer->backdrop_blur_ignore_transparent = true;
+	scene_buffer->backdrop_blur_strength = 1.0f;
+	scene_buffer->backdrop_blur_alpha = 1.0f;
 	scene_buffer->corners = CORNER_LOCATION_NONE;
 
 	scene_buffer_set_buffer(scene_buffer, buffer);
@@ -1508,6 +1531,25 @@ void wlr_scene_buffer_set_backdrop_blur_ignore_transparent(
 	}
 
 	scene_buffer->backdrop_blur_ignore_transparent = enabled;
+	scene_node_update(&scene_buffer->node, NULL);
+}
+
+void wlr_scene_buffer_set_backdrop_blur_strength(struct wlr_scene_buffer *scene_buffer,
+		float strength) {
+	if (scene_buffer->backdrop_blur_strength == strength) {
+		return;
+	}
+	scene_buffer->backdrop_blur_strength = strength;
+	scene_node_update(&scene_buffer->node, NULL);
+}
+
+void wlr_scene_buffer_set_backdrop_blur_alpha(struct wlr_scene_buffer *scene_buffer,
+		float alpha) {
+	if (scene_buffer->backdrop_blur_alpha == alpha) {
+		return;
+	}
+
+	scene_buffer->backdrop_blur_alpha = alpha;
 	scene_node_update(&scene_buffer->node, NULL);
 }
 
@@ -1854,7 +1896,7 @@ static void scene_entry_render(struct render_list_entry *entry, const struct ren
 						.dst_box = dst_box,
 						.transform = WL_OUTPUT_TRANSFORM_NORMAL,
 						.clip = &render_region,
-						.alpha = &scene_rect->color[3],
+						.alpha = &scene_rect->backdrop_blur_alpha,
 						.filter_mode = WLR_SCALE_FILTER_BILINEAR,
 						.blend_mode = WLR_RENDER_BLEND_MODE_PREMULTIPLIED,
 					},
@@ -1867,6 +1909,7 @@ static void scene_entry_render(struct render_list_entry *entry, const struct ren
 				.use_optimized_blur = scene_rect->backdrop_blur_optimized,
 				.blur_data = &scene->blur_data,
 				.ignore_transparent = false,
+				.blur_strength = scene_rect->backdrop_blur_strength,
 			};
 			// Render the actual blur behind the surface
 			fx_render_pass_add_blur(data->render_pass, &blur_options);
@@ -1937,6 +1980,7 @@ static void scene_entry_render(struct render_list_entry *entry, const struct ren
 					.discard_transparent = false,
 				},
 				.blur_data = &scene->blur_data,
+				.blur_strength = 1.0f,
 			};
 			bool result = fx_render_pass_add_optimized_blur(data->render_pass, &blur_options);
 			if (result) {
@@ -2034,7 +2078,7 @@ static void scene_entry_render(struct render_list_entry *entry, const struct ren
 							.dst_box = dst_box,
 							.transform = WL_OUTPUT_TRANSFORM_NORMAL,
 							.clip = &render_region, // Render with the smaller region, clipping CSD
-							.alpha = &scene_buffer->opacity,
+							.alpha = &scene_buffer->backdrop_blur_alpha,
 							.filter_mode = WLR_SCALE_FILTER_BILINEAR,
 						},
 						.clip_box = &dst_box,
@@ -2046,6 +2090,7 @@ static void scene_entry_render(struct render_list_entry *entry, const struct ren
 					.use_optimized_blur = scene_buffer->backdrop_blur_optimized,
 					.blur_data = &scene->blur_data,
 					.ignore_transparent = scene_buffer->backdrop_blur_ignore_transparent,
+					.blur_strength = scene_buffer->backdrop_blur_strength,
 				};
 				// Render the actual blur behind the surface
 				fx_render_pass_add_blur(data->render_pass, &blur_options);

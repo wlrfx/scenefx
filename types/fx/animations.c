@@ -40,6 +40,11 @@ fx_translate_animation_create(struct wlr_box start, struct wlr_box end, struct f
 	return animation;
 }
 
+void
+fx_translate_animation_destroy(struct fx_translate_animation *animation) {
+	free(animation);
+}
+
 static double
 find_animation_curve_at(struct fx_animation_curve *curve, double t) {
 	size_t down = 0;

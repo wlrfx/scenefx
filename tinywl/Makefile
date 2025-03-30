@@ -2,7 +2,7 @@ PKG_CONFIG?=pkg-config
 WAYLAND_PROTOCOLS=$(shell $(PKG_CONFIG) --variable=pkgdatadir wayland-protocols)
 WAYLAND_SCANNER=$(shell $(PKG_CONFIG) --variable=wayland_scanner wayland-scanner)
 
-PKGS="wlroots-0.18" wayland-server xkbcommon
+PKGS="scenefx-0.2" "wlroots-0.18" wayland-server xkbcommon
 CFLAGS+=$(shell $(PKG_CONFIG) --cflags $(PKGS))
 LIBS=$(shell $(PKG_CONFIG) --libs $(PKGS))
 

@@ -21,6 +21,12 @@ fx_animation_manager_init(struct wl_display *display, struct wlr_scene *scene) {
     manager.scene = scene;
 }
 
+struct fx_animation_curve {
+	double params[4];
+
+	double baked_points_x[FX_ANIMATIONS_BAKED_POINTS_COUNT], baked_points_y[FX_ANIMATIONS_BAKED_POINTS_COUNT];
+};
+
 struct fx_animation_curve *
 fx_animation_curve_create(double params[static 4]) {
 	struct fx_animation_curve *curve = calloc(1, sizeof(*curve));

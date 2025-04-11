@@ -1,3 +1,4 @@
+#include "scenefx/types/fx/animations.h"
 #include <assert.h>
 #include <getopt.h>
 #include <stdbool.h>
@@ -52,6 +53,8 @@ struct tinywl_server {
 		struct wlr_scene_optimized_blur *blur_layer;
 		struct wlr_scene_tree *toplevel_layer;
 	} layers;
+
+	struct fx_animation_curve *animation_curve;
 
 	struct wlr_xdg_shell *xdg_shell;
 	struct wl_listener new_xdg_toplevel;
@@ -110,6 +113,8 @@ struct tinywl_toplevel {
 	int corner_radius;
 	struct wlr_scene_shadow *shadow;
 	struct wlr_scene_rect *border;
+
+	struct fx_transform_animation *popin_animation;
 };
 
 struct tinywl_popup {
@@ -598,6 +603,10 @@ static void xdg_toplevel_commit(struct wl_listener *listener, void *data) {
 		return;
 	}
 
+	/* we dont take the commits from a client if its animating currently.
+	 * this should be handled better, but for showing animations off this is fine */
+	if(toplevel->popin_animation) return;
+
 	struct wlr_box geometry;
 	wlr_xdg_surface_get_geometry(toplevel->xdg_toplevel->base, &geometry);
 	wlr_scene_subsurface_tree_set_clip(&toplevel->xdg_scene_tree->node, &geometry);
@@ -815,9 +824,60 @@ static void iter_xdg_scene_buffers(struct wlr_scene_buffer *buffer, int sx,
 	}
 }
 
+/* this callback is called on regular intervals for the duration of the animation.
+ * `current` contains the current progress of the animation, and is equal to `start` on the first call
+ * of this function, and `end` of the last one (with `done` set to true).
+ * at any moment, in this callback or not, a user can stop the animation by calling
+ * `fx_transform_animation_destroy()`. here we destroy the animation after its done,
+ * and invalidate our pointer to it, as well as when the toplevel unmaps */
+static void timer_animation_update(struct wlr_box current, bool done, void *user_data) {
+	struct tinywl_toplevel *toplevel = user_data;
+
+	struct wlr_box geometry;
+	wlr_xdg_surface_get_geometry(toplevel->xdg_toplevel->base, &geometry);
+
+	/* we clip the surface to this size; since this size can be bigger then the
+	 * buffer size a more sophisticated compositor may want to stretch the buffer if needed */
+	wlr_scene_subsurface_tree_set_clip(&toplevel->scene_tree->node, &(struct wlr_box){
+		.x = geometry.x,
+		.y = geometry.y,
+		.width = current.width,
+		.height = current.height,
+	});
+
+	/* we set the effects to match this size */
+	int border_width = current.width + (BORDER_THICKNESS * 2);
+	int border_height = current.height + (BORDER_THICKNESS * 2);
+
+	wlr_scene_rect_set_size(toplevel->border, border_width, border_height);
+	wlr_scene_rect_set_clipped_region(toplevel->border, (struct clipped_region) {
+			.corner_radius = toplevel->corner_radius,
+			.corners = CORNER_LOCATION_ALL,
+			.area = { BORDER_THICKNESS, BORDER_THICKNESS, geometry.width, geometry.height }
+	});
+
+	int blur_sigma = toplevel->shadow->blur_sigma;
+	wlr_scene_shadow_set_size(toplevel->shadow,
+			border_width + (blur_sigma * 2),
+			border_height + (blur_sigma * 2));
+	wlr_scene_shadow_set_clipped_region(toplevel->shadow, (struct clipped_region) {
+			.corner_radius = toplevel->corner_radius + BORDER_THICKNESS,
+			.corners = CORNER_LOCATION_ALL,
+			.area = { blur_sigma, blur_sigma, border_width, border_height }
+	});
+
+	wlr_scene_node_set_position(&toplevel->scene_tree->node, current.x, current.y);
+
+	if (done) {
+		fx_transform_animation_destroy(toplevel->popin_animation);
+		toplevel->popin_animation = NULL;
+	}
+}
+
 static void xdg_toplevel_map(struct wl_listener *listener, void *data) {
 	/* Called when the surface is mapped, or ready to display on-screen. */
 	struct tinywl_toplevel *toplevel = wl_container_of(listener, toplevel, map);
+	struct tinywl_server *server = toplevel->server;
 
 	wlr_scene_node_set_enabled(&toplevel->scene_tree->node, true);
 
@@ -827,6 +887,29 @@ static void xdg_toplevel_map(struct wl_listener *listener, void *data) {
 	wl_list_insert(&toplevel->server->toplevels, &toplevel->link);
 
 	focus_toplevel(toplevel, toplevel->xdg_toplevel->base->surface);
+
+	/* we setup the popin animation, we start it from the middle of the screen, with a size of 1, 1 */
+	/* we naively take the first output */
+	struct tinywl_output *first_output = wl_container_of(server->outputs.next, first_output, link);
+	struct wlr_box output_box;
+	wlr_output_layout_get_box(server->output_layout, first_output->wlr_output, &output_box);
+
+	struct wlr_box start = {
+		output_box.x + output_box.width / 2,
+		output_box.y + output_box.height / 2,
+		1,
+		1
+	};
+
+	/* for the end we use toplevels reported geometry */
+	struct wlr_box end;
+	wlr_xdg_surface_get_geometry(toplevel->xdg_toplevel->base, &end);
+
+	end.x = output_box.x + (output_box.width - end.width) / 2;
+	end.y = output_box.y + (output_box.height - end.height) / 2;
+
+	toplevel->popin_animation = fx_transform_animation_create(start, end, 500, server->animation_curve,
+							   timer_animation_update, toplevel);
 }
 
 static void xdg_toplevel_unmap(struct wl_listener *listener, void *data) {
@@ -838,6 +921,10 @@ static void xdg_toplevel_unmap(struct wl_listener *listener, void *data) {
 	/* Reset the cursor mode if the grabbed toplevel was unmapped. */
 	if (toplevel == toplevel->server->grabbed_toplevel) {
 		reset_cursor_mode(toplevel->server);
+	}
+
+	if (toplevel->popin_animation) {
+		fx_transform_animation_destroy(toplevel->popin_animation);
 	}
 
 	wl_list_remove(&toplevel->link);
@@ -1168,6 +1255,12 @@ int main(int argc, char *argv[]) {
 	struct blur_data blur_data = blur_data_get_default();
 	wlr_scene_set_blur_data(server.scene, blur_data);
 
+	/* we initialize the animation system */
+	fx_animation_manager_init(server.wl_display, server.scene);
+
+	/* and then create the animation curve, you can have multiple of these */
+	server.animation_curve = fx_animation_curve_create((double[4]){ 0.57, 0.67, 0.12, 1 });
+
 	/* Set up xdg-shell version 3. The xdg-shell is a Wayland protocol which is
 	 * used for application windows. For more detail on shells, refer to
 	 * https://drewdevault.com/2018/07/29/Wayland-shells.html.
@@ -1273,5 +1366,7 @@ int main(int argc, char *argv[]) {
 	wlr_renderer_destroy(server.renderer);
 	wlr_backend_destroy(server.backend);
 	wl_display_destroy(server.wl_display);
+
+	fx_animation_curve_destroy(server.animation_curve);
 	return 0;
 }

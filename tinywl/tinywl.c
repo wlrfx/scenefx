@@ -603,8 +603,10 @@ static void xdg_toplevel_commit(struct wl_listener *listener, void *data) {
 		return;
 	}
 
-	/* we dont take the commits from a client if its animating currently.
-	 * this should be handled better, but for showing animations off this is fine */
+	/* we dont take the commits from a client if its animating currently. this
+	 * should be handled better, but for showing animations off this is fine.
+	 * in a more sophisticated compositor you may want to destroy the current
+	 * animation, and start a new one from the current box of this animation */
 	if(toplevel->popin_animation) return;
 
 	struct wlr_box geometry;
@@ -888,8 +890,8 @@ static void xdg_toplevel_map(struct wl_listener *listener, void *data) {
 
 	focus_toplevel(toplevel, toplevel->xdg_toplevel->base->surface);
 
-	/* we setup the popin animation, we start it from the middle of the screen, with a size of 1, 1 */
-	/* we naively take the first output */
+	/* setup the pop-in animation: we start it from the middle of the screen,
+	 * with a size of 1, 1; we naively take the first output */
 	struct tinywl_output *first_output = wl_container_of(server->outputs.next, first_output, link);
 	struct wlr_box output_box;
 	wlr_output_layout_get_box(server->output_layout, first_output->wlr_output, &output_box);
@@ -905,6 +907,7 @@ static void xdg_toplevel_map(struct wl_listener *listener, void *data) {
 	struct wlr_box end;
 	wlr_xdg_surface_get_geometry(toplevel->xdg_toplevel->base, &end);
 
+	/* but patch it to the middle of the screen */
 	end.x = output_box.x + (output_box.width - end.width) / 2;
 	end.y = output_box.y + (output_box.height - end.height) / 2;
 

@@ -47,8 +47,8 @@ float corner_alpha(vec2 size, vec2 position, float round_tl, float round_tr, flo
 
 void main() {
     float corner_alpha = corner_alpha(
-        size,
-        position,
+        size - 0.5,
+        position + 0.25,
         radius_top_left,
         radius_top_right,
         radius_bottom_left,

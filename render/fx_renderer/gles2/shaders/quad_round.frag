@@ -20,8 +20,8 @@ float corner_alpha(vec2 size, vec2 position, float round_tl, float round_tr, flo
 
 void main() {
     float quad_corner_alpha = corner_alpha(
-        size,
-        position,
+        size - 1.0,
+        position + 0.5,
         radius_top_left,
         radius_top_right,
         radius_bottom_left,

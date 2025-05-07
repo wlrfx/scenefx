@@ -609,6 +609,7 @@ void fx_render_pass_add_box_shadow(struct fx_gles_render_pass *pass,
 	glUniform1f(renderer->shaders.box_shadow.blur_sigma, options->blur_sigma);
 	glUniform2f(renderer->shaders.box_shadow.size, box.width, box.height);
 	glUniform2f(renderer->shaders.box_shadow.position, box.x, box.y);
+	glUniform1f(renderer->shaders.box_shadow.corner_radius, options->corner_radius);
 
 	glUniform1f(renderer->shaders.box_shadow.clip_radius_top_left,
 			(CORNER_LOCATION_TOP_LEFT & clipped_region_corners) == CORNER_LOCATION_TOP_LEFT ?
@@ -624,6 +625,7 @@ void fx_render_pass_add_box_shadow(struct fx_gles_render_pass *pass,
 			clipped_region_corner_radius : 0);
 
 	glUniform2f(renderer->shaders.box_shadow.clip_position, clipped_region_box.x, clipped_region_box.y);
+	glUniform2f(renderer->shaders.box_shadow.clip_size, clipped_region_box.width, clipped_region_box.height);
 
 	render(&box, &clip_region, renderer->shaders.box_shadow.pos_attrib);
 	pixman_region32_fini(&clip_region);

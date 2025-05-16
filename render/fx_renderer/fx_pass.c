@@ -3,7 +3,9 @@
 #include <assert.h>
 #include <pixman.h>
 #include <time.h>
+#include <unistd.h>
 #include <wlr/render/allocator.h>
+#include <wlr/render/drm_syncobj.h>
 #include <wlr/types/wlr_matrix.h>
 #include <wlr/util/transform.h>
 #include <wlr/util/log.h>
@@ -11,13 +13,13 @@
 
 #include "render/egl.h"
 #include "render/fx_renderer/fx_renderer.h"
-#include "render/fx_renderer/matrix.h"
 #include "render/fx_renderer/shaders.h"
 #include "render/pass.h"
 #include "scenefx/render/fx_renderer/fx_renderer.h"
 #include "scenefx/render/fx_renderer/fx_effect_framebuffers.h"
 #include "scenefx/types/fx/blur_data.h"
 #include "scenefx/types/fx/corner_location.h"
+#include "util/matrix.h"
 
 #define MAX_QUADS 86 // 4kb
 
@@ -67,6 +69,7 @@ static bool render_pass_submit(struct wlr_render_pass *wlr_pass) {
 	struct fx_gles_render_pass *pass = get_render_pass(wlr_pass);
 	struct fx_renderer *renderer = pass->buffer->renderer;
 	struct fx_render_timer *timer = pass->timer;
+	bool ok = false;
 
 	push_fx_debug(renderer);
 
@@ -82,12 +85,36 @@ static bool render_pass_submit(struct wlr_render_pass *wlr_pass) {
 		clock_gettime(CLOCK_MONOTONIC, &timer->cpu_end);
 	}
 
-	glFlush();
+	if (pass->signal_timeline != NULL) {
+		EGLSyncKHR sync = wlr_egl_create_sync(renderer->egl, -1);
+		if (sync == EGL_NO_SYNC_KHR) {
+			goto out;
+		}
+
+		int sync_file_fd = wlr_egl_dup_fence_fd(renderer->egl, sync);
+		wlr_egl_destroy_sync(renderer->egl, sync);
+		if (sync_file_fd < 0) {
+			goto out;
+		}
+
+		ok = wlr_drm_syncobj_timeline_import_sync_file(pass->signal_timeline, pass->signal_point, sync_file_fd);
+		close(sync_file_fd);
+		if (!ok) {
+			goto out;
+		}
+	} else {
+		glFlush();
+	}
+
+	ok = true;
+
+out:
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
 	pop_fx_debug(renderer);
 	wlr_egl_restore_context(&pass->prev_ctx);
 
+	wlr_drm_syncobj_timeline_unref(pass->signal_timeline);
 	wlr_buffer_unlock(pass->buffer->buffer);
 	struct fx_effect_framebuffers *fbos = fx_effect_framebuffers_try_get(pass->output);
 	if (fbos) {
@@ -95,7 +122,7 @@ static bool render_pass_submit(struct wlr_render_pass *wlr_pass) {
 	}
 	free(pass);
 
-	return true;
+	return ok;
 }
 
 static void render_pass_add_texture(struct wlr_render_pass *wlr_pass,
@@ -292,6 +319,27 @@ void fx_render_pass_add_texture(struct fx_gles_render_pass *pass,
 	src_fbox.height /= options->texture->height;
 
 	push_fx_debug(renderer);
+
+	if (options->wait_timeline != NULL) {
+		int sync_file_fd =
+			wlr_drm_syncobj_timeline_export_sync_file(options->wait_timeline, options->wait_point);
+		if (sync_file_fd < 0) {
+			return;
+		}
+
+		EGLSyncKHR sync = wlr_egl_create_sync(renderer->egl, sync_file_fd);
+		close(sync_file_fd);
+		if (sync == EGL_NO_SYNC_KHR) {
+			return;
+		}
+
+		bool ok = wlr_egl_wait_sync(renderer->egl, sync);
+		wlr_egl_destroy_sync(renderer->egl, sync);
+		if (!ok) {
+			return;
+		}
+	}
+
 	bool has_alpha = texture->has_alpha
 		|| alpha < 1.0
 		|| fx_options->corner_radius > 0
@@ -1028,7 +1076,8 @@ static const char *reset_status_str(GLenum status) {
 }
 
 static struct fx_gles_render_pass *begin_buffer_pass(struct fx_framebuffer *buffer,
-		struct wlr_egl_context *prev_ctx, struct fx_render_timer *timer) {
+		struct wlr_egl_context *prev_ctx, struct fx_render_timer *timer,
+		struct wlr_drm_syncobj_timeline *signal_timeline, uint64_t signal_point) {
 	struct fx_renderer *renderer = buffer->renderer;
 	struct wlr_buffer *wlr_buffer = buffer->buffer;
 
@@ -1056,6 +1105,10 @@ static struct fx_gles_render_pass *begin_buffer_pass(struct fx_framebuffer *buff
 	pass->buffer = buffer;
 	pass->timer = timer;
 	pass->prev_ctx = *prev_ctx;
+	if (signal_timeline != NULL) {
+		pass->signal_timeline = wlr_drm_syncobj_timeline_ref(signal_timeline);
+		pass->signal_point = signal_point;
+	}
 
 	matrix_projection(pass->projection_matrix, wlr_buffer->width, wlr_buffer->height,
 		WL_OUTPUT_TRANSFORM_FLIPPED_180);
@@ -1120,7 +1173,8 @@ struct fx_gles_render_pass *fx_renderer_begin_buffer_pass(
 		}
 	}
 
-	struct fx_gles_render_pass *pass = begin_buffer_pass(buffer, &prev_ctx, timer);
+	struct fx_gles_render_pass *pass = begin_buffer_pass(buffer,
+			&prev_ctx, timer, options->signal_timeline, options->signal_point);
 	if (!pass) {
 		return NULL;
 	}

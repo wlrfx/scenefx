@@ -6,7 +6,6 @@ elif 'auto' in renderers and get_option('auto_features').disabled()
 endif
 
 scenefx_files += files(
-	'matrix.c',
 	'util.c',
 	'shaders.c',
 	'pixel_format.c',
@@ -35,6 +34,8 @@ if 'gles2' in renderers or 'auto' in renderers
 	endif
 	gbm = dependency('gbm', required: 'gles2' in renderers)
 	glesv2 = dependency('glesv2', required: 'gles2' in renderers)
+
+	glslang = find_program('glslang', 'glslangValidator', native: true, required: false, disabler: true)
 
 	if egl.found() and gbm.found() and glesv2.found()
 		scenefx_deps += [egl, gbm, glesv2]

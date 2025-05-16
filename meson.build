@@ -3,11 +3,12 @@ project(
 	'c',
 	version: '0.2.1',
 	license: 'MIT',
-	meson_version: '>=0.59.0',
+	meson_version: '>=1.3',
 	default_options: [
-		'c_std=' + (meson.version().version_compare('>=1.3.0') ? 'c23,c11' : 'c11'),
+		'c_std=' + (meson.version().version_compare('>=1.4.0') ? 'c23,c11' : 'c11'),
 		'warning_level=2',
 		'werror=true',
+		'wrap_mode=nodownload',
 	],
 )
 
@@ -22,6 +23,7 @@ big_endian = target_machine.endian() == 'big'
 add_project_arguments([
 	'-D_POSIX_C_SOURCE=200809L',
 	'-DWLR_USE_UNSTABLE',
+	'-DWLR_PRIVATE=',
 	'-DWLR_LITTLE_ENDIAN=@0@'.format(little_endian.to_int()),
 	'-DWLR_BIG_ENDIAN=@0@'.format(big_endian.to_int()),
 ], language: 'c')
@@ -48,31 +50,10 @@ add_project_arguments(cc.get_supported_arguments([
 	'-Wno-unused-parameter',
 ]), language: 'c')
 
-# Compute the relative path used by compiler invocations.
-source_root = meson.current_source_dir().split('/')
-build_root = meson.global_build_root().split('/')
-relative_dir_parts = []
-i = 0
-in_prefix = true
-foreach p : build_root
-	if i >= source_root.length() or not in_prefix or p != source_root[i]
-		in_prefix = false
-		relative_dir_parts += '..'
-	endif
-	i += 1
-endforeach
-i = 0
-in_prefix = true
-foreach p : source_root
-	if i >= build_root.length() or not in_prefix or build_root[i] != p
-		in_prefix = false
-		relative_dir_parts += p
-	endif
-	i += 1
-endforeach
-relative_dir = join_paths(relative_dir_parts) + '/'
+fs = import('fs')
 
 # Strip relative path prefixes from the code if possible, otherwise hide them.
+relative_dir = fs.relative_to(meson.current_source_dir(), meson.global_build_root()) + '/'
 if cc.has_argument('-fmacro-prefix-map=/prefix/to/hide=')
 	add_project_arguments(
 		'-fmacro-prefix-map=@0@='.format(relative_dir),
@@ -85,15 +66,20 @@ else
 	)
 endif
 
-wayland_project_options = ['tests=false', 'documentation=false']
+wayland_kwargs = {
+	'version': '>=1.23.1',
+	'fallback': 'wayland',
+	'default_options': [
+		'tests=false',
+		'documentation=false',
+	],
+}
 wayland_server = dependency('wayland-server',
-	version: '>=1.23',
-	fallback: 'wayland',
-	default_options: wayland_project_options,
+	kwargs: wayland_kwargs,
 )
 
 wlroots_options = [ 'examples=false' ]
-wlroots_version = ['>=0.18.1', '<0.19.0']
+wlroots_version = ['>=0.19.0', '<0.20.0']
 wlroots = dependency('wlroots-0.18',
 	version: wlroots_version,
 	default_options: wlroots_options,
@@ -119,7 +105,7 @@ drm = dependency('libdrm',
 )
 xkbcommon = dependency('xkbcommon')
 pixman = dependency('pixman-1',
-	version: '>=0.42.0',
+	version: '>=0.43.0',
 	fallback: 'pixman',
 	default_options: ['werror=false'],
 )

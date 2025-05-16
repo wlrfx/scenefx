@@ -1,7 +1,7 @@
-#ifndef _MATRIX_H
-#define _MATRIX_H
+#ifndef UTIL_MATRIX_H
+#define UTIL_MATRIX_H
 
-#include <wlr/types/wlr_output.h>
+#include <wayland-server-protocol.h>
 
 /**
  * Writes a 2D orthographic projection matrix to mat of (width, height) with a

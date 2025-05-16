@@ -1,8 +1,8 @@
-#include <math.h>
+#include <assert.h>
 #include <string.h>
-#include <wlr/types/wlr_output.h>
-
-#include "render/fx_renderer/matrix.h"
+#include <wayland-server-protocol.h>
+#include <wlr/util/box.h>
+#include "util/matrix.h"
 
 static const float transforms[][9] = {
 	[WL_OUTPUT_TRANSFORM_NORMAL] = {

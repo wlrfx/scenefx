@@ -30,12 +30,12 @@ vec4 gradient(vec4 colors[LEN], int count, vec2 size, vec2 grad_box, vec2 origin
 	}
 
 	float smooth = 1.0/float(count - 1);
-    int ind = int(step/smooth);
-    float at = float(ind)*smooth;
+	int ind = int(step/smooth);
+	float at = float(ind)*smooth;
 
-    vec4 color = colors[ind];
-    if(ind > 0) color = mix(colors[ind - 1], color, smoothstep(at - smooth, at, step));
-    if(ind <= count - 1) color = mix(color, colors[ind + 1], smoothstep(at, at + smooth, step));
+	vec4 color = colors[ind];
+	if(ind > 0) color = mix(colors[ind - 1], color, smoothstep(at - smooth, at, step));
+	if(ind <= count - 1) color = mix(color, colors[ind + 1], smoothstep(at, at + smooth, step));
 
 	return color;
 }

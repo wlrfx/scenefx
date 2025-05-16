@@ -16,15 +16,23 @@ shaders = [
 ]
 
 foreach name : shaders
-    output = name.underscorify() + '_src.h'
-    var = name.underscorify() + '_src'
-    scenefx_files += custom_target(
-        output,
-        command: [embed, var],
-        input: name,
-        output: output,
-        feed: true,
-        capture: true,
-    )
+	# custom_target(
+	# 	'gles2-' + name,
+	# 	input: name,
+	# 	output: name + '_check',
+	# 	command: [glslang, '@INPUT@'],
+	# 	build_by_default: true,
+	# )
+
+	output = name.underscorify() + '_src.h'
+	var = name.underscorify() + '_src'
+	scenefx_files += custom_target(
+		output,
+		command: [embed, var],
+		input: name,
+		output: output,
+		feed: true,
+		capture: true,
+	)
 endforeach
 

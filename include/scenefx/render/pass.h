@@ -18,6 +18,8 @@ struct fx_gles_render_pass {
 	float projection_matrix[9];
 	struct wlr_egl_context prev_ctx;
 	struct fx_render_timer *timer;
+	struct wlr_drm_syncobj_timeline *signal_timeline;
+	uint64_t signal_point;
 };
 
 struct fx_buffer_pass_options {

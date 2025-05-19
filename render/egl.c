@@ -312,17 +312,6 @@ static bool egl_init_display(struct wlr_egl *egl, EGLDisplay display) {
 			return false;
 		}
 
-		if (check_egl_ext(device_exts_str, "EGL_MESA_device_software")) {
-			if (env_parse_bool("WLR_RENDERER_ALLOW_SOFTWARE")) {
-				wlr_log(WLR_INFO, "Using software rendering");
-			} else {
-				wlr_log(WLR_ERROR, "Software rendering detected, please use "
-					"the WLR_RENDERER_ALLOW_SOFTWARE environment variable "
-					"to proceed");
-				return false;
-			}
-		}
-
 #ifdef EGL_DRIVER_NAME_EXT
 		if (check_egl_ext(device_exts_str, "EGL_EXT_device_persistent_id")) {
 			driver_name = egl->procs.eglQueryDeviceStringEXT(egl->device,
@@ -334,6 +323,20 @@ static bool egl_init_display(struct wlr_egl *egl, EGLDisplay display) {
 			check_egl_ext(device_exts_str, "EGL_EXT_device_drm");
 		egl->exts.EXT_device_drm_render_node =
 			check_egl_ext(device_exts_str, "EGL_EXT_device_drm_render_node");
+
+		// The only way a non-DRM device is selected is when the user
+		// explicitly picks software rendering
+		if (check_egl_ext(device_exts_str, "EGL_MESA_device_software") &&
+				egl->exts.EXT_device_drm) {
+			if (env_parse_bool("WLR_RENDERER_ALLOW_SOFTWARE")) {
+				wlr_log(WLR_INFO, "Using software rendering");
+			} else {
+				wlr_log(WLR_ERROR, "Software rendering detected, please use "
+					"the WLR_RENDERER_ALLOW_SOFTWARE environment variable "
+					"to proceed");
+				return false;
+			}
+		}
 	}
 
 	if (!check_egl_ext(display_exts_str, "EGL_KHR_no_config_context") &&
@@ -346,6 +349,18 @@ static bool egl_init_display(struct wlr_egl *egl, EGLDisplay display) {
 	if (!check_egl_ext(display_exts_str, "EGL_KHR_surfaceless_context")) {
 		wlr_log(WLR_ERROR, "EGL_KHR_surfaceless_context not supported");
 		return false;
+	}
+
+	if (check_egl_ext(display_exts_str, "EGL_KHR_fence_sync") &&
+			check_egl_ext(display_exts_str, "EGL_ANDROID_native_fence_sync")) {
+		load_egl_proc(&egl->procs.eglCreateSyncKHR, "eglCreateSyncKHR");
+		load_egl_proc(&egl->procs.eglDestroySyncKHR, "eglDestroySyncKHR");
+		load_egl_proc(&egl->procs.eglDupNativeFenceFDANDROID,
+			"eglDupNativeFenceFDANDROID");
+	}
+
+	if (check_egl_ext(display_exts_str, "EGL_KHR_wait_sync")) {
+		load_egl_proc(&egl->procs.eglWaitSyncKHR, "eglWaitSyncKHR");
 	}
 
 	egl->exts.IMG_context_priority =
@@ -377,7 +392,7 @@ static bool egl_init(struct wlr_egl *egl, EGLenum platform,
 	}
 
 	display_attribs[display_attribs_len++] = EGL_NONE;
-	assert(display_attribs_len < sizeof(display_attribs) / sizeof(display_attribs[0]));
+	assert(display_attribs_len <= sizeof(display_attribs) / sizeof(display_attribs[0]));
 
 	EGLDisplay display = egl->procs.eglGetPlatformDisplayEXT(platform,
 		remote_display, display_attribs);
@@ -464,32 +479,55 @@ static EGLDeviceEXT get_egl_device_from_drm_fd(struct wlr_egl *egl,
 
 	if (!egl->procs.eglQueryDevicesEXT(nb_devices, devices, &nb_devices)) {
 		wlr_log(WLR_ERROR, "Failed to query EGL devices");
+		free(devices);
 		return EGL_NO_DEVICE_EXT;
 	}
 
-	drmDevice *device = NULL;
-	int ret = drmGetDevice(drm_fd, &device);
-	if (ret < 0) {
-		wlr_log(WLR_ERROR, "Failed to get DRM device: %s", strerror(-ret));
-		return EGL_NO_DEVICE_EXT;
+	drmDevice *selected_drm_device = NULL;
+	if (drm_fd >= 0) {
+		int ret = drmGetDevice(drm_fd, &selected_drm_device);
+		if (ret < 0) {
+			wlr_log(WLR_ERROR, "Failed to get DRM device: %s", strerror(-ret));
+			free(devices);
+			return EGL_NO_DEVICE_EXT;
+		}
 	}
 
 	EGLDeviceEXT egl_device = NULL;
 	for (int i = 0; i < nb_devices; i++) {
-		const char *egl_device_name = egl->procs.eglQueryDeviceStringEXT(
-				devices[i], EGL_DRM_DEVICE_FILE_EXT);
-		if (egl_device_name == NULL) {
+		const char *device_exts_str = egl->procs.eglQueryDeviceStringEXT(devices[i], EGL_EXTENSIONS);
+		if (device_exts_str == NULL) {
+			wlr_log(WLR_ERROR, "eglQueryDeviceStringEXT(EGL_EXTENSIONS) failed");
 			continue;
 		}
 
-		if (device_has_name(device, egl_device_name)) {
-			wlr_log(WLR_DEBUG, "Using EGL device %s", egl_device_name);
+		const char *egl_device_name = NULL;
+		if (check_egl_ext(device_exts_str, "EGL_EXT_device_drm")) {
+			egl_device_name = egl->procs.eglQueryDeviceStringEXT(devices[i], EGL_DRM_DEVICE_FILE_EXT);
+			if (egl_device_name == NULL) {
+				wlr_log(WLR_ERROR, "eglQueryDeviceStringEXT(EGL_DRM_DEVICE_FILE_EXT) failed");
+				continue;
+			}
+		}
+
+		bool is_software = check_egl_ext(device_exts_str, "EGL_MESA_device_software");
+
+		bool found;
+		if (selected_drm_device != NULL) {
+			found = egl_device_name != NULL && device_has_name(selected_drm_device, egl_device_name);
+		} else {
+			found = is_software;
+		}
+		if (found) {
+			if (egl_device_name != NULL) {
+				wlr_log(WLR_DEBUG, "Using EGL device %s", egl_device_name);
+			}
 			egl_device = devices[i];
 			break;
 		}
 	}
 
-	drmFreeDevice(&device);
+	drmFreeDevice(&selected_drm_device);
 	free(devices);
 
 	return egl_device;
@@ -542,7 +580,7 @@ struct wlr_egl *wlr_egl_create_with_drm_fd(int drm_fd) {
 		wlr_log(WLR_DEBUG, "EXT_platform_device not supported");
 	}
 
-	if (egl->exts.KHR_platform_gbm) {
+	if (egl->exts.KHR_platform_gbm && drm_fd >= 0) {
 		int gbm_fd = open_render_node(drm_fd);
 		if (gbm_fd < 0) {
 			wlr_log(WLR_ERROR, "Failed to open DRM render node");
@@ -770,7 +808,7 @@ EGLImageKHR wlr_egl_create_image_from_dmabuf(struct wlr_egl *egl,
 	attribs[atti++] = EGL_TRUE;
 
 	attribs[atti++] = EGL_NONE;
-	assert(atti < sizeof(attribs)/sizeof(attribs[0]));
+	assert(atti <= sizeof(attribs)/sizeof(attribs[0]));
 
 	EGLImageKHR image = egl->procs.eglCreateImageKHR(egl->display, EGL_NO_CONTEXT,
 		EGL_LINUX_DMA_BUF_EXT, NULL, attribs);
@@ -1013,4 +1051,66 @@ int wlr_egl_dup_drm_fd(struct wlr_egl *egl) {
 		wlr_log_errno(WLR_ERROR, "Failed to dup GBM FD");
 	}
 	return fd;
+}
+
+EGLSyncKHR wlr_egl_create_sync(struct wlr_egl *egl, int fence_fd) {
+	if (!egl->procs.eglCreateSyncKHR) {
+		return EGL_NO_SYNC_KHR;
+	}
+
+	EGLint attribs[3] = { EGL_NONE };
+	int dup_fd = -1;
+	if (fence_fd >= 0) {
+		dup_fd = fcntl(fence_fd, F_DUPFD_CLOEXEC, 0);
+		if (dup_fd < 0) {
+			wlr_log_errno(WLR_ERROR, "dup failed");
+			return EGL_NO_SYNC_KHR;
+		}
+
+		attribs[0] = EGL_SYNC_NATIVE_FENCE_FD_ANDROID;
+		attribs[1] = dup_fd;
+		attribs[2] = EGL_NONE;
+	}
+
+	EGLSyncKHR sync = egl->procs.eglCreateSyncKHR(egl->display,
+		EGL_SYNC_NATIVE_FENCE_ANDROID, attribs);
+	if (sync == EGL_NO_SYNC_KHR) {
+		wlr_log(WLR_ERROR, "eglCreateSyncKHR failed");
+		if (dup_fd >= 0) {
+			close(dup_fd);
+		}
+	}
+	return sync;
+}
+
+void wlr_egl_destroy_sync(struct wlr_egl *egl, EGLSyncKHR sync) {
+	if (sync == EGL_NO_SYNC_KHR) {
+		return;
+	}
+	assert(egl->procs.eglDestroySyncKHR);
+	if (egl->procs.eglDestroySyncKHR(egl->display, sync) != EGL_TRUE) {
+		wlr_log(WLR_ERROR, "eglDestroySyncKHR failed");
+	}
+}
+
+int wlr_egl_dup_fence_fd(struct wlr_egl *egl, EGLSyncKHR sync) {
+	if (!egl->procs.eglDupNativeFenceFDANDROID) {
+		return -1;
+	}
+
+	int fd = egl->procs.eglDupNativeFenceFDANDROID(egl->display, sync);
+	if (fd == EGL_NO_NATIVE_FENCE_FD_ANDROID) {
+		wlr_log(WLR_ERROR, "eglDupNativeFenceFDANDROID failed");
+		return -1;
+	}
+
+	return fd;
+}
+
+bool wlr_egl_wait_sync(struct wlr_egl *egl, EGLSyncKHR sync) {
+	if (egl->procs.eglWaitSyncKHR(egl->display, sync, 0) != EGL_TRUE) {
+		wlr_log(WLR_ERROR, "eglWaitSyncKHR failed");
+		return false;
+	}
+	return true;
 }

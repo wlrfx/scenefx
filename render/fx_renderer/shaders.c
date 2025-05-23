@@ -148,7 +148,7 @@ bool link_quad_program(struct quad_shader *shader, GLint client_version) {
 
 bool link_quad_grad_program(struct quad_grad_shader *shader, GLint client_version, int max_len) {
 	GLchar quad_src_part[2048];
-	GLchar quad_src[2048];
+	GLchar quad_src[4096];
 	if (client_version > 2) {
 		snprintf(quad_src_part, sizeof(quad_src_part),
 			quad_grad_frag_gles3_src, max_len);
@@ -220,7 +220,7 @@ bool link_quad_round_program(struct quad_round_shader *shader, GLint client_vers
 }
 
 bool link_quad_grad_round_program(struct quad_grad_round_shader *shader, GLint client_version, int max_len) {
-	GLchar quad_src_part[4096];
+	GLchar quad_src_part[2048];
 	GLchar quad_src[4096];
 	if (client_version > 2) {
 		snprintf(quad_src_part, sizeof(quad_src_part),
@@ -265,7 +265,7 @@ bool link_quad_grad_round_program(struct quad_grad_round_shader *shader, GLint c
 }
 
 bool link_tex_program(struct tex_shader *shader, GLint client_version, enum fx_tex_shader_source source) {
-	GLchar frag_src_part[4096];
+	GLchar frag_src_part[2048];
 	GLchar frag_src[4096];
 	if (client_version > 2) {
 		snprintf(frag_src_part, sizeof(frag_src_part),

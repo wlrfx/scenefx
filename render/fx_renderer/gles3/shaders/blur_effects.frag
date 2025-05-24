@@ -1,16 +1,16 @@
-#ifdef GL_FRAGMENT_PRECISION_HIGH
-precision highp float;
-#else
-precision mediump float;
-#endif
+#version 300 es
 
-varying vec2 v_texcoord;
+precision highp float;
+
+in vec2 v_texcoord;
 uniform sampler2D tex;
 
 uniform float brightness;
 uniform float contrast;
 uniform float saturation;
 uniform float noise;
+
+out vec4 fragColor;
 
 mat4 brightnessMatrix() {
 	float b = brightness - 1.0;
@@ -54,5 +54,5 @@ void main() {
 	// Do *not* transpose the combined matrix when multiplying
 	color = brightnessMatrix() * contrastMatrix() * saturationMatrix() * color;
 	color.xyz += noiseAmount(v_texcoord);
-	gl_FragColor = color;
+	fragColor = color;
 }

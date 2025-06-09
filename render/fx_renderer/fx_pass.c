@@ -6,7 +6,6 @@
 #include <unistd.h>
 #include <wlr/render/allocator.h>
 #include <wlr/render/drm_syncobj.h>
-#include <wlr/types/wlr_matrix.h>
 #include <wlr/util/transform.h>
 #include <wlr/util/log.h>
 #include <wlr/util/region.h>

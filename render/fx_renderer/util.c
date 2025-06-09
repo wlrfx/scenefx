@@ -5,14 +5,7 @@
 #include <xf86drm.h>
 
 #include "render/fx_renderer/util.h"
-
-static uint32_t backend_get_buffer_caps(struct wlr_backend *backend) {
-	if (!backend->impl->get_buffer_caps) {
-		return 0;
-	}
-
-	return backend->impl->get_buffer_caps(backend);
-}
+#include "util/env.h"
 
 static int open_drm_render_node(void) {
 	uint32_t flags = 0;
@@ -66,6 +59,12 @@ bool open_preferred_drm_fd(struct wlr_backend *backend, int *drm_fd_ptr,
 		return true;
 	}
 
+	if (env_parse_bool("WLR_RENDERER_FORCE_SOFTWARE")) {
+		*drm_fd_ptr = -1;
+		*own_drm_fd = false;
+		return true;
+	}
+
 	// Allow the user to override the render node
 	const char *render_name = getenv("WLR_RENDER_DRM_DEVICE");
 	if (render_name != NULL) {
@@ -97,8 +96,7 @@ bool open_preferred_drm_fd(struct wlr_backend *backend, int *drm_fd_ptr,
 
 	// If the backend hasn't picked a DRM FD, but accepts DMA-BUFs, pick an
 	// arbitrary render node
-	uint32_t backend_caps = backend_get_buffer_caps(backend);
-	if (backend_caps & WLR_BUFFER_CAP_DMABUF) {
+	if (backend->buffer_caps & WLR_BUFFER_CAP_DMABUF) {
 		int drm_fd = open_drm_render_node();
 		if (drm_fd < 0) {
 			return false;

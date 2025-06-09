@@ -128,7 +128,7 @@ struct tinywl_keyboard {
 	struct wl_listener destroy;
 };
 
-static void focus_toplevel(struct tinywl_toplevel *toplevel, struct wlr_surface *surface) {
+static void focus_toplevel(struct tinywl_toplevel *toplevel) {
 	/* Note: this function only deals with keyboard focus. */
 	if (toplevel == NULL) {
 		return;
@@ -136,6 +136,7 @@ static void focus_toplevel(struct tinywl_toplevel *toplevel, struct wlr_surface 
 	struct tinywl_server *server = toplevel->server;
 	struct wlr_seat *seat = server->seat;
 	struct wlr_surface *prev_surface = seat->keyboard_state.focused_surface;
+	struct wlr_surface *surface = toplevel->xdg_toplevel->base->surface;
 	if (prev_surface == surface) {
 		/* Don't re-focus an already focused surface. */
 		return;
@@ -165,7 +166,7 @@ static void focus_toplevel(struct tinywl_toplevel *toplevel, struct wlr_surface 
 	 * clients without additional work on your part.
 	 */
 	if (keyboard != NULL) {
-		wlr_seat_keyboard_notify_enter(seat, toplevel->xdg_toplevel->base->surface,
+		wlr_seat_keyboard_notify_enter(seat, surface,
 			keyboard->keycodes, keyboard->num_keycodes, &keyboard->modifiers);
 	}
 }
@@ -207,7 +208,7 @@ static bool handle_keybinding(struct tinywl_server *server, xkb_keysym_t sym) {
 		}
 		struct tinywl_toplevel *next_toplevel =
 			wl_container_of(server->toplevels.prev, next_toplevel, link);
-		focus_toplevel(next_toplevel, next_toplevel->xdg_toplevel->base->surface);
+		focus_toplevel(next_toplevel);
 		break;
 	default:
 		return false;
@@ -396,7 +397,7 @@ static void reset_cursor_mode(struct tinywl_server *server) {
 	server->grabbed_toplevel = NULL;
 }
 
-static void process_cursor_move(struct tinywl_server *server, uint32_t time) {
+static void process_cursor_move(struct tinywl_server *server) {
 	/* Move the grabbed toplevel to the new position. */
 	struct tinywl_toplevel *toplevel = server->grabbed_toplevel;
 	wlr_scene_node_set_position(&toplevel->scene_tree->node,
@@ -404,7 +405,7 @@ static void process_cursor_move(struct tinywl_server *server, uint32_t time) {
 		server->cursor->y - server->grab_y);
 }
 
-static void process_cursor_resize(struct tinywl_server *server, uint32_t time) {
+static void process_cursor_resize(struct tinywl_server *server) {
 	/*
 	 * Resizing the grabbed toplevel can be a little bit complicated, because we
 	 * could be resizing from any corner or edge. This not only resizes the
@@ -446,10 +447,9 @@ static void process_cursor_resize(struct tinywl_server *server, uint32_t time) {
 		}
 	}
 
-	struct wlr_box geo_box;
-	wlr_xdg_surface_get_geometry(toplevel->xdg_toplevel->base, &geo_box);
+	struct wlr_box *geo_box = &toplevel->xdg_toplevel->base->geometry;
 	wlr_scene_node_set_position(&toplevel->scene_tree->node,
-		new_left - geo_box.x, new_top - geo_box.y);
+		new_left - geo_box->x, new_top - geo_box->y);
 
 	int new_width = new_right - new_left;
 	int new_height = new_bottom - new_top;
@@ -459,8 +459,8 @@ static void process_cursor_resize(struct tinywl_server *server, uint32_t time) {
 	struct wlr_box clip = {
 		.width = new_width,
 		.height = new_height,
-		.x = geo_box.x,
-		.y = geo_box.y,
+		.x = geo_box->x,
+		.y = geo_box->y,
 	};
 	wlr_scene_subsurface_tree_set_clip(&toplevel->scene_tree->node, &clip);
 }
@@ -468,10 +468,10 @@ static void process_cursor_resize(struct tinywl_server *server, uint32_t time) {
 static void process_cursor_motion(struct tinywl_server *server, uint32_t time) {
 	/* If the mode is non-passthrough, delegate to those functions. */
 	if (server->cursor_mode == TINYWL_CURSOR_MOVE) {
-		process_cursor_move(server, time);
+		process_cursor_move(server);
 		return;
 	} else if (server->cursor_mode == TINYWL_CURSOR_RESIZE) {
-		process_cursor_resize(server, time);
+		process_cursor_resize(server);
 		return;
 	}
 
@@ -549,16 +549,16 @@ static void server_cursor_button(struct wl_listener *listener, void *data) {
 	/* Notify the client with pointer focus that a button press has occurred */
 	wlr_seat_pointer_notify_button(server->seat,
 			event->time_msec, event->button, event->state);
-	double sx, sy;
-	struct wlr_surface *surface = NULL;
-	struct tinywl_toplevel *toplevel = desktop_toplevel_at(server,
-			server->cursor->x, server->cursor->y, &surface, &sx, &sy);
 	if (event->state == WL_POINTER_BUTTON_STATE_RELEASED) {
 		/* If you released any buttons, we exit interactive move/resize mode. */
 		reset_cursor_mode(server);
 	} else {
 		/* Focus that client if the button was _pressed_ */
-		focus_toplevel(toplevel, surface);
+		double sx, sy;
+		struct wlr_surface *surface = NULL;
+		struct tinywl_toplevel *toplevel = desktop_toplevel_at(server,
+				server->cursor->x, server->cursor->y, &surface, &sx, &sy);
+		focus_toplevel(toplevel);
 	}
 }
 
@@ -598,12 +598,11 @@ static void xdg_toplevel_commit(struct wl_listener *listener, void *data) {
 		return;
 	}
 
-	struct wlr_box geometry;
-	wlr_xdg_surface_get_geometry(toplevel->xdg_toplevel->base, &geometry);
-	wlr_scene_subsurface_tree_set_clip(&toplevel->xdg_scene_tree->node, &geometry);
+	struct wlr_box *geometry = &toplevel->xdg_toplevel->base->geometry;
+	wlr_scene_subsurface_tree_set_clip(&toplevel->xdg_scene_tree->node, geometry);
 
-	int border_width = geometry.width + (BORDER_THICKNESS * 2);
-	int border_height = geometry.height + (BORDER_THICKNESS * 2);
+	int border_width = geometry->width + (BORDER_THICKNESS * 2);
+	int border_height = geometry->height + (BORDER_THICKNESS * 2);
 
 	// technically we dont actually need the hole here since optimized blur would
 	// hide the border + shadow, but we do here to show compositors how to implement it
@@ -612,7 +611,7 @@ static void xdg_toplevel_commit(struct wl_listener *listener, void *data) {
 	wlr_scene_rect_set_clipped_region(toplevel->border, (struct clipped_region) {
 			.corner_radius = toplevel->corner_radius,
 			.corners = CORNER_LOCATION_ALL,
-			.area = { BORDER_THICKNESS, BORDER_THICKNESS, geometry.width, geometry.height }
+			.area = { BORDER_THICKNESS, BORDER_THICKNESS, geometry->width, geometry->height }
 	});
 
 	int blur_sigma = toplevel->shadow->blur_sigma;
@@ -826,7 +825,7 @@ static void xdg_toplevel_map(struct wl_listener *listener, void *data) {
 
 	wl_list_insert(&toplevel->server->toplevels, &toplevel->link);
 
-	focus_toplevel(toplevel, toplevel->xdg_toplevel->base->surface);
+	focus_toplevel(toplevel);
 }
 
 static void xdg_toplevel_unmap(struct wl_listener *listener, void *data) {
@@ -867,13 +866,7 @@ static void begin_interactive(struct tinywl_toplevel *toplevel,
 	 * compositor stops propegating pointer events to clients and instead
 	 * consumes them itself, to move or resize windows. */
 	struct tinywl_server *server = toplevel->server;
-	struct wlr_surface *focused_surface =
-		server->seat->pointer_state.focused_surface;
-	if (toplevel->xdg_toplevel->base->surface !=
-			wlr_surface_get_root_surface(focused_surface)) {
-		/* Deny move/resize requests from unfocused clients. */
-		return;
-	}
+
 	server->grabbed_toplevel = toplevel;
 	server->cursor_mode = mode;
 
@@ -881,17 +874,16 @@ static void begin_interactive(struct tinywl_toplevel *toplevel,
 		server->grab_x = server->cursor->x - toplevel->scene_tree->node.x;
 		server->grab_y = server->cursor->y - toplevel->scene_tree->node.y;
 	} else {
-		struct wlr_box geo_box;
-		wlr_xdg_surface_get_geometry(toplevel->xdg_toplevel->base, &geo_box);
+		struct wlr_box *geo_box = &toplevel->xdg_toplevel->base->geometry;
 
-		double border_x = (toplevel->scene_tree->node.x + geo_box.x) +
-			((edges & WLR_EDGE_RIGHT) ? geo_box.width : 0);
-		double border_y = (toplevel->scene_tree->node.y + geo_box.y) +
-			((edges & WLR_EDGE_BOTTOM) ? geo_box.height : 0);
+		double border_x = (toplevel->scene_tree->node.x + geo_box->x) +
+			((edges & WLR_EDGE_RIGHT) ? geo_box->width : 0);
+		double border_y = (toplevel->scene_tree->node.y + geo_box->y) +
+			((edges & WLR_EDGE_BOTTOM) ? geo_box->height : 0);
 		server->grab_x = server->cursor->x - border_x;
 		server->grab_y = server->cursor->y - border_y;
 
-		server->grab_geobox = geo_box;
+		server->grab_geobox = *geo_box;
 		server->grab_geobox.x += toplevel->scene_tree->node.x;
 		server->grab_geobox.y += toplevel->scene_tree->node.y;
 
@@ -1263,9 +1255,26 @@ int main(int argc, char *argv[]) {
 			socket);
 	wl_display_run(server.wl_display);
 
+
 	/* Once wl_display_run returns, we destroy all clients then shut down the
 	 * server. */
 	wl_display_destroy_clients(server.wl_display);
+
+	wl_list_remove(&server.new_xdg_toplevel.link);
+	wl_list_remove(&server.new_xdg_popup.link);
+
+	wl_list_remove(&server.cursor_motion.link);
+	wl_list_remove(&server.cursor_motion_absolute.link);
+	wl_list_remove(&server.cursor_button.link);
+	wl_list_remove(&server.cursor_axis.link);
+	wl_list_remove(&server.cursor_frame.link);
+
+	wl_list_remove(&server.new_input.link);
+	wl_list_remove(&server.request_cursor.link);
+	wl_list_remove(&server.request_set_selection.link);
+
+	wl_list_remove(&server.new_output.link);
+
 	wlr_scene_node_destroy(&server.scene->tree.node);
 	wlr_xcursor_manager_destroy(server.cursor_mgr);
 	wlr_cursor_destroy(server.cursor);

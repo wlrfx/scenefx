@@ -1,3 +1,4 @@
+#include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <assert.h>
@@ -785,8 +786,11 @@ static void render_blur_effects(struct fx_gles_render_pass *pass,
 static struct fx_framebuffer *get_main_buffer_blur(struct fx_gles_render_pass *pass,
 		struct fx_render_blur_pass_options *fx_options) {
 	struct fx_renderer *renderer = pass->buffer->renderer;
-	struct blur_data *blur_data = fx_options->blur_data;
 	struct wlr_box monitor_box = get_monitor_box(pass->output);
+
+	// We don't want to affect the reference blur_data
+	struct blur_data blur_data = blur_data_apply_strength(fx_options->blur_data, fx_options->blur_strength);
+	fx_options->blur_data = &blur_data;
 
 	pixman_region32_t damage;
 	pixman_region32_init(&damage);
@@ -794,7 +798,7 @@ static struct fx_framebuffer *get_main_buffer_blur(struct fx_gles_render_pass *p
 	wlr_region_transform(&damage, &damage, fx_options->tex_options.base.transform,
 			monitor_box.width, monitor_box.height);
 
-	wlr_region_expand(&damage, &damage, blur_data_calc_size(fx_options->blur_data));
+	wlr_region_expand(&damage, &damage, blur_data_calc_size(&blur_data));
 
 	// damage region will be scaled, make a temp
 	pixman_region32_t scaled_damage;
@@ -813,13 +817,13 @@ static struct fx_framebuffer *get_main_buffer_blur(struct fx_gles_render_pass *p
 	fx_options->tex_options.base.filter_mode = WLR_SCALE_FILTER_BILINEAR;
 
 	// Downscale
-	for (int i = 0; i < blur_data->num_passes; ++i) {
+	for (int i = 0; i < blur_data.num_passes; ++i) {
 		wlr_region_scale(&scaled_damage, &damage, 1.0f / (1 << (i + 1)));
 		render_blur_segments(pass, fx_options, &renderer->shaders.blur1);
 	}
 
 	// Upscale
-	for (int i = blur_data->num_passes - 1; i >= 0; --i) {
+	for (int i = blur_data.num_passes - 1; i >= 0; --i) {
 		// when upsampling we make the region twice as big
 		wlr_region_scale(&scaled_damage, &damage, 1.0f / (1 << i));
 		render_blur_segments(pass, fx_options, &renderer->shaders.blur2);
@@ -828,7 +832,7 @@ static struct fx_framebuffer *get_main_buffer_blur(struct fx_gles_render_pass *p
 	pixman_region32_fini(&scaled_damage);
 
 	// Render additional blur effects like saturation, noise, contrast, etc...
-	if (blur_data_should_parameters_blur_effects(blur_data)
+	if (blur_data_should_parameters_blur_effects(&blur_data)
 			&& pixman_region32_not_empty(&damage)) {
 		if (fx_options->current_buffer == pass->fx_effect_framebuffers->effects_buffer) {
 			fx_framebuffer_bind(pass->fx_effect_framebuffers->effects_buffer_swapped);
@@ -879,8 +883,9 @@ void fx_render_pass_add_blur(struct fx_gles_render_pass *pass,
 		goto damage_finish;
 	}
 
+	const bool has_strength = fx_options->blur_strength < 1.0;
 	struct fx_framebuffer *buffer = pass->fx_effect_framebuffers->optimized_blur_buffer;
-	if (!buffer || !fx_options->use_optimized_blur) {
+	if (!buffer || !fx_options->use_optimized_blur || has_strength) {
 		if (!buffer) {
 			wlr_log(WLR_ERROR, "Warning: Failed to use optimized blur");
 		}
@@ -890,7 +895,15 @@ void fx_render_pass_add_blur(struct fx_gles_render_pass *pass,
 		// Render the blur into its own buffer
 		struct fx_render_blur_pass_options blur_options = *fx_options;
 		blur_options.tex_options.base.clip = &translucent_region;
-		blur_options.current_buffer = pass->buffer;
+		if (fx_options->use_optimized_blur && has_strength
+				// If the optimized blur hasn't been rendered yet
+				&& pass->fx_effect_framebuffers->optimized_no_blur_buffer) {
+			// Re-blur the saved non-blurred version of the optimized blur.
+			// Isn't as efficient as just using the optimized blur buffer
+			blur_options.current_buffer = pass->fx_effect_framebuffers->optimized_no_blur_buffer;
+		} else {
+			blur_options.current_buffer = pass->buffer;
+		}
 		buffer = get_main_buffer_blur(pass, &blur_options);
 	}
 	struct wlr_texture *wlr_texture =
@@ -955,6 +968,8 @@ bool fx_render_pass_add_optimized_blur(struct fx_gles_render_pass *pass,
 	bool failed = false;
 	fx_framebuffer_get_or_create_custom(renderer, pass->output, NULL,
 			&pass->fx_effect_framebuffers->optimized_blur_buffer, &failed);
+	fx_framebuffer_get_or_create_custom(renderer, pass->output, NULL,
+			&pass->fx_effect_framebuffers->optimized_no_blur_buffer, &failed);
 	if (failed) {
 		goto finish;
 	}
@@ -962,6 +977,10 @@ bool fx_render_pass_add_optimized_blur(struct fx_gles_render_pass *pass,
 	// Render the newly blurred content into the blur_buffer
 	fx_renderer_read_to_buffer(pass, &clip,
 			pass->fx_effect_framebuffers->optimized_blur_buffer, buffer, false);
+
+	// Save the current scene pass state
+	fx_renderer_read_to_buffer(pass, &clip,
+			pass->fx_effect_framebuffers->optimized_no_blur_buffer, pass->buffer, false);
 
 finish:
 	pixman_region32_fini(&clip);

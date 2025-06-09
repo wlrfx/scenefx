@@ -16,8 +16,8 @@ shaders = [
 ]
 
 foreach name : shaders
-    output = name.underscorify() + '_gles2_src.h'
-    var = name.underscorify() + '_gles2_src'
+    output = name.underscorify() + '_gles3_src.h'
+    var = name.underscorify() + '_gles3_src'
     scenefx_files += custom_target(
         output,
         command: [embed, var],

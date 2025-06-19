@@ -1008,16 +1008,17 @@ bool fx_render_pass_add_optimized_blur(struct fx_gles_render_pass *pass,
 
 	// Render the newly blurred content into the blur_buffer
 	fx_renderer_read_to_buffer(pass, &clip,
-			pass->fx_effect_framebuffers->optimized_blur_buffer, buffer, false);
+			pass->fx_effect_framebuffers->optimized_blur_buffer, buffer);
 
 finish:
 	pixman_region32_fini(&clip);
 	return !failed;
 }
 
+// TODO: Use blitting for glesv3
 void fx_renderer_read_to_buffer(struct fx_gles_render_pass *pass,
 		pixman_region32_t *_region, struct fx_framebuffer *dst_buffer,
-		struct fx_framebuffer *src_buffer, bool transformed_region) {
+		struct fx_framebuffer *src_buffer) {
 	if (!_region || !pixman_region32_not_empty(_region)) {
 		return;
 	}
@@ -1025,15 +1026,6 @@ void fx_renderer_read_to_buffer(struct fx_gles_render_pass *pass,
 	pixman_region32_t region;
 	pixman_region32_init(&region);
 	pixman_region32_copy(&region, _region);
-
-	// Restore the transformed region to normal
-	if (pass->output && transformed_region) {
-		int ow, oh;
-		wlr_output_transformed_resolution(pass->output, &ow, &oh);
-		enum wl_output_transform transform =
-			wlr_output_transform_invert(pass->output->transform);
-		wlr_region_transform(&region, &region, transform, ow, oh);
-	}
 
 	struct wlr_texture *src_tex =
 		fx_texture_from_buffer(&pass->buffer->renderer->wlr_renderer, src_buffer->buffer);

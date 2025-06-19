@@ -1144,8 +1144,8 @@ void wlr_scene_buffer_set_buffer_with_options(struct wlr_scene_buffer *scene_buf
 	// produce we need to update the node.
 	bool update = mapped != prev_mapped;
 	if (buffer != NULL && scene_buffer->dst_width == 0 && scene_buffer->dst_height == 0) {
-			update = update || scene_buffer->buffer_width != buffer->width ||
-				scene_buffer->buffer_height != buffer->height;
+		update = update || scene_buffer->buffer_width != buffer->width ||
+			scene_buffer->buffer_height != buffer->height;
 	}
 
 	// If this is a buffer change, check if it's a single pixel buffer.
@@ -2539,15 +2539,25 @@ static void apply_blur_region(struct wlr_scene_node *node,
 	// Add the buffer to the blur_region if it's not fully opaque
 	if (pixman_region32_empty(&opaque_region)) {
 		struct wlr_box node_box = {
-			.x = x,
-			.y = y,
+			.x = x - scene_output->x,
+			.y = y - scene_output->y,
 		};
 		scene_node_get_size(node, &node_box.width, &node_box.height);
-		scale_box(&node_box, scene_output->output->scale);
+
+		struct wlr_output *output = scene_output->output;
+
+		int output_width, output_height;
+		wlr_output_transformed_resolution(output, &output_width, &output_height);
+
+		// Transform the box back to regular un-transformed units
+		scale_box(&node_box, output->scale);
+		wlr_box_transform(&node_box, &node_box,
+				wlr_output_transform_invert(output->transform),
+				output_width, output_height);
 
 		pixman_region32_union_rect(blur_region, blur_region,
-				node_box.x - scene_output->x,
-				node_box.y - scene_output->y,
+				node_box.x,
+				node_box.y,
 				node_box.width, node_box.height);
 	}
 	pixman_region32_fini(&opaque_region);
@@ -2858,9 +2868,8 @@ bool wlr_scene_output_build_state(struct wlr_scene_output *scene_output,
 	bool whole_output_blur_damaged = false;
 	// Expand the damage to compensate for blur
 	if (render_data.has_blur) {
-		int output_width, output_height;
-		wlr_output_transformed_resolution(output, &output_width, &output_height);
-
+		int output_width = output->width;
+		int output_height = output->height;
 		struct blur_data *blur_data = &scene_output->scene->blur_data;
 		pixman_region32_t *damage = &render_data.damage;
 
@@ -2874,10 +2883,6 @@ bool wlr_scene_output_build_state(struct wlr_scene_output *scene_output,
 			// the whole output
 			whole_output_blur_damaged = true;
 		}else {
-			// Expand the original damage to compensate for surrounding
-			// blurred views to avoid sharp edges between damage regions
-			wlr_region_expand(damage, damage, blur_data_calc_size(blur_data));
-
 			// copy the surrounding content where the blur would display artifacts
 			// and draw it above the artifacts
 			pixman_region32_t extended_damage;
@@ -2899,7 +2904,7 @@ bool wlr_scene_output_build_state(struct wlr_scene_output *scene_output,
 			// Capture the padding pixels before blur for later use
 			fx_renderer_read_to_buffer(render_pass, &effect_fbos->blur_padding_region,
 					effect_fbos->blur_saved_pixels_buffer,
-					render_pass->buffer, true);
+					render_pass->buffer);
 		}
 	}
 	pixman_region32_fini(&blur_region);
@@ -2970,11 +2975,9 @@ bool wlr_scene_output_build_state(struct wlr_scene_output *scene_output,
 	}
 
 	if (render_data.has_blur && !whole_output_blur_damaged) {
-		// TODO: Investigate blitting instead
 		// Render the saved pixels over the blur artifacts
 		fx_renderer_read_to_buffer(render_pass, &effect_fbos->blur_padding_region,
-				render_pass->buffer,
-				effect_fbos->blur_saved_pixels_buffer, true);
+				render_pass->buffer, effect_fbos->blur_saved_pixels_buffer);
 	}
 
 	if (debug_damage == WLR_SCENE_DEBUG_DAMAGE_HIGHLIGHT) {

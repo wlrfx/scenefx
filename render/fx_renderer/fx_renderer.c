@@ -8,15 +8,14 @@
 #include <GLES2/gl2.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <time.h>
 #include <unistd.h>
 #include <wlr/backend.h>
 #include <wlr/render/allocator.h>
 #include <wlr/render/egl.h>
 #include <wlr/render/interface.h>
-#include <wlr/types/wlr_matrix.h>
 #include <wlr/util/box.h>
 #include <wlr/util/log.h>
+#include <xf86drm.h>
 
 #include "render/egl.h"
 #include "render/fx_renderer/shaders.h"
@@ -522,6 +521,13 @@ struct wlr_renderer *fx_renderer_create_egl(struct wlr_egl *egl) {
 	wlr_egl_unset_current(renderer->egl);
 
 	get_fx_shm_formats(renderer, &renderer->shm_texture_formats);
+
+	int drm_fd = wlr_renderer_get_drm_fd(&renderer->wlr_renderer);
+	uint64_t cap_syncobj_timeline;
+	if (drm_fd >= 0 && drmGetCap(drm_fd, DRM_CAP_SYNCOBJ_TIMELINE, &cap_syncobj_timeline) == 0) {
+		renderer->wlr_renderer.features.timeline = egl->procs.eglDupNativeFenceFDANDROID &&
+			egl->procs.eglWaitSyncKHR && cap_syncobj_timeline != 0;
+	}
 
 	return &renderer->wlr_renderer;
 

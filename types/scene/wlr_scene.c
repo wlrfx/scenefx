@@ -1788,7 +1788,6 @@ static void scene_entry_render(struct render_list_entry *entry, const struct ren
 		rect_clipped_region_box.x += x;
 		rect_clipped_region_box.y += y;
 
-		scale_box(&rect_clipped_region_box, data->scale);
 		transform_output_box(&rect_clipped_region_box, data);
 		corner_location_transform(node_transform, &rect_clipped_corners);
 
@@ -1862,7 +1861,6 @@ static void scene_entry_render(struct render_list_entry *entry, const struct ren
 		shadow_clipped_region_box.x += x;
 		shadow_clipped_region_box.y += y;
 
-		scale_box(&shadow_clipped_region_box, data->scale);
 		transform_output_box(&shadow_clipped_region_box, data);
 		corner_location_transform(node_transform, &shadow_clipped_corners);
 

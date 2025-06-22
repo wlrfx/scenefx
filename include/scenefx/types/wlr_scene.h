@@ -28,9 +28,9 @@
 #include <wlr/util/addon.h>
 #include <wlr/util/box.h>
 
-#include "scenefx/types/fx/blur_data.h"
 #include "scenefx/types/fx/clipped_region.h"
 #include "scenefx/types/fx/corner_location.h"
+#include "types/blur_data.h"
 
 struct wlr_output;
 struct wlr_output_layout;

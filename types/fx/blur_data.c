@@ -1,4 +1,4 @@
-#include "scenefx/types/fx/blur_data.h"
+#include "types/blur_data.h"
 
 struct blur_data blur_data_get_default(void) {
 	return (struct blur_data) {

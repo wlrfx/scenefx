@@ -16,8 +16,8 @@
 #include "render/pass.h"
 #include "scenefx/render/fx_renderer/fx_renderer.h"
 #include "scenefx/render/fx_renderer/fx_effect_framebuffers.h"
-#include "scenefx/types/fx/blur_data.h"
 #include "scenefx/types/fx/corner_location.h"
+#include "types/blur_data.h"
 #include "util/matrix.h"
 
 #define MAX_QUADS 86 // 4kb

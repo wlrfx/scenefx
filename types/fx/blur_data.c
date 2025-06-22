@@ -22,15 +22,6 @@ bool blur_data_should_parameters_blur_effects(struct blur_data *blur_data) {
 		|| blur_data->noise > 0.0f;
 }
 
-bool blur_data_cmp(struct blur_data *a, struct blur_data *b) {
-	return a->radius == b->radius &&
-		a->num_passes == b->num_passes &&
-		a->noise == b->noise &&
-		a->brightness == b->brightness &&
-		a->contrast == b->contrast &&
-		a->saturation == b->saturation;
-}
-
 int blur_data_calc_size(struct blur_data *blur_data) {
 	return pow(2, blur_data->num_passes + 1) * blur_data->radius;
 }

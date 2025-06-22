@@ -1032,15 +1032,85 @@ static void mark_all_optimized_blur_nodes_dirty(struct wlr_scene_node *node) {
 	}
 }
 
-void wlr_scene_set_blur_data(struct wlr_scene *scene, struct blur_data blur_data) {
+void wlr_scene_set_blur_data(struct wlr_scene *scene, int num_passes,
+		int radius, float noise, float brightness, float contrast, float saturation) {
 	struct blur_data *buff_data = &scene->blur_data;
-	if (blur_data_cmp(buff_data, &blur_data)) {
+	if (buff_data->num_passes == num_passes
+			&& buff_data->radius == radius
+			&& buff_data->noise == noise
+			&& buff_data->brightness == brightness
+			&& buff_data->contrast == contrast
+			&& buff_data->saturation == saturation) {
 		return;
 	}
 
-	memcpy(&scene->blur_data, &blur_data,
-			sizeof(struct blur_data));
+	buff_data->num_passes = num_passes;
+	buff_data->radius = radius;
+	buff_data->noise = noise;
+	buff_data->brightness = brightness;
+	buff_data->contrast = contrast;
+	buff_data->saturation = saturation;
 
+	mark_all_optimized_blur_nodes_dirty(&scene->tree.node);
+	scene_node_update(&scene->tree.node, NULL);
+}
+
+void wlr_scene_set_blur_num_passes(struct wlr_scene *scene, int num_passes) {
+	struct blur_data *buff_data = &scene->blur_data;
+	if (buff_data->num_passes == num_passes) {
+		return;
+	}
+	buff_data->num_passes = num_passes;
+	mark_all_optimized_blur_nodes_dirty(&scene->tree.node);
+	scene_node_update(&scene->tree.node, NULL);
+}
+
+void wlr_scene_set_blur_radius(struct wlr_scene *scene, int radius) {
+	struct blur_data *buff_data = &scene->blur_data;
+	if (buff_data->radius == radius) {
+		return;
+	}
+	buff_data->radius = radius;
+	mark_all_optimized_blur_nodes_dirty(&scene->tree.node);
+	scene_node_update(&scene->tree.node, NULL);
+}
+
+void wlr_scene_set_blur_noise(struct wlr_scene *scene, float noise) {
+	struct blur_data *buff_data = &scene->blur_data;
+	if (buff_data->noise == noise) {
+		return;
+	}
+	buff_data->noise = noise;
+	mark_all_optimized_blur_nodes_dirty(&scene->tree.node);
+	scene_node_update(&scene->tree.node, NULL);
+}
+
+void wlr_scene_set_blur_brightness(struct wlr_scene *scene, float brightness) {
+	struct blur_data *buff_data = &scene->blur_data;
+	if (buff_data->brightness == brightness) {
+		return;
+	}
+	buff_data->brightness = brightness;
+	mark_all_optimized_blur_nodes_dirty(&scene->tree.node);
+	scene_node_update(&scene->tree.node, NULL);
+}
+
+void wlr_scene_set_blur_contrast(struct wlr_scene *scene, float contrast) {
+	struct blur_data *buff_data = &scene->blur_data;
+	if (buff_data->contrast == contrast) {
+		return;
+	}
+	buff_data->contrast = contrast;
+	mark_all_optimized_blur_nodes_dirty(&scene->tree.node);
+	scene_node_update(&scene->tree.node, NULL);
+}
+
+void wlr_scene_set_blur_saturation(struct wlr_scene *scene, float saturation) {
+	struct blur_data *buff_data = &scene->blur_data;
+	if (buff_data->saturation == saturation) {
+		return;
+	}
+	buff_data->saturation = saturation;
 	mark_all_optimized_blur_nodes_dirty(&scene->tree.node);
 	scene_node_update(&scene->tree.node, NULL);
 }

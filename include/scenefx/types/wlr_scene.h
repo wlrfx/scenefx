@@ -379,8 +379,27 @@ struct wlr_scene_node *wlr_scene_node_at(struct wlr_scene_node *node,
 struct wlr_scene *wlr_scene_create(void);
 
 
-/** Sets the global blur parameters */
-void wlr_scene_set_blur_data(struct wlr_scene *scene, struct blur_data blur_data);
+// Sets the global blur parameters
+void wlr_scene_set_blur_data(struct wlr_scene *scene, int num_passes,
+	int radius, float noise, float brightness, float contrast, float saturation);
+
+// Sets the global blur num_passes parameter
+void wlr_scene_set_blur_num_passes(struct wlr_scene *scene, int num_passes);
+
+// Sets the global blur radius parameter
+void wlr_scene_set_blur_radius(struct wlr_scene *scene, int radius);
+
+// Sets the global blur noise parameter
+void wlr_scene_set_blur_noise(struct wlr_scene *scene, float noise);
+
+// Sets the global blur brightness parameter
+void wlr_scene_set_blur_brightness(struct wlr_scene *scene, float brightness);
+
+// Sets the global blur contrast parameter
+void wlr_scene_set_blur_contrast(struct wlr_scene *scene, float contrast);
+
+// Sets the global blur saturation parameter
+void wlr_scene_set_blur_saturation(struct wlr_scene *scene, float saturation);
 
 /**
  * Handles linux_dmabuf_v1 feedback for all surfaces in the scene.

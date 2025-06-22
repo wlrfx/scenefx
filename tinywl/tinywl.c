@@ -5,7 +5,6 @@
 #include <stdio.h>
 #include <time.h>
 #include <scenefx/render/fx_renderer/fx_renderer.h>
-#include <scenefx/types/fx/blur_data.h>
 #include <scenefx/types/fx/clipped_region.h>
 #include <scenefx/types/fx/corner_location.h>
 #include <scenefx/types/wlr_scene.h>
@@ -1155,10 +1154,6 @@ int main(int argc, char *argv[]) {
 			},
 	});
 	wlr_scene_node_set_position(&rect->node, 200, 200);
-
-	// blur
-	struct blur_data blur_data = blur_data_get_default();
-	wlr_scene_set_blur_data(server.scene, blur_data);
 
 	/* Set up xdg-shell version 3. The xdg-shell is a Wayland protocol which is
 	 * used for application windows. For more detail on shells, refer to

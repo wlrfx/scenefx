@@ -30,7 +30,6 @@
 
 #include "scenefx/types/fx/clipped_region.h"
 #include "scenefx/types/fx/corner_location.h"
-#include "types/blur_data.h"
 
 struct wlr_output;
 struct wlr_output_layout;
@@ -118,7 +117,15 @@ struct wlr_scene {
 		bool calculate_visibility;
 		bool highlight_transparent_region;
 
-		struct blur_data blur_data;
+		struct {
+			int num_passes;
+			int radius;
+			float noise;
+			float brightness;
+			float contrast;
+			float saturation;
+		} blur_data;
+
 	} WLR_PRIVATE;
 };
 

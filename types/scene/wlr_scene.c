@@ -23,10 +23,10 @@
 #include "scenefx/render/pass.h"
 #include "scenefx/types/fx/clipped_region.h"
 #include "scenefx/types/fx/corner_location.h"
-#include "types/blur_data.h"
 #include "types/wlr_output.h"
 #include "types/wlr_scene.h"
 #include "util/array.h"
+#include "util/fx_helpers.h"
 #include "util/env.h"
 #include "util/time.h"
 #include "wlr/util/box.h"
@@ -220,7 +220,13 @@ struct wlr_scene *wlr_scene_create(void) {
 	scene->calculate_visibility = !env_parse_bool("WLR_SCENE_DISABLE_VISIBILITY");
 	scene->highlight_transparent_region = env_parse_bool("WLR_SCENE_HIGHLIGHT_TRANSPARENT_REGION");
 
-	scene->blur_data = blur_data_get_default();
+	// default blur_data
+	scene->blur_data.radius = 5;
+	scene->blur_data.num_passes = 3;
+	scene->blur_data.noise = 0.02;
+	scene->blur_data.brightness = 0.9;
+	scene->blur_data.contrast = 0.9;
+	scene->blur_data.saturation = 1.1;
 
 	return scene;
 }
@@ -1034,83 +1040,76 @@ static void mark_all_optimized_blur_nodes_dirty(struct wlr_scene_node *node) {
 
 void wlr_scene_set_blur_data(struct wlr_scene *scene, int num_passes,
 		int radius, float noise, float brightness, float contrast, float saturation) {
-	struct blur_data *buff_data = &scene->blur_data;
-	if (buff_data->num_passes == num_passes
-			&& buff_data->radius == radius
-			&& buff_data->noise == noise
-			&& buff_data->brightness == brightness
-			&& buff_data->contrast == contrast
-			&& buff_data->saturation == saturation) {
+	if (scene->blur_data.num_passes == num_passes
+			&& scene->blur_data.radius == radius
+			&& scene->blur_data.noise == noise
+			&& scene->blur_data.brightness == brightness
+			&& scene->blur_data.contrast == contrast
+			&& scene->blur_data.saturation == saturation) {
 		return;
 	}
 
-	buff_data->num_passes = num_passes;
-	buff_data->radius = radius;
-	buff_data->noise = noise;
-	buff_data->brightness = brightness;
-	buff_data->contrast = contrast;
-	buff_data->saturation = saturation;
+	scene->blur_data.num_passes = num_passes;
+	scene->blur_data.radius = radius;
+	scene->blur_data.noise = noise;
+	scene->blur_data.brightness = brightness;
+	scene->blur_data.contrast = contrast;
+	scene->blur_data.saturation = saturation;
 
 	mark_all_optimized_blur_nodes_dirty(&scene->tree.node);
 	scene_node_update(&scene->tree.node, NULL);
 }
 
 void wlr_scene_set_blur_num_passes(struct wlr_scene *scene, int num_passes) {
-	struct blur_data *buff_data = &scene->blur_data;
-	if (buff_data->num_passes == num_passes) {
+	if (scene->blur_data.num_passes == num_passes) {
 		return;
 	}
-	buff_data->num_passes = num_passes;
+	scene->blur_data.num_passes = num_passes;
 	mark_all_optimized_blur_nodes_dirty(&scene->tree.node);
 	scene_node_update(&scene->tree.node, NULL);
 }
 
 void wlr_scene_set_blur_radius(struct wlr_scene *scene, int radius) {
-	struct blur_data *buff_data = &scene->blur_data;
-	if (buff_data->radius == radius) {
+	if (scene->blur_data.radius == radius) {
 		return;
 	}
-	buff_data->radius = radius;
+	scene->blur_data.radius = radius;
 	mark_all_optimized_blur_nodes_dirty(&scene->tree.node);
 	scene_node_update(&scene->tree.node, NULL);
 }
 
 void wlr_scene_set_blur_noise(struct wlr_scene *scene, float noise) {
-	struct blur_data *buff_data = &scene->blur_data;
-	if (buff_data->noise == noise) {
+	if (scene->blur_data.noise == noise) {
 		return;
 	}
-	buff_data->noise = noise;
+	scene->blur_data.noise = noise;
 	mark_all_optimized_blur_nodes_dirty(&scene->tree.node);
 	scene_node_update(&scene->tree.node, NULL);
 }
 
 void wlr_scene_set_blur_brightness(struct wlr_scene *scene, float brightness) {
-	struct blur_data *buff_data = &scene->blur_data;
-	if (buff_data->brightness == brightness) {
+	if (scene->blur_data.brightness == brightness) {
 		return;
 	}
-	buff_data->brightness = brightness;
+	scene->blur_data.brightness = brightness;
 	mark_all_optimized_blur_nodes_dirty(&scene->tree.node);
 	scene_node_update(&scene->tree.node, NULL);
 }
 
 void wlr_scene_set_blur_contrast(struct wlr_scene *scene, float contrast) {
-	struct blur_data *buff_data = &scene->blur_data;
-	if (buff_data->contrast == contrast) {
+	if (scene->blur_data.contrast == contrast) {
 		return;
 	}
-	buff_data->contrast = contrast;
+	scene->blur_data.contrast = contrast;
 	mark_all_optimized_blur_nodes_dirty(&scene->tree.node);
 	scene_node_update(&scene->tree.node, NULL);
 }
 
 void wlr_scene_set_blur_saturation(struct wlr_scene *scene, float saturation) {
-	struct blur_data *buff_data = &scene->blur_data;
-	if (buff_data->saturation == saturation) {
+	if (scene->blur_data.saturation == saturation) {
 		return;
 	}
-	buff_data->saturation = saturation;
+	scene->blur_data.saturation = saturation;
 	mark_all_optimized_blur_nodes_dirty(&scene->tree.node);
 	scene_node_update(&scene->tree.node, NULL);
 }
@@ -1758,6 +1757,10 @@ struct wlr_scene_node *wlr_scene_node_at(struct wlr_scene_node *node,
 	return NULL;
 }
 
+static bool is_scene_blur_enabled(int radius, int num_passes) {
+	return radius > 0 && num_passes > 0;
+}
+
 struct render_list_entry {
 	struct wlr_scene_node *node;
 	bool highlight_transparent_region;
@@ -1811,7 +1814,7 @@ static void scene_entry_render(struct render_list_entry *entry, const struct ren
 		// blur
 		bool has_alpha = !pixman_region32_empty(&opaque);
 		if (has_alpha && scene_rect->backdrop_blur &&
-				is_scene_blur_enabled(&scene->blur_data)) {
+				is_scene_blur_enabled(scene->blur_data.radius, scene->blur_data.num_passes)) {
 			pixman_region32_t opaque_region;
 			pixman_region32_init(&opaque_region);
 			scene_node_opaque_region(node, x, y, &opaque_region);
@@ -1841,7 +1844,12 @@ static void scene_entry_render(struct render_list_entry *entry, const struct ren
 				},
 				.opaque_region = &opaque_region,
 				.use_optimized_blur = scene_rect->backdrop_blur_optimized,
-				.blur_data = &scene->blur_data,
+				.num_passes = scene->blur_data.num_passes,
+				.radius = scene->blur_data.radius,
+				.noise = scene->blur_data.noise,
+				.brightness = scene->blur_data.brightness,
+				.contrast = scene->blur_data.contrast,
+				.saturation = scene->blur_data.saturation,
 				.ignore_transparent = false,
 			};
 			// Render the actual blur behind the surface
@@ -1894,7 +1902,7 @@ static void scene_entry_render(struct render_list_entry *entry, const struct ren
 	case WLR_SCENE_NODE_OPTIMIZED_BLUR:;
 		struct wlr_scene_optimized_blur *scene_blur = wlr_scene_optimized_blur_from_node(node);
 		// Re-render the optimized blur buffer when needed
-		if (data->has_blur && is_scene_blur_enabled(&scene->blur_data)
+		if (data->has_blur && is_scene_blur_enabled(scene->blur_data.radius, scene->blur_data.num_passes)
 				&& scene_blur->dirty) {
 			const float opacity = 1.0f;
 			enum wl_output_transform transform =
@@ -1912,7 +1920,12 @@ static void scene_entry_render(struct render_list_entry *entry, const struct ren
 					.corner_radius = 0,
 					.discard_transparent = false,
 				},
-				.blur_data = &scene->blur_data,
+				.num_passes = scene->blur_data.num_passes,
+				.radius = scene->blur_data.radius,
+				.noise = scene->blur_data.noise,
+				.brightness = scene->blur_data.brightness,
+				.contrast = scene->blur_data.contrast,
+				.saturation = scene->blur_data.saturation,
 			};
 			bool result = fx_render_pass_add_optimized_blur(data->render_pass, &blur_options);
 			if (result) {
@@ -1986,7 +1999,7 @@ static void scene_entry_render(struct render_list_entry *entry, const struct ren
 		corner_location_transform(transform, &buffer_corners);
 
 		// Blur
-		if (scene_buffer->backdrop_blur && is_scene_blur_enabled(&scene->blur_data)) {
+		if (scene_buffer->backdrop_blur && is_scene_blur_enabled(scene->blur_data.radius, scene->blur_data.num_passes)) {
 			pixman_region32_t opaque_region;
 			pixman_region32_init(&opaque_region);
 
@@ -2020,7 +2033,12 @@ static void scene_entry_render(struct render_list_entry *entry, const struct ren
 					},
 					.opaque_region = &opaque_region,
 					.use_optimized_blur = scene_buffer->backdrop_blur_optimized,
-					.blur_data = &scene->blur_data,
+					.num_passes = scene->blur_data.num_passes,
+					.radius = scene->blur_data.radius,
+					.noise = scene->blur_data.noise,
+					.brightness = scene->blur_data.brightness,
+					.contrast = scene->blur_data.contrast,
+					.saturation = scene->blur_data.saturation,
 					.ignore_transparent = scene_buffer->backdrop_blur_ignore_transparent,
 				};
 				// Render the actual blur behind the surface
@@ -2940,7 +2958,6 @@ bool wlr_scene_output_build_state(struct wlr_scene_output *scene_output,
 	if (render_data.has_blur) {
 		int output_width = output->width;
 		int output_height = output->height;
-		struct blur_data *blur_data = &scene_output->scene->blur_data;
 		pixman_region32_t *damage = &render_data.damage;
 
 		// ensure that the damage isn't expanding past the output's size
@@ -2959,7 +2976,8 @@ bool wlr_scene_output_build_state(struct wlr_scene_output *scene_output,
 			pixman_region32_init(&extended_damage);
 			pixman_region32_intersect(&extended_damage, damage, &blur_region);
 			// Expand the region to compensate for blur artifacts
-			wlr_region_expand(&extended_damage, &extended_damage, blur_data_calc_size(blur_data));
+			wlr_region_expand(&extended_damage, &extended_damage,
+					calc_blur_size(scene_output->scene->blur_data.num_passes, scene_output->scene->blur_data.radius));
 			// Limit to the monitors viewport
 			pixman_region32_intersect_rect(&extended_damage, &extended_damage,
 					0, 0, output_width, output_height);

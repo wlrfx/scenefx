@@ -17,7 +17,7 @@
 #include "scenefx/render/fx_renderer/fx_renderer.h"
 #include "scenefx/render/fx_renderer/fx_effect_framebuffers.h"
 #include "scenefx/types/fx/corner_location.h"
-#include "types/blur_data.h"
+#include "util/fx_helpers.h"
 #include "util/matrix.h"
 
 #define MAX_QUADS 86 // 4kb
@@ -692,35 +692,30 @@ void fx_render_pass_add_box_shadow(struct fx_gles_render_pass *pass,
 
 // Renders the blur for each damaged rect and swaps the buffer
 static void render_blur_segments(struct fx_gles_render_pass *pass,
-		struct fx_render_blur_pass_options *fx_options, struct blur_shader* shader) {
-	struct fx_render_texture_options *tex_options = &fx_options->tex_options;
-	struct wlr_render_texture_options *options = &tex_options->base;
+		struct wlr_render_texture_options *tex_options,
+		struct fx_framebuffer *current_buffer, int blur_radius,
+		struct blur_shader* shader) {
 	struct fx_renderer *renderer = pass->buffer->renderer;
-	struct blur_data *blur_data = fx_options->blur_data;
 
 	// Swap fbo
-	if (fx_options->current_buffer == pass->fx_effect_framebuffers->effects_buffer) {
+	if (current_buffer == pass->fx_effect_framebuffers->effects_buffer) {
 		fx_framebuffer_bind(pass->fx_effect_framebuffers->effects_buffer_swapped);
 	} else {
 		fx_framebuffer_bind(pass->fx_effect_framebuffers->effects_buffer);
 	}
 
-	options->texture = fx_texture_from_buffer(&renderer->wlr_renderer,
-			fx_options->current_buffer->buffer);
-	struct fx_texture *texture = fx_get_texture(options->texture);
-
-	/*
-	 * Render
-	 */
+	tex_options->texture = fx_texture_from_buffer(&renderer->wlr_renderer,
+			current_buffer->buffer);
+	struct fx_texture *texture = fx_get_texture(tex_options->texture);
 
 	struct wlr_box dst_box;
 	struct wlr_fbox src_fbox;
-	wlr_render_texture_options_get_src_box(options, &src_fbox);
-	wlr_render_texture_options_get_dst_box(options, &dst_box);
-	src_fbox.x /= options->texture->width;
-	src_fbox.y /= options->texture->height;
-	src_fbox.width /= options->texture->width;
-	src_fbox.height /= options->texture->height;
+	wlr_render_texture_options_get_src_box(tex_options, &src_fbox);
+	wlr_render_texture_options_get_dst_box(tex_options, &dst_box);
+	src_fbox.x /= tex_options->texture->width;
+	src_fbox.y /= tex_options->texture->height;
+	src_fbox.width /= tex_options->texture->width;
+	src_fbox.height /= tex_options->texture->height;
 
 	glDisable(GL_BLEND);
 	glDisable(GL_STENCIL_TEST);
@@ -732,7 +727,7 @@ static void render_blur_segments(struct fx_gles_render_pass *pass,
 	glActiveTexture(GL_TEXTURE0);
 	glBindTexture(texture->target, texture->tex);
 
-	switch (options->filter_mode) {
+	switch (tex_options->filter_mode) {
 	case WLR_SCALE_FILTER_BILINEAR:
 		glTexParameteri(texture->target, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
 		glTexParameteri(texture->target, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
@@ -742,55 +737,54 @@ static void render_blur_segments(struct fx_gles_render_pass *pass,
 	}
 
 	glUniform1i(shader->tex, 0);
-	glUniform1f(shader->radius, blur_data->radius);
+	glUniform1f(shader->radius, blur_radius);
 
 	if (shader == &renderer->shaders.blur1) {
 		glUniform2f(shader->halfpixel,
-				0.5f / (options->texture->width / 2.0f),
-				0.5f / (options->texture->height / 2.0f));
+				0.5f / (tex_options->texture->width / 2.0f),
+				0.5f / (tex_options->texture->height / 2.0f));
 	} else {
+		// TODO: assert shader is blur2
 		glUniform2f(shader->halfpixel,
-				0.5f / (options->texture->width * 2.0f),
-				0.5f / (options->texture->height * 2.0f));
+				0.5f / (tex_options->texture->width * 2.0f),
+				0.5f / (tex_options->texture->height * 2.0f));
 	}
 
 	set_proj_matrix(shader->proj, pass->projection_matrix, &dst_box);
-	set_tex_matrix(shader->tex_proj, options->transform, &src_fbox);
+	set_tex_matrix(shader->tex_proj, tex_options->transform, &src_fbox);
 
-	render(&dst_box, options->clip, shader->pos_attrib);
+	render(&dst_box, tex_options->clip, shader->pos_attrib);
 
 	glBindTexture(texture->target, 0);
 	pop_fx_debug(renderer);
 
-	wlr_texture_destroy(options->texture);
+	wlr_texture_destroy(tex_options->texture);
 
 	// Swap buffer. We don't want to draw to the same buffer
-	if (fx_options->current_buffer != pass->fx_effect_framebuffers->effects_buffer) {
-		fx_options->current_buffer = pass->fx_effect_framebuffers->effects_buffer;
+	if (current_buffer != pass->fx_effect_framebuffers->effects_buffer) {
+		current_buffer = pass->fx_effect_framebuffers->effects_buffer;
 	} else {
-		fx_options->current_buffer = pass->fx_effect_framebuffers->effects_buffer_swapped;
+		current_buffer = pass->fx_effect_framebuffers->effects_buffer_swapped;
 	}
 }
 
 static void render_blur_effects(struct fx_gles_render_pass *pass,
-		struct fx_render_blur_pass_options *fx_options) {
-	struct fx_render_texture_options *tex_options = &fx_options->tex_options;
-	struct wlr_render_texture_options *options = &tex_options->base;
+		struct wlr_render_texture_options *tex_options, float noise,
+		float brightness, float contrast, float saturation) {
 	struct fx_renderer *renderer = pass->buffer->renderer;
-	struct blur_data *blur_data = fx_options->blur_data;
-	struct fx_texture *texture = fx_get_texture(options->texture);
+	struct fx_texture *texture = fx_get_texture(tex_options->texture);
 
 	struct blur_effects_shader shader = renderer->shaders.blur_effects;
 
 	struct wlr_box dst_box;
 	struct wlr_fbox src_fbox;
-	wlr_render_texture_options_get_src_box(options, &src_fbox);
-	wlr_render_texture_options_get_dst_box(options, &dst_box);
+	wlr_render_texture_options_get_src_box(tex_options, &src_fbox);
+	wlr_render_texture_options_get_dst_box(tex_options, &dst_box);
 
-	src_fbox.x /= options->texture->width;
-	src_fbox.y /= options->texture->height;
-	src_fbox.width /= options->texture->width;
-	src_fbox.height /= options->texture->height;
+	src_fbox.x /= tex_options->texture->width;
+	src_fbox.y /= tex_options->texture->height;
+	src_fbox.width /= tex_options->texture->width;
+	src_fbox.height /= tex_options->texture->height;
 
 	glDisable(GL_BLEND);
 	glDisable(GL_STENCIL_TEST);
@@ -802,7 +796,7 @@ static void render_blur_effects(struct fx_gles_render_pass *pass,
 	glActiveTexture(GL_TEXTURE0);
 	glBindTexture(texture->target, texture->tex);
 
-	switch (options->filter_mode) {
+	switch (tex_options->filter_mode) {
 	case WLR_SCALE_FILTER_BILINEAR:
 		glTexParameteri(texture->target, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
 		glTexParameteri(texture->target, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
@@ -812,27 +806,26 @@ static void render_blur_effects(struct fx_gles_render_pass *pass,
 	}
 
 	glUniform1i(shader.tex, 0);
-	glUniform1f(shader.noise, blur_data->noise);
-	glUniform1f(shader.brightness, blur_data->brightness);
-	glUniform1f(shader.contrast, blur_data->contrast);
-	glUniform1f(shader.saturation, blur_data->saturation);
+	glUniform1f(shader.noise, noise);
+	glUniform1f(shader.brightness, brightness);
+	glUniform1f(shader.contrast, contrast);
+	glUniform1f(shader.saturation, saturation);
 
 	set_proj_matrix(shader.proj, pass->projection_matrix, &dst_box);
-	set_tex_matrix(shader.tex_proj, options->transform, &src_fbox);
+	set_tex_matrix(shader.tex_proj, tex_options->transform, &src_fbox);
 
-	render(&dst_box, options->clip, shader.pos_attrib);
+	render(&dst_box, tex_options->clip, shader.pos_attrib);
 
 	glBindTexture(texture->target, 0);
 	pop_fx_debug(renderer);
 
-	wlr_texture_destroy(options->texture);
+	wlr_texture_destroy(tex_options->texture);
 }
 
 // Blurs the main_buffer content and returns the blurred framebuffer
 static struct fx_framebuffer *get_main_buffer_blur(struct fx_gles_render_pass *pass,
 		struct fx_render_blur_pass_options *fx_options) {
 	struct fx_renderer *renderer = pass->buffer->renderer;
-	struct blur_data *blur_data = fx_options->blur_data;
 	struct wlr_box monitor_box = get_monitor_box(pass->output);
 
 	pixman_region32_t damage;
@@ -841,7 +834,8 @@ static struct fx_framebuffer *get_main_buffer_blur(struct fx_gles_render_pass *p
 	wlr_region_transform(&damage, &damage, fx_options->tex_options.base.transform,
 			monitor_box.width, monitor_box.height);
 
-	wlr_region_expand(&damage, &damage, blur_data_calc_size(fx_options->blur_data));
+	wlr_region_expand(&damage, &damage,
+			calc_blur_size(fx_options->num_passes, fx_options->radius));
 
 	// damage region will be scaled, make a temp
 	pixman_region32_t scaled_damage;
@@ -860,22 +854,25 @@ static struct fx_framebuffer *get_main_buffer_blur(struct fx_gles_render_pass *p
 	fx_options->tex_options.base.filter_mode = WLR_SCALE_FILTER_BILINEAR;
 
 	// Downscale
-	for (int i = 0; i < blur_data->num_passes; ++i) {
+	for (int i = 0; i < fx_options->num_passes; ++i) {
 		wlr_region_scale(&scaled_damage, &damage, 1.0f / (1 << (i + 1)));
-		render_blur_segments(pass, fx_options, &renderer->shaders.blur1);
+		render_blur_segments(pass, &fx_options->tex_options.base,
+				fx_options->current_buffer, fx_options->radius, &renderer->shaders.blur1);
 	}
 
 	// Upscale
-	for (int i = blur_data->num_passes - 1; i >= 0; --i) {
+	for (int i = fx_options->num_passes - 1; i >= 0; --i) {
 		// when upsampling we make the region twice as big
 		wlr_region_scale(&scaled_damage, &damage, 1.0f / (1 << i));
-		render_blur_segments(pass, fx_options, &renderer->shaders.blur2);
+		render_blur_segments(pass, &fx_options->tex_options.base,
+				fx_options->current_buffer, fx_options->radius, &renderer->shaders.blur2);
 	}
 
 	pixman_region32_fini(&scaled_damage);
 
 	// Render additional blur effects like saturation, noise, contrast, etc...
-	if (blur_data_should_parameters_blur_effects(blur_data)
+	if ((fx_options->brightness != 1.0f || fx_options->saturation != 1.0f
+			|| fx_options->contrast != 1.0f || fx_options->noise > 0.0f)
 			&& pixman_region32_not_empty(&damage)) {
 		if (fx_options->current_buffer == pass->fx_effect_framebuffers->effects_buffer) {
 			fx_framebuffer_bind(pass->fx_effect_framebuffers->effects_buffer_swapped);
@@ -885,7 +882,8 @@ static struct fx_framebuffer *get_main_buffer_blur(struct fx_gles_render_pass *p
 		fx_options->tex_options.base.clip = &damage;
 		fx_options->tex_options.base.texture = fx_texture_from_buffer(
 				&renderer->wlr_renderer, fx_options->current_buffer->buffer);
-		render_blur_effects(pass, fx_options);
+		render_blur_effects(pass, &fx_options->tex_options.base, fx_options->noise,
+				fx_options->brightness, fx_options->contrast, fx_options->saturation);
 		if (fx_options->current_buffer != pass->fx_effect_framebuffers->effects_buffer) {
 			fx_options->current_buffer = pass->fx_effect_framebuffers->effects_buffer;
 		} else {

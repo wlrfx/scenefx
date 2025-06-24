@@ -1,7 +1,7 @@
 project(
 	'scenefx',
 	'c',
-	version: '0.3.0',
+	version: '0.4.0',
 	license: 'MIT',
 	meson_version: '>=1.3',
 	default_options: [
@@ -44,7 +44,7 @@ add_project_arguments(cc.get_supported_arguments([
 	'-Woverflow',
 	'-Wmissing-prototypes',
 	'-Walloca',
-
+'-O',
 	'-Wno-missing-braces',
 	'-Wno-missing-field-initializers',
 	'-Wno-unused-parameter',

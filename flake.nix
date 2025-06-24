@@ -9,7 +9,7 @@
           { wlroots_0_19, ... }:
           pkgs.stdenv.mkDerivation {
             pname = "scenefx";
-            version = "0.1.0-git";
+            version = "0.3.0-git";
             src = ./.;
             outputs = [
               "out"

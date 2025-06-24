@@ -19,8 +19,6 @@ bool is_scene_blur_enabled(struct blur_data *blur_data);
 
 bool blur_data_should_parameters_blur_effects(struct blur_data *blur_data);
 
-bool blur_data_cmp(struct blur_data *a, struct blur_data *b);
-
 int blur_data_calc_size(struct blur_data *blur_data);
 
 #endif

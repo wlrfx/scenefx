@@ -28,9 +28,9 @@
 #include <wlr/util/addon.h>
 #include <wlr/util/box.h>
 
+#include "scenefx/types/fx/blur_data.h"
 #include "scenefx/types/fx/clipped_region.h"
 #include "scenefx/types/fx/corner_location.h"
-#include "types/blur_data.h"
 
 struct wlr_output;
 struct wlr_output_layout;
@@ -47,6 +47,8 @@ struct wlr_scene_output_layout;
 struct wlr_presentation;
 struct wlr_linux_dmabuf_v1;
 struct wlr_output_state;
+
+struct blur_data;
 
 typedef bool (*wlr_scene_buffer_point_accepts_input_func_t)(
 	struct wlr_scene_buffer *buffer, double *sx, double *sy);

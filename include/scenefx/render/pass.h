@@ -99,9 +99,15 @@ struct fx_render_blur_pass_options {
 	struct fx_render_texture_options tex_options;
 	pixman_region32_t *opaque_region;
 	struct fx_framebuffer *current_buffer;
-	struct blur_data *blur_data;
 	bool use_optimized_blur;
 	bool ignore_transparent;
+
+	int num_passes;
+	int radius;
+	float noise;
+	float brightness;
+	float contrast;
+	float saturation;
 };
 
 /**

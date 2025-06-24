@@ -44,7 +44,7 @@ add_project_arguments(cc.get_supported_arguments([
 	'-Woverflow',
 	'-Wmissing-prototypes',
 	'-Walloca',
-'-O',
+
 	'-Wno-missing-braces',
 	'-Wno-missing-field-initializers',
 	'-Wno-unused-parameter',

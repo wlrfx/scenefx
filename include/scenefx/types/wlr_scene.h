@@ -48,8 +48,6 @@ struct wlr_presentation;
 struct wlr_linux_dmabuf_v1;
 struct wlr_output_state;
 
-struct blur_data;
-
 typedef bool (*wlr_scene_buffer_point_accepts_input_func_t)(
 	struct wlr_scene_buffer *buffer, double *sx, double *sy);
 

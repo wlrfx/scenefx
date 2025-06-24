@@ -9,7 +9,7 @@
           { wlroots_0_19, ... }:
           pkgs.stdenv.mkDerivation {
             pname = "scenefx";
-            version = "0.4.0-git";
+            version = "0.4.1-git";
             src = ./.;
             outputs = [
               "out"
@@ -34,6 +34,9 @@
               wayland # wayland-server
               wayland-protocols
               wlroots_0_19
+              libgbm
+              xorg.libxcb
+              xorg.xcbutilwm
             ];
 
             meta = with pkgs.lib; {

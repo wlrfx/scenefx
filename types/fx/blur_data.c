@@ -2,7 +2,7 @@
 
 struct blur_data blur_data_get_default(void) {
 	return (struct blur_data) {
-		.radius = 5.0f,
+		.radius = 5,
 		.num_passes = 3,
 		.noise = 0.02,
 		.brightness = 0.9,
@@ -22,16 +22,7 @@ bool blur_data_should_parameters_blur_effects(struct blur_data *blur_data) {
 		|| blur_data->noise > 0.0f;
 }
 
-bool blur_data_cmp(struct blur_data *a, struct blur_data *b) {
-	return a->radius == b->radius &&
-		a->num_passes == b->num_passes &&
-		a->noise == b->noise &&
-		a->brightness == b->brightness &&
-		a->contrast == b->contrast &&
-		a->saturation == b->saturation;
-}
-
-int blur_data_calc_size(const struct blur_data *blur_data) {
+int blur_data_calc_size(struct blur_data *blur_data) {
 	return pow(2, blur_data->num_passes + 1) * blur_data->radius;
 }
 
@@ -46,7 +37,7 @@ static void adjust_post_effects(struct blur_data *blur_data, float strength) {
 	blur_data->saturation = lerp(1.0, blur_data->saturation, strength);
 }
 
-struct blur_data blur_data_apply_strength(const struct blur_data *ref_blur_data, float strength) {
+struct blur_data blur_data_apply_strength(struct blur_data *ref_blur_data, float strength) {
 	struct blur_data blur_data = *ref_blur_data;
 
 	if (strength >= 1.0f) {
@@ -69,3 +60,4 @@ struct blur_data blur_data_apply_strength(const struct blur_data *ref_blur_data,
 
 	return blur_data;
 }
+

@@ -1027,7 +1027,7 @@ bool fx_render_pass_add_optimized_blur(struct fx_gles_render_pass *pass,
 
 	// Save the current scene pass state
 	fx_renderer_read_to_buffer(pass, &clip,
-			pass->fx_effect_framebuffers->optimized_no_blur_buffer, pass->buffer, false);
+			pass->fx_effect_framebuffers->optimized_no_blur_buffer, pass->buffer);
 
 finish:
 	pixman_region32_fini(&clip);

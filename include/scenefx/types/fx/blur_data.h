@@ -6,7 +6,7 @@
 
 struct blur_data {
 	int num_passes;
-	float radius;
+	int radius;
 	float noise;
 	float brightness;
 	float contrast;
@@ -19,7 +19,8 @@ bool is_scene_blur_enabled(struct blur_data *blur_data);
 
 bool blur_data_should_parameters_blur_effects(struct blur_data *blur_data);
 
+int blur_data_calc_size(struct blur_data *blur_data);
 
-struct blur_data blur_data_apply_strength(const struct blur_data *blur_data, float strength);
+struct blur_data blur_data_apply_strength(struct blur_data *blur_data, float strength);
 
 #endif

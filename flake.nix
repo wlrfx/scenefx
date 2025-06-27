@@ -1,15 +1,27 @@
 {
   description = "Scenefx development environment";
-  inputs.nixpkgs.url = "github:nixos/nixpkgs/nixpkgs-unstable";
-  outputs =
-    { self, nixpkgs, ... }:
-    let
-      mkPackages = pkgs: {
-        scenefx = pkgs.callPackage (
-          { wlroots_0_19, ... }:
-          pkgs.stdenv.mkDerivation {
+
+  inputs = {
+    nixpkgs.url = "github:nixos/nixpkgs/nixpkgs-unstable";
+
+    systems.url = "github:nix-systems/default-linux";
+
+	flake-utils = {
+	  url = "github:numtide/flake-utils";
+	  inputs.systems.follows = "systems";
+	};
+  };
+
+  outputs = { self, nixpkgs, flake-utils, ... }:
+    flake-utils.lib.eachDefaultSystem (system:
+      let
+	    pkgs = import nixpkgs { inherit system; };
+
+      in {
+        packages = rec {
+          scenefx-git = pkgs.stdenv.mkDerivation {
             pname = "scenefx";
-            version = "0.4.1-git";
+            version = "git";
             src = ./.;
             outputs = [
               "out"
@@ -45,44 +57,18 @@
               license = licenses.mit;
               platforms = platforms.linux;
             };
-          }
-        ) { };
-      };
+          };
 
-      targetSystems = [
-        "aarch64-linux"
-        "x86_64-linux"
-      ];
-      pkgsFor = system: import nixpkgs { inherit system; };
-      forEachSystem = f: nixpkgs.lib.genAttrs targetSystems (system: f (pkgsFor system));
-    in
-    {
-      overlays = rec {
-        default = insert;
-        override = _: prev: mkPackages prev;
-        insert = _: prev: mkPackages (pkgsFor prev.system);
-      };
+          default = scenefx-git;
+		};
 
-      packages = forEachSystem (
-        pkgs: (mkPackages pkgs) // { default = self.packages.${pkgs.system}.scenefx; }
-      );
-
-      devShells = forEachSystem (pkgs: {
-        default = pkgs.mkShell {
+        devShells.default = pkgs.mkShell {
           name = "scenefx-shell";
-          inputsFrom = [
-            self.packages.${pkgs.system}.scenefx
-            pkgs.wlroots_0_19
-          ];
-          shellHook = ''
-            (
-              # Copy the nix version of wlroots into the project
-              mkdir -p "$PWD/subprojects" && cd "$PWD/subprojects"
-              cp -R --no-preserve=mode,ownership ${pkgs.wlroots_0_19.src} wlroots
-            )'';
-        };
-      });
+	      inputsFrom = [ self.packages.${system}.scenefx-git ];
+	    };
 
-      formatter = forEachSystem (pkgs: pkgs.nixfmt-rfc-style);
-    };
+        formatter = pkgs.nixfmt-rfc-style;
+      }
+    );
 }
+

@@ -2634,34 +2634,26 @@ static void apply_blur_region(struct wlr_scene_node *node,
 	int x, y;
 	wlr_scene_node_coords(node, &x, &y);
 
-	pixman_region32_t opaque_region;
-	pixman_region32_init(&opaque_region);
-	scene_node_opaque_region(node, x, y, &opaque_region);
-	// Add the buffer to the blur_region if it's not fully opaque
-	if (pixman_region32_empty(&opaque_region)) {
-		struct wlr_box node_box = {
-			.x = x - scene_output->x,
-			.y = y - scene_output->y,
-		};
-		scene_node_get_size(node, &node_box.width, &node_box.height);
+	struct wlr_box node_box = {
+		.x = x - scene_output->x,
+		.y = y - scene_output->y,
+	};
+	scene_node_get_size(node, &node_box.width, &node_box.height);
 
-		struct wlr_output *output = scene_output->output;
+	struct wlr_output *output = scene_output->output;
 
-		int output_width, output_height;
-		wlr_output_transformed_resolution(output, &output_width, &output_height);
+	int output_width, output_height;
+	wlr_output_transformed_resolution(output, &output_width, &output_height);
 
-		// Transform the box back to regular un-transformed units
-		scale_box(&node_box, output->scale);
-		wlr_box_transform(&node_box, &node_box,
-				wlr_output_transform_invert(output->transform),
-				output_width, output_height);
+	// Transform the box back to regular un-transformed units
+	scale_box(&node_box, output->scale);
+	wlr_box_transform(&node_box, &node_box,
+			wlr_output_transform_invert(output->transform),
+			output_width, output_height);
 
-		pixman_region32_union_rect(blur_region, blur_region,
-				node_box.x,
-				node_box.y,
-				node_box.width, node_box.height);
-	}
-	pixman_region32_fini(&opaque_region);
+	pixman_region32_union_rect(blur_region, blur_region,
+			node_box.x, node_box.y,
+			node_box.width, node_box.height);
 }
 
 static bool scene_output_has_blur(int list_len,

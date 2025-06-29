@@ -21,6 +21,7 @@
 #include "scenefx/render/fx_renderer/fx_effect_framebuffers.h"
 #include "scenefx/render/fx_renderer/fx_renderer.h"
 #include "scenefx/render/pass.h"
+#include "scenefx/types/fx/blur_data.h"
 #include "scenefx/types/fx/clipped_region.h"
 #include "scenefx/types/fx/corner_location.h"
 #include "types/wlr_output.h"
@@ -38,6 +39,13 @@
 
 #define DMABUF_FEEDBACK_DEBOUNCE_FRAMES  30
 #define HIGHLIGHT_DAMAGE_FADEOUT_TIME   250
+
+#define SCENE_BUFFER_SHOULD_BLUR(scene_buffer, scene) \
+	scene_buffer->backdrop_blur && is_scene_blur_enabled(&scene->blur_data) && \
+		(!scene_buffer->buffer_is_opaque || scene_buffer->opacity < 1.0f)
+#define SCENE_RECT_SHOULD_BLUR(scene_rect, scene) \
+	scene_rect->backdrop_blur && is_scene_blur_enabled(&scene->blur_data) && \
+		scene_rect->color[3] != 1
 
 struct wlr_scene_tree *wlr_scene_tree_from_node(struct wlr_scene_node *node) {
 	assert(node->type == WLR_SCENE_NODE_TREE);
@@ -355,6 +363,7 @@ struct scene_update_data {
 #endif
 
 	bool optimized_blur_dirty;
+	struct wlr_scene *scene;
 };
 
 static uint32_t region_area(pixman_region32_t *region) {
@@ -664,6 +673,21 @@ static bool scene_node_update_iterator(struct wlr_scene_node *node,
 	pixman_region32_intersect_rect(&node->visible, &node->visible,
 		lx, ly, box.width, box.height);
 
+	// Expand the damage to compensate for blur artifacts
+	if (node->type == WLR_SCENE_NODE_BUFFER) {
+		struct wlr_scene_buffer *scene_buffer = wlr_scene_buffer_from_node(node);
+		if (SCENE_BUFFER_SHOULD_BLUR(scene_buffer, data->scene)) {
+			wlr_region_expand(&node->visible, &node->visible,
+					blur_data_calc_size(&data->scene->blur_data));
+		}
+	} else if (node->type == WLR_SCENE_NODE_RECT) {
+		struct wlr_scene_rect *scene_rect = wlr_scene_rect_from_node(node);
+		if (SCENE_RECT_SHOULD_BLUR(scene_rect, data->scene)) {
+			wlr_region_expand(&node->visible, &node->visible,
+					blur_data_calc_size(&data->scene->blur_data));
+		}
+	}
+
 	if (data->calculate_visibility && !data->optimized_blur_dirty) {
 		pixman_region32_t opaque;
 		pixman_region32_init(&opaque);
@@ -737,6 +761,7 @@ static void scene_update_region(struct wlr_scene *scene,
 		.outputs = &scene->outputs,
 		.calculate_visibility = scene->calculate_visibility,
 		.optimized_blur_dirty = false,
+		.scene = scene,
 	};
 
 	// update node visibility and output enter/leave events
@@ -1329,6 +1354,12 @@ void wlr_scene_buffer_set_buffer_with_options(struct wlr_scene_buffer *scene_buf
 		pixman_region32_intersect(&output_damage, &output_damage, &cull_region);
 		pixman_region32_fini(&cull_region);
 
+		// Expand the damage when committed to, fixes blur artifacts
+		if (SCENE_BUFFER_SHOULD_BLUR(scene_buffer, scene)) {
+			wlr_region_expand(&output_damage, &output_damage,
+					blur_data_calc_size(&scene->blur_data));
+		}
+
 		pixman_region32_translate(&output_damage,
 			(int)round((lx - scene_output->x) * output_scale),
 			(int)round((ly - scene_output->y) * output_scale));
@@ -1809,8 +1840,7 @@ static void scene_entry_render(struct render_list_entry *entry, const struct ren
 
 		// blur
 		bool has_alpha = !pixman_region32_empty(&opaque);
-		if (has_alpha && scene_rect->backdrop_blur &&
-				is_scene_blur_enabled(&scene->blur_data)) {
+		if (has_alpha && SCENE_RECT_SHOULD_BLUR(scene_rect, scene)) {
 			pixman_region32_t opaque_region;
 			pixman_region32_init(&opaque_region);
 			scene_node_opaque_region(node, x, y, &opaque_region);
@@ -1957,6 +1987,8 @@ static void scene_entry_render(struct render_list_entry *entry, const struct ren
 		enum corner_location buffer_corners = scene_buffer->corners;
 
 		if (scene_buffer->is_single_pixel_buffer) {
+			// TODO: Render blur/rounded corners/etc here:
+
 			// Render the buffer as a rect, this is likely to be more efficient
 			wlr_render_pass_add_rect(&data->render_pass->base, &(struct wlr_render_rect_options){
 				.box = dst_box,
@@ -1985,7 +2017,7 @@ static void scene_entry_render(struct render_list_entry *entry, const struct ren
 		corner_location_transform(transform, &buffer_corners);
 
 		// Blur
-		if (scene_buffer->backdrop_blur && is_scene_blur_enabled(&scene->blur_data)) {
+		if (SCENE_BUFFER_SHOULD_BLUR(scene_buffer, scene)) {
 			pixman_region32_t opaque_region;
 			pixman_region32_init(&opaque_region);
 
@@ -2645,13 +2677,13 @@ static bool scene_output_has_blur(int list_len,
 		switch (node->type) {
 		case WLR_SCENE_NODE_BUFFER:;
 			struct wlr_scene_buffer *scene_buffer = wlr_scene_buffer_from_node(node);
-			if (scene_buffer->backdrop_blur) {
+			if (SCENE_BUFFER_SHOULD_BLUR(scene_buffer, scene_output->scene)) {
 				apply_blur_region(node, scene_output, blur_region);
 			}
 			break;
 		case WLR_SCENE_NODE_RECT:;
 			struct wlr_scene_rect *scene_rect = wlr_scene_rect_from_node(node);
-			if (scene_rect->backdrop_blur) {
+			if (SCENE_RECT_SHOULD_BLUR(scene_rect, scene_output->scene)) {
 				apply_blur_region(node, scene_output, blur_region);
 			}
 			break;

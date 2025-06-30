@@ -14,6 +14,7 @@
 #include "render/fx_renderer/fx_renderer.h"
 #include "render/fx_renderer/shaders.h"
 #include "render/pass.h"
+#include "render/tracy.h"
 #include "scenefx/render/fx_renderer/fx_renderer.h"
 #include "scenefx/render/fx_renderer/fx_effect_framebuffers.h"
 #include "scenefx/types/fx/corner_location.h"
@@ -70,6 +71,7 @@ static bool render_pass_submit(struct wlr_render_pass *wlr_pass) {
 	struct fx_render_timer *timer = pass->timer;
 	bool ok = false;
 
+	TRACY_BOTH_ZONES_START(pass->buffer->renderer);
 	push_fx_debug(renderer);
 
 	if (timer) {
@@ -111,6 +113,10 @@ out:
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
 	pop_fx_debug(renderer);
+	TRACY_BOTH_ZONES_END;
+
+	TRACY_GPU_ZONE_COLLECT(renderer);
+
 	wlr_egl_restore_context(&pass->prev_ctx);
 
 	wlr_drm_syncobj_timeline_unref(pass->signal_timeline);
@@ -121,6 +127,7 @@ out:
 	}
 	free(pass);
 
+	TRACY_MARK_FRAME_END("Frame");
 	return ok;
 }
 
@@ -317,24 +324,28 @@ void fx_render_pass_add_texture(struct fx_gles_render_pass *pass,
 	src_fbox.width /= options->texture->width;
 	src_fbox.height /= options->texture->height;
 
+	TRACY_BOTH_ZONES_START(renderer);
 	push_fx_debug(renderer);
 
 	if (options->wait_timeline != NULL) {
 		int sync_file_fd =
 			wlr_drm_syncobj_timeline_export_sync_file(options->wait_timeline, options->wait_point);
 		if (sync_file_fd < 0) {
+			TRACY_BOTH_ZONES_END;
 			return;
 		}
 
 		EGLSyncKHR sync = wlr_egl_create_sync(renderer->egl, sync_file_fd);
 		close(sync_file_fd);
 		if (sync == EGL_NO_SYNC_KHR) {
+			TRACY_BOTH_ZONES_END;
 			return;
 		}
 
 		bool ok = wlr_egl_wait_sync(renderer->egl, sync);
 		wlr_egl_destroy_sync(renderer->egl, sync);
 		if (!ok) {
+			TRACY_BOTH_ZONES_END;
 			return;
 		}
 	}
@@ -383,7 +394,9 @@ void fx_render_pass_add_texture(struct fx_gles_render_pass *pass,
 	render(&dst_box, options->clip, shader->pos_attrib);
 
 	glBindTexture(texture->target, 0);
+
 	pop_fx_debug(renderer);
+	TRACY_BOTH_ZONES_END;
 }
 
 void fx_render_pass_add_rect(struct fx_gles_render_pass *pass,
@@ -419,12 +432,13 @@ void fx_render_pass_add_rect(struct fx_gles_render_pass *pass,
 		pixman_region32_subtract(&clip_region, &clip_region, &user_clip_region);
 		pixman_region32_fini(&user_clip_region);
 
-		push_fx_debug(renderer);
 		setup_blending(options->blend_mode);
 	} else {
-		push_fx_debug(renderer);
 		setup_blending(color->a == 1.0 ? WLR_RENDER_BLEND_MODE_NONE : options->blend_mode);
 	}
+
+	TRACY_BOTH_ZONES_START(renderer);
+	push_fx_debug(renderer);
 
 	struct quad_shader shader = renderer->shaders.quad;
 	glUseProgram(shader.program);
@@ -445,6 +459,7 @@ void fx_render_pass_add_rect(struct fx_gles_render_pass *pass,
 	pixman_region32_fini(&clip_region);
 
 	pop_fx_debug(renderer);
+	TRACY_BOTH_ZONES_END;
 }
 
 void fx_render_pass_add_rect_grad(struct fx_gles_render_pass *pass,
@@ -468,7 +483,9 @@ void fx_render_pass_add_rect_grad(struct fx_gles_render_pass *pass,
 	struct wlr_box box;
 	wlr_render_rect_options_get_box(options, pass->buffer->buffer, &box);
 
+	TRACY_BOTH_ZONES_START(renderer);
 	push_fx_debug(renderer);
+
 	setup_blending(options->blend_mode);
 
 	glUseProgram(renderer->shaders.quad_grad.program);
@@ -486,6 +503,7 @@ void fx_render_pass_add_rect_grad(struct fx_gles_render_pass *pass,
 	render(&box, options->clip, renderer->shaders.quad_grad.pos_attrib);
 
 	pop_fx_debug(renderer);
+	TRACY_BOTH_ZONES_END;
 }
 
 void fx_render_pass_add_rounded_rect(struct fx_gles_render_pass *pass,
@@ -524,7 +542,9 @@ void fx_render_pass_add_rounded_rect(struct fx_gles_render_pass *pass,
 		pixman_region32_fini(&user_clip_region);
 	}
 
+	TRACY_BOTH_ZONES_START(renderer);
 	push_fx_debug(renderer);
+
 	setup_blending(WLR_RENDER_BLEND_MODE_PREMULTIPLIED);
 
 	struct quad_round_shader shader = renderer->shaders.quad_round;
@@ -561,6 +581,7 @@ void fx_render_pass_add_rounded_rect(struct fx_gles_render_pass *pass,
 	pixman_region32_fini(&clip_region);
 
 	pop_fx_debug(renderer);
+	TRACY_BOTH_ZONES_END;
 }
 
 void fx_render_pass_add_rounded_rect_grad(struct fx_gles_render_pass *pass,
@@ -584,7 +605,9 @@ void fx_render_pass_add_rounded_rect_grad(struct fx_gles_render_pass *pass,
 	struct wlr_box box;
 	wlr_render_rect_options_get_box(options, pass->buffer->buffer, &box);
 
+	TRACY_BOTH_ZONES_START(renderer);
 	push_fx_debug(renderer);
+
 	setup_blending(WLR_RENDER_BLEND_MODE_PREMULTIPLIED);
 
 	struct quad_grad_round_shader shader = renderer->shaders.quad_grad_round;
@@ -617,6 +640,7 @@ void fx_render_pass_add_rounded_rect_grad(struct fx_gles_render_pass *pass,
 	render(&box, options->clip, shader.pos_attrib);
 
 	pop_fx_debug(renderer);
+	TRACY_BOTH_ZONES_END;
 }
 
 void fx_render_pass_add_box_shadow(struct fx_gles_render_pass *pass,
@@ -650,7 +674,9 @@ void fx_render_pass_add_box_shadow(struct fx_gles_render_pass *pass,
 		pixman_region32_fini(&user_clip_region);
 	}
 
+	TRACY_BOTH_ZONES_START(renderer);
 	push_fx_debug(renderer);
+
 	// blending will practically always be needed (unless we have a madman
 	// who uses opaque shadows with zero sigma), so just enable it
 	setup_blending(WLR_RENDER_BLEND_MODE_PREMULTIPLIED);
@@ -688,6 +714,7 @@ void fx_render_pass_add_box_shadow(struct fx_gles_render_pass *pass,
 	glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
 
 	pop_fx_debug(renderer);
+	TRACY_BOTH_ZONES_END;
 }
 
 // Renders the blur for each damaged rect and swaps the buffer
@@ -697,6 +724,9 @@ static void render_blur_segments(struct fx_gles_render_pass *pass,
 	struct wlr_render_texture_options *options = &tex_options->base;
 	struct fx_renderer *renderer = pass->buffer->renderer;
 	struct blur_data *blur_data = fx_options->blur_data;
+
+	TRACY_BOTH_ZONES_START(renderer);
+	push_fx_debug(renderer);
 
 	// Swap fbo
 	if (fx_options->current_buffer == pass->fx_effect_framebuffers->effects_buffer) {
@@ -761,6 +791,7 @@ static void render_blur_segments(struct fx_gles_render_pass *pass,
 
 	glBindTexture(texture->target, 0);
 	pop_fx_debug(renderer);
+	TRACY_BOTH_ZONES_END;
 
 	wlr_texture_destroy(options->texture);
 
@@ -795,6 +826,7 @@ static void render_blur_effects(struct fx_gles_render_pass *pass,
 	glDisable(GL_BLEND);
 	glDisable(GL_STENCIL_TEST);
 
+	TRACY_BOTH_ZONES_START(renderer);
 	push_fx_debug(renderer);
 
 	glUseProgram(shader.program);
@@ -823,7 +855,9 @@ static void render_blur_effects(struct fx_gles_render_pass *pass,
 	render(&dst_box, options->clip, shader.pos_attrib);
 
 	glBindTexture(texture->target, 0);
+
 	pop_fx_debug(renderer);
+	TRACY_BOTH_ZONES_END;
 
 	wlr_texture_destroy(options->texture);
 }
@@ -858,6 +892,9 @@ static struct fx_framebuffer *get_main_buffer_blur(struct fx_gles_render_pass *p
 	fx_options->tex_options.base.clip = &scaled_damage;
 	// Artifacts with NEAREST filter
 	fx_options->tex_options.base.filter_mode = WLR_SCALE_FILTER_BILINEAR;
+
+	TRACY_BOTH_ZONES_START(renderer);
+	push_fx_debug(renderer);
 
 	// Downscale
 	for (int i = 0; i < blur_data->num_passes; ++i) {
@@ -898,6 +935,9 @@ static struct fx_framebuffer *get_main_buffer_blur(struct fx_gles_render_pass *p
 	// Bind back to the default buffer
 	fx_framebuffer_bind(pass->buffer);
 
+	pop_fx_debug(renderer);
+	TRACY_BOTH_ZONES_END;
+
 	return fx_options->current_buffer;
 }
 
@@ -911,6 +951,9 @@ void fx_render_pass_add_blur(struct fx_gles_render_pass *pass,
 	struct fx_renderer *renderer = pass->buffer->renderer;
 	struct fx_render_texture_options *tex_options = &fx_options->tex_options;
 	const struct wlr_render_texture_options *options = &tex_options->base;
+
+	TRACY_BOTH_ZONES_START(renderer);
+	push_fx_debug(renderer);
 
 	pixman_region32_t translucent_region;
 	pixman_region32_init(&translucent_region);
@@ -976,6 +1019,9 @@ void fx_render_pass_add_blur(struct fx_gles_render_pass *pass,
 
 damage_finish:
 	pixman_region32_fini(&translucent_region);
+
+	pop_fx_debug(renderer);
+	TRACY_BOTH_ZONES_END;
 }
 
 bool fx_render_pass_add_optimized_blur(struct fx_gles_render_pass *pass,
@@ -987,6 +1033,9 @@ bool fx_render_pass_add_optimized_blur(struct fx_gles_render_pass *pass,
 	}
 	struct fx_renderer *renderer = pass->buffer->renderer;
 	struct wlr_box dst_box = fx_options->tex_options.base.dst_box;
+
+	TRACY_BOTH_ZONES_START(renderer);
+	push_fx_debug(renderer);
 
 	pixman_region32_t clip;
 	pixman_region32_init_rect(&clip,
@@ -1012,6 +1061,9 @@ bool fx_render_pass_add_optimized_blur(struct fx_gles_render_pass *pass,
 
 finish:
 	pixman_region32_fini(&clip);
+
+	pop_fx_debug(renderer);
+	TRACY_BOTH_ZONES_END;
 	return !failed;
 }
 
@@ -1022,6 +1074,8 @@ void fx_renderer_read_to_buffer(struct fx_gles_render_pass *pass,
 	if (!_region || !pixman_region32_not_empty(_region)) {
 		return;
 	}
+	TRACY_BOTH_ZONES_START(pass->buffer->renderer);
+	TRACY_ZONE_VALUE(pass->buffer->renderer->client_version);
 
 	pixman_region32_t region;
 	pixman_region32_init(&region);
@@ -1030,8 +1084,7 @@ void fx_renderer_read_to_buffer(struct fx_gles_render_pass *pass,
 	struct wlr_texture *src_tex =
 		fx_texture_from_buffer(&pass->buffer->renderer->wlr_renderer, src_buffer->buffer);
 	if (src_tex == NULL) {
-		pixman_region32_fini(&region);
-		return;
+		goto done;
 	}
 
 	// Draw onto the dst_buffer
@@ -1057,6 +1110,9 @@ void fx_renderer_read_to_buffer(struct fx_gles_render_pass *pass,
 	// Bind back to the main WLR buffer
 	fx_framebuffer_bind(pass->buffer);
 
+done:;
+	TRACY_BOTH_ZONES_END;
+
 	pixman_region32_fini(&region);
 }
 
@@ -1080,22 +1136,27 @@ static struct fx_gles_render_pass *begin_buffer_pass(struct fx_framebuffer *buff
 	struct fx_renderer *renderer = buffer->renderer;
 	struct wlr_buffer *wlr_buffer = buffer->buffer;
 
+	TRACY_BOTH_ZONES_START(renderer);
+
 	if (renderer->procs.glGetGraphicsResetStatusKHR) {
 		GLenum status = renderer->procs.glGetGraphicsResetStatusKHR();
 		if (status != GL_NO_ERROR) {
 			wlr_log(WLR_ERROR, "GPU reset (%s)", reset_status_str(status));
 			wl_signal_emit_mutable(&renderer->wlr_renderer.events.lost, NULL);
+			TRACY_BOTH_ZONES_END;
 			return NULL;
 		}
 	}
 
 	GLint fbo = fx_framebuffer_get_fbo(buffer);
 	if (!fbo) {
+		TRACY_BOTH_ZONES_END;
 		return NULL;
 	}
 
 	struct fx_gles_render_pass *pass = calloc(1, sizeof(*pass));
 	if (pass == NULL) {
+		TRACY_BOTH_ZONES_END;
 		return NULL;
 	}
 
@@ -1118,14 +1179,17 @@ static struct fx_gles_render_pass *begin_buffer_pass(struct fx_framebuffer *buff
 	glViewport(0, 0, wlr_buffer->width, wlr_buffer->height);
 	glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
 	glDisable(GL_SCISSOR_TEST);
-	pop_fx_debug(renderer);
 
+	pop_fx_debug(renderer);
+	TRACY_BOTH_ZONES_END;
 	return pass;
 }
 
 struct fx_gles_render_pass *fx_renderer_begin_buffer_pass(
 		struct wlr_renderer *wlr_renderer, struct wlr_buffer *wlr_buffer,
 		struct wlr_output *output, const struct fx_buffer_pass_options *fx_options) {
+	TRACY_MARK_FRAME_START("Frame");
+
 	const struct wlr_buffer_pass_options *options = fx_options->base;
 	struct fx_renderer *renderer = fx_get_renderer(wlr_renderer);
 

@@ -194,6 +194,10 @@ struct fx_renderer {
 	// Set to true when 'wlr_renderer_begin_buffer_pass' is called instead of
 	// our custom 'fx_renderer_begin_buffer_pass' function
 	bool basic_renderer;
+
+	GLint client_version;
+
+	struct tracy_data *tracy_data;
 };
 
 #endif

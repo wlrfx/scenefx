@@ -112,6 +112,7 @@ pixman = dependency('pixman-1',
 math = cc.find_library('m')
 rt = cc.find_library('rt')
 
+scenefx_override_options = []
 scenefx_files = []
 scenefx_deps = [
 	wlroots,
@@ -122,6 +123,28 @@ scenefx_deps = [
 	math,
 	rt,
 ]
+
+# Tracy
+if get_option('tracy_enable')
+	if get_option('buildtype') != 'debugoptimized'
+		warning('Profiling builds should set --buildtype=debugoptimized')
+	endif
+
+	scenefx_override_options += [
+		'c_std=' + (meson.version().version_compare('>=1.4.0') ? 'c23,c11' : 'c11'),
+		'warning_level=2',
+		'werror=false',
+		'wrap_mode=default',
+	]
+	scenefx_deps += dependency('tracy', static: true, required: true)
+	add_project_arguments(
+		[
+			'-DTRACY_ENABLE',
+			'-DTRACY_ON_DEMAND',
+		],
+		language: ['c', 'cpp'],
+	)
+endif
 
 subdir('protocol')
 subdir('render')
@@ -138,6 +161,7 @@ lib_scenefx = library(
 	dependencies: scenefx_deps,
 	include_directories:  [ scenefx_inc ],
 	install: true,
+	override_options: scenefx_override_options,
 )
 
 
@@ -162,3 +186,7 @@ pkgconfig.generate(
 	description: 'Wlroots effects library',
 	subdirs: versioned_name,
 )
+
+summary({
+	'tracy': get_option('tracy_enable'),
+}, bool_yn: true)

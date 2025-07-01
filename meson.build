@@ -112,7 +112,6 @@ pixman = dependency('pixman-1',
 math = cc.find_library('m')
 rt = cc.find_library('rt')
 
-scenefx_override_options = []
 scenefx_files = []
 scenefx_deps = [
 	wlroots,
@@ -130,13 +129,17 @@ if get_option('tracy_enable')
 		warning('Profiling builds should set --buildtype=debugoptimized')
 	endif
 
-	scenefx_override_options += [
-		'c_std=' + (meson.version().version_compare('>=1.4.0') ? 'c23,c11' : 'c11'),
-		'warning_level=2',
+	tracy_options = [
+		'default_library=static',
 		'werror=false',
-		'wrap_mode=default',
+		'warning_level=0',
 	]
-	scenefx_deps += dependency('tracy', static: true, required: true)
+	tracy_proj = subproject(
+		'tracy',
+		required: true,
+		default_options: tracy_options
+	)
+	scenefx_deps += tracy_proj.get_variable('tracy_dep')
 	add_project_arguments(
 		[
 			'-DTRACY_ENABLE',
@@ -161,7 +164,6 @@ lib_scenefx = library(
 	dependencies: scenefx_deps,
 	include_directories:  [ scenefx_inc ],
 	install: true,
-	override_options: scenefx_override_options,
 )
 
 

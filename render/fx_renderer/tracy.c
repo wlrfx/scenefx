@@ -23,7 +23,6 @@
 
 static atomic_int id_counter = 0;
 
-// TODO:
 struct tracy_data {
 	struct fx_renderer *renderer;
 
@@ -41,7 +40,7 @@ static unsigned int get_next_query_index(struct tracy_data *tracy_data) {
 	return id;
 }
 
-void tracy_gpu_zone_begin(struct tracy_data *tracy_data, struct tracy_gpu_ctx *out_ctx,
+void tracy_gpu_zone_begin(struct tracy_data *tracy_data, struct tracy_gpu_zone_context *out_ctx,
 		const int line, const char *source, const char *func, const char *name) {
 	if (out_ctx == NULL || tracy_data == NULL) {
 		return;
@@ -59,8 +58,8 @@ void tracy_gpu_zone_begin(struct tracy_data *tracy_data, struct tracy_gpu_ctx *o
 	}
 
 	// Create the query object
-	unsigned int query = get_next_query_index(tracy_data);
-	tracy_data->renderer->procs.glQueryCounterEXT(tracy_data->queries[query], GL_TIMESTAMP_EXT);
+	unsigned int query = tracy_data->queries[get_next_query_index(tracy_data)];
+	tracy_data->renderer->procs.glQueryCounterEXT(query, GL_TIMESTAMP_EXT);
 
 	// Label the zone
 	uint64_t srcloc = ___tracy_alloc_srcloc_name(line,
@@ -72,26 +71,27 @@ void tracy_gpu_zone_begin(struct tracy_data *tracy_data, struct tracy_gpu_ctx *o
 	// Begin the Tracy GPU zone
 	const struct ___tracy_gpu_zone_begin_data data = {
 		.context = tracy_data->context_id,
-		.queryId = (uint16_t) tracy_data->queries[query],
+		.queryId = (uint16_t) query,
 		.srcloc = srcloc,
 	};
 	___tracy_emit_gpu_zone_begin_alloc(data);
 }
 
-void tracy_gpu_zone_end(struct tracy_gpu_ctx *ctx) {
+void tracy_gpu_zone_end(struct tracy_gpu_zone_context *ctx) {
 	if (ctx == NULL || ctx->tracy_data == NULL || !ctx->is_active) {
 		return;
 	}
+	struct tracy_data *tracy_data = ctx->tracy_data;
 
 	// Create the query object
-	unsigned int query = get_next_query_index(ctx->tracy_data);
-	ctx->tracy_data->renderer->procs.glQueryCounterEXT(
-			ctx->tracy_data->queries[query], GL_TIMESTAMP_EXT);
+	unsigned int query = tracy_data->queries[get_next_query_index(tracy_data)];
+	tracy_data->renderer->procs.glQueryCounterEXT(
+			query, GL_TIMESTAMP_EXT);
 
 	// End the Tracy GPU zone
 	const struct ___tracy_gpu_zone_end_data data = {
-		.context = ctx->tracy_data->context_id,
-		.queryId = (uint16_t) ctx->tracy_data->queries[query],
+		.context = tracy_data->context_id,
+		.queryId = (uint16_t) query,
 	};
 	___tracy_emit_gpu_zone_end(data);
 }
@@ -149,7 +149,6 @@ void tracy_gpu_context_destroy(struct tracy_data *tracy_data) {
 		return;
 	}
 
-	// TODO: Anything else?
 	tracy_data->renderer->procs.glDeleteQueriesEXT(QUERY_COUNT, tracy_data->queries);
 	free(tracy_data);
 }
@@ -189,8 +188,11 @@ struct tracy_data *tracy_gpu_context_new(struct fx_renderer *renderer) {
 	___tracy_emit_gpu_new_context(data);
 
 	// Set the custom name
-	char ctx_name[128];
-	snprintf(ctx_name, sizeof(ctx_name), "FX Renderer (GLESV%i): %s", renderer->client_version, glGetString(GL_RENDERER));
+	int len = snprintf(NULL, 0, "FX Renderer (GLESV%i): %s",
+		renderer->client_version, glGetString(GL_RENDERER)) + 1; \
+	char ctx_name[len]; \
+	snprintf(ctx_name, len, "FX Renderer (GLESV%i): %s",
+		renderer->client_version, glGetString(GL_RENDERER)); \
 	const struct ___tracy_gpu_context_name_data name_data = {
 		.context = tracy_data->context_id,
 		.name = ctx_name,

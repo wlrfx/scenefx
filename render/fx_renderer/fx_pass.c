@@ -112,6 +112,7 @@ static bool render_pass_submit(struct wlr_render_pass *wlr_pass) {
 out:
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
+	TRACY_MARK_FRAME_END("Frame");
 	pop_fx_debug(renderer);
 	TRACY_BOTH_ZONES_END;
 
@@ -127,7 +128,6 @@ out:
 	}
 	free(pass);
 
-	TRACY_MARK_FRAME_END("Frame");
 	return ok;
 }
 

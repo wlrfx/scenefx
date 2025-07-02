@@ -325,6 +325,16 @@ void fx_render_pass_add_texture(struct fx_gles_render_pass *pass,
 	src_fbox.height /= options->texture->height;
 
 	TRACY_BOTH_ZONES_START(renderer);
+	TRACY_ZONE_TEXT_f("dst_box (WxH, X, Y): %ix%i, %i, %i",
+			dst_box.width, dst_box.height, dst_box.x, dst_box.y);
+	TRACY_ZONE_TEXT_f("clip_box (WxH, X, Y): %ix%i, %i, %i",
+			clip_box->width, clip_box->height, clip_box->x, clip_box->y);
+	TRACY_ZONE_TEXT_f("src_box (WxH, X, Y): %lfx%lf, %lf, %lf",
+			src_fbox.width, src_fbox.height, src_fbox.x, src_fbox.y);
+	TRACY_ZONE_TEXT_f("Shader Type: %s",
+			shader == &renderer->shaders.tex_rgba ? "RGBA"
+			: shader == &renderer->shaders.tex_rgbx ? "RGBX"
+			: "EXT");
 	push_fx_debug(renderer);
 
 	if (options->wait_timeline != NULL) {
@@ -354,6 +364,7 @@ void fx_render_pass_add_texture(struct fx_gles_render_pass *pass,
 		|| alpha < 1.0
 		|| fx_options->corner_radius > 0
 		|| fx_options->discard_transparent;
+	TRACY_ZONE_TEXT_f("Has Alpha: %i", has_alpha);
 	setup_blending(!has_alpha ? WLR_RENDER_BLEND_MODE_NONE : options->blend_mode);
 
 	glUseProgram(shader->program);
@@ -438,6 +449,17 @@ void fx_render_pass_add_rect(struct fx_gles_render_pass *pass,
 	}
 
 	TRACY_BOTH_ZONES_START(renderer);
+	TRACY_ZONE_TEXT_f("Box (WxH, X, Y): %ix%i, %i, %i", box.width, box.height, box.x, box.y);
+	TRACY_ZONE_TEXT_f("Clip Box (WxH, X, Y): %ix%i, %i, %i",
+			clipped_region_box.width, clipped_region_box.height,
+			clipped_region_box.x, clipped_region_box.y);
+	TRACY_ZONE_TEXT_f("Clip Box Corners (TL, TR, BL, BR): %i, %i, %i, %i",
+			(CORNER_LOCATION_TOP_LEFT & clipped_region_corners) == CORNER_LOCATION_TOP_LEFT,
+			(CORNER_LOCATION_TOP_RIGHT & clipped_region_corners) == CORNER_LOCATION_TOP_RIGHT,
+			(CORNER_LOCATION_BOTTOM_LEFT & clipped_region_corners) == CORNER_LOCATION_BOTTOM_LEFT,
+			(CORNER_LOCATION_BOTTOM_RIGHT & clipped_region_corners) == CORNER_LOCATION_BOTTOM_RIGHT);
+	TRACY_ZONE_TEXT_f("Clip Box Corner Radius: %i", fx_options->clipped_region.corner_radius);
+	TRACY_ZONE_TEXT_f("Color RGBA: %f, %f, %f, %f", color->r, color->g, color->b, color->a);
 	push_fx_debug(renderer);
 
 	struct quad_shader shader = renderer->shaders.quad;
@@ -484,6 +506,21 @@ void fx_render_pass_add_rect_grad(struct fx_gles_render_pass *pass,
 	wlr_render_rect_options_get_box(options, pass->buffer->buffer, &box);
 
 	TRACY_BOTH_ZONES_START(renderer);
+	TRACY_ZONE_TEXT_f("Box (WxH, X, Y): %ix%i, %i, %i", box.width, box.height, box.x, box.y);
+	TRACY_ZONE_TEXT_f("Gradient:");
+	TRACY_ZONE_TEXT_f("\tNum Colors: %i", fx_options->gradient.count);
+	TRACY_ZONE_TEXT_f("\tBlend: %i", fx_options->gradient.blend);
+	TRACY_ZONE_TEXT_f("\tDegree: %f", fx_options->gradient.degree);
+	TRACY_ZONE_TEXT_f("\tType: %s",
+			fx_options->gradient.linear == 1 ? "Linear"
+			: fx_options->gradient.linear == 2 ? "Conic"
+			: "Unknown");
+	TRACY_ZONE_TEXT_f("\tOrigin: %fx%f",
+			fx_options->gradient.origin[0], fx_options->gradient.origin[1]);
+	TRACY_ZONE_TEXT_f("\tRange (WxH, X, Y): %ix%i, %i, %i",
+			fx_options->gradient.range.width, fx_options->gradient.range.height,
+			fx_options->gradient.range.x, fx_options->gradient.range.y);
+	// TODO: Display Colors (not really sure how it works without a scene example...)
 	push_fx_debug(renderer);
 
 	setup_blending(options->blend_mode);
@@ -543,6 +580,23 @@ void fx_render_pass_add_rounded_rect(struct fx_gles_render_pass *pass,
 	}
 
 	TRACY_BOTH_ZONES_START(renderer);
+	TRACY_ZONE_TEXT_f("Box (WxH, X, Y): %ix%i, %i, %i", box.width, box.height, box.x, box.y);
+	TRACY_ZONE_TEXT_f("Clip Box (WxH, X, Y): %ix%i, %i, %i",
+			clipped_region_box.width, clipped_region_box.height,
+			clipped_region_box.x, clipped_region_box.y);
+	TRACY_ZONE_TEXT_f("Clip Box Corners (TL, TR, BL, BR): %i, %i, %i, %i",
+			(CORNER_LOCATION_TOP_LEFT & clipped_region_corners) == CORNER_LOCATION_TOP_LEFT,
+			(CORNER_LOCATION_TOP_RIGHT & clipped_region_corners) == CORNER_LOCATION_TOP_RIGHT,
+			(CORNER_LOCATION_BOTTOM_LEFT & clipped_region_corners) == CORNER_LOCATION_BOTTOM_LEFT,
+			(CORNER_LOCATION_BOTTOM_RIGHT & clipped_region_corners) == CORNER_LOCATION_BOTTOM_RIGHT);
+	TRACY_ZONE_TEXT_f("Clip Box Corner Radius: %i", fx_options->clipped_region.corner_radius);
+	TRACY_ZONE_TEXT_f("Color RGBA: %f, %f, %f, %f", color->r, color->g, color->b, color->a);
+	TRACY_ZONE_TEXT_f("Corner Radius: %i", fx_options->corner_radius);
+	TRACY_ZONE_TEXT_f("Corners (TL, TR, BL, BR): %i, %i, %i, %i",
+			(CORNER_LOCATION_TOP_LEFT & fx_options->corners) == CORNER_LOCATION_TOP_LEFT,
+			(CORNER_LOCATION_TOP_RIGHT & fx_options->corners) == CORNER_LOCATION_TOP_RIGHT,
+			(CORNER_LOCATION_BOTTOM_LEFT & fx_options->corners) == CORNER_LOCATION_BOTTOM_LEFT,
+			(CORNER_LOCATION_BOTTOM_RIGHT & fx_options->corners) == CORNER_LOCATION_BOTTOM_RIGHT);
 	push_fx_debug(renderer);
 
 	setup_blending(WLR_RENDER_BLEND_MODE_PREMULTIPLIED);
@@ -606,6 +660,26 @@ void fx_render_pass_add_rounded_rect_grad(struct fx_gles_render_pass *pass,
 	wlr_render_rect_options_get_box(options, pass->buffer->buffer, &box);
 
 	TRACY_BOTH_ZONES_START(renderer);
+	TRACY_ZONE_TEXT_f("Box (WxH, X, Y): %ix%i, %i, %i", box.width, box.height, box.x, box.y);
+	TRACY_ZONE_TEXT_f("Corners (TL, TR, BL, BR): %i, %i, %i, %i",
+			(CORNER_LOCATION_TOP_LEFT & fx_options->corners) == CORNER_LOCATION_TOP_LEFT,
+			(CORNER_LOCATION_TOP_RIGHT & fx_options->corners) == CORNER_LOCATION_TOP_RIGHT,
+			(CORNER_LOCATION_BOTTOM_LEFT & fx_options->corners) == CORNER_LOCATION_BOTTOM_LEFT,
+			(CORNER_LOCATION_BOTTOM_RIGHT & fx_options->corners) == CORNER_LOCATION_BOTTOM_RIGHT);
+	TRACY_ZONE_TEXT_f("Gradient:");
+	TRACY_ZONE_TEXT_f("\tNum Colors: %i", fx_options->gradient.count);
+	TRACY_ZONE_TEXT_f("\tBlend: %i", fx_options->gradient.blend);
+	TRACY_ZONE_TEXT_f("\tDegree: %f", fx_options->gradient.degree);
+	TRACY_ZONE_TEXT_f("\tType: %s",
+			fx_options->gradient.linear == 1 ? "Linear"
+			: fx_options->gradient.linear == 2 ? "Conic"
+			: "Unknown");
+	TRACY_ZONE_TEXT_f("\tOrigin: %fx%f",
+			fx_options->gradient.origin[0], fx_options->gradient.origin[1]);
+	TRACY_ZONE_TEXT_f("\tRange (WxH, X, Y): %ix%i, %i, %i",
+			fx_options->gradient.range.width, fx_options->gradient.range.height,
+			fx_options->gradient.range.x, fx_options->gradient.range.y);
+	// TODO: Display Colors (not really sure how it works without a scene example...)
 	push_fx_debug(renderer);
 
 	setup_blending(WLR_RENDER_BLEND_MODE_PREMULTIPLIED);
@@ -675,6 +749,21 @@ void fx_render_pass_add_box_shadow(struct fx_gles_render_pass *pass,
 	}
 
 	TRACY_BOTH_ZONES_START(renderer);
+	TRACY_ZONE_TEXT_f("Box (WxH, X, Y): %ix%i, %i, %i", box.width, box.height, box.x, box.y);
+	TRACY_ZONE_TEXT_f("Clip Box (WxH, X, Y): %ix%i, %i, %i",
+			clipped_region_box.width, clipped_region_box.height,
+			clipped_region_box.x, clipped_region_box.y);
+	TRACY_ZONE_TEXT_f("Clip Box Corners (TL, TR, BL, BR): %i, %i, %i, %i",
+			(CORNER_LOCATION_TOP_LEFT & clipped_region_corners) == CORNER_LOCATION_TOP_LEFT,
+			(CORNER_LOCATION_TOP_RIGHT & clipped_region_corners) == CORNER_LOCATION_TOP_RIGHT,
+			(CORNER_LOCATION_BOTTOM_LEFT & clipped_region_corners) == CORNER_LOCATION_BOTTOM_LEFT,
+			(CORNER_LOCATION_BOTTOM_RIGHT & clipped_region_corners) == CORNER_LOCATION_BOTTOM_RIGHT);
+	TRACY_ZONE_TEXT_f("Clip Box Corner Radius: %i", options->clipped_region.corner_radius);
+	TRACY_ZONE_TEXT_f("Corner Radius: %i", options->corner_radius);
+	TRACY_ZONE_TEXT_f("Shadow Options:");
+	TRACY_ZONE_TEXT_f("\tColor RGBA: %f, %f, %f, %f",
+			options->color.r, options->color.g, options->color.b, options->color.a);
+	TRACY_ZONE_TEXT_f("\tBlur Sigma: %f", options->blur_sigma);
 	push_fx_debug(renderer);
 
 	// blending will practically always be needed (unless we have a madman
@@ -894,6 +983,37 @@ static struct fx_framebuffer *get_main_buffer_blur(struct fx_gles_render_pass *p
 	fx_options->tex_options.base.filter_mode = WLR_SCALE_FILTER_BILINEAR;
 
 	TRACY_BOTH_ZONES_START(renderer);
+	TRACY_ZONE_TEXT_f("dst_box (WxH, X, Y): %ix%i, %i, %i",
+			fx_options->tex_options.base.dst_box.width,
+			fx_options->tex_options.base.dst_box.height,
+			fx_options->tex_options.base.dst_box.x,
+			fx_options->tex_options.base.dst_box.y);
+	TRACY_ZONE_TEXT_f("clip_box (WxH, X, Y): %ix%i, %i, %i",
+			fx_options->tex_options.clip_box->width,
+			fx_options->tex_options.clip_box->height,
+			fx_options->tex_options.clip_box->x,
+			fx_options->tex_options.clip_box->y);
+	TRACY_ZONE_TEXT_f("Corners (TL, TR, BL, BR): %i, %i, %i, %i",
+			(CORNER_LOCATION_TOP_LEFT & fx_options->tex_options.corners) == CORNER_LOCATION_TOP_LEFT,
+			(CORNER_LOCATION_TOP_RIGHT & fx_options->tex_options.corners) == CORNER_LOCATION_TOP_RIGHT,
+			(CORNER_LOCATION_BOTTOM_LEFT & fx_options->tex_options.corners) == CORNER_LOCATION_BOTTOM_LEFT,
+			(CORNER_LOCATION_BOTTOM_RIGHT & fx_options->tex_options.corners) == CORNER_LOCATION_BOTTOM_RIGHT);
+	TRACY_ZONE_TEXT_f("Corner Radius: %i", fx_options->tex_options.corner_radius);
+	TRACY_ZONE_TEXT_f("src_box (WxH, X, Y): %lfx%lf, %lf, %lf",
+			fx_options->tex_options.base.src_box.width,
+			fx_options->tex_options.base.src_box.height,
+			fx_options->tex_options.base.src_box.x,
+			fx_options->tex_options.base.src_box.y);
+	TRACY_ZONE_TEXT_f("Ignore Transparent: %i", fx_options->ignore_transparent);
+	TRACY_ZONE_TEXT_f("Discard Transparent: %i", fx_options->tex_options.discard_transparent);
+	TRACY_ZONE_TEXT_f("Use Optimized Blur: %i", fx_options->use_optimized_blur);
+	TRACY_ZONE_TEXT_f("Blur Options:");
+	TRACY_ZONE_TEXT_f("\tNum Blur Passes: %d", fx_options->blur_data->num_passes);
+	TRACY_ZONE_TEXT_f("\tBlur Radius: %d", fx_options->blur_data->radius);
+	TRACY_ZONE_TEXT_f("\tBrightness: %f", fx_options->blur_data->brightness);
+	TRACY_ZONE_TEXT_f("\tContrast: %f", fx_options->blur_data->contrast);
+	TRACY_ZONE_TEXT_f("\tNoise: %f", fx_options->blur_data->noise);
+	TRACY_ZONE_TEXT_f("\tSaturation: %f", fx_options->blur_data->saturation);
 	push_fx_debug(renderer);
 
 	// Downscale
@@ -970,6 +1090,9 @@ void fx_render_pass_add_blur(struct fx_gles_render_pass *pass,
 	}
 
 	struct fx_framebuffer *buffer = pass->fx_effect_framebuffers->optimized_blur_buffer;
+	TRACY_ZONE_TEXT_f("Use Optimized Blur: %i", fx_options->use_optimized_blur);
+	TRACY_ZONE_TEXT_f("Optimized Blur Successfully Used: %i",
+			buffer && fx_options->use_optimized_blur);
 	if (!buffer || !fx_options->use_optimized_blur) {
 		if (!buffer) {
 			wlr_log(WLR_ERROR, "Warning: Failed to use optimized blur");
@@ -1035,6 +1158,31 @@ bool fx_render_pass_add_optimized_blur(struct fx_gles_render_pass *pass,
 	struct wlr_box dst_box = fx_options->tex_options.base.dst_box;
 
 	TRACY_BOTH_ZONES_START(renderer);
+	TRACY_ZONE_TEXT_f("dst_box (WxH, X, Y): %ix%i, %i, %i",
+			fx_options->tex_options.base.dst_box.width,
+			fx_options->tex_options.base.dst_box.height,
+			fx_options->tex_options.base.dst_box.x,
+			fx_options->tex_options.base.dst_box.y);
+	TRACY_ZONE_TEXT_f("clip_box (WxH, X, Y): %ix%i, %i, %i",
+			fx_options->tex_options.clip_box->width,
+			fx_options->tex_options.clip_box->height,
+			fx_options->tex_options.clip_box->x,
+			fx_options->tex_options.clip_box->y);
+	TRACY_ZONE_TEXT_f("src_box (WxH, X, Y): %lfx%lf, %lf, %lf",
+			fx_options->tex_options.base.src_box.width,
+			fx_options->tex_options.base.src_box.height,
+			fx_options->tex_options.base.src_box.x,
+			fx_options->tex_options.base.src_box.y);
+	TRACY_ZONE_TEXT_f("Ignore Transparent: %i", fx_options->ignore_transparent);
+	TRACY_ZONE_TEXT_f("Discard Transparent: %i", fx_options->tex_options.discard_transparent);
+	TRACY_ZONE_TEXT_f("Use Optimized Blur: %i", fx_options->use_optimized_blur);
+	TRACY_ZONE_TEXT_f("Blur Options:");
+	TRACY_ZONE_TEXT_f("\tNum Blur Passes: %d", fx_options->blur_data->num_passes);
+	TRACY_ZONE_TEXT_f("\tBlur Radius: %d", fx_options->blur_data->radius);
+	TRACY_ZONE_TEXT_f("\tBrightness: %f", fx_options->blur_data->brightness);
+	TRACY_ZONE_TEXT_f("\tContrast: %f", fx_options->blur_data->contrast);
+	TRACY_ZONE_TEXT_f("\tNoise: %f", fx_options->blur_data->noise);
+	TRACY_ZONE_TEXT_f("\tSaturation: %f", fx_options->blur_data->saturation);
 	push_fx_debug(renderer);
 
 	pixman_region32_t clip;
@@ -1075,7 +1223,7 @@ void fx_renderer_read_to_buffer(struct fx_gles_render_pass *pass,
 		return;
 	}
 	TRACY_BOTH_ZONES_START(pass->buffer->renderer);
-	TRACY_ZONE_VALUE(pass->buffer->renderer->client_version);
+	TRACY_ZONE_TEXT_f("GLES version: %i", pass->buffer->renderer->client_version);
 
 	pixman_region32_t region;
 	pixman_region32_init(&region);
@@ -1137,6 +1285,7 @@ static struct fx_gles_render_pass *begin_buffer_pass(struct fx_framebuffer *buff
 	struct wlr_buffer *wlr_buffer = buffer->buffer;
 
 	TRACY_BOTH_ZONES_START(renderer);
+	TRACY_ZONE_TEXT_f("Basic Renderer: %i", renderer->basic_renderer);
 
 	if (renderer->procs.glGetGraphicsResetStatusKHR) {
 		GLenum status = renderer->procs.glGetGraphicsResetStatusKHR();

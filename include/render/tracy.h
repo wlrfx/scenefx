@@ -38,6 +38,13 @@ struct tracy_gpu_zone_context {
 
 #define TRACY_ZONE_TEXT(txt, size) \
 	TracyCZoneText(ctx, txt, size);
+#define TRACY_ZONE_TEXT_f(...) \
+	{ \
+		int len = snprintf(NULL, 0, __VA_ARGS__) + 1; \
+		char str[len]; \
+		snprintf(str, len, __VA_ARGS__); \
+		TracyCZoneText(ctx, str, len); \
+	}
 #define TRACY_ZONE_NAME(txt, size) \
 	TracyCZoneName(ctx, txt, size);
 #define TRACY_ZONE_NAME_f(...) \
@@ -119,6 +126,7 @@ struct tracy_data *tracy_gpu_context_new(struct fx_renderer *renderer);
  */
 
 #define TRACY_ZONE_TEXT(txt, size)
+#define TRACY_ZONE_TEXT_f(...)
 #define TRACY_ZONE_NAME(txt, size)
 #define TRACY_ZONE_NAME_f(...)
 #define TRACY_ZONE_COLOR(color)

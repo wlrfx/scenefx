@@ -1,6 +1,8 @@
 #ifndef TRACY
 #define TRACY
 
+#include <stdio.h>
+
 #include "include/render/fx_renderer/fx_renderer.h"
 
 struct tracy_data;
@@ -38,6 +40,13 @@ struct tracy_gpu_zone_context {
 	TracyCZoneText(ctx, txt, size);
 #define TRACY_ZONE_NAME(txt, size) \
 	TracyCZoneName(ctx, txt, size);
+#define TRACY_ZONE_NAME_f(...) \
+	{ \
+		int len = snprintf(NULL, 0, __VA_ARGS__) + 1; \
+		char str[len]; \
+		snprintf(str, len, __VA_ARGS__); \
+		TracyCZoneName(ctx, str, len); \
+	}
 #define TRACY_ZONE_COLOR(color) \
 	TracyCZoneColor(ctx, color);
 #define TRACY_ZONE_VALUE(value) \
@@ -111,6 +120,7 @@ struct tracy_data *tracy_gpu_context_new(struct fx_renderer *renderer);
 
 #define TRACY_ZONE_TEXT(txt, size)
 #define TRACY_ZONE_NAME(txt, size)
+#define TRACY_ZONE_NAME_f(...)
 #define TRACY_ZONE_COLOR(color)
 #define TRACY_ZONE_VALUE(value)
 

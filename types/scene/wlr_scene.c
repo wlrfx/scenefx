@@ -18,6 +18,7 @@
 #include <wlr/util/region.h>
 #include <wlr/util/transform.h>
 
+#include "render/tracy.h"
 #include "scenefx/render/fx_renderer/fx_effect_framebuffers.h"
 #include "scenefx/render/fx_renderer/fx_renderer.h"
 #include "scenefx/render/pass.h"
@@ -2747,6 +2748,9 @@ static void scene_output_state_attempt_gamma(struct wlr_scene_output *scene_outp
 
 bool wlr_scene_output_build_state(struct wlr_scene_output *scene_output,
 		struct wlr_output_state *state, const struct wlr_scene_output_state_options *options) {
+	TRACY_ZONE_START;
+	TRACY_ZONE_NAME_f("Build State: %s", scene_output->output->name);
+
 	struct wlr_scene_output_state_options default_options = {0};
 	if (!options) {
 		options = &default_options;
@@ -2761,6 +2765,7 @@ bool wlr_scene_output_build_state(struct wlr_scene_output *scene_output,
 
 	if ((state->committed & WLR_OUTPUT_STATE_ENABLED) && !state->enabled) {
 		// if the state is being disabled, do nothing.
+		TRACY_ZONE_END;
 		return true;
 	}
 
@@ -2901,12 +2906,14 @@ bool wlr_scene_output_build_state(struct wlr_scene_output *scene_output,
 			timespec_sub(&duration, &end_time, &start_time);
 			timer->pre_render_duration = timespec_to_nsec(&duration);
 		}
+		TRACY_ZONE_END;
 		return true;
 	}
 
 	struct wlr_swapchain *swapchain = options->swapchain;
 	if (!swapchain) {
 		if (!wlr_output_configure_primary_swapchain(output, state, &output->swapchain)) {
+			TRACY_ZONE_END;
 			return false;
 		}
 
@@ -2915,6 +2922,7 @@ bool wlr_scene_output_build_state(struct wlr_scene_output *scene_output,
 
 	struct wlr_buffer *buffer = wlr_swapchain_acquire(swapchain);
 	if (buffer == NULL) {
+		TRACY_ZONE_END;
 		return false;
 	}
 
@@ -2944,6 +2952,7 @@ bool wlr_scene_output_build_state(struct wlr_scene_output *scene_output,
 			);
 	if (render_pass == NULL) {
 		wlr_buffer_unlock(buffer);
+		TRACY_ZONE_END;
 		return false;
 	}
 	struct fx_effect_framebuffers *effect_fbos = render_pass->fx_effect_framebuffers;
@@ -3098,6 +3107,7 @@ bool wlr_scene_output_build_state(struct wlr_scene_output *scene_output,
 		// if we failed to render the buffer, it will have undefined contents
 		// Trash the damage ring
 		wlr_damage_ring_add_whole(&scene_output->damage_ring);
+		TRACY_ZONE_END;
 		return false;
 	}
 
@@ -3111,6 +3121,7 @@ bool wlr_scene_output_build_state(struct wlr_scene_output *scene_output,
 
 	scene_output_state_attempt_gamma(scene_output, state);
 
+	TRACY_ZONE_END;
 	return true;
 }
 

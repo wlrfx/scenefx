@@ -341,21 +341,21 @@ void fx_render_pass_add_texture(struct fx_gles_render_pass *pass,
 		int sync_file_fd =
 			wlr_drm_syncobj_timeline_export_sync_file(options->wait_timeline, options->wait_point);
 		if (sync_file_fd < 0) {
-			TRACY_BOTH_ZONES_END;
+			TRACY_BOTH_ZONES_END_FAIL;
 			return;
 		}
 
 		EGLSyncKHR sync = wlr_egl_create_sync(renderer->egl, sync_file_fd);
 		close(sync_file_fd);
 		if (sync == EGL_NO_SYNC_KHR) {
-			TRACY_BOTH_ZONES_END;
+			TRACY_BOTH_ZONES_END_FAIL;
 			return;
 		}
 
 		bool ok = wlr_egl_wait_sync(renderer->egl, sync);
 		wlr_egl_destroy_sync(renderer->egl, sync);
 		if (!ok) {
-			TRACY_BOTH_ZONES_END;
+			TRACY_BOTH_ZONES_END_FAIL;
 			return;
 		}
 	}
@@ -1284,28 +1284,22 @@ static struct fx_gles_render_pass *begin_buffer_pass(struct fx_framebuffer *buff
 	struct fx_renderer *renderer = buffer->renderer;
 	struct wlr_buffer *wlr_buffer = buffer->buffer;
 
-	TRACY_BOTH_ZONES_START(renderer);
-	TRACY_ZONE_TEXT_f("Basic Renderer: %i", renderer->basic_renderer);
-
 	if (renderer->procs.glGetGraphicsResetStatusKHR) {
 		GLenum status = renderer->procs.glGetGraphicsResetStatusKHR();
 		if (status != GL_NO_ERROR) {
 			wlr_log(WLR_ERROR, "GPU reset (%s)", reset_status_str(status));
 			wl_signal_emit_mutable(&renderer->wlr_renderer.events.lost, NULL);
-			TRACY_BOTH_ZONES_END;
 			return NULL;
 		}
 	}
 
 	GLint fbo = fx_framebuffer_get_fbo(buffer);
 	if (!fbo) {
-		TRACY_BOTH_ZONES_END;
 		return NULL;
 	}
 
 	struct fx_gles_render_pass *pass = calloc(1, sizeof(*pass));
 	if (pass == NULL) {
-		TRACY_BOTH_ZONES_END;
 		return NULL;
 	}
 
@@ -1330,7 +1324,6 @@ static struct fx_gles_render_pass *begin_buffer_pass(struct fx_framebuffer *buff
 	glDisable(GL_SCISSOR_TEST);
 
 	pop_fx_debug(renderer);
-	TRACY_BOTH_ZONES_END;
 	return pass;
 }
 
@@ -1342,10 +1335,15 @@ struct fx_gles_render_pass *fx_renderer_begin_buffer_pass(
 	const struct wlr_buffer_pass_options *options = fx_options->base;
 	struct fx_renderer *renderer = fx_get_renderer(wlr_renderer);
 
+	TRACY_BOTH_ZONES_START(renderer);
+	TRACY_ZONE_TEXT_f("Output: %s", output ? output->name: NULL);
+	TRACY_ZONE_TEXT_f("Basic Renderer: %i", renderer->basic_renderer);
+
 	renderer->basic_renderer = (output == NULL);
 
 	struct wlr_egl_context prev_ctx = {0};
 	if (!wlr_egl_make_current(renderer->egl, &prev_ctx)) {
+		TRACY_BOTH_ZONES_END_FAIL;
 		return NULL;
 	}
 
@@ -1357,6 +1355,7 @@ struct fx_gles_render_pass *fx_renderer_begin_buffer_pass(
 
 	struct fx_framebuffer *buffer = fx_framebuffer_get_or_create(renderer, wlr_buffer);
 	if (!buffer) {
+		TRACY_BOTH_ZONES_END_FAIL;
 		return NULL;
 	}
 
@@ -1388,9 +1387,11 @@ struct fx_gles_render_pass *fx_renderer_begin_buffer_pass(
 	struct fx_gles_render_pass *pass = begin_buffer_pass(buffer,
 			&prev_ctx, timer, options->signal_timeline, options->signal_point);
 	if (!pass) {
+		TRACY_BOTH_ZONES_END_FAIL;
 		return NULL;
 	}
 	pass->fx_effect_framebuffers = fbos;
 	pass->output = output;
+	TRACY_BOTH_ZONES_END;
 	return pass;
 }

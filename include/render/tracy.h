@@ -1,8 +1,6 @@
 #ifndef TRACY
 #define TRACY
 
-#include <stdio.h>
-
 #include "include/render/fx_renderer/fx_renderer.h"
 
 struct tracy_data;
@@ -30,6 +28,10 @@ struct tracy_gpu_zone_context {
 #define TRACY_ZONE_START_N(name) \
 	TracyCZoneN(ctx, name, true)
 #define TRACY_ZONE_END \
+	TRACY_ZONE_TEXT_f("Success On Line: %i", __LINE__) \
+	TracyCZoneEnd(ctx)
+#define TRACY_ZONE_END_FAIL \
+	TRACY_ZONE_TEXT_f("Fail On Line: %i", __LINE__) \
 	TracyCZoneEnd(ctx)
 
 /**
@@ -93,6 +95,9 @@ struct tracy_gpu_zone_context {
 #define TRACY_BOTH_ZONES_END \
 	TRACY_ZONE_END \
 	TRACY_GPU_ZONE_END
+#define TRACY_BOTH_ZONES_END_FAIL \
+	TRACY_ZONE_END_FAIL \
+	TRACY_GPU_ZONE_END
 
 // Private functions: Don't use these outside of this file!
 
@@ -120,6 +125,7 @@ struct tracy_data *tracy_gpu_context_new(struct fx_renderer *renderer);
 #define TRACY_ZONE_START
 #define TRACY_ZONE_START_N(name)
 #define TRACY_ZONE_END
+#define TRACY_ZONE_END_FAIL
 
 /**
  * Zone helpers
@@ -154,6 +160,7 @@ struct tracy_data *tracy_gpu_context_new(struct fx_renderer *renderer);
 
 #define TRACY_BOTH_ZONES_START(renderer)
 #define TRACY_BOTH_ZONES_END
+#define TRACY_BOTH_ZONES_END_FAIL
 
 #endif  /* ifdef TRACY_ENABLE */
 

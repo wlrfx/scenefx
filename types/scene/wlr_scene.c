@@ -2765,7 +2765,7 @@ bool wlr_scene_output_build_state(struct wlr_scene_output *scene_output,
 
 	if ((state->committed & WLR_OUTPUT_STATE_ENABLED) && !state->enabled) {
 		// if the state is being disabled, do nothing.
-		TRACY_ZONE_END;
+		TRACY_ZONE_END_FAIL;
 		return true;
 	}
 
@@ -2913,7 +2913,7 @@ bool wlr_scene_output_build_state(struct wlr_scene_output *scene_output,
 	struct wlr_swapchain *swapchain = options->swapchain;
 	if (!swapchain) {
 		if (!wlr_output_configure_primary_swapchain(output, state, &output->swapchain)) {
-			TRACY_ZONE_END;
+			TRACY_ZONE_END_FAIL;
 			return false;
 		}
 
@@ -2922,7 +2922,7 @@ bool wlr_scene_output_build_state(struct wlr_scene_output *scene_output,
 
 	struct wlr_buffer *buffer = wlr_swapchain_acquire(swapchain);
 	if (buffer == NULL) {
-		TRACY_ZONE_END;
+		TRACY_ZONE_END_FAIL;
 		return false;
 	}
 
@@ -2952,7 +2952,7 @@ bool wlr_scene_output_build_state(struct wlr_scene_output *scene_output,
 			);
 	if (render_pass == NULL) {
 		wlr_buffer_unlock(buffer);
-		TRACY_ZONE_END;
+		TRACY_ZONE_END_FAIL;
 		return false;
 	}
 	struct fx_effect_framebuffers *effect_fbos = render_pass->fx_effect_framebuffers;
@@ -3107,7 +3107,7 @@ bool wlr_scene_output_build_state(struct wlr_scene_output *scene_output,
 		// if we failed to render the buffer, it will have undefined contents
 		// Trash the damage ring
 		wlr_damage_ring_add_whole(&scene_output->damage_ring);
-		TRACY_ZONE_END;
+		TRACY_ZONE_END_FAIL;
 		return false;
 	}
 

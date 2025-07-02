@@ -1336,7 +1336,7 @@ struct fx_gles_render_pass *fx_renderer_begin_buffer_pass(
 	struct fx_renderer *renderer = fx_get_renderer(wlr_renderer);
 
 	TRACY_BOTH_ZONES_START(renderer);
-	TRACY_ZONE_TEXT_f("Output: %s", output ? output->name: NULL);
+	TRACY_ZONE_TEXT_f("Output: %s", output ? output->name: "Unknown Output");
 	TRACY_ZONE_TEXT_f("Basic Renderer: %i", renderer->basic_renderer);
 
 	renderer->basic_renderer = (output == NULL);

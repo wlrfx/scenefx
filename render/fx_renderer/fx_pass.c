@@ -112,7 +112,6 @@ static bool render_pass_submit(struct wlr_render_pass *wlr_pass) {
 out:
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
-	TRACY_MARK_FRAME_END("Frame");
 	pop_fx_debug(renderer);
 	TRACY_BOTH_ZONES_END;
 
@@ -128,6 +127,7 @@ out:
 	}
 	free(pass);
 
+	TRACY_MARK_FRAME;
 	return ok;
 }
 
@@ -1330,22 +1330,20 @@ static struct fx_gles_render_pass *begin_buffer_pass(struct fx_framebuffer *buff
 struct fx_gles_render_pass *fx_renderer_begin_buffer_pass(
 		struct wlr_renderer *wlr_renderer, struct wlr_buffer *wlr_buffer,
 		struct wlr_output *output, const struct fx_buffer_pass_options *fx_options) {
-	TRACY_MARK_FRAME_START("Frame");
 
 	const struct wlr_buffer_pass_options *options = fx_options->base;
 	struct fx_renderer *renderer = fx_get_renderer(wlr_renderer);
-
-	TRACY_BOTH_ZONES_START(renderer);
-	TRACY_ZONE_TEXT_f("Output: %s", output ? output->name: "Unknown Output");
-	TRACY_ZONE_TEXT_f("Basic Renderer: %i", renderer->basic_renderer);
 
 	renderer->basic_renderer = (output == NULL);
 
 	struct wlr_egl_context prev_ctx = {0};
 	if (!wlr_egl_make_current(renderer->egl, &prev_ctx)) {
-		TRACY_BOTH_ZONES_END_FAIL;
 		return NULL;
 	}
+
+	TRACY_BOTH_ZONES_START(renderer);
+	TRACY_ZONE_TEXT_f("Output: %s", output ? output->name: "Unknown Output");
+	TRACY_ZONE_TEXT_f("Basic Renderer: %i", renderer->basic_renderer);
 
 	struct fx_render_timer *timer = NULL;
 	if (options->timer) {

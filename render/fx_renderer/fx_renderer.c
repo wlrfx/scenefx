@@ -486,6 +486,7 @@ struct wlr_renderer *fx_renderer_create_egl(struct wlr_egl *egl) {
 		load_gl_proc(&renderer->procs.glDeleteQueriesEXT, "glDeleteQueriesEXT");
 		load_gl_proc(&renderer->procs.glQueryCounterEXT, "glQueryCounterEXT");
 		load_gl_proc(&renderer->procs.glGetQueryObjectivEXT, "glGetQueryObjectivEXT");
+		load_gl_proc(&renderer->procs.glGetQueryivEXT, "glGetQueryivEXT");
 		load_gl_proc(&renderer->procs.glGetQueryObjectui64vEXT, "glGetQueryObjectui64vEXT");
 		if (eglGetProcAddress("glGetInteger64vEXT")) {
 			load_gl_proc(&renderer->procs.glGetInteger64vEXT, "glGetInteger64vEXT");

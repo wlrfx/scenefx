@@ -58,8 +58,8 @@ void tracy_gpu_zone_begin(struct tracy_data *tracy_data, struct tracy_gpu_zone_c
 	}
 
 	// Create the query object
-	unsigned int query = tracy_data->queries[get_next_query_index(tracy_data)];
-	tracy_data->renderer->procs.glQueryCounterEXT(query, GL_TIMESTAMP_EXT);
+	const unsigned int query = get_next_query_index(tracy_data);
+	tracy_data->renderer->procs.glQueryCounterEXT(tracy_data->queries[query], GL_TIMESTAMP_EXT);
 
 	// Label the zone
 	uint64_t srcloc = ___tracy_alloc_srcloc_name(line,
@@ -84,9 +84,8 @@ void tracy_gpu_zone_end(struct tracy_gpu_zone_context *ctx) {
 	struct tracy_data *tracy_data = ctx->tracy_data;
 
 	// Create the query object
-	unsigned int query = tracy_data->queries[get_next_query_index(tracy_data)];
-	tracy_data->renderer->procs.glQueryCounterEXT(
-			query, GL_TIMESTAMP_EXT);
+	const unsigned int query = get_next_query_index(tracy_data);
+	tracy_data->renderer->procs.glQueryCounterEXT(tracy_data->queries[query], GL_TIMESTAMP_EXT);
 
 	// End the Tracy GPU zone
 	const struct ___tracy_gpu_zone_end_data data = {
@@ -98,6 +97,7 @@ void tracy_gpu_zone_end(struct tracy_gpu_zone_context *ctx) {
 
 void tracy_gpu_context_collect(struct tracy_data *tracy_data) {
 	if (tracy_data == NULL) {
+		TracyCMessageL("tracy_data == NULL");
 		return;
 	}
 
@@ -132,7 +132,7 @@ void tracy_gpu_context_collect(struct tracy_data *tracy_data) {
 		const struct ___tracy_gpu_time_data data = {
 			.context = tracy_data->context_id,
 			.gpuTime = time,
-			.queryId = (uint16_t) tracy_data->queries[tracy_data->q_tail],
+			.queryId = (uint16_t) tracy_data->q_tail,
 		};
 		___tracy_emit_gpu_time(data);
 
@@ -167,16 +167,16 @@ struct tracy_data *tracy_gpu_context_new(struct fx_renderer *renderer) {
 	tracy_data->q_head = 0;
 	tracy_data->q_tail = 0;
 
-	// clear disjoint flag
-	GLint64 disjoint;
-	renderer->procs.glGetInteger64vEXT(GL_GPU_DISJOINT_EXT, &disjoint);
-
 	// Create the query objects
 	renderer->procs.glGenQueriesEXT(QUERY_COUNT, tracy_data->queries);
 
 	// Get the current GL time
 	GLint64 gl_gpu_time;
 	renderer->procs.glGetInteger64vEXT(GL_TIMESTAMP_EXT, &gl_gpu_time);
+
+	// Create the query objects
+	GLint bits;
+	renderer->procs.glGetQueryivEXT(GL_TIMESTAMP_EXT, GL_QUERY_COUNTER_BITS_EXT, &bits);
 
 	const struct ___tracy_gpu_new_context_data data = {
 		.context = tracy_data->context_id,

@@ -16,8 +16,7 @@ struct tracy_gpu_zone_context {
  * Frame
  */
 
-#define TRACY_MARK_FRAME_START(name) TracyCFrameMarkStart(name)
-#define TRACY_MARK_FRAME_END(name) TracyCFrameMarkEnd(name)
+#define TRACY_MARK_FRAME TracyCFrameMark
 
 /**
  * Zone
@@ -115,8 +114,7 @@ struct tracy_data *tracy_gpu_context_new(struct fx_renderer *renderer);
  * Frame
  */
 
-#define TRACY_MARK_FRAME_START(name)
-#define TRACY_MARK_FRAME_END(name)
+#define TRACY_MARK_FRAME
 
 /**
  * Zone

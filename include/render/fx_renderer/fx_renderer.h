@@ -170,6 +170,7 @@ struct fx_renderer {
 		PFNGLDELETEQUERIESEXTPROC glDeleteQueriesEXT;
 		PFNGLQUERYCOUNTEREXTPROC glQueryCounterEXT;
 		PFNGLGETQUERYOBJECTIVEXTPROC glGetQueryObjectivEXT;
+		PFNGLGETQUERYIVEXTPROC glGetQueryivEXT;
 		PFNGLGETQUERYOBJECTUI64VEXTPROC glGetQueryObjectui64vEXT;
 		PFNGLGETINTEGER64VEXTPROC glGetInteger64vEXT;
 	} procs;
@@ -194,6 +195,10 @@ struct fx_renderer {
 	// Set to true when 'wlr_renderer_begin_buffer_pass' is called instead of
 	// our custom 'fx_renderer_begin_buffer_pass' function
 	bool basic_renderer;
+
+	GLint client_version;
+
+	struct tracy_data *tracy_data;
 };
 
 #endif

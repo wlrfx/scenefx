@@ -19,6 +19,27 @@ struct tracy_gpu_zone_context {
 #define TRACY_MARK_FRAME TracyCFrameMark
 
 /**
+ * Messaging
+ */
+
+#define TRACY_MESSAGE(...) \
+	{ \
+		int len = snprintf(NULL, 0, __VA_ARGS__) + 1; \
+		char str[len]; \
+		snprintf(str, len, __VA_ARGS__); \
+		TracyCMessage(str, len); \
+	}
+#define TRACY_MESSAGE_COLOR(color, ...) \
+	{ \
+		int len = snprintf(NULL, 0, __VA_ARGS__) + 1; \
+		char str[len]; \
+		snprintf(str, len, __VA_ARGS__); \
+		TracyCMessageC(str, len, color); \
+	}
+#define TRACY_MESSAGE_ERROR(...) \
+	TRACY_MESSAGE_COLOR(0xFF0000, __VA_ARGS__)
+
+/**
  * Zone
  */
 
@@ -115,6 +136,14 @@ struct tracy_data *tracy_gpu_context_new(struct fx_renderer *renderer);
  */
 
 #define TRACY_MARK_FRAME
+
+/**
+ * Messaging
+ */
+
+#define TRACY_MESSAGE(...)
+#define TRACY_MESSAGE_COLOR(color, ...)
+#define TRACY_MESSAGE_ERROR(...)
 
 /**
  * Zone

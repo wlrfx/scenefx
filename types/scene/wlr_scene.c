@@ -1174,9 +1174,11 @@ void wlr_scene_optimized_blur_set_size(struct wlr_scene_optimized_blur *blur_nod
 void wlr_scene_optimized_blur_mark_dirty(struct wlr_scene_optimized_blur *blur_node) {
 	// Skip re-rendering the optimized blur if the blur node is disabled
 	if (blur_node && !blur_node->node.enabled) {
+		TRACY_MESSAGE_ERROR("Failed marking Optimized Blur dirty");
 		return;
 	}
 
+	TRACY_MESSAGE("Optimized Blur marked dirty");
 	blur_node->dirty = true;
 
 	scene_node_update(&blur_node->node, NULL);

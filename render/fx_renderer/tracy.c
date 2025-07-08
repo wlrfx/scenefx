@@ -188,10 +188,10 @@ struct tracy_data *tracy_gpu_context_new(struct fx_renderer *renderer) {
 	___tracy_emit_gpu_new_context(data);
 
 	// Set the custom name
-	int len = snprintf(NULL, 0, "FX Renderer (GLESV%i): %s",
+	int len = snprintf(NULL, 0, "FX Renderer (GLESV%d): %s",
 		renderer->client_version, glGetString(GL_RENDERER)) + 1; \
 	char ctx_name[len]; \
-	snprintf(ctx_name, len, "FX Renderer (GLESV%i): %s",
+	snprintf(ctx_name, len, "FX Renderer (GLESV%d): %s",
 		renderer->client_version, glGetString(GL_RENDERER)); \
 	const struct ___tracy_gpu_context_name_data name_data = {
 		.context = tracy_data->context_id,

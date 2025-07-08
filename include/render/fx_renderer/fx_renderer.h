@@ -198,6 +198,7 @@ struct fx_renderer {
 
 	GLint client_version;
 
+	// NULL when tracy is disabled
 	struct tracy_data *tracy_data;
 };
 

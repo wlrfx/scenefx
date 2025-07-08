@@ -27,10 +27,10 @@ struct tracy_gpu_zone_context {
 #define TRACY_ZONE_START_N(name) \
 	TracyCZoneN(ctx, name, true)
 #define TRACY_ZONE_END \
-	TRACY_ZONE_TEXT_f("Success On Line: %i", __LINE__) \
+	TRACY_ZONE_TEXT_f("Success On Line: %d", __LINE__) \
 	TracyCZoneEnd(ctx)
 #define TRACY_ZONE_END_FAIL \
-	TRACY_ZONE_TEXT_f("Fail On Line: %i", __LINE__) \
+	TRACY_ZONE_TEXT_f("Fail On Line: %d", __LINE__) \
 	TracyCZoneEnd(ctx)
 
 /**

@@ -110,6 +110,10 @@ static bool render_pass_submit(struct wlr_render_pass *wlr_pass) {
 	ok = true;
 
 out:
+	// Send over the finished frame to tracy. Can be removed and placed else
+	// where to debug other buffers
+	TRACY_CAPTURE_BUFFER(renderer->tracy_data, pass->buffer);
+
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
 	pop_fx_debug(renderer);

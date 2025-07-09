@@ -145,7 +145,7 @@ if get_option('tracy_enable')
 			'-DTRACY_ENABLE',
 			'-DTRACY_ON_DEMAND',
 		],
-		language: ['c', 'cpp'],
+		language: 'c',
 	)
 endif
 

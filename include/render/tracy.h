@@ -119,7 +119,20 @@ struct tracy_gpu_zone_context {
 	TRACY_ZONE_END_FAIL \
 	TRACY_GPU_ZONE_END
 
+/**
+ * Screen capture
+ */
+
+/**
+ * Copies over the content of src_buffer to tracy.
+ * NOTE: Can only be called once per frame (tracy limitation).
+ */
+#define TRACY_CAPTURE_BUFFER(tracy_data, src_buffer) \
+	tracy_capture_buffer(tracy_data, src_buffer)
+
 // Private functions: Don't use these outside of this file!
+
+void tracy_capture_buffer(struct tracy_data *tracy_data, struct fx_framebuffer *src_buffer);
 
 void tracy_gpu_zone_begin(struct tracy_data *tracy_data, struct tracy_gpu_zone_context *out_ctx,
 		const int line, const char *source, const char *func, const char *name);
@@ -188,6 +201,12 @@ struct tracy_data *tracy_gpu_context_new(struct fx_renderer *renderer);
 #define TRACY_BOTH_ZONES_START(renderer)
 #define TRACY_BOTH_ZONES_END
 #define TRACY_BOTH_ZONES_END_FAIL
+
+/**
+ * Screen capture
+ */
+
+#define TRACY_CAPTURE_BUFFER(tracy_data, src_buffer)
 
 #endif  /* ifdef TRACY_ENABLE */
 

@@ -18,6 +18,7 @@
 #include <wlr/util/region.h>
 #include <wlr/util/transform.h>
 
+#include "render/tracy.h"
 #include "scenefx/render/fx_renderer/fx_effect_framebuffers.h"
 #include "scenefx/render/fx_renderer/fx_renderer.h"
 #include "scenefx/render/pass.h"
@@ -1173,9 +1174,11 @@ void wlr_scene_optimized_blur_set_size(struct wlr_scene_optimized_blur *blur_nod
 void wlr_scene_optimized_blur_mark_dirty(struct wlr_scene_optimized_blur *blur_node) {
 	// Skip re-rendering the optimized blur if the blur node is disabled
 	if (blur_node && !blur_node->node.enabled) {
+		TRACY_MESSAGE_ERROR("Failed marking Optimized Blur dirty");
 		return;
 	}
 
+	TRACY_MESSAGE("Optimized Blur marked dirty");
 	blur_node->dirty = true;
 
 	scene_node_update(&blur_node->node, NULL);
@@ -2747,6 +2750,9 @@ static void scene_output_state_attempt_gamma(struct wlr_scene_output *scene_outp
 
 bool wlr_scene_output_build_state(struct wlr_scene_output *scene_output,
 		struct wlr_output_state *state, const struct wlr_scene_output_state_options *options) {
+	TRACY_ZONE_START;
+	TRACY_ZONE_NAME_f("Build State: %s", scene_output->output->name);
+
 	struct wlr_scene_output_state_options default_options = {0};
 	if (!options) {
 		options = &default_options;
@@ -2761,6 +2767,7 @@ bool wlr_scene_output_build_state(struct wlr_scene_output *scene_output,
 
 	if ((state->committed & WLR_OUTPUT_STATE_ENABLED) && !state->enabled) {
 		// if the state is being disabled, do nothing.
+		TRACY_ZONE_END_FAIL;
 		return true;
 	}
 
@@ -2901,12 +2908,14 @@ bool wlr_scene_output_build_state(struct wlr_scene_output *scene_output,
 			timespec_sub(&duration, &end_time, &start_time);
 			timer->pre_render_duration = timespec_to_nsec(&duration);
 		}
+		TRACY_ZONE_END;
 		return true;
 	}
 
 	struct wlr_swapchain *swapchain = options->swapchain;
 	if (!swapchain) {
 		if (!wlr_output_configure_primary_swapchain(output, state, &output->swapchain)) {
+			TRACY_ZONE_END_FAIL;
 			return false;
 		}
 
@@ -2915,6 +2924,7 @@ bool wlr_scene_output_build_state(struct wlr_scene_output *scene_output,
 
 	struct wlr_buffer *buffer = wlr_swapchain_acquire(swapchain);
 	if (buffer == NULL) {
+		TRACY_ZONE_END_FAIL;
 		return false;
 	}
 
@@ -2944,6 +2954,7 @@ bool wlr_scene_output_build_state(struct wlr_scene_output *scene_output,
 			);
 	if (render_pass == NULL) {
 		wlr_buffer_unlock(buffer);
+		TRACY_ZONE_END_FAIL;
 		return false;
 	}
 	struct fx_effect_framebuffers *effect_fbos = render_pass->fx_effect_framebuffers;
@@ -3092,12 +3103,21 @@ bool wlr_scene_output_build_state(struct wlr_scene_output *scene_output,
 	wlr_output_add_software_cursors_to_render_pass(output, &render_pass->base, &render_data.damage);
 	pixman_region32_fini(&render_data.damage);
 
+#ifdef TRACY_ENABLE
+	struct fx_renderer *renderer = fx_get_renderer(output->renderer);
+	// Send over the finished frame to tracy. Can be removed and placed else
+	// where to debug other buffers
+	TRACY_CAPTURE_BUFFER(renderer->tracy_data, render_pass->buffer);
+	TRACY_MARK_FRAME;
+#endif
+
 	if (!wlr_render_pass_submit(&render_pass->base)) {
 		wlr_buffer_unlock(buffer);
 
 		// if we failed to render the buffer, it will have undefined contents
 		// Trash the damage ring
 		wlr_damage_ring_add_whole(&scene_output->damage_ring);
+		TRACY_ZONE_END_FAIL;
 		return false;
 	}
 
@@ -3111,6 +3131,7 @@ bool wlr_scene_output_build_state(struct wlr_scene_output *scene_output,
 
 	scene_output_state_attempt_gamma(scene_output, state);
 
+	TRACY_ZONE_END;
 	return true;
 }
 

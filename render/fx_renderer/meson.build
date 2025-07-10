@@ -7,6 +7,7 @@ endif
 
 scenefx_files += files(
 	'util.c',
+	'tracy.c',
 	'shaders.c',
 	'pixel_format.c',
 	'fx_pass.c',

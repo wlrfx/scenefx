@@ -368,6 +368,23 @@ static bool link_shaders(struct fx_renderer *renderer) {
 		goto error;
 	}
 
+	// discard transparent shaders
+	if (!link_discard_transparent_program(&renderer->shaders.discard_transparent_rgba,
+			(GLint) client_version, SHADER_SOURCE_TEXTURE_RGBA)) {
+		wlr_log(WLR_ERROR, "Could not link discard_transparent_rgba shader");
+		goto error;
+	}
+	if (!link_discard_transparent_program(&renderer->shaders.discard_transparent_rgbx,
+			(GLint) client_version, SHADER_SOURCE_TEXTURE_RGBX)) {
+		wlr_log(WLR_ERROR, "Could not link discard_transparent_rgbx shader");
+		goto error;
+	}
+	if (!link_discard_transparent_program(&renderer->shaders.discard_transparent_ext,
+			(GLint) client_version, SHADER_SOURCE_TEXTURE_EXTERNAL)) {
+		wlr_log(WLR_ERROR, "Could not link discard_transparent_ext shader");
+		goto error;
+	}
+
 	return true;
 
 error:
@@ -382,6 +399,9 @@ error:
 	glDeleteProgram(renderer->shaders.blur1.program);
 	glDeleteProgram(renderer->shaders.blur2.program);
 	glDeleteProgram(renderer->shaders.blur_effects.program);
+	glDeleteProgram(renderer->shaders.discard_transparent_rgba.program);
+	glDeleteProgram(renderer->shaders.discard_transparent_rgbx.program);
+	glDeleteProgram(renderer->shaders.discard_transparent_ext.program);
 
 	return false;
 }

@@ -16,6 +16,7 @@
 #include "render/pass.h"
 #include "scenefx/render/fx_renderer/fx_renderer.h"
 #include "scenefx/render/fx_renderer/fx_effect_framebuffers.h"
+#include "scenefx/render/pass.h"
 #include "scenefx/types/fx/corner_location.h"
 #include "scenefx/types/fx/blur_data.h"
 #include "util/matrix.h"
@@ -27,7 +28,6 @@ struct fx_render_texture_options fx_render_texture_options_default(
 	struct fx_render_texture_options options = {
 		.corner_radius = 0,
 		.corners = CORNER_LOCATION_NONE,
-		.discard_transparent = false,
 		.clip_box = NULL,
 	};
 	memcpy(&options.base, base, sizeof(*base));
@@ -341,8 +341,7 @@ void fx_render_pass_add_texture(struct fx_gles_render_pass *pass,
 
 	bool has_alpha = texture->has_alpha
 		|| alpha < 1.0
-		|| fx_options->corner_radius > 0
-		|| fx_options->discard_transparent;
+		|| fx_options->corner_radius > 0;
 	setup_blending(!has_alpha ? WLR_RENDER_BLEND_MODE_NONE : options->blend_mode);
 
 	glUseProgram(shader->program);
@@ -367,7 +366,6 @@ void fx_render_pass_add_texture(struct fx_gles_render_pass *pass,
 	glUniform1f(shader->alpha, alpha);
 	glUniform2f(shader->size, clip_box->width, clip_box->height);
 	glUniform2f(shader->position, clip_box->x, clip_box->y);
-	glUniform1f(shader->discard_transparent, fx_options->discard_transparent);
 	glUniform1f(shader->radius_top_left, (CORNER_LOCATION_TOP_LEFT & corners) == CORNER_LOCATION_TOP_LEFT ?
 			fx_options->corner_radius : 0);
 	glUniform1f(shader->radius_top_right, (CORNER_LOCATION_TOP_RIGHT & corners) == CORNER_LOCATION_TOP_RIGHT ?
@@ -901,6 +899,10 @@ static struct fx_framebuffer *get_main_buffer_blur(struct fx_gles_render_pass *p
 	return fx_options->current_buffer;
 }
 
+static void fx_render_pass_add_ignore_transparent(struct fx_gles_render_pass *pass,
+		struct fx_render_texture_options *tex_options) {
+}
+
 void fx_render_pass_add_blur(struct fx_gles_render_pass *pass,
 		struct fx_render_blur_pass_options *fx_options) {
 	if (pass->buffer->renderer->basic_renderer) {
@@ -945,14 +947,13 @@ void fx_render_pass_add_blur(struct fx_gles_render_pass *pass,
 	struct fx_texture *blur_texture = fx_get_texture(wlr_texture);
 	blur_texture->has_alpha = true;
 
+	bool should_ignore_transparent = fx_options->ignore_transparent &&
+			tex_options->base.texture;
+
 	// Get a stencil of the window ignoring transparent regions
-	if (fx_options->ignore_transparent && fx_options->tex_options.base.texture) {
+	if (should_ignore_transparent) {
 		stencil_mask_init();
-
-		struct fx_render_texture_options tex_options = fx_options->tex_options;
-		tex_options.discard_transparent = true;
-		fx_render_pass_add_texture(pass, &tex_options);
-
+		fx_render_pass_add_ignore_transparent(pass, tex_options);
 		stencil_mask_close(true);
 	}
 
@@ -970,7 +971,7 @@ void fx_render_pass_add_blur(struct fx_gles_render_pass *pass,
 	wlr_texture_destroy(&blur_texture->wlr_texture);
 
 	// Finish stenciling
-	if (fx_options->ignore_transparent && fx_options->tex_options.base.texture) {
+	if (should_ignore_transparent) {
 		stencil_mask_fini();
 	}
 

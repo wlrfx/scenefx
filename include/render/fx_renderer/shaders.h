@@ -117,8 +117,6 @@ struct tex_shader {
 	GLint radius_top_right;
 	GLint radius_bottom_left;
 	GLint radius_bottom_right;
-
-	GLint discard_transparent;
 };
 
 bool link_tex_program(struct tex_shader *shader, GLint client_version, enum fx_tex_shader_source source);

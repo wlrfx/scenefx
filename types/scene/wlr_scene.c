@@ -1836,7 +1836,6 @@ static void scene_entry_render(struct render_list_entry *entry, const struct ren
 					.clip_box = &dst_box,
 					.corner_radius = scene_rect->corner_radius * data->scale,
 					.corners = rect_corners,
-					.discard_transparent = false,
 				},
 				.opaque_region = &opaque_region,
 				.use_optimized_blur = scene_rect->backdrop_blur_optimized,
@@ -1909,7 +1908,6 @@ static void scene_entry_render(struct render_list_entry *entry, const struct ren
 					},
 					.clip_box = &dst_box,
 					.corner_radius = 0,
-					.discard_transparent = false,
 				},
 				.blur_data = &scene->blur_data,
 			};
@@ -2015,7 +2013,6 @@ static void scene_entry_render(struct render_list_entry *entry, const struct ren
 						.clip_box = &dst_box,
 						.corner_radius = scene_buffer->corner_radius * data->scale,
 						.corners = buffer_corners,
-						.discard_transparent = false,
 					},
 					.opaque_region = &opaque_region,
 					.use_optimized_blur = scene_buffer->backdrop_blur_optimized,

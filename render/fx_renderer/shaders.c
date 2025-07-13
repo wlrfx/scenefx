@@ -296,7 +296,6 @@ bool link_tex_program(struct tex_shader *shader, GLint client_version, enum fx_t
 	shader->radius_top_right = glGetUniformLocation(prog, "radius_top_right");
 	shader->radius_bottom_left = glGetUniformLocation(prog, "radius_bottom_left");
 	shader->radius_bottom_right = glGetUniformLocation(prog, "radius_bottom_right");
-	shader->discard_transparent = glGetUniformLocation(prog, "discard_transparent");
 
 	return true;
 }

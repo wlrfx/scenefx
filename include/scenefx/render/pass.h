@@ -57,7 +57,6 @@ struct fx_render_texture_options {
 	const struct wlr_box *clip_box; // Used to clip csd. Ignored if NULL
 	enum corner_location corners;
 	int corner_radius;
-	bool discard_transparent;
 };
 
 struct fx_render_rect_options {

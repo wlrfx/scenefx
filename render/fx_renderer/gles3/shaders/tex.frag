@@ -33,8 +33,6 @@ uniform float radius_top_right;
 uniform float radius_bottom_left;
 uniform float radius_bottom_right;
 
-uniform bool discard_transparent;
-
 out vec4 fragColor;
 
 vec4 sample_texture() {
@@ -57,9 +55,4 @@ void main() {
         radius_bottom_right
     );
 	fragColor = mix(sample_texture() * alpha, vec4(0.0), corner_alpha);
-
-	if (discard_transparent && fragColor.a == 0.0) {
-		discard;
-		return;
-	}
 }

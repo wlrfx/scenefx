@@ -117,8 +117,6 @@ struct tex_shader {
 	GLint radius_top_right;
 	GLint radius_bottom_left;
 	GLint radius_bottom_right;
-
-	GLint discard_transparent;
 };
 
 bool link_tex_program(struct tex_shader *shader, GLint client_version, enum fx_tex_shader_source source);
@@ -169,5 +167,16 @@ struct blur_effects_shader {
 };
 
 bool link_blur_effects_program(struct blur_effects_shader *shader, GLint client_version);
+
+struct discard_transparent_shader {
+	GLuint program;
+	GLint proj;
+	GLint tex_proj;
+	GLint tex;
+	GLint pos_attrib;
+};
+
+bool link_discard_transparent_program(struct discard_transparent_shader *shader,
+		GLint client_version, enum fx_tex_shader_source source);
 
 #endif

@@ -186,6 +186,9 @@ struct fx_renderer {
 		struct blur_shader blur1;
 		struct blur_shader blur2;
 		struct blur_effects_shader blur_effects;
+		struct discard_transparent_shader discard_transparent_rgba;
+		struct discard_transparent_shader discard_transparent_rgbx;
+		struct discard_transparent_shader discard_transparent_ext;
 	} shaders;
 
 	struct wl_list buffers; // fx_framebuffer.link

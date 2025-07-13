@@ -900,8 +900,7 @@ static struct fx_framebuffer *get_main_buffer_blur(struct fx_gles_render_pass *p
 }
 
 static void fx_render_pass_add_discard_transparent(struct fx_gles_render_pass *pass,
-		struct fx_render_texture_options *fx_options) {
-	const struct wlr_render_texture_options *options = &fx_options->base;
+		struct wlr_render_texture_options *options) {
 	struct fx_renderer *renderer = pass->buffer->renderer;
 	struct fx_texture *texture = fx_get_texture(options->texture);
 
@@ -1034,7 +1033,7 @@ void fx_render_pass_add_blur(struct fx_gles_render_pass *pass,
 	// Get a stencil of the window ignoring transparent regions
 	if (should_ignore_transparent) {
 		stencil_mask_init();
-		fx_render_pass_add_discard_transparent(pass, tex_options);
+		fx_render_pass_add_discard_transparent(pass, &tex_options->base);
 		stencil_mask_close(true);
 	}
 

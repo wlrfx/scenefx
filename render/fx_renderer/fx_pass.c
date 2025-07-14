@@ -829,7 +829,8 @@ static void render_blur_effects(struct fx_gles_render_pass *pass,
 	wlr_texture_destroy(options->texture);
 }
 
-// Blurs the main_buffer content and returns the blurred framebuffer
+// Blurs the main_buffer content and returns the blurred framebuffer.
+// Returns NULL when the blur parameters reach 0.
 static struct fx_framebuffer *get_main_buffer_blur(struct fx_gles_render_pass *pass,
 		struct fx_render_blur_pass_options *fx_options) {
 	struct fx_renderer *renderer = pass->buffer->renderer;
@@ -837,6 +838,9 @@ static struct fx_framebuffer *get_main_buffer_blur(struct fx_gles_render_pass *p
 
 	// We don't want to affect the reference blur_data
 	struct blur_data blur_data = blur_data_apply_strength(fx_options->blur_data, fx_options->blur_strength);
+	if (fx_options->blur_strength <= 0 || blur_data.num_passes <= 0 || blur_data.radius <= 0) {
+		return NULL;
+	}
 	fx_options->blur_data = &blur_data;
 
 	pixman_region32_t damage;
@@ -952,6 +956,9 @@ void fx_render_pass_add_blur(struct fx_gles_render_pass *pass,
 			blur_options.current_buffer = pass->buffer;
 		}
 		buffer = get_main_buffer_blur(pass, &blur_options);
+		if (!buffer) {
+			goto damage_finish;
+		}
 	}
 	struct wlr_texture *wlr_texture =
 		fx_texture_from_buffer(&renderer->wlr_renderer, buffer->buffer);

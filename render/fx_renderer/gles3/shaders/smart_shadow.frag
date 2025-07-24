@@ -10,7 +10,7 @@ uniform vec2 size;
 uniform vec2 position;
 uniform float blur_sigma;
 uniform vec4 color;
-uniform bool is_horizontal;
+uniform vec2 direction;
 
 out vec4 fragColor;
 
@@ -32,12 +32,7 @@ void main() {
 	float weight_sum = 0.0f;
 	for (int i = 0; i < kernelSize; ++i) {
 		float offset = float(i - kernelSize / 2);
-		vec2 tex_offset;
-		if (is_horizontal) {
-			tex_offset = vec2(offset / size.x, 0.0f);
-		} else {
-			tex_offset = vec2(0.0f, offset / size.y);
-		}
+		vec2 tex_offset = vec2(offset / size.x, offset / size.y) * direction;
 
 		float weight = gaussian(offset);
 		weight_sum += weight;

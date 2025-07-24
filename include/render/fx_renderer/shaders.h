@@ -177,7 +177,7 @@ struct smart_shadow_shader {
 	GLint tex;
 	GLint color;
 	GLint blur_sigma;
-	GLint is_horizontal;
+	GLint direction;
 	GLint pos_attrib;
 	GLint size;
 	GLint position;

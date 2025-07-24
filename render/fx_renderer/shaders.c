@@ -401,7 +401,7 @@ bool link_smart_shadow_program(struct smart_shadow_shader *shader, GLint client_
 	shader->tex = glGetUniformLocation(prog, "tex");
 	shader->color = glGetUniformLocation(prog, "color");
 	shader->blur_sigma = glGetUniformLocation(prog, "blur_sigma");
-	shader->is_horizontal = glGetUniformLocation(prog, "is_horizontal");
+	shader->direction = glGetUniformLocation(prog, "direction");
 	shader->pos_attrib = glGetAttribLocation(prog, "pos");
 	shader->tex_proj = glGetUniformLocation(prog, "tex_proj");
 	shader->size = glGetUniformLocation(prog, "size");
@@ -423,7 +423,7 @@ bool link_smart_shadow_final_program(struct smart_shadow_shader *shader, GLint c
 	shader->tex = glGetUniformLocation(prog, "tex");
 	shader->color = glGetUniformLocation(prog, "color");
 	shader->blur_sigma = glGetUniformLocation(prog, "blur_sigma");
-	shader->is_horizontal = glGetUniformLocation(prog, "is_horizontal");
+	shader->direction = glGetUniformLocation(prog, "direction");
 	shader->pos_attrib = glGetAttribLocation(prog, "pos");
 	shader->tex_proj = glGetUniformLocation(prog, "tex_proj");
 	shader->size = glGetUniformLocation(prog, "size");

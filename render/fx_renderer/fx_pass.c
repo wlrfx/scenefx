@@ -1061,7 +1061,7 @@ static void render_smart_shadow_blur_direction(struct fx_gles_render_pass *pass,
 	glUniform1i(shader->tex, 0);
 	glUniform4f(shader->color, fx_options->color.r, fx_options->color.g, fx_options->color.b, fx_options->color.a);
 	glUniform1f(shader->blur_sigma, fx_options->blur_sigma);
-	glUniform1f(shader->is_horizontal, is_horizontal);
+	glUniform2f(shader->direction, 1 - !is_horizontal, 1 - is_horizontal);
 	glUniform2f(shader->size, dst_box.width, dst_box.height);
 	glUniform2f(shader->position, dst_box.x, dst_box.y);
 
@@ -1122,7 +1122,7 @@ static void fx_render_pass_add_smart_shadow_final(struct fx_gles_render_pass *pa
 	glUniform1i(shader->tex, 0);
 	glUniform4f(shader->color, fx_options->color.r, fx_options->color.g, fx_options->color.b, fx_options->color.a);
 	glUniform1f(shader->blur_sigma, fx_options->blur_sigma);
-	glUniform1f(shader->is_horizontal, false);
+	glUniform2f(shader->direction, 0, 0);
 	glUniform2f(shader->size, dst_box.width, dst_box.height);
 	glUniform2f(shader->position, dst_box.x, dst_box.y);
 

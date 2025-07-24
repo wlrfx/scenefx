@@ -216,6 +216,11 @@ struct wlr_scene_buffer {
 	bool backdrop_blur_optimized;
 	bool backdrop_blur_ignore_transparent;
 	enum corner_location corners;
+	// TODO: Config
+	struct {
+		bool enabled;
+		int blur_radius;
+	} smart_shadow;
 
 	float opacity;
 	enum wlr_scale_filter_mode filter_mode;

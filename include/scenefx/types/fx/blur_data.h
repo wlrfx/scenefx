@@ -4,6 +4,12 @@
 #include <stdbool.h>
 #include <wlr/util/addon.h>
 
+// TODO: Move this
+// TODO: Probably smaller
+// #define smart_shadow_calc_size(blur_sigma) ceil(blur_sigma * 3.0) * 2 + 1
+// NOTE: Might have to be larger in some instances?
+#define smart_shadow_calc_size(blur_sigma) ceil(blur_sigma * 2)
+
 struct blur_data {
 	int num_passes;
 	int radius;

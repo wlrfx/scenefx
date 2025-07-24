@@ -21,7 +21,7 @@ out vec4 fragColor;
 // https://www.rastergrid.com/blog/2010/09/efficient-gaussian-blur-with-linear-sampling/
 float gaussian(float x) {
 	return exp(-(x * x) / (2.0 * blur_sigma * blur_sigma))
-		/ (sqrt(2.0 * 3.141592653589793) * blur_sigma * blur_sigma);
+		/ (sqrt(2.0 * 3.141592653589793) * blur_sigma);
 }
 
 void main() {

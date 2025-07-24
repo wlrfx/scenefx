@@ -20,6 +20,8 @@
 #include "blur1_frag_gles3_src.h"
 #include "blur2_frag_gles3_src.h"
 #include "blur_effects_frag_gles3_src.h"
+#include "smart_shadow_frag_gles3_src.h"
+#include "smart_shadow_final_frag_gles3_src.h"
 // gles2
 #include "common_vert_gles2_src.h"
 #include "gradient_frag_gles2_src.h"
@@ -382,6 +384,50 @@ bool link_blur_effects_program(struct blur_effects_shader *shader, GLint client_
 	shader->brightness = glGetUniformLocation(prog, "brightness");
 	shader->contrast = glGetUniformLocation(prog, "contrast");
 	shader->saturation = glGetUniformLocation(prog, "saturation");
+
+	return true;
+}
+
+bool link_smart_shadow_program(struct smart_shadow_shader *shader, GLint client_version) {
+	GLuint prog;
+	shader->program = prog = client_version > 2 ? link_program(smart_shadow_frag_gles3_src, client_version)
+		// TODO: GLES2
+		: link_program(smart_shadow_frag_gles3_src, client_version);
+	if (!shader->program) {
+		return false;
+	}
+
+	shader->proj = glGetUniformLocation(prog, "proj");
+	shader->tex = glGetUniformLocation(prog, "tex");
+	shader->color = glGetUniformLocation(prog, "color");
+	shader->blur_sigma = glGetUniformLocation(prog, "blur_sigma");
+	shader->is_horizontal = glGetUniformLocation(prog, "is_horizontal");
+	shader->pos_attrib = glGetAttribLocation(prog, "pos");
+	shader->tex_proj = glGetUniformLocation(prog, "tex_proj");
+	shader->size = glGetUniformLocation(prog, "size");
+	shader->position = glGetUniformLocation(prog, "position");
+
+	return true;
+}
+
+bool link_smart_shadow_final_program(struct smart_shadow_shader *shader, GLint client_version) {
+	GLuint prog;
+	shader->program = prog = client_version > 2 ? link_program(smart_shadow_final_frag_gles3_src, client_version)
+		// TODO: GLES2
+		: link_program(smart_shadow_final_frag_gles3_src, client_version);
+	if (!shader->program) {
+		return false;
+	}
+
+	shader->proj = glGetUniformLocation(prog, "proj");
+	shader->tex = glGetUniformLocation(prog, "tex");
+	shader->color = glGetUniformLocation(prog, "color");
+	shader->blur_sigma = glGetUniformLocation(prog, "blur_sigma");
+	shader->is_horizontal = glGetUniformLocation(prog, "is_horizontal");
+	shader->pos_attrib = glGetAttribLocation(prog, "pos");
+	shader->tex_proj = glGetUniformLocation(prog, "tex_proj");
+	shader->size = glGetUniformLocation(prog, "size");
+	shader->position = glGetUniformLocation(prog, "position");
 
 	return true;
 }

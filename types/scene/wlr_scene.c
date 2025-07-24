@@ -40,12 +40,14 @@
 #define DMABUF_FEEDBACK_DEBOUNCE_FRAMES  30
 #define HIGHLIGHT_DAMAGE_FADEOUT_TIME   250
 
+#define SCENE_BUFFER_SHOULD_SMART_SHADOW(scene_buffer) \
+	(scene_buffer->smart_shadow.enabled && scene_buffer->smart_shadow.blur_radius > 0)
 #define SCENE_BUFFER_SHOULD_BLUR(scene_buffer, blur_data) \
-	scene_buffer->backdrop_blur && is_scene_blur_enabled(blur_data) && \
-		(!scene_buffer->buffer_is_opaque || scene_buffer->opacity < 1.0f)
+	(scene_buffer->backdrop_blur && is_scene_blur_enabled(blur_data) && \
+	 (!scene_buffer->buffer_is_opaque || scene_buffer->opacity < 1.0f))
 #define SCENE_RECT_SHOULD_BLUR(scene_rect, blur_data) \
-	scene_rect->backdrop_blur && is_scene_blur_enabled(blur_data) && \
-		scene_rect->color[3] < 1.0f
+	(scene_rect->backdrop_blur && is_scene_blur_enabled(blur_data) && \
+	 scene_rect->color[3] < 1.0f)
 
 struct wlr_scene_tree *wlr_scene_tree_from_node(struct wlr_scene_node *node) {
 	assert(node->type == WLR_SCENE_NODE_TREE);
@@ -397,6 +399,7 @@ struct render_data {
 	struct fx_gles_render_pass *render_pass;
 	pixman_region32_t damage;
 
+	// Backdrop blur and smart shadows (also uses blur)
 	bool has_blur;
 };
 
@@ -676,9 +679,15 @@ static bool scene_node_update_iterator(struct wlr_scene_node *node,
 	// Expand the damage to compensate for blur artifacts
 	if (node->type == WLR_SCENE_NODE_BUFFER) {
 		struct wlr_scene_buffer *scene_buffer = wlr_scene_buffer_from_node(node);
+		// TODO: Don't just expand both, expand the largest (blur radius vs
+		// shadow radius)
 		if (SCENE_BUFFER_SHOULD_BLUR(scene_buffer, data->blur_data)) {
 			wlr_region_expand(&node->visible, &node->visible,
 					blur_data_calc_size(data->blur_data));
+		}
+		if (SCENE_BUFFER_SHOULD_SMART_SHADOW(scene_buffer)) {
+			wlr_region_expand(&node->visible, &node->visible,
+					smart_shadow_calc_size(scene_buffer->smart_shadow.blur_radius));
 		}
 	} else if (node->type == WLR_SCENE_NODE_RECT) {
 		struct wlr_scene_rect *scene_rect = wlr_scene_rect_from_node(node);
@@ -1206,6 +1215,8 @@ struct wlr_scene_buffer *wlr_scene_buffer_create(struct wlr_scene_tree *parent,
 	scene_buffer->backdrop_blur_optimized = false;
 	scene_buffer->backdrop_blur_ignore_transparent = true;
 	scene_buffer->corners = CORNER_LOCATION_NONE;
+	scene_buffer->smart_shadow.enabled = false;
+	scene_buffer->smart_shadow.blur_radius = 0;
 
 	scene_buffer_set_buffer(scene_buffer, buffer);
 	scene_node_update(&scene_buffer->node, NULL);
@@ -1355,9 +1366,15 @@ void wlr_scene_buffer_set_buffer_with_options(struct wlr_scene_buffer *scene_buf
 		pixman_region32_fini(&cull_region);
 
 		// Expand the damage when committed to, fixes blur artifacts
+		// TODO: Don't just expand both, expand the largest (blur radius vs
+		// shadow radius)
 		if (SCENE_BUFFER_SHOULD_BLUR(scene_buffer, &scene->blur_data)) {
 			wlr_region_expand(&output_damage, &output_damage,
 					blur_data_calc_size(&scene->blur_data));
+		}
+		if (SCENE_BUFFER_SHOULD_SMART_SHADOW(scene_buffer)) {
+			wlr_region_expand(&output_damage, &output_damage,
+					smart_shadow_calc_size(scene_buffer->smart_shadow.blur_radius));
 		}
 
 		pixman_region32_translate(&output_damage,
@@ -2081,6 +2098,26 @@ static void scene_entry_render(struct render_list_entry *entry, const struct ren
 			.corner_radius = scene_buffer->corner_radius * data->scale,
 		};
 
+		// TODO: Render before blur
+		if (SCENE_BUFFER_SHOULD_SMART_SHADOW(scene_buffer)) {
+			const float alpha = 1.0;
+			struct fx_render_smart_shadow_options shadow_options = {
+				.tex_options = tex_options,
+
+				// TODO:
+				.blur_sigma = scene_buffer->smart_shadow.blur_radius,
+				.color = {
+					// TODO: Fix weak colors
+					.r = 0 * alpha,
+					.g = 1 * alpha,
+					.b = 0 * alpha,
+					.a = alpha,
+				},
+				.x_offset = 0,
+				.y_offset = 0,
+			};
+			fx_render_pass_add_smart_shadow(data->render_pass, &shadow_options);
+		}
 		fx_render_pass_add_texture(data->render_pass, &tex_options);
 
 		struct wlr_scene_output_sample_event sample_event = {
@@ -2659,17 +2696,13 @@ static void apply_blur_region(struct wlr_scene_node *node,
 static bool scene_output_has_blur(int list_len,
 		struct render_list_entry *list_data, struct wlr_scene_output *scene_output,
 		pixman_region32_t *blur_region) {
-	if (scene_output->scene->blur_data.radius <= 0 ||
-			scene_output->scene->blur_data.num_passes <= 0) {
-		return false;
-	}
-
 	for (int i = list_len - 1; i >= 0; i--) {
 		struct wlr_scene_node *node = list_data[i].node;
 		switch (node->type) {
 		case WLR_SCENE_NODE_BUFFER:;
 			struct wlr_scene_buffer *scene_buffer = wlr_scene_buffer_from_node(node);
-			if (SCENE_BUFFER_SHOULD_BLUR(scene_buffer, &scene_output->scene->blur_data)) {
+			if (SCENE_BUFFER_SHOULD_BLUR(scene_buffer, &scene_output->scene->blur_data)
+					|| SCENE_BUFFER_SHOULD_SMART_SHADOW(scene_buffer)) {
 				apply_blur_region(node, scene_output, blur_region);
 			}
 			break;
@@ -2976,6 +3009,8 @@ bool wlr_scene_output_build_state(struct wlr_scene_output *scene_output,
 			// the whole output
 			whole_output_blur_damaged = true;
 		}else {
+			// TODO: Also compensate for smart shadow blur
+
 			// copy the surrounding content where the blur would display artifacts
 			// and draw it above the artifacts
 			pixman_region32_t extended_damage;

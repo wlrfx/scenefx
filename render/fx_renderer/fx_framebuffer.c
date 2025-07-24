@@ -1,3 +1,4 @@
+#include <assert.h>
 #include <stdlib.h>
 #include <wlr/interfaces/wlr_buffer.h>
 #include <wlr/render/allocator.h>
@@ -67,6 +68,7 @@ GLuint fx_framebuffer_get_fbo(struct fx_framebuffer *buffer) {
 	return buffer->fbo;
 }
 
+// TODO: Remove swapchain arg now when it's not needed
 void fx_framebuffer_get_or_create_custom(struct fx_renderer *renderer,
 		struct wlr_output *output, struct wlr_swapchain *swapchain,
 		struct fx_framebuffer **fx_framebuffer, bool *failed) {
@@ -87,9 +89,21 @@ void fx_framebuffer_get_or_create_custom(struct fx_renderer *renderer,
 	int height = output->height;
 	struct wlr_buffer *wlr_buffer = NULL;
 
+	// Try getting a format with alpha. One could use the outputs swapchain
+	// format, but that one doesn't support alpha.
+	const struct fx_pixel_format *pix_fmt =
+		get_fx_format_from_gl(GL_RGBA, GL_UNSIGNED_BYTE, true);
+	if (!pix_fmt) {
+		wlr_log(WLR_ERROR, "Could not get pixel format for custom fx framebuffer!");
+		*failed = true;
+		return;
+	}
+	const struct wlr_drm_format *format = wlr_drm_format_set_get(&renderer->shm_texture_formats, pix_fmt->drm_format);
+	// Should exist when found with get_fx_format_from_gl
+	assert(format);
+
 	if (*fx_framebuffer == NULL) {
-		wlr_buffer = wlr_allocator_create_buffer(allocator, width, height,
-				&swapchain->format);
+		wlr_buffer = wlr_allocator_create_buffer(allocator, width, height, format);
 		if (wlr_buffer == NULL) {
 			wlr_log(WLR_ERROR, "Failed to allocate buffer");
 			*failed = true;

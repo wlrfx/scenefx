@@ -170,4 +170,20 @@ struct blur_effects_shader {
 
 bool link_blur_effects_program(struct blur_effects_shader *shader, GLint client_version);
 
+struct smart_shadow_shader {
+	GLuint program;
+	GLint proj;
+	GLint tex_proj;
+	GLint tex;
+	GLint color;
+	GLint blur_sigma;
+	GLint is_horizontal;
+	GLint pos_attrib;
+	GLint size;
+	GLint position;
+};
+
+bool link_smart_shadow_program(struct smart_shadow_shader *shader, GLint client_version);
+bool link_smart_shadow_final_program(struct smart_shadow_shader *shader, GLint client_version);
+
 #endif

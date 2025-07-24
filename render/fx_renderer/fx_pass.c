@@ -1015,6 +1015,243 @@ finish:
 	return !failed;
 }
 
+static void render_smart_shadow_blur_direction(struct fx_gles_render_pass *pass,
+		const struct fx_render_smart_shadow_options *fx_options,
+		bool is_horizontal) {
+	const struct wlr_render_texture_options *options = &fx_options->tex_options.base;
+	struct fx_renderer *renderer = pass->buffer->renderer;
+	struct fx_texture *texture = fx_get_texture(options->texture);
+	assert(texture->has_alpha);
+
+	struct smart_shadow_shader *shader = &renderer->shaders.smart_shadow;
+
+	struct wlr_box dst_box;
+	struct wlr_fbox src_fbox;
+	wlr_render_texture_options_get_src_box(options, &src_fbox);
+	wlr_render_texture_options_get_dst_box(options, &dst_box);
+
+	src_fbox.x /= options->texture->width;
+	src_fbox.y /= options->texture->height;
+	src_fbox.width /= options->texture->width;
+	src_fbox.height /= options->texture->height;
+
+	push_fx_debug(renderer);
+
+	// setup_blending(options->blend_mode);
+	setup_blending(WLR_RENDER_BLEND_MODE_NONE);
+	glBlendFunc(GL_ONE, GL_ZERO);
+	// setup_blending(WLR_RENDER_BLEND_MODE_PREMULTIPLIED);
+
+	glUseProgram(shader->program);
+
+	glActiveTexture(GL_TEXTURE0);
+	glBindTexture(texture->target, texture->tex);
+
+	switch (options->filter_mode) {
+	case WLR_SCALE_FILTER_BILINEAR:
+		glTexParameteri(texture->target, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+		glTexParameteri(texture->target, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+		break;
+	case WLR_SCALE_FILTER_NEAREST:
+		glTexParameteri(texture->target, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+		glTexParameteri(texture->target, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+		break;
+	}
+
+	glUniform1i(shader->tex, 0);
+	glUniform4f(shader->color, fx_options->color.r, fx_options->color.g, fx_options->color.b, fx_options->color.a);
+	glUniform1f(shader->blur_sigma, fx_options->blur_sigma);
+	glUniform1f(shader->is_horizontal, is_horizontal);
+	glUniform2f(shader->size, dst_box.width, dst_box.height);
+	glUniform2f(shader->position, dst_box.x, dst_box.y);
+
+	set_proj_matrix(shader->proj, pass->projection_matrix, &dst_box);
+	set_tex_matrix(shader->tex_proj, options->transform, &src_fbox);
+
+	render(&dst_box, options->clip, shader->pos_attrib);
+
+	glBindTexture(texture->target, 0);
+
+	glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
+
+	pop_fx_debug(renderer);
+}
+
+static void fx_render_pass_add_smart_shadow_final(struct fx_gles_render_pass *pass,
+		const struct fx_render_smart_shadow_options *fx_options) {
+	const struct wlr_render_texture_options *options = &fx_options->tex_options.base;
+	struct fx_renderer *renderer = pass->buffer->renderer;
+	struct fx_texture *texture = fx_get_texture(options->texture);
+
+	struct smart_shadow_shader *shader = &renderer->shaders.smart_shadow_final;
+
+	struct wlr_box dst_box;
+	struct wlr_fbox src_fbox;
+	wlr_render_texture_options_get_src_box(options, &src_fbox);
+	wlr_render_texture_options_get_dst_box(options, &dst_box);
+
+	src_fbox.x /= options->texture->width;
+	src_fbox.y /= options->texture->height;
+	src_fbox.width /= options->texture->width;
+	src_fbox.height /= options->texture->height;
+
+	push_fx_debug(renderer);
+
+	// setup_blending(options->blend_mode);
+	// setup_blending(WLR_RENDER_BLEND_MODE_NONE);
+	setup_blending(WLR_RENDER_BLEND_MODE_PREMULTIPLIED);
+	// glEnable(GL_BLEND);
+	// glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
+	glUseProgram(shader->program);
+
+	glActiveTexture(GL_TEXTURE0);
+	glBindTexture(texture->target, texture->tex);
+
+	switch (options->filter_mode) {
+	case WLR_SCALE_FILTER_BILINEAR:
+		glTexParameteri(texture->target, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+		glTexParameteri(texture->target, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+		break;
+	case WLR_SCALE_FILTER_NEAREST:
+		glTexParameteri(texture->target, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+		glTexParameteri(texture->target, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+		break;
+	}
+
+	glUniform1i(shader->tex, 0);
+	glUniform4f(shader->color, fx_options->color.r, fx_options->color.g, fx_options->color.b, fx_options->color.a);
+	glUniform1f(shader->blur_sigma, fx_options->blur_sigma);
+	glUniform1f(shader->is_horizontal, false);
+	glUniform2f(shader->size, dst_box.width, dst_box.height);
+	glUniform2f(shader->position, dst_box.x, dst_box.y);
+
+	set_proj_matrix(shader->proj, pass->projection_matrix, &dst_box);
+	set_tex_matrix(shader->tex_proj, options->transform, &src_fbox);
+
+	render(&dst_box, options->clip, shader->pos_attrib);
+
+	glBindTexture(texture->target, 0);
+
+	glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
+
+	pop_fx_debug(renderer);
+}
+
+// TODO: Downsize it to 1/2 or 1/4 the size, similar to the kawase blur
+// TODO: Use Kawase blur instead?
+void fx_render_pass_add_smart_shadow(struct fx_gles_render_pass *pass,
+		struct fx_render_smart_shadow_options *fx_options) {
+	if (pass->buffer->renderer->basic_renderer) {
+		wlr_log(WLR_ERROR, "Please use 'fx_renderer_begin_buffer_pass' instead of "
+				"'wlr_renderer_begin_buffer_pass' to use advanced effects");
+		return;
+	}
+
+	// struct wlr_box saved_dst_box = fx_options->tex_options.base.dst_box;
+	// struct wlr_fbox saved_src_box = fx_options->tex_options.base.src_box;
+
+	const float blur_sigma = smart_shadow_calc_size(fx_options->blur_sigma);
+	struct fx_renderer *renderer = pass->buffer->renderer;
+	struct wlr_box *dst_box = &fx_options->tex_options.base.dst_box;
+
+	struct fx_framebuffer *effects_buffer_swapped = pass->fx_effect_framebuffers->effects_buffer_swapped;
+	struct fx_framebuffer *effects_buffer = pass->fx_effect_framebuffers->effects_buffer;
+	struct wlr_box monitor_box = get_monitor_box(pass->output);
+
+	pixman_region32_t clip;
+	pixman_region32_init_rect(&clip,
+			dst_box->x - blur_sigma, dst_box->y - blur_sigma,
+			dst_box->width + blur_sigma * 2, dst_box->height + blur_sigma * 2);
+	pixman_region32_intersect(&clip, &clip, fx_options->tex_options.base.clip);
+	// TODO: EXPAND MORE
+	wlr_region_expand(&clip, &clip, smart_shadow_calc_size(fx_options->blur_sigma));
+	// wlr_region_expand(&clip, &clip, ceil(fx_options->blur_sigma * 3.0) * 2 + 1);
+	fx_options->tex_options.base.clip = &clip;
+
+	bool save = false;
+
+	// TODO: Use regular shadow if the base texture isn't transparent:
+	// - fx_get_texture(fx_options->tex_options.base.texture)->has_alpha
+
+	fx_framebuffer_bind(effects_buffer);
+
+	// Clear the pending region, otherwise translucent regions mix with
+	// previously calculated blur.
+	glEnable(GL_SCISSOR_TEST);
+	int n_rects;
+	const pixman_box32_t *rects = pixman_region32_rectangles(&clip, &n_rects);
+	for (int i = 0; i < n_rects; i++) {
+		const pixman_box32_t rect = rects[i];
+		glScissor(rect.x1, rect.y1, rect.x2 - rect.x1, rect.y2 - rect.y1);
+		glClearColor(0, 0, 0, 0);
+		glClear(GL_COLOR_BUFFER_BIT);
+	}
+	glDisable(GL_SCISSOR_TEST);
+
+	// Initially Render to the effects buffer
+	fx_render_pass_add_texture(pass, &(struct fx_render_texture_options) {
+		.base = fx_options->tex_options.base,
+		.clip_box = NULL,
+		.discard_transparent = true,
+		.corner_radius = 0,
+		.corners = CORNER_LOCATION_NONE,
+	});
+	if (save) {
+		save_buffer_to_png(
+				fx_texture_from_buffer(&renderer->wlr_renderer, effects_buffer->buffer),
+				"./effects_1-PRE.png");
+	}
+
+	// Prepare for blurring
+	fx_options->tex_options.base.src_box = (struct wlr_fbox) {
+		.x = 0, .y = 0, .width = monitor_box.width, .height = monitor_box.height,
+	};
+	fx_options->tex_options.base.dst_box = monitor_box;
+
+	// Horizontal Pass
+	fx_framebuffer_bind(effects_buffer_swapped);
+	fx_options->tex_options.base.texture = fx_texture_from_buffer(&renderer->wlr_renderer,
+			effects_buffer->buffer);
+	render_smart_shadow_blur_direction(pass, fx_options, true);
+	if (save) {
+		save_buffer_to_png(
+				fx_texture_from_buffer(&renderer->wlr_renderer, effects_buffer_swapped->buffer),
+				"./effects_H.png");
+	}
+
+	// Vertical Pass
+	fx_framebuffer_bind(effects_buffer);
+	fx_options->tex_options.base.texture = fx_texture_from_buffer(&renderer->wlr_renderer,
+			effects_buffer_swapped->buffer);
+	// glClearColor(0, 0, 0, 0);
+	// glClear(GL_COLOR_BUFFER_BIT);
+	render_smart_shadow_blur_direction(pass, fx_options, false);
+	if (save) {
+		save_buffer_to_png(
+				fx_texture_from_buffer(&renderer->wlr_renderer, effects_buffer->buffer),
+				"./effects_V.png");
+	}
+
+	// Final Render Pass
+	fx_framebuffer_bind(pass->buffer);
+	fx_options->tex_options.base.dst_box = monitor_box;
+	fx_options->tex_options.base.src_box = (struct wlr_fbox) {
+		.x = 0, .y = 0, .width = monitor_box.width, .height = monitor_box.height,
+	};
+	fx_options->tex_options.base.texture = fx_texture_from_buffer(&renderer->wlr_renderer,
+			effects_buffer->buffer);
+	// pixman_region32_intersect_rect(&clip, &clip,
+	// 		saved_dst_box.x, saved_dst_box.y,
+	// 		saved_dst_box.width, saved_dst_box.height);
+	fx_render_pass_add_smart_shadow_final(pass, fx_options);
+
+	// fx_options->tex_options.base.dst_box = saved_dst_box;
+	// fx_options->tex_options.base.src_box = saved_src_box;
+
+	pixman_region32_fini(&clip);
+}
+
 // TODO: Use blitting for glesv3
 void fx_renderer_read_to_buffer(struct fx_gles_render_pass *pass,
 		pixman_region32_t *_region, struct fx_framebuffer *dst_buffer,

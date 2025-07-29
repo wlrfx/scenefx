@@ -1148,9 +1148,6 @@ void fx_render_pass_add_smart_shadow(struct fx_gles_render_pass *pass,
 		return;
 	}
 
-	// struct wlr_box saved_dst_box = fx_options->tex_options.base.dst_box;
-	// struct wlr_fbox saved_src_box = fx_options->tex_options.base.src_box;
-
 	const float blur_sigma = smart_shadow_calc_size(fx_options->blur_sigma);
 	struct fx_renderer *renderer = pass->buffer->renderer;
 	struct wlr_box *dst_box = &fx_options->tex_options.base.dst_box;
@@ -1168,8 +1165,6 @@ void fx_render_pass_add_smart_shadow(struct fx_gles_render_pass *pass,
 	wlr_region_expand(&clip, &clip, smart_shadow_calc_size(fx_options->blur_sigma));
 	// wlr_region_expand(&clip, &clip, ceil(fx_options->blur_sigma * 3.0) * 2 + 1);
 	fx_options->tex_options.base.clip = &clip;
-
-	bool save = false;
 
 	// TODO: Use regular shadow if the base texture isn't transparent:
 	// - fx_get_texture(fx_options->tex_options.base.texture)->has_alpha
@@ -1197,43 +1192,34 @@ void fx_render_pass_add_smart_shadow(struct fx_gles_render_pass *pass,
 		.corner_radius = 0,
 		.corners = CORNER_LOCATION_NONE,
 	});
-	if (save) {
-		save_buffer_to_png(
-				fx_texture_from_buffer(&renderer->wlr_renderer, effects_buffer->buffer),
-				"./effects_1-PRE.png");
-	}
 
+	//
 	// Prepare for blurring
+	//
 	fx_options->tex_options.base.src_box = (struct wlr_fbox) {
 		.x = 0, .y = 0, .width = monitor_box.width, .height = monitor_box.height,
 	};
 	fx_options->tex_options.base.dst_box = monitor_box;
 
+	//
 	// Horizontal Pass
+	//
 	fx_framebuffer_bind(effects_buffer_swapped);
 	fx_options->tex_options.base.texture = fx_texture_from_buffer(&renderer->wlr_renderer,
 			effects_buffer->buffer);
 	render_smart_shadow_blur_direction(pass, fx_options, true);
-	if (save) {
-		save_buffer_to_png(
-				fx_texture_from_buffer(&renderer->wlr_renderer, effects_buffer_swapped->buffer),
-				"./effects_H.png");
-	}
 
+	//
 	// Vertical Pass
+	//
 	fx_framebuffer_bind(effects_buffer);
 	fx_options->tex_options.base.texture = fx_texture_from_buffer(&renderer->wlr_renderer,
 			effects_buffer_swapped->buffer);
-	// glClearColor(0, 0, 0, 0);
-	// glClear(GL_COLOR_BUFFER_BIT);
 	render_smart_shadow_blur_direction(pass, fx_options, false);
-	if (save) {
-		save_buffer_to_png(
-				fx_texture_from_buffer(&renderer->wlr_renderer, effects_buffer->buffer),
-				"./effects_V.png");
-	}
 
+	//
 	// Final Render Pass
+	//
 	fx_framebuffer_bind(pass->buffer);
 	fx_options->tex_options.base.dst_box = monitor_box;
 	fx_options->tex_options.base.src_box = (struct wlr_fbox) {
@@ -1241,9 +1227,6 @@ void fx_render_pass_add_smart_shadow(struct fx_gles_render_pass *pass,
 	};
 	fx_options->tex_options.base.texture = fx_texture_from_buffer(&renderer->wlr_renderer,
 			effects_buffer->buffer);
-	// pixman_region32_intersect_rect(&clip, &clip,
-	// 		saved_dst_box.x, saved_dst_box.y,
-	// 		saved_dst_box.width, saved_dst_box.height);
 	fx_render_pass_add_smart_shadow_final(pass, fx_options);
 
 	// fx_options->tex_options.base.dst_box = saved_dst_box;

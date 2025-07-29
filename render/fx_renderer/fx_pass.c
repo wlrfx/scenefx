@@ -52,6 +52,17 @@ static struct wlr_box get_monitor_box(struct wlr_output *output) {
 	return (struct wlr_box) { 0, 0, output->width, output->height };
 }
 
+static int scale_length(int length, int offset, float scale) {
+	return round((offset + length) * scale) - round(offset * scale);
+}
+
+static void scale_box(struct wlr_box *box, float scale) {
+	box->width = scale_length(box->width, box->x, scale);
+	box->height = scale_length(box->height, box->y, scale);
+	box->x = round(box->x * scale);
+	box->y = round(box->y * scale);
+}
+
 ///
 /// Base Wlroots pass functions
 ///
@@ -1040,7 +1051,6 @@ static void render_smart_shadow_blur_direction(struct fx_gles_render_pass *pass,
 	// setup_blending(options->blend_mode);
 	setup_blending(WLR_RENDER_BLEND_MODE_NONE);
 	glBlendFunc(GL_ONE, GL_ZERO);
-	// setup_blending(WLR_RENDER_BLEND_MODE_PREMULTIPLIED);
 
 	glUseProgram(shader->program);
 
@@ -1053,9 +1063,7 @@ static void render_smart_shadow_blur_direction(struct fx_gles_render_pass *pass,
 		glTexParameteri(texture->target, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 		break;
 	case WLR_SCALE_FILTER_NEAREST:
-		glTexParameteri(texture->target, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-		glTexParameteri(texture->target, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-		break;
+		abort();
 	}
 
 	glUniform1i(shader->tex, 0);
@@ -1139,6 +1147,9 @@ void fx_render_pass_add_smart_shadow(struct fx_gles_render_pass *pass,
 				"'wlr_renderer_begin_buffer_pass' to use advanced effects");
 		return;
 	}
+	// Downsample the blur at half resolution to increase performance. No visual
+	// difference
+	fx_options->blur_sigma *= smart_shadow_downscale;
 
 	const float blur_sigma = smart_shadow_calc_size(fx_options->blur_sigma);
 	struct fx_renderer *renderer = pass->buffer->renderer;
@@ -1154,9 +1165,13 @@ void fx_render_pass_add_smart_shadow(struct fx_gles_render_pass *pass,
 			dst_box.y - blur_sigma + fx_options->y_offset,
 			dst_box.width + blur_sigma * 2, dst_box.height + blur_sigma * 2);
 	pixman_region32_intersect(&clip, &clip, fx_options->tex_options.base.clip);
+
+	pixman_region32_t clip_scaled;
+	pixman_region32_init(&clip_scaled);
+	wlr_region_scale(&clip_scaled, &clip, smart_shadow_downscale);
 	pixman_region32_t clip_extended;
 	pixman_region32_init(&clip_extended);
-	wlr_region_expand(&clip_extended, &clip, blur_sigma);
+	wlr_region_expand(&clip_extended, &clip_scaled, blur_sigma);
 
 	// TODO: Use regular shadow if the base texture isn't transparent:
 	// - fx_get_texture(fx_options->tex_options.base.texture)->has_alpha
@@ -1177,10 +1192,14 @@ void fx_render_pass_add_smart_shadow(struct fx_gles_render_pass *pass,
 	glDisable(GL_SCISSOR_TEST);
 
 	// Initially Render to the effects buffer
-	fx_options->tex_options.base.clip = &clip;
+	fx_options->tex_options.base.clip = &clip_scaled;
 	fx_options->tex_options.clip_box = NULL;
+
 	fx_options->tex_options.base.dst_box.x += fx_options->x_offset;
 	fx_options->tex_options.base.dst_box.y += fx_options->y_offset;
+	scale_box(&fx_options->tex_options.base.dst_box, smart_shadow_downscale);
+	fx_options->tex_options.base.blend_mode = WLR_RENDER_BLEND_MODE_NONE;
+	fx_options->tex_options.base.filter_mode = WLR_SCALE_FILTER_BILINEAR;
 	fx_render_pass_add_texture(pass, &fx_options->tex_options);
 
 	//
@@ -1214,6 +1233,7 @@ void fx_render_pass_add_smart_shadow(struct fx_gles_render_pass *pass,
 	fx_framebuffer_bind(pass->buffer);
 	fx_options->tex_options.base.clip = &clip;
 	fx_options->tex_options.base.dst_box = monitor_box;
+	scale_box(&fx_options->tex_options.base.dst_box, 1 / smart_shadow_downscale);
 	fx_options->tex_options.base.src_box = (struct wlr_fbox) {
 		.x = 0, .y = 0, .width = monitor_box.width, .height = monitor_box.height,
 	};
@@ -1222,6 +1242,7 @@ void fx_render_pass_add_smart_shadow(struct fx_gles_render_pass *pass,
 	fx_render_pass_add_smart_shadow_final(pass, fx_options);
 
 	pixman_region32_fini(&clip_extended);
+	pixman_region32_fini(&clip_scaled);
 	pixman_region32_fini(&clip);
 }
 

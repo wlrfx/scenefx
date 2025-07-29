@@ -6,6 +6,7 @@
 
 // TODO: Move this
 #define smart_shadow_calc_size(blur_sigma) (ceil(1.5f * blur_sigma) * 2)
+#define smart_shadow_downscale 0.5
 
 struct blur_data {
 	int num_passes;

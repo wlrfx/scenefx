@@ -1219,6 +1219,8 @@ struct wlr_scene_buffer *wlr_scene_buffer_create(struct wlr_scene_tree *parent,
 	scene_buffer->smart_shadow.blur_radius = 0;
 	scene_buffer->smart_shadow.x_offset = 0;
 	scene_buffer->smart_shadow.y_offset = 0;
+	// TODO: MOVE
+	memcpy(scene_buffer->smart_shadow.color, (float[4]){0, 0, 0, 1}, sizeof(scene_buffer->smart_shadow.color));
 
 	scene_buffer_set_buffer(scene_buffer, buffer);
 	scene_node_update(&scene_buffer->node, NULL);
@@ -2053,7 +2055,6 @@ static void scene_entry_render(struct render_list_entry *entry, const struct ren
 		// TODO: Place in shadow_node instead?
 		if (SCENE_BUFFER_SHOULD_SMART_SHADOW(scene_buffer)) {
 			// const float alpha = 0.5;
-			const float alpha = 1.0;
 			struct fx_render_smart_shadow_options shadow_options = {
 				.tex_options = tex_options,
 
@@ -2061,10 +2062,10 @@ static void scene_entry_render(struct render_list_entry *entry, const struct ren
 				.blur_sigma = scene_buffer->smart_shadow.blur_radius,
 				.color = {
 					// TODO: Fix weak colors
-					.r = 0 * alpha,
-					.g = 1 * alpha,
-					.b = 0 * alpha,
-					.a = alpha,
+					.r = scene_buffer->smart_shadow.color[0],
+					.g = scene_buffer->smart_shadow.color[1],
+					.b = scene_buffer->smart_shadow.color[2],
+					.a = scene_buffer->smart_shadow.color[3],
 				},
 				.x_offset = scene_buffer->smart_shadow.x_offset,
 				.y_offset = scene_buffer->smart_shadow.y_offset,

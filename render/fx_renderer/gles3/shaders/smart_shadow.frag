@@ -16,6 +16,7 @@ out vec4 fragColor;
 // References:
 // - https://lisyarus.github.io/blog/posts/blur-coefficients-generator.html
 // - https://stackoverflow.com/a/64845819
+// - https://github.com/servo/webrender/blob/main/webrender/res/cs_blur.glsl
 
 // https://www.rastergrid.com/blog/2010/09/efficient-gaussian-blur-with-linear-sampling/
 float gaussian(float x) {
@@ -41,8 +42,4 @@ void main() {
 	}
 
 	fragColor = blur_color / weight_sum;
-
-	// TODO: Fix weak colors when opacity is low (compared to the reference CSS
-	// drop-shadow implementation)!
-	fragColor = vec4(fragColor.a) * color;
 }

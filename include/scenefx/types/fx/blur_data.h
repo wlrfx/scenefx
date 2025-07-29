@@ -5,6 +5,7 @@
 #include <wlr/util/addon.h>
 
 // TODO: Move this
+// TODO: Doesn't have to be this large!
 #define smart_shadow_calc_size(blur_sigma) ceil(blur_sigma * 3.0f) * 2 + 1
 
 struct blur_data {

@@ -1096,11 +1096,8 @@ static void fx_render_pass_add_smart_shadow_final(struct fx_gles_render_pass *pa
 
 	push_fx_debug(renderer);
 
-	// setup_blending(options->blend_mode);
-	// setup_blending(WLR_RENDER_BLEND_MODE_NONE);
 	setup_blending(WLR_RENDER_BLEND_MODE_PREMULTIPLIED);
-	// glEnable(GL_BLEND);
-	// glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+	glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
 
 	glUseProgram(shader->program);
 

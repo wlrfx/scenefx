@@ -14,6 +14,6 @@ out vec4 fragColor;
 
 void main() {
 	vec4 tex_sample = texture2D(tex, v_texcoord);
-	// TODO: Post processing or just Blit the texture to the main FBO instead?
-	fragColor = tex_sample;
+	// Sample the textures alpha mask and mix it with the shadow color
+	fragColor = vec4(color.rgb * tex_sample.a, tex_sample.a * color.a);
 }

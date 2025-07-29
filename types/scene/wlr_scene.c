@@ -679,15 +679,12 @@ static bool scene_node_update_iterator(struct wlr_scene_node *node,
 	// Expand the damage to compensate for blur artifacts
 	if (node->type == WLR_SCENE_NODE_BUFFER) {
 		struct wlr_scene_buffer *scene_buffer = wlr_scene_buffer_from_node(node);
-		// TODO: Don't just expand both, expand the largest (blur radius vs
-		// shadow radius)
-		if (SCENE_BUFFER_SHOULD_BLUR(scene_buffer, data->blur_data)) {
-			wlr_region_expand(&node->visible, &node->visible,
-					blur_data_calc_size(data->blur_data));
-		}
-		if (SCENE_BUFFER_SHOULD_SMART_SHADOW(scene_buffer)) {
-			wlr_region_expand(&node->visible, &node->visible,
+		if (SCENE_BUFFER_SHOULD_BLUR(scene_buffer, data->blur_data)
+				|| SCENE_BUFFER_SHOULD_SMART_SHADOW(scene_buffer)) {
+			const int blur_size = fmax(
+					blur_data_calc_size(data->blur_data),
 					smart_shadow_calc_size(scene_buffer->smart_shadow.blur_radius));
+			wlr_region_expand(&node->visible, &node->visible, blur_size);
 		}
 	} else if (node->type == WLR_SCENE_NODE_RECT) {
 		struct wlr_scene_rect *scene_rect = wlr_scene_rect_from_node(node);
@@ -1366,15 +1363,12 @@ void wlr_scene_buffer_set_buffer_with_options(struct wlr_scene_buffer *scene_buf
 		pixman_region32_fini(&cull_region);
 
 		// Expand the damage when committed to, fixes blur artifacts
-		// TODO: Don't just expand both, expand the largest (blur radius vs
-		// shadow radius)
-		if (SCENE_BUFFER_SHOULD_BLUR(scene_buffer, &scene->blur_data)) {
-			wlr_region_expand(&output_damage, &output_damage,
-					blur_data_calc_size(&scene->blur_data));
-		}
-		if (SCENE_BUFFER_SHOULD_SMART_SHADOW(scene_buffer)) {
-			wlr_region_expand(&output_damage, &output_damage,
+		if (SCENE_BUFFER_SHOULD_BLUR(scene_buffer, &scene->blur_data)
+				|| SCENE_BUFFER_SHOULD_SMART_SHADOW(scene_buffer)) {
+			const int blur_size = fmax(
+					blur_data_calc_size(&scene->blur_data),
 					smart_shadow_calc_size(scene_buffer->smart_shadow.blur_radius));
+			wlr_region_expand(&output_damage, &output_damage, blur_size);
 		}
 
 		pixman_region32_translate(&output_damage,
@@ -2666,8 +2660,8 @@ bool wlr_scene_output_needs_frame(struct wlr_scene_output *scene_output) {
 		scene_output->gamma_lut_changed;
 }
 
-static void apply_blur_region(struct wlr_scene_node *node,
-		struct wlr_scene_output *scene_output, pixman_region32_t *blur_region) {
+static void node_blur_region(struct wlr_scene_node *node,
+		struct wlr_scene_output *scene_output, pixman_region32_t *node_region) {
 	int x, y;
 	wlr_scene_node_coords(node, &x, &y);
 
@@ -2688,42 +2682,86 @@ static void apply_blur_region(struct wlr_scene_node *node,
 			wlr_output_transform_invert(output->transform),
 			output_width, output_height);
 
-	pixman_region32_union_rect(blur_region, blur_region,
+	pixman_region32_union_rect(node_region, node_region,
 			node_box.x, node_box.y,
 			node_box.width, node_box.height);
 }
 
 static bool scene_output_has_blur(int list_len,
 		struct render_list_entry *list_data, struct wlr_scene_output *scene_output,
-		pixman_region32_t *blur_region) {
+		pixman_region32_t *blur_region, pixman_region32_t *extended_blur_region,
+		const pixman_region32_t *damage) {
+	const int scene_blur_size = blur_data_calc_size(&scene_output->scene->blur_data);
+	bool has_blur = false;
+
 	for (int i = list_len - 1; i >= 0; i--) {
 		struct wlr_scene_node *node = list_data[i].node;
+		int blur_size = scene_blur_size;
+		pixman_region32_t node_region;
+		pixman_region32_init(&node_region);
+
 		switch (node->type) {
 		case WLR_SCENE_NODE_BUFFER:;
 			struct wlr_scene_buffer *scene_buffer = wlr_scene_buffer_from_node(node);
-			if (SCENE_BUFFER_SHOULD_BLUR(scene_buffer, &scene_output->scene->blur_data)
-					|| SCENE_BUFFER_SHOULD_SMART_SHADOW(scene_buffer)) {
-				apply_blur_region(node, scene_output, blur_region);
+			if (!SCENE_BUFFER_SHOULD_BLUR(scene_buffer, &scene_output->scene->blur_data)
+					&& !SCENE_BUFFER_SHOULD_SMART_SHADOW(scene_buffer)) {
+				goto fini;
+			}
+			node_blur_region(node, scene_output, &node_region);
+			if (SCENE_BUFFER_SHOULD_SMART_SHADOW(scene_buffer)) {
+				const int shadow_size = smart_shadow_calc_size(scene_buffer->smart_shadow.blur_radius);
+				// Make sure to re-render the shadow due to it extending past
+				// the buffer
+				wlr_region_expand(&node_region, &node_region, shadow_size);
+
+				blur_size = fmax(blur_size, shadow_size);
 			}
 			break;
 		case WLR_SCENE_NODE_RECT:;
 			struct wlr_scene_rect *scene_rect = wlr_scene_rect_from_node(node);
-			if (SCENE_RECT_SHOULD_BLUR(scene_rect, &scene_output->scene->blur_data)) {
-				apply_blur_region(node, scene_output, blur_region);
+			if (!SCENE_RECT_SHOULD_BLUR(scene_rect, &scene_output->scene->blur_data)) {
+				goto fini;
 			}
+			node_blur_region(node, scene_output, &node_region);
 			break;
 		case WLR_SCENE_NODE_OPTIMIZED_BLUR:;
 			struct wlr_scene_optimized_blur *scene_blur = wlr_scene_optimized_blur_from_node(node);
-			if (scene_blur->dirty) {
-				apply_blur_region(node, scene_output, blur_region);
+			if (!scene_blur->dirty) {
+				goto fini;
 			}
+			node_blur_region(node, scene_output, &node_region);
 			break;
 		default:
 			// TODO: Add support for other node types
-			break;
+			goto fini;
 		}
+
+		if (pixman_region32_empty(&node_region)) {
+			goto fini;
+		}
+
+		has_blur = true;
+
+		// Apply the nodes blur size to allow for a non-fixed blur size for all nodes.
+		pixman_region32_t region;
+		pixman_region32_init(&region);
+		pixman_region32_intersect(&region, &node_region, damage);
+		if (pixman_region32_not_empty(&region)) {
+			pixman_region32_union(blur_region, blur_region, &region);
+
+			pixman_region32_t extended_damage;
+			pixman_region32_init(&extended_damage);
+			// Expand the region to compensate for blur artifacts
+			wlr_region_expand(&extended_damage, &region, blur_size);
+			pixman_region32_union(extended_blur_region, extended_blur_region, &extended_damage);
+			pixman_region32_fini(&extended_damage);
+		}
+		pixman_region32_fini(&region);
+
+fini:
+		pixman_region32_fini(&node_region);
 	}
-	return !pixman_region32_empty(blur_region);
+	return has_blur;
 }
 
 bool wlr_scene_output_commit(struct wlr_scene_output *scene_output,
@@ -2987,16 +3025,17 @@ bool wlr_scene_output_build_state(struct wlr_scene_output *scene_output,
 		&render_data.damage);
 
 	// Blur artifact prevention
-	pixman_region32_t blur_region;
-	pixman_region32_init(&blur_region);
-	render_data.has_blur =
-		scene_output_has_blur(list_len, list_data, scene_output, &blur_region);
+	pixman_region32_t node_blur_region;
+	pixman_region32_init(&node_blur_region);
+	pixman_region32_t extended_node_blur_region;
+	pixman_region32_init(&extended_node_blur_region);
+	render_data.has_blur = scene_output_has_blur(list_len, list_data, scene_output,
+			&node_blur_region, &extended_node_blur_region, &render_data.damage);
 	bool whole_output_blur_damaged = false;
 	// Expand the damage to compensate for blur
 	if (render_data.has_blur) {
 		int output_width = output->width;
 		int output_height = output->height;
-		struct blur_data *blur_data = &scene_output->scene->blur_data;
 		pixman_region32_t *damage = &render_data.damage;
 
 		// ensure that the damage isn't expanding past the output's size
@@ -3008,16 +3047,12 @@ bool wlr_scene_output_build_state(struct wlr_scene_output *scene_output,
 			// No need to compensate for blur artifacts when the damage spans
 			// the whole output
 			whole_output_blur_damaged = true;
-		}else {
-			// TODO: Also compensate for smart shadow blur
-
+		} else {
 			// copy the surrounding content where the blur would display artifacts
 			// and draw it above the artifacts
 			pixman_region32_t extended_damage;
 			pixman_region32_init(&extended_damage);
-			pixman_region32_intersect(&extended_damage, damage, &blur_region);
-			// Expand the region to compensate for blur artifacts
-			wlr_region_expand(&extended_damage, &extended_damage, blur_data_calc_size(blur_data));
+			pixman_region32_subtract(&extended_damage, &extended_node_blur_region, &node_blur_region);
 			// Limit to the monitors viewport
 			pixman_region32_intersect_rect(&extended_damage, &extended_damage,
 					0, 0, output_width, output_height);
@@ -3035,7 +3070,8 @@ bool wlr_scene_output_build_state(struct wlr_scene_output *scene_output,
 					render_pass->buffer);
 		}
 	}
-	pixman_region32_fini(&blur_region);
+	pixman_region32_fini(&node_blur_region);
+	pixman_region32_fini(&extended_node_blur_region);
 
 	pixman_region32_t background;
 	pixman_region32_init(&background);

@@ -409,7 +409,7 @@ bool link_smart_shadow_program(struct smart_shadow_shader *shader, GLint client_
 	return true;
 }
 
-bool link_smart_shadow_final_program(struct smart_shadow_shader *shader, GLint client_version) {
+bool link_smart_shadow_final_program(struct smart_shadow_final_shader *shader, GLint client_version) {
 	GLuint prog;
 	shader->program = prog = client_version > 2 ? link_program(smart_shadow_final_frag_gles3_src, client_version)
 		// TODO: GLES2
@@ -421,11 +421,8 @@ bool link_smart_shadow_final_program(struct smart_shadow_shader *shader, GLint c
 	shader->proj = glGetUniformLocation(prog, "proj");
 	shader->tex = glGetUniformLocation(prog, "tex");
 	shader->color = glGetUniformLocation(prog, "color");
-	shader->blur_sigma = glGetUniformLocation(prog, "blur_sigma");
-	shader->direction = glGetUniformLocation(prog, "direction");
 	shader->pos_attrib = glGetAttribLocation(prog, "pos");
 	shader->tex_proj = glGetUniformLocation(prog, "tex_proj");
-	shader->size = glGetUniformLocation(prog, "size");
 
 	return true;
 }

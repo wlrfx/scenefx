@@ -1082,7 +1082,7 @@ static void fx_render_pass_add_smart_shadow_final(struct fx_gles_render_pass *pa
 	struct fx_renderer *renderer = pass->buffer->renderer;
 	struct fx_texture *texture = fx_get_texture(options->texture);
 
-	struct smart_shadow_shader *shader = &renderer->shaders.smart_shadow_final;
+	struct smart_shadow_final_shader *shader = &renderer->shaders.smart_shadow_final;
 
 	struct wlr_box dst_box;
 	struct wlr_fbox src_fbox;
@@ -1117,9 +1117,6 @@ static void fx_render_pass_add_smart_shadow_final(struct fx_gles_render_pass *pa
 
 	glUniform1i(shader->tex, 0);
 	glUniform4f(shader->color, fx_options->color.r, fx_options->color.g, fx_options->color.b, fx_options->color.a);
-	glUniform1f(shader->blur_sigma, fx_options->blur_sigma);
-	glUniform2f(shader->direction, 0, 0);
-	glUniform2f(shader->size, dst_box.width, dst_box.height);
 
 	set_proj_matrix(shader->proj, pass->projection_matrix, &dst_box);
 	set_tex_matrix(shader->tex_proj, options->transform, &src_fbox);

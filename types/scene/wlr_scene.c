@@ -2027,6 +2027,50 @@ static void scene_entry_render(struct render_list_entry *entry, const struct ren
 		transform = wlr_output_transform_compose(transform, data->transform);
 		corner_location_transform(transform, &buffer_corners);
 
+		// Base texture rendering options
+		struct fx_render_texture_options tex_options = {
+			.base = (struct wlr_render_texture_options){
+				.texture = texture,
+				.src_box = scene_buffer->src_box,
+				.dst_box = dst_box,
+				.transform = transform,
+				.clip = &render_region, // Render with the smaller region, clipping CSD
+				.alpha = &scene_buffer->opacity,
+				.filter_mode = scene_buffer->filter_mode,
+				.blend_mode = !data->output->scene->calculate_visibility ||
+					!pixman_region32_empty(&opaque) ?
+					WLR_RENDER_BLEND_MODE_PREMULTIPLIED : WLR_RENDER_BLEND_MODE_NONE,
+				.wait_timeline = scene_buffer->wait_timeline,
+				.wait_point = scene_buffer->wait_point,
+			},
+			.clip_box = &dst_box,
+			.corners = buffer_corners,
+			.corner_radius = scene_buffer->corner_radius * data->scale,
+		};
+
+		// Smart shadow
+		// TODO: Place in shadow_node instead?
+		if (SCENE_BUFFER_SHOULD_SMART_SHADOW(scene_buffer)) {
+			// const float alpha = 0.5;
+			const float alpha = 1.0;
+			struct fx_render_smart_shadow_options shadow_options = {
+				.tex_options = tex_options,
+
+				// TODO:
+				.blur_sigma = scene_buffer->smart_shadow.blur_radius,
+				.color = {
+					// TODO: Fix weak colors
+					.r = 0 * alpha,
+					.g = 1 * alpha,
+					.b = 0 * alpha,
+					.a = alpha,
+				},
+				.x_offset = 0,
+				.y_offset = 0,
+			};
+			fx_render_pass_add_smart_shadow(data->render_pass, &shadow_options);
+		}
+
 		// Blur
 		if (SCENE_BUFFER_SHOULD_BLUR(scene_buffer, &scene->blur_data)) {
 			pixman_region32_t opaque_region;
@@ -2072,46 +2116,6 @@ static void scene_entry_render(struct render_list_entry *entry, const struct ren
 			pixman_region32_fini(&opaque_region);
 		}
 
-		struct fx_render_texture_options tex_options = {
-			.base = (struct wlr_render_texture_options){
-				.texture = texture,
-				.src_box = scene_buffer->src_box,
-				.dst_box = dst_box,
-				.transform = transform,
-				.clip = &render_region, // Render with the smaller region, clipping CSD
-				.alpha = &scene_buffer->opacity,
-				.filter_mode = scene_buffer->filter_mode,
-				.blend_mode = !data->output->scene->calculate_visibility ||
-					!pixman_region32_empty(&opaque) ?
-					WLR_RENDER_BLEND_MODE_PREMULTIPLIED : WLR_RENDER_BLEND_MODE_NONE,
-				.wait_timeline = scene_buffer->wait_timeline,
-				.wait_point = scene_buffer->wait_point,
-			},
-			.clip_box = &dst_box,
-			.corners = buffer_corners,
-			.corner_radius = scene_buffer->corner_radius * data->scale,
-		};
-
-		// TODO: Render before blur
-		if (SCENE_BUFFER_SHOULD_SMART_SHADOW(scene_buffer)) {
-			const float alpha = 1.0;
-			struct fx_render_smart_shadow_options shadow_options = {
-				.tex_options = tex_options,
-
-				// TODO:
-				.blur_sigma = scene_buffer->smart_shadow.blur_radius,
-				.color = {
-					// TODO: Fix weak colors
-					.r = 0 * alpha,
-					.g = 1 * alpha,
-					.b = 0 * alpha,
-					.a = alpha,
-				},
-				.x_offset = 0,
-				.y_offset = 0,
-			};
-			fx_render_pass_add_smart_shadow(data->render_pass, &shadow_options);
-		}
 		fx_render_pass_add_texture(data->render_pass, &tex_options);
 
 		struct wlr_scene_output_sample_event sample_event = {

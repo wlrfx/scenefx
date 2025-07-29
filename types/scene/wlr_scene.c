@@ -679,12 +679,15 @@ static bool scene_node_update_iterator(struct wlr_scene_node *node,
 	// Expand the damage to compensate for blur artifacts
 	if (node->type == WLR_SCENE_NODE_BUFFER) {
 		struct wlr_scene_buffer *scene_buffer = wlr_scene_buffer_from_node(node);
-		if (SCENE_BUFFER_SHOULD_BLUR(scene_buffer, data->blur_data)
-				|| SCENE_BUFFER_SHOULD_SMART_SHADOW(scene_buffer)) {
-			const int blur_size = fmax(
-					blur_data_calc_size(data->blur_data),
-					smart_shadow_calc_size(scene_buffer->smart_shadow.blur_radius));
-			wlr_region_expand(&node->visible, &node->visible, blur_size);
+		if (SCENE_BUFFER_SHOULD_BLUR(scene_buffer, data->blur_data)) {
+			wlr_region_expand(&node->visible, &node->visible, blur_data_calc_size(data->blur_data));
+		}
+		if (SCENE_BUFFER_SHOULD_SMART_SHADOW(scene_buffer)) {
+			const int shadow_size = smart_shadow_calc_size(scene_buffer->smart_shadow.blur_radius);
+			pixman_region32_union_rect(&node->visible, &node->visible,
+					lx - shadow_size + scene_buffer->smart_shadow.x_offset,
+					ly - shadow_size + scene_buffer->smart_shadow.y_offset,
+					box.width + shadow_size * 2, box.height + shadow_size * 2);
 		}
 	} else if (node->type == WLR_SCENE_NODE_RECT) {
 		struct wlr_scene_rect *scene_rect = wlr_scene_rect_from_node(node);
@@ -1214,6 +1217,8 @@ struct wlr_scene_buffer *wlr_scene_buffer_create(struct wlr_scene_tree *parent,
 	scene_buffer->corners = CORNER_LOCATION_NONE;
 	scene_buffer->smart_shadow.enabled = false;
 	scene_buffer->smart_shadow.blur_radius = 0;
+	scene_buffer->smart_shadow.x_offset = 0;
+	scene_buffer->smart_shadow.y_offset = 0;
 
 	scene_buffer_set_buffer(scene_buffer, buffer);
 	scene_node_update(&scene_buffer->node, NULL);
@@ -1363,12 +1368,8 @@ void wlr_scene_buffer_set_buffer_with_options(struct wlr_scene_buffer *scene_buf
 		pixman_region32_fini(&cull_region);
 
 		// Expand the damage when committed to, fixes blur artifacts
-		if (SCENE_BUFFER_SHOULD_BLUR(scene_buffer, &scene->blur_data)
-				|| SCENE_BUFFER_SHOULD_SMART_SHADOW(scene_buffer)) {
-			const int blur_size = fmax(
-					blur_data_calc_size(&scene->blur_data),
-					smart_shadow_calc_size(scene_buffer->smart_shadow.blur_radius));
-			wlr_region_expand(&output_damage, &output_damage, blur_size);
+		if (SCENE_BUFFER_SHOULD_BLUR(scene_buffer, &scene->blur_data)) {
+			wlr_region_expand(&output_damage, &output_damage, blur_data_calc_size(&scene->blur_data));
 		}
 
 		pixman_region32_translate(&output_damage,
@@ -2065,8 +2066,8 @@ static void scene_entry_render(struct render_list_entry *entry, const struct ren
 					.b = 0 * alpha,
 					.a = alpha,
 				},
-				.x_offset = 0,
-				.y_offset = 0,
+				.x_offset = scene_buffer->smart_shadow.x_offset,
+				.y_offset = scene_buffer->smart_shadow.y_offset,
 			};
 			fx_render_pass_add_smart_shadow(data->render_pass, &shadow_options);
 		}
@@ -2664,7 +2665,7 @@ bool wlr_scene_output_needs_frame(struct wlr_scene_output *scene_output) {
 		scene_output->gamma_lut_changed;
 }
 
-static void node_blur_region(struct wlr_scene_node *node,
+static struct wlr_box node_blur_region(struct wlr_scene_node *node,
 		struct wlr_scene_output *scene_output, pixman_region32_t *node_region) {
 	int x, y;
 	wlr_scene_node_coords(node, &x, &y);
@@ -2689,6 +2690,8 @@ static void node_blur_region(struct wlr_scene_node *node,
 	pixman_region32_union_rect(node_region, node_region,
 			node_box.x, node_box.y,
 			node_box.width, node_box.height);
+
+	return node_box;
 }
 
 static bool scene_output_has_blur(int list_len,
@@ -2711,12 +2714,15 @@ static bool scene_output_has_blur(int list_len,
 					&& !SCENE_BUFFER_SHOULD_SMART_SHADOW(scene_buffer)) {
 				goto fini;
 			}
-			node_blur_region(node, scene_output, &node_region);
+			struct wlr_box box = node_blur_region(node, scene_output, &node_region);
 			if (SCENE_BUFFER_SHOULD_SMART_SHADOW(scene_buffer)) {
 				const int shadow_size = smart_shadow_calc_size(scene_buffer->smart_shadow.blur_radius);
 				// Make sure to re-render the shadow due to it extending past
 				// the buffer
-				wlr_region_expand(&node_region, &node_region, shadow_size);
+				pixman_region32_union_rect(&node_region, &node_region,
+						box.x - shadow_size + scene_buffer->smart_shadow.x_offset,
+						box.y - shadow_size + scene_buffer->smart_shadow.y_offset,
+						box.width + shadow_size * 2, box.height + shadow_size * 2);
 
 				blur_size = fmax(blur_size, shadow_size);
 			}

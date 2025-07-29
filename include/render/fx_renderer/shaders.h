@@ -180,7 +180,6 @@ struct smart_shadow_shader {
 	GLint direction;
 	GLint pos_attrib;
 	GLint size;
-	GLint position;
 };
 
 bool link_smart_shadow_program(struct smart_shadow_shader *shader, GLint client_version);

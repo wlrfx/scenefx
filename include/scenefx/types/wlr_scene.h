@@ -220,6 +220,7 @@ struct wlr_scene_buffer {
 	struct {
 		bool enabled;
 		int blur_radius;
+		int x_offset, y_offset;
 	} smart_shadow;
 
 	float opacity;

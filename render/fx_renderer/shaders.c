@@ -405,7 +405,6 @@ bool link_smart_shadow_program(struct smart_shadow_shader *shader, GLint client_
 	shader->pos_attrib = glGetAttribLocation(prog, "pos");
 	shader->tex_proj = glGetUniformLocation(prog, "tex_proj");
 	shader->size = glGetUniformLocation(prog, "size");
-	shader->position = glGetUniformLocation(prog, "position");
 
 	return true;
 }
@@ -427,7 +426,6 @@ bool link_smart_shadow_final_program(struct smart_shadow_shader *shader, GLint c
 	shader->pos_attrib = glGetAttribLocation(prog, "pos");
 	shader->tex_proj = glGetUniformLocation(prog, "tex_proj");
 	shader->size = glGetUniformLocation(prog, "size");
-	shader->position = glGetUniformLocation(prog, "position");
 
 	return true;
 }

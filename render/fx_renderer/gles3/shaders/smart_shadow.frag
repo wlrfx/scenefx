@@ -7,7 +7,6 @@ in vec2 v_texcoord;
 uniform sampler2D tex;
 
 uniform vec2 size;
-uniform vec2 position;
 uniform float blur_sigma;
 uniform vec4 color;
 uniform vec2 direction;

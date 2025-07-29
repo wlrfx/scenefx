@@ -1063,7 +1063,6 @@ static void render_smart_shadow_blur_direction(struct fx_gles_render_pass *pass,
 	glUniform1f(shader->blur_sigma, fx_options->blur_sigma);
 	glUniform2f(shader->direction, 1 - !is_horizontal, 1 - is_horizontal);
 	glUniform2f(shader->size, dst_box.width, dst_box.height);
-	glUniform2f(shader->position, dst_box.x, dst_box.y);
 
 	set_proj_matrix(shader->proj, pass->projection_matrix, &dst_box);
 	set_tex_matrix(shader->tex_proj, options->transform, &src_fbox);
@@ -1124,7 +1123,6 @@ static void fx_render_pass_add_smart_shadow_final(struct fx_gles_render_pass *pa
 	glUniform1f(shader->blur_sigma, fx_options->blur_sigma);
 	glUniform2f(shader->direction, 0, 0);
 	glUniform2f(shader->size, dst_box.width, dst_box.height);
-	glUniform2f(shader->position, dst_box.x, dst_box.y);
 
 	set_proj_matrix(shader->proj, pass->projection_matrix, &dst_box);
 	set_tex_matrix(shader->tex_proj, options->transform, &src_fbox);
@@ -1150,7 +1148,7 @@ void fx_render_pass_add_smart_shadow(struct fx_gles_render_pass *pass,
 
 	const float blur_sigma = smart_shadow_calc_size(fx_options->blur_sigma);
 	struct fx_renderer *renderer = pass->buffer->renderer;
-	struct wlr_box *dst_box = &fx_options->tex_options.base.dst_box;
+	struct wlr_box dst_box = fx_options->tex_options.base.dst_box;
 
 	struct fx_framebuffer *effects_buffer_swapped = pass->fx_effect_framebuffers->effects_buffer_swapped;
 	struct fx_framebuffer *effects_buffer = pass->fx_effect_framebuffers->effects_buffer;
@@ -1158,8 +1156,9 @@ void fx_render_pass_add_smart_shadow(struct fx_gles_render_pass *pass,
 
 	pixman_region32_t clip;
 	pixman_region32_init_rect(&clip,
-			dst_box->x - blur_sigma, dst_box->y - blur_sigma,
-			dst_box->width + blur_sigma * 2, dst_box->height + blur_sigma * 2);
+			dst_box.x - blur_sigma + fx_options->x_offset,
+			dst_box.y - blur_sigma + fx_options->y_offset,
+			dst_box.width + blur_sigma * 2, dst_box.height + blur_sigma * 2);
 	pixman_region32_intersect(&clip, &clip, fx_options->tex_options.base.clip);
 	pixman_region32_t clip_extended;
 	pixman_region32_init(&clip_extended);
@@ -1185,6 +1184,9 @@ void fx_render_pass_add_smart_shadow(struct fx_gles_render_pass *pass,
 
 	// Initially Render to the effects buffer
 	fx_options->tex_options.base.clip = &clip;
+	fx_options->tex_options.clip_box = NULL;
+	fx_options->tex_options.base.dst_box.x += fx_options->x_offset;
+	fx_options->tex_options.base.dst_box.y += fx_options->y_offset;
 	fx_render_pass_add_texture(pass, &fx_options->tex_options);
 
 	//

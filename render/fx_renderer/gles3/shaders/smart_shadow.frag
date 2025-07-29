@@ -26,7 +26,7 @@ float gaussian(float x) {
 
 void main() {
 	vec4 blur_color = vec4(0.0f);
-	int kernelSize = int(ceil(blur_sigma * 3.0f)) * 2 + 1;
+	int kernelSize = int(ceil(1.5f * blur_sigma)) * 2;
 
 	// Run in two passes (one horizontal and one vertical) instead of nested for-loops. O(n*2) instead of O(n^2).
 	float weight_sum = 0.0f;

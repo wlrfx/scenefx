@@ -1161,10 +1161,9 @@ void fx_render_pass_add_smart_shadow(struct fx_gles_render_pass *pass,
 			dst_box->x - blur_sigma, dst_box->y - blur_sigma,
 			dst_box->width + blur_sigma * 2, dst_box->height + blur_sigma * 2);
 	pixman_region32_intersect(&clip, &clip, fx_options->tex_options.base.clip);
-	// TODO: EXPAND MORE
-	wlr_region_expand(&clip, &clip, smart_shadow_calc_size(fx_options->blur_sigma));
-	// wlr_region_expand(&clip, &clip, ceil(fx_options->blur_sigma * 3.0) * 2 + 1);
-	fx_options->tex_options.base.clip = &clip;
+	pixman_region32_t clip_extended;
+	pixman_region32_init(&clip_extended);
+	wlr_region_expand(&clip_extended, &clip, blur_sigma);
 
 	// TODO: Use regular shadow if the base texture isn't transparent:
 	// - fx_get_texture(fx_options->tex_options.base.texture)->has_alpha
@@ -1175,7 +1174,7 @@ void fx_render_pass_add_smart_shadow(struct fx_gles_render_pass *pass,
 	// previously calculated blur.
 	glEnable(GL_SCISSOR_TEST);
 	int n_rects;
-	const pixman_box32_t *rects = pixman_region32_rectangles(&clip, &n_rects);
+	const pixman_box32_t *rects = pixman_region32_rectangles(&clip_extended, &n_rects);
 	for (int i = 0; i < n_rects; i++) {
 		const pixman_box32_t rect = rects[i];
 		glScissor(rect.x1, rect.y1, rect.x2 - rect.x1, rect.y2 - rect.y1);
@@ -1185,17 +1184,13 @@ void fx_render_pass_add_smart_shadow(struct fx_gles_render_pass *pass,
 	glDisable(GL_SCISSOR_TEST);
 
 	// Initially Render to the effects buffer
-	fx_render_pass_add_texture(pass, &(struct fx_render_texture_options) {
-		.base = fx_options->tex_options.base,
-		.clip_box = NULL,
-		.discard_transparent = true,
-		.corner_radius = 0,
-		.corners = CORNER_LOCATION_NONE,
-	});
+	fx_options->tex_options.base.clip = &clip;
+	fx_render_pass_add_texture(pass, &fx_options->tex_options);
 
 	//
 	// Prepare for blurring
 	//
+	fx_options->tex_options.base.clip = &clip_extended;
 	fx_options->tex_options.base.src_box = (struct wlr_fbox) {
 		.x = 0, .y = 0, .width = monitor_box.width, .height = monitor_box.height,
 	};
@@ -1221,6 +1216,7 @@ void fx_render_pass_add_smart_shadow(struct fx_gles_render_pass *pass,
 	// Final Render Pass
 	//
 	fx_framebuffer_bind(pass->buffer);
+	fx_options->tex_options.base.clip = &clip;
 	fx_options->tex_options.base.dst_box = monitor_box;
 	fx_options->tex_options.base.src_box = (struct wlr_fbox) {
 		.x = 0, .y = 0, .width = monitor_box.width, .height = monitor_box.height,
@@ -1229,9 +1225,7 @@ void fx_render_pass_add_smart_shadow(struct fx_gles_render_pass *pass,
 			effects_buffer->buffer);
 	fx_render_pass_add_smart_shadow_final(pass, fx_options);
 
-	// fx_options->tex_options.base.dst_box = saved_dst_box;
-	// fx_options->tex_options.base.src_box = saved_src_box;
-
+	pixman_region32_fini(&clip_extended);
 	pixman_region32_fini(&clip);
 }
 

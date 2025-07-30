@@ -374,13 +374,13 @@ static bool link_shaders(struct fx_renderer *renderer) {
 		goto error;
 	}
 
-	// Smart Shadow shaders
-	if (!link_smart_shadow_program(&renderer->shaders.smart_shadow, (GLint) client_version)) {
-		wlr_log(WLR_ERROR, "Could not link smart_shadow shader");
+	// Drop Shadow shaders
+	if (!link_drop_shadow_program(&renderer->shaders.drop_shadow, (GLint) client_version)) {
+		wlr_log(WLR_ERROR, "Could not link drop_shadow shader");
 		goto error;
 	}
-	if (!link_smart_shadow_final_program(&renderer->shaders.smart_shadow_final, (GLint) client_version)) {
-		wlr_log(WLR_ERROR, "Could not link smart_shadow_final shader");
+	if (!link_drop_shadow_final_program(&renderer->shaders.drop_shadow_final, (GLint) client_version)) {
+		wlr_log(WLR_ERROR, "Could not link drop_shadow_final shader");
 		goto error;
 	}
 
@@ -398,8 +398,8 @@ error:
 	glDeleteProgram(renderer->shaders.blur1.program);
 	glDeleteProgram(renderer->shaders.blur2.program);
 	glDeleteProgram(renderer->shaders.blur_effects.program);
-	glDeleteProgram(renderer->shaders.smart_shadow.program);
-	glDeleteProgram(renderer->shaders.smart_shadow_final.program);
+	glDeleteProgram(renderer->shaders.drop_shadow.program);
+	glDeleteProgram(renderer->shaders.drop_shadow_final.program);
 
 	return false;
 }

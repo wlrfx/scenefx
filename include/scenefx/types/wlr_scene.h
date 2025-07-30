@@ -222,7 +222,7 @@ struct wlr_scene_buffer {
 		int blur_radius;
 		int x_offset, y_offset;
 		float color[4];
-	} smart_shadow;
+	} drop_shadow;
 
 	float opacity;
 	enum wlr_scale_filter_mode filter_mode;

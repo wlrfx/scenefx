@@ -40,8 +40,8 @@
 #define DMABUF_FEEDBACK_DEBOUNCE_FRAMES  30
 #define HIGHLIGHT_DAMAGE_FADEOUT_TIME   250
 
-#define SCENE_BUFFER_SHOULD_SMART_SHADOW(scene_buffer) \
-	(scene_buffer->smart_shadow.enabled && scene_buffer->smart_shadow.blur_radius > 0)
+#define SCENE_BUFFER_SHOULD_DROP_SHADOW(scene_buffer) \
+	(scene_buffer->drop_shadow.enabled && scene_buffer->drop_shadow.blur_radius > 0)
 #define SCENE_BUFFER_SHOULD_BLUR(scene_buffer, blur_data) \
 	(scene_buffer->backdrop_blur && is_scene_blur_enabled(blur_data) && \
 	 (!scene_buffer->buffer_is_opaque || scene_buffer->opacity < 1.0f))
@@ -399,7 +399,7 @@ struct render_data {
 	struct fx_gles_render_pass *render_pass;
 	pixman_region32_t damage;
 
-	// Backdrop blur and smart shadows (also uses blur)
+	// Backdrop blur and drop shadows (also uses blur)
 	bool has_blur;
 };
 
@@ -682,11 +682,11 @@ static bool scene_node_update_iterator(struct wlr_scene_node *node,
 		if (SCENE_BUFFER_SHOULD_BLUR(scene_buffer, data->blur_data)) {
 			wlr_region_expand(&node->visible, &node->visible, blur_data_calc_size(data->blur_data));
 		}
-		if (SCENE_BUFFER_SHOULD_SMART_SHADOW(scene_buffer)) {
-			const int shadow_size = smart_shadow_calc_size(scene_buffer->smart_shadow.blur_radius);
+		if (SCENE_BUFFER_SHOULD_DROP_SHADOW(scene_buffer)) {
+			const int shadow_size = drop_shadow_calc_size(scene_buffer->drop_shadow.blur_radius);
 			pixman_region32_union_rect(&node->visible, &node->visible,
-					lx - shadow_size + scene_buffer->smart_shadow.x_offset,
-					ly - shadow_size + scene_buffer->smart_shadow.y_offset,
+					lx - shadow_size + scene_buffer->drop_shadow.x_offset,
+					ly - shadow_size + scene_buffer->drop_shadow.y_offset,
 					box.width + shadow_size * 2, box.height + shadow_size * 2);
 		}
 	} else if (node->type == WLR_SCENE_NODE_RECT) {
@@ -1215,12 +1215,12 @@ struct wlr_scene_buffer *wlr_scene_buffer_create(struct wlr_scene_tree *parent,
 	scene_buffer->backdrop_blur_optimized = false;
 	scene_buffer->backdrop_blur_ignore_transparent = true;
 	scene_buffer->corners = CORNER_LOCATION_NONE;
-	scene_buffer->smart_shadow.enabled = false;
-	scene_buffer->smart_shadow.blur_radius = 0;
-	scene_buffer->smart_shadow.x_offset = 0;
-	scene_buffer->smart_shadow.y_offset = 0;
+	scene_buffer->drop_shadow.enabled = false;
+	scene_buffer->drop_shadow.blur_radius = 0;
+	scene_buffer->drop_shadow.x_offset = 0;
+	scene_buffer->drop_shadow.y_offset = 0;
 	// TODO: MOVE
-	memcpy(scene_buffer->smart_shadow.color, (float[4]){0, 0, 0, 1}, sizeof(scene_buffer->smart_shadow.color));
+	memcpy(scene_buffer->drop_shadow.color, (float[4]){0, 0, 0, 1}, sizeof(scene_buffer->drop_shadow.color));
 
 	scene_buffer_set_buffer(scene_buffer, buffer);
 	scene_node_update(&scene_buffer->node, NULL);
@@ -2051,26 +2051,23 @@ static void scene_entry_render(struct render_list_entry *entry, const struct ren
 			.corner_radius = scene_buffer->corner_radius * data->scale,
 		};
 
-		// Smart shadow
+		// Drop Shadow
 		// TODO: Place in shadow_node instead?
-		if (SCENE_BUFFER_SHOULD_SMART_SHADOW(scene_buffer)) {
-			// const float alpha = 0.5;
-			struct fx_render_smart_shadow_options shadow_options = {
+		if (SCENE_BUFFER_SHOULD_DROP_SHADOW(scene_buffer)) {
+			struct fx_render_drop_shadow_options shadow_options = {
 				.tex_options = tex_options,
-
-				// TODO:
-				.blur_sigma = scene_buffer->smart_shadow.blur_radius,
+				.blur_sigma = scene_buffer->drop_shadow.blur_radius,
 				.color = {
 					// TODO: Fix weak colors
-					.r = scene_buffer->smart_shadow.color[0],
-					.g = scene_buffer->smart_shadow.color[1],
-					.b = scene_buffer->smart_shadow.color[2],
-					.a = scene_buffer->smart_shadow.color[3],
+					.r = scene_buffer->drop_shadow.color[0],
+					.g = scene_buffer->drop_shadow.color[1],
+					.b = scene_buffer->drop_shadow.color[2],
+					.a = scene_buffer->drop_shadow.color[3],
 				},
-				.x_offset = scene_buffer->smart_shadow.x_offset,
-				.y_offset = scene_buffer->smart_shadow.y_offset,
+				.x_offset = scene_buffer->drop_shadow.x_offset,
+				.y_offset = scene_buffer->drop_shadow.y_offset,
 			};
-			fx_render_pass_add_smart_shadow(data->render_pass, &shadow_options);
+			fx_render_pass_add_drop_shadow(data->render_pass, &shadow_options);
 		}
 
 		// Blur
@@ -2712,17 +2709,17 @@ static bool scene_output_has_blur(int list_len,
 		case WLR_SCENE_NODE_BUFFER:;
 			struct wlr_scene_buffer *scene_buffer = wlr_scene_buffer_from_node(node);
 			if (!SCENE_BUFFER_SHOULD_BLUR(scene_buffer, &scene_output->scene->blur_data)
-					&& !SCENE_BUFFER_SHOULD_SMART_SHADOW(scene_buffer)) {
+					&& !SCENE_BUFFER_SHOULD_DROP_SHADOW(scene_buffer)) {
 				goto fini;
 			}
 			struct wlr_box box = node_blur_region(node, scene_output, &node_region);
-			if (SCENE_BUFFER_SHOULD_SMART_SHADOW(scene_buffer)) {
-				const int shadow_size = smart_shadow_calc_size(scene_buffer->smart_shadow.blur_radius);
+			if (SCENE_BUFFER_SHOULD_DROP_SHADOW(scene_buffer)) {
+				const int shadow_size = drop_shadow_calc_size(scene_buffer->drop_shadow.blur_radius);
 				// Make sure to re-render the shadow due to it extending past
 				// the buffer
 				pixman_region32_union_rect(&node_region, &node_region,
-						box.x - shadow_size + scene_buffer->smart_shadow.x_offset,
-						box.y - shadow_size + scene_buffer->smart_shadow.y_offset,
+						box.x - shadow_size + scene_buffer->drop_shadow.x_offset,
+						box.y - shadow_size + scene_buffer->drop_shadow.y_offset,
 						box.width + shadow_size * 2, box.height + shadow_size * 2);
 
 				blur_size = fmax(blur_size, shadow_size);

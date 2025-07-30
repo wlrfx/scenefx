@@ -1026,15 +1026,15 @@ finish:
 	return !failed;
 }
 
-static void render_smart_shadow_blur_direction(struct fx_gles_render_pass *pass,
-		const struct fx_render_smart_shadow_options *fx_options,
+static void render_drop_shadow_blur_direction(struct fx_gles_render_pass *pass,
+		const struct fx_render_drop_shadow_options *fx_options,
 		bool is_horizontal) {
 	const struct wlr_render_texture_options *options = &fx_options->tex_options.base;
 	struct fx_renderer *renderer = pass->buffer->renderer;
 	struct fx_texture *texture = fx_get_texture(options->texture);
 	assert(texture->has_alpha);
 
-	struct smart_shadow_shader *shader = &renderer->shaders.smart_shadow;
+	struct drop_shadow_shader *shader = &renderer->shaders.drop_shadow;
 
 	struct wlr_box dst_box;
 	struct wlr_fbox src_fbox;
@@ -1084,13 +1084,13 @@ static void render_smart_shadow_blur_direction(struct fx_gles_render_pass *pass,
 	pop_fx_debug(renderer);
 }
 
-static void fx_render_pass_add_smart_shadow_final(struct fx_gles_render_pass *pass,
-		const struct fx_render_smart_shadow_options *fx_options) {
+static void fx_render_pass_add_drop_shadow_final(struct fx_gles_render_pass *pass,
+		const struct fx_render_drop_shadow_options *fx_options) {
 	const struct wlr_render_texture_options *options = &fx_options->tex_options.base;
 	struct fx_renderer *renderer = pass->buffer->renderer;
 	struct fx_texture *texture = fx_get_texture(options->texture);
 
-	struct smart_shadow_final_shader *shader = &renderer->shaders.smart_shadow_final;
+	struct drop_shadow_final_shader *shader = &renderer->shaders.drop_shadow_final;
 
 	struct wlr_box dst_box;
 	struct wlr_fbox src_fbox;
@@ -1140,8 +1140,8 @@ static void fx_render_pass_add_smart_shadow_final(struct fx_gles_render_pass *pa
 
 // TODO: Downsize it to 1/2 or 1/4 the size, similar to the kawase blur
 // TODO: Use Kawase blur instead?
-void fx_render_pass_add_smart_shadow(struct fx_gles_render_pass *pass,
-		struct fx_render_smart_shadow_options *fx_options) {
+void fx_render_pass_add_drop_shadow(struct fx_gles_render_pass *pass,
+		struct fx_render_drop_shadow_options *fx_options) {
 	if (pass->buffer->renderer->basic_renderer) {
 		wlr_log(WLR_ERROR, "Please use 'fx_renderer_begin_buffer_pass' instead of "
 				"'wlr_renderer_begin_buffer_pass' to use advanced effects");
@@ -1149,9 +1149,9 @@ void fx_render_pass_add_smart_shadow(struct fx_gles_render_pass *pass,
 	}
 	// Downsample the blur at half resolution to increase performance. No visual
 	// difference
-	fx_options->blur_sigma *= smart_shadow_downscale;
+	fx_options->blur_sigma *= drop_shadow_downscale;
 
-	const float blur_sigma = smart_shadow_calc_size(fx_options->blur_sigma);
+	const float blur_sigma = drop_shadow_calc_size(fx_options->blur_sigma);
 	struct fx_renderer *renderer = pass->buffer->renderer;
 	struct wlr_box dst_box = fx_options->tex_options.base.dst_box;
 
@@ -1168,7 +1168,7 @@ void fx_render_pass_add_smart_shadow(struct fx_gles_render_pass *pass,
 
 	pixman_region32_t clip_scaled;
 	pixman_region32_init(&clip_scaled);
-	wlr_region_scale(&clip_scaled, &clip, smart_shadow_downscale);
+	wlr_region_scale(&clip_scaled, &clip, drop_shadow_downscale);
 	pixman_region32_t clip_extended;
 	pixman_region32_init(&clip_extended);
 	wlr_region_expand(&clip_extended, &clip_scaled, blur_sigma);
@@ -1197,7 +1197,7 @@ void fx_render_pass_add_smart_shadow(struct fx_gles_render_pass *pass,
 
 	fx_options->tex_options.base.dst_box.x += fx_options->x_offset;
 	fx_options->tex_options.base.dst_box.y += fx_options->y_offset;
-	scale_box(&fx_options->tex_options.base.dst_box, smart_shadow_downscale);
+	scale_box(&fx_options->tex_options.base.dst_box, drop_shadow_downscale);
 	fx_options->tex_options.base.blend_mode = WLR_RENDER_BLEND_MODE_NONE;
 	fx_options->tex_options.base.filter_mode = WLR_SCALE_FILTER_BILINEAR;
 	fx_render_pass_add_texture(pass, &fx_options->tex_options);
@@ -1217,7 +1217,7 @@ void fx_render_pass_add_smart_shadow(struct fx_gles_render_pass *pass,
 	fx_framebuffer_bind(effects_buffer_swapped);
 	fx_options->tex_options.base.texture = fx_texture_from_buffer(&renderer->wlr_renderer,
 			effects_buffer->buffer);
-	render_smart_shadow_blur_direction(pass, fx_options, true);
+	render_drop_shadow_blur_direction(pass, fx_options, true);
 
 	//
 	// Vertical Pass
@@ -1225,7 +1225,7 @@ void fx_render_pass_add_smart_shadow(struct fx_gles_render_pass *pass,
 	fx_framebuffer_bind(effects_buffer);
 	fx_options->tex_options.base.texture = fx_texture_from_buffer(&renderer->wlr_renderer,
 			effects_buffer_swapped->buffer);
-	render_smart_shadow_blur_direction(pass, fx_options, false);
+	render_drop_shadow_blur_direction(pass, fx_options, false);
 
 	//
 	// Final Render Pass
@@ -1233,13 +1233,13 @@ void fx_render_pass_add_smart_shadow(struct fx_gles_render_pass *pass,
 	fx_framebuffer_bind(pass->buffer);
 	fx_options->tex_options.base.clip = &clip;
 	fx_options->tex_options.base.dst_box = monitor_box;
-	scale_box(&fx_options->tex_options.base.dst_box, 1 / smart_shadow_downscale);
+	scale_box(&fx_options->tex_options.base.dst_box, 1 / drop_shadow_downscale);
 	fx_options->tex_options.base.src_box = (struct wlr_fbox) {
 		.x = 0, .y = 0, .width = monitor_box.width, .height = monitor_box.height,
 	};
 	fx_options->tex_options.base.texture = fx_texture_from_buffer(&renderer->wlr_renderer,
 			effects_buffer->buffer);
-	fx_render_pass_add_smart_shadow_final(pass, fx_options);
+	fx_render_pass_add_drop_shadow_final(pass, fx_options);
 
 	pixman_region32_fini(&clip_extended);
 	pixman_region32_fini(&clip_scaled);

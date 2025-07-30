@@ -1161,8 +1161,7 @@ void fx_render_pass_add_drop_shadow(struct fx_gles_render_pass *pass,
 
 	pixman_region32_t clip;
 	pixman_region32_init_rect(&clip,
-			dst_box.x - blur_sigma + fx_options->x_offset,
-			dst_box.y - blur_sigma + fx_options->y_offset,
+			dst_box.x - blur_sigma, dst_box.y - blur_sigma,
 			dst_box.width + blur_sigma * 2, dst_box.height + blur_sigma * 2);
 	pixman_region32_intersect(&clip, &clip, fx_options->tex_options.base.clip);
 
@@ -1195,8 +1194,6 @@ void fx_render_pass_add_drop_shadow(struct fx_gles_render_pass *pass,
 	fx_options->tex_options.base.clip = &clip_scaled;
 	fx_options->tex_options.clip_box = NULL;
 
-	fx_options->tex_options.base.dst_box.x += fx_options->x_offset;
-	fx_options->tex_options.base.dst_box.y += fx_options->y_offset;
 	scale_box(&fx_options->tex_options.base.dst_box, drop_shadow_downscale);
 	fx_options->tex_options.base.blend_mode = WLR_RENDER_BLEND_MODE_NONE;
 	fx_options->tex_options.base.filter_mode = WLR_SCALE_FILTER_BILINEAR;

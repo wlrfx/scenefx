@@ -156,6 +156,11 @@ struct wlr_scene_rect {
 	struct clipped_region clipped_region;
 };
 
+enum wlr_scene_shadow_type {
+	WLR_SCENE_SHADOW_TYPE_DROP,
+	WLR_SCENE_SHADOW_TYPE_BOX,
+};
+
 /** A scene-graph node displaying a shadow */
 struct wlr_scene_shadow {
 	struct wlr_scene_node node;
@@ -163,6 +168,10 @@ struct wlr_scene_shadow {
 	int corner_radius;
 	float color[4];
 	float blur_sigma;
+
+	enum wlr_scene_shadow_type type;
+	// Used to draw a drop-shadow. If NULL, falls-back to a box-shadow
+	struct wlr_scene_buffer *reference_buffer;
 
 	struct clipped_region clipped_region;
 };
@@ -216,13 +225,6 @@ struct wlr_scene_buffer {
 	bool backdrop_blur_optimized;
 	bool backdrop_blur_ignore_transparent;
 	enum corner_location corners;
-	// TODO: Config
-	struct {
-		bool enabled;
-		int blur_radius;
-		int x_offset, y_offset;
-		float color[4];
-	} drop_shadow;
 
 	float opacity;
 	enum wlr_scale_filter_mode filter_mode;
@@ -546,7 +548,7 @@ void wlr_scene_rect_set_backdrop_blur_optimized(struct wlr_scene_rect *rect,
  */
 struct wlr_scene_shadow *wlr_scene_shadow_create(struct wlr_scene_tree *parent,
 		int width, int height, int corner_radius, float blur_sigma,
-		const float color[static 4]);
+		const float color[static 4], enum wlr_scene_shadow_type type);
 
 /**
  * Change the width and height of an existing shadow node.
@@ -567,6 +569,40 @@ void wlr_scene_shadow_set_blur_sigma(struct wlr_scene_shadow *shadow, float blur
  * Change the color of an existing shadow node.
  */
 void wlr_scene_shadow_set_color(struct wlr_scene_shadow *shadow, const float color[static 4]);
+
+/**
+ * Change the reference scene_buffer.
+ * NOTE: Will fallback to a box-shadow if the provided buffer is NULL.
+ */
+void wlr_scene_shadow_set_reference_buffer(struct wlr_scene_shadow *shadow,
+		struct wlr_scene_buffer *ref_buffer);
+
+/**
+ * Gets the sample size of the shadow. Can be used when setting the size of
+ * the shadow node. Returns the correct size offset used depending on the
+ * shadow-type. A drop-shadow returns a larger integer compared to the
+ * box-shadow, so this can be used to dynamically adjust the size and position
+ * depending on the shadow-type. Eg:
+ *
+ * Scene Buffer size: 100 x 100px
+ * Proper Shadow Node size: 100px + offset x 100px + offset = the correct size
+ */
+int wlr_scene_shadow_get_offset(struct wlr_scene_shadow *shadow);
+
+/**
+ * Sets the type of shadow that's being used
+ *
+ * If set to the drop-shadow type, the shadow will be a blurred version of
+ * the buffer (a drop-shadow, like in CSS). This type of shadow adapts to the
+ * buffer, ignoring transparent regions. An example would be text shadows, or
+ * weirdly shaped bars/docks. NOTE: Will ignore the clipped_region.
+ *
+ * Otherwise, a regular faster and simpler box-shadow will be drawn.
+ *
+ * NOTE: Please use the `wlr_scene_shadow_get_offset` function to get a dynamic
+ * offset depending on the type.
+ */
+void wlr_scene_shadow_set_type(struct wlr_scene_shadow *shadow, enum wlr_scene_shadow_type type);
 
 /**
  * Sets the region where to clip the shadow.

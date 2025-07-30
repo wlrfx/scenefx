@@ -40,8 +40,6 @@
 #define DMABUF_FEEDBACK_DEBOUNCE_FRAMES  30
 #define HIGHLIGHT_DAMAGE_FADEOUT_TIME   250
 
-#define SCENE_BUFFER_SHOULD_DROP_SHADOW(scene_buffer) \
-	(scene_buffer->drop_shadow.enabled && scene_buffer->drop_shadow.blur_radius > 0)
 #define SCENE_BUFFER_SHOULD_BLUR(scene_buffer, blur_data) \
 	(scene_buffer->backdrop_blur && is_scene_blur_enabled(blur_data) && \
 	 (!scene_buffer->buffer_is_opaque || scene_buffer->opacity < 1.0f))
@@ -682,13 +680,6 @@ static bool scene_node_update_iterator(struct wlr_scene_node *node,
 		if (SCENE_BUFFER_SHOULD_BLUR(scene_buffer, data->blur_data)) {
 			wlr_region_expand(&node->visible, &node->visible, blur_data_calc_size(data->blur_data));
 		}
-		if (SCENE_BUFFER_SHOULD_DROP_SHADOW(scene_buffer)) {
-			const int shadow_size = drop_shadow_calc_size(scene_buffer->drop_shadow.blur_radius);
-			pixman_region32_union_rect(&node->visible, &node->visible,
-					lx - shadow_size + scene_buffer->drop_shadow.x_offset,
-					ly - shadow_size + scene_buffer->drop_shadow.y_offset,
-					box.width + shadow_size * 2, box.height + shadow_size * 2);
-		}
 	} else if (node->type == WLR_SCENE_NODE_RECT) {
 		struct wlr_scene_rect *scene_rect = wlr_scene_rect_from_node(node);
 		if (SCENE_RECT_SHOULD_BLUR(scene_rect, data->blur_data)) {
@@ -979,7 +970,7 @@ void wlr_scene_rect_set_clipped_region(struct wlr_scene_rect *rect,
 
 struct wlr_scene_shadow *wlr_scene_shadow_create(struct wlr_scene_tree *parent,
 		int width, int height, int corner_radius, float blur_sigma,
-		const float color [static 4]) {
+		const float color [static 4], enum wlr_scene_shadow_type type) {
 	struct wlr_scene_shadow *scene_shadow = calloc(1, sizeof(*scene_shadow));
 	if (scene_shadow == NULL) {
 		return NULL;
@@ -995,6 +986,9 @@ struct wlr_scene_shadow *wlr_scene_shadow_create(struct wlr_scene_tree *parent,
 	scene_shadow->clipped_region = clipped_region_get_default();
 
 	scene_node_update(&scene_shadow->node, NULL);
+
+	scene_shadow->reference_buffer = NULL;
+	scene_shadow->type = type;
 
 	return scene_shadow;
 }
@@ -1019,7 +1013,7 @@ void wlr_scene_shadow_set_corner_radius(struct wlr_scene_shadow *shadow, int cor
 }
 
 void wlr_scene_shadow_set_blur_sigma(struct wlr_scene_shadow *shadow, float blur_sigma) {
-	if (shadow->blur_sigma == blur_sigma) {
+	if (shadow->blur_sigma == blur_sigma || blur_sigma < 0) {
 		return;
 	}
 
@@ -1033,6 +1027,39 @@ void wlr_scene_shadow_set_color(struct wlr_scene_shadow *shadow, const float col
 	}
 
 	memcpy(shadow->color, color, sizeof(shadow->color));
+	scene_node_update(&shadow->node, NULL);
+}
+
+void wlr_scene_shadow_set_reference_buffer(struct wlr_scene_shadow *shadow,
+		struct wlr_scene_buffer *ref_buffer) {
+	if (shadow->type != WLR_SCENE_SHADOW_TYPE_DROP) {
+		wlr_log(WLR_ERROR, "Trying to set a reference buffer to a shadow with type of box."
+				"Please change its type before calling this function");
+		return;
+	}
+	if (ref_buffer == shadow->reference_buffer) {
+		return;
+	}
+
+	shadow->reference_buffer = ref_buffer;
+	scene_node_update(&shadow->node, NULL);
+}
+
+int wlr_scene_shadow_get_offset(struct wlr_scene_shadow *shadow) {
+	switch (shadow->type) {
+	case WLR_SCENE_SHADOW_TYPE_DROP:
+		return drop_shadow_calc_size(shadow->blur_sigma);
+	case WLR_SCENE_SHADOW_TYPE_BOX:
+		return shadow->blur_sigma;
+	}
+}
+
+void wlr_scene_shadow_set_type(struct wlr_scene_shadow *shadow, enum wlr_scene_shadow_type type) {
+	if (type == shadow->type) {
+		return;
+	}
+
+	shadow->type = type;
 	scene_node_update(&shadow->node, NULL);
 }
 
@@ -1215,12 +1242,6 @@ struct wlr_scene_buffer *wlr_scene_buffer_create(struct wlr_scene_tree *parent,
 	scene_buffer->backdrop_blur_optimized = false;
 	scene_buffer->backdrop_blur_ignore_transparent = true;
 	scene_buffer->corners = CORNER_LOCATION_NONE;
-	scene_buffer->drop_shadow.enabled = false;
-	scene_buffer->drop_shadow.blur_radius = 0;
-	scene_buffer->drop_shadow.x_offset = 0;
-	scene_buffer->drop_shadow.y_offset = 0;
-	// TODO: MOVE
-	memcpy(scene_buffer->drop_shadow.color, (float[4]){0, 0, 0, 1}, sizeof(scene_buffer->drop_shadow.color));
 
 	scene_buffer_set_buffer(scene_buffer, buffer);
 	scene_node_update(&scene_buffer->node, NULL);
@@ -1965,6 +1986,9 @@ static void scene_entry_render(struct render_list_entry *entry, const struct ren
 		break;
 	case WLR_SCENE_NODE_SHADOW:;
 		struct wlr_scene_shadow *scene_shadow = wlr_scene_shadow_from_node(node);
+		if (scene_shadow->blur_sigma < 0 || scene_shadow->color[3] <= 0) {
+			break;
+		}
 
 		struct wlr_box shadow_clipped_region_box = scene_shadow->clipped_region.area;
 		int shadow_clipped_region_corner_radius = scene_shadow->clipped_region.corner_radius;
@@ -1977,6 +2001,85 @@ static void scene_entry_render(struct render_list_entry *entry, const struct ren
 		transform_output_box(&shadow_clipped_region_box, data);
 		corner_location_transform(node_transform, &shadow_clipped_corners);
 
+		// Drop Shadow
+		if (scene_shadow->type == WLR_SCENE_SHADOW_TYPE_DROP) {
+			struct wlr_scene_buffer *scene_buffer = scene_shadow->reference_buffer;
+			if (!scene_buffer) {
+				wlr_log(WLR_ERROR, "Trying to render drop-shadow with NULL reference_buffer."
+						" Please set the buffer before rendering. Rendering as a box-shadow...");
+				goto fallback_box_shadow;
+			}
+			enum corner_location buffer_corners = scene_buffer->corners;
+
+			struct wlr_texture *texture = scene_buffer_get_texture(scene_buffer,
+					data->output->output->renderer);
+			if (texture == NULL) {
+				goto fallback_box_shadow;
+			}
+
+			const int shadow_size = drop_shadow_calc_size(scene_shadow->blur_sigma);
+
+			// Optimization: Fallback to a regular box-shadow if the texture is fully opaque
+			struct fx_texture_attribs attribs;
+			fx_texture_get_attribs(texture, &attribs);
+			if (!attribs.has_alpha) {
+				const int size_diff = fabs(scene_shadow->blur_sigma - shadow_size) - 2;
+				dst_box.x += size_diff;
+				dst_box.y += size_diff;
+				dst_box.width -= size_diff * 2;
+				dst_box.height -= size_diff * 2;
+				shadow_clipped_region_box.x += size_diff;
+				shadow_clipped_region_box.y += size_diff;
+				goto fallback_box_shadow;
+			}
+
+			enum wl_output_transform transform =
+				wlr_output_transform_invert(scene_buffer->transform);
+			transform = wlr_output_transform_compose(transform, data->transform);
+			corner_location_transform(transform, &buffer_corners);
+
+			dst_box.x += shadow_size;
+			dst_box.y += shadow_size;
+			dst_box.width -= shadow_size * 2;
+			dst_box.height -= shadow_size * 2;
+
+			const float opacity = 1.0f;
+			struct fx_render_drop_shadow_options shadow_options = {
+				// The same as the scene_buffer
+				// TODO: function to get this instead instead of copy/pasting?
+				.tex_options = {
+					.base = (struct wlr_render_texture_options){
+						.texture = texture,
+						.src_box = scene_buffer->src_box,
+						.dst_box = dst_box,
+						.transform = transform,
+						.clip = &render_region, // Render with the smaller region, clipping CSD
+						.alpha = &opacity,
+						.filter_mode = scene_buffer->filter_mode,
+						.blend_mode = !data->output->scene->calculate_visibility ||
+							!pixman_region32_empty(&opaque) ?
+							WLR_RENDER_BLEND_MODE_PREMULTIPLIED : WLR_RENDER_BLEND_MODE_NONE,
+						.wait_timeline = scene_buffer->wait_timeline,
+						.wait_point = scene_buffer->wait_point,
+					},
+					.clip_box = NULL,
+					.corners = buffer_corners,
+					.corner_radius = scene_buffer->corner_radius * data->scale,
+				},
+				.blur_sigma = scene_shadow->blur_sigma,
+				.color = {
+					.r = scene_shadow->color[0],
+					.g = scene_shadow->color[1],
+					.b = scene_shadow->color[2],
+					.a = scene_shadow->color[3],
+				},
+			};
+			fx_render_pass_add_drop_shadow(data->render_pass, &shadow_options);
+			break;
+		}
+
+fallback_box_shadow:
+		// Fallback to a regular box-shadow
 		struct fx_render_box_shadow_options shadow_options = {
 			.box = dst_box,
 			.clipped_region = {
@@ -2050,25 +2153,6 @@ static void scene_entry_render(struct render_list_entry *entry, const struct ren
 			.corners = buffer_corners,
 			.corner_radius = scene_buffer->corner_radius * data->scale,
 		};
-
-		// Drop Shadow
-		// TODO: Place in shadow_node instead?
-		if (SCENE_BUFFER_SHOULD_DROP_SHADOW(scene_buffer)) {
-			struct fx_render_drop_shadow_options shadow_options = {
-				.tex_options = tex_options,
-				.blur_sigma = scene_buffer->drop_shadow.blur_radius,
-				.color = {
-					// TODO: Fix weak colors
-					.r = scene_buffer->drop_shadow.color[0],
-					.g = scene_buffer->drop_shadow.color[1],
-					.b = scene_buffer->drop_shadow.color[2],
-					.a = scene_buffer->drop_shadow.color[3],
-				},
-				.x_offset = scene_buffer->drop_shadow.x_offset,
-				.y_offset = scene_buffer->drop_shadow.y_offset,
-			};
-			fx_render_pass_add_drop_shadow(data->render_pass, &shadow_options);
-		}
 
 		// Blur
 		if (SCENE_BUFFER_SHOULD_BLUR(scene_buffer, &scene->blur_data)) {
@@ -2663,7 +2747,7 @@ bool wlr_scene_output_needs_frame(struct wlr_scene_output *scene_output) {
 		scene_output->gamma_lut_changed;
 }
 
-static struct wlr_box node_blur_region(struct wlr_scene_node *node,
+static void node_blur_region(struct wlr_scene_node *node,
 		struct wlr_scene_output *scene_output, pixman_region32_t *node_region) {
 	int x, y;
 	wlr_scene_node_coords(node, &x, &y);
@@ -2688,8 +2772,6 @@ static struct wlr_box node_blur_region(struct wlr_scene_node *node,
 	pixman_region32_union_rect(node_region, node_region,
 			node_box.x, node_box.y,
 			node_box.width, node_box.height);
-
-	return node_box;
 }
 
 static bool scene_output_has_blur(int list_len,
@@ -2708,22 +2790,10 @@ static bool scene_output_has_blur(int list_len,
 		switch (node->type) {
 		case WLR_SCENE_NODE_BUFFER:;
 			struct wlr_scene_buffer *scene_buffer = wlr_scene_buffer_from_node(node);
-			if (!SCENE_BUFFER_SHOULD_BLUR(scene_buffer, &scene_output->scene->blur_data)
-					&& !SCENE_BUFFER_SHOULD_DROP_SHADOW(scene_buffer)) {
+			if (!SCENE_BUFFER_SHOULD_BLUR(scene_buffer, &scene_output->scene->blur_data)) {
 				goto fini;
 			}
-			struct wlr_box box = node_blur_region(node, scene_output, &node_region);
-			if (SCENE_BUFFER_SHOULD_DROP_SHADOW(scene_buffer)) {
-				const int shadow_size = drop_shadow_calc_size(scene_buffer->drop_shadow.blur_radius);
-				// Make sure to re-render the shadow due to it extending past
-				// the buffer
-				pixman_region32_union_rect(&node_region, &node_region,
-						box.x - shadow_size + scene_buffer->drop_shadow.x_offset,
-						box.y - shadow_size + scene_buffer->drop_shadow.y_offset,
-						box.width + shadow_size * 2, box.height + shadow_size * 2);
-
-				blur_size = fmax(blur_size, shadow_size);
-			}
+			node_blur_region(node, scene_output, &node_region);
 			break;
 		case WLR_SCENE_NODE_RECT:;
 			struct wlr_scene_rect *scene_rect = wlr_scene_rect_from_node(node);
@@ -2738,6 +2808,21 @@ static bool scene_output_has_blur(int list_len,
 				goto fini;
 			}
 			node_blur_region(node, scene_output, &node_region);
+			break;
+		case WLR_SCENE_NODE_SHADOW:;
+			struct wlr_scene_shadow *scene_shadow = wlr_scene_shadow_from_node(node);
+			if (scene_shadow->type != WLR_SCENE_SHADOW_TYPE_DROP
+					|| !scene_shadow->reference_buffer
+					|| scene_shadow->blur_sigma < 0) {
+				goto fini;
+			}
+			node_blur_region(node, scene_output, &node_region);
+			const int shadow_size = drop_shadow_calc_size(scene_shadow->blur_sigma);
+			// Make sure to re-render the shadow due to it extending past
+			// the buffer
+			wlr_region_expand(&node_region, &node_region, shadow_size);
+
+			blur_size = shadow_size;
 			break;
 		default:
 			// TODO: Add support for other node types

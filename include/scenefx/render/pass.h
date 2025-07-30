@@ -104,7 +104,7 @@ struct fx_render_blur_pass_options {
 	bool ignore_transparent;
 };
 
-struct fx_render_smart_shadow_options {
+struct fx_render_drop_shadow_options {
 	struct fx_render_texture_options tex_options;
 
 	// TODO: Make sure that this matches CSS drop-shadow
@@ -152,12 +152,12 @@ void fx_render_pass_add_box_shadow(struct fx_gles_render_pass *pass,
 		const struct fx_render_box_shadow_options *options);
 
 /**
- * Render a smart shadow. Blurs a reference texture, turning it into a dynamic
+ * Render a drop shadow. Blurs a reference texture, turning it into a dynamic
  * shadow which includes transparent regions such as any transparent hole in a
  * surface.
  */
-void fx_render_pass_add_smart_shadow(struct fx_gles_render_pass *pass,
-		struct fx_render_smart_shadow_options *fx_options);
+void fx_render_pass_add_drop_shadow(struct fx_gles_render_pass *pass,
+		struct fx_render_drop_shadow_options *fx_options);
 
 /**
  * Render blur.

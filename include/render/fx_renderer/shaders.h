@@ -170,7 +170,7 @@ struct blur_effects_shader {
 
 bool link_blur_effects_program(struct blur_effects_shader *shader, GLint client_version);
 
-struct smart_shadow_shader {
+struct drop_shadow_shader {
 	GLuint program;
 	GLint proj;
 	GLint tex_proj;
@@ -182,9 +182,9 @@ struct smart_shadow_shader {
 	GLint size;
 };
 
-bool link_smart_shadow_program(struct smart_shadow_shader *shader, GLint client_version);
+bool link_drop_shadow_program(struct drop_shadow_shader *shader, GLint client_version);
 
-struct smart_shadow_final_shader {
+struct drop_shadow_final_shader {
 	GLuint program;
 	GLint proj;
 	GLint tex_proj;
@@ -193,6 +193,6 @@ struct smart_shadow_final_shader {
 	GLint pos_attrib;
 };
 
-bool link_smart_shadow_final_program(struct smart_shadow_final_shader *shader, GLint client_version);
+bool link_drop_shadow_final_program(struct drop_shadow_final_shader *shader, GLint client_version);
 
 #endif

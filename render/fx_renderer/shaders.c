@@ -20,8 +20,8 @@
 #include "blur1_frag_gles3_src.h"
 #include "blur2_frag_gles3_src.h"
 #include "blur_effects_frag_gles3_src.h"
-#include "smart_shadow_frag_gles3_src.h"
-#include "smart_shadow_final_frag_gles3_src.h"
+#include "drop_shadow_frag_gles3_src.h"
+#include "drop_shadow_final_frag_gles3_src.h"
 // gles2
 #include "common_vert_gles2_src.h"
 #include "gradient_frag_gles2_src.h"
@@ -388,11 +388,11 @@ bool link_blur_effects_program(struct blur_effects_shader *shader, GLint client_
 	return true;
 }
 
-bool link_smart_shadow_program(struct smart_shadow_shader *shader, GLint client_version) {
+bool link_drop_shadow_program(struct drop_shadow_shader *shader, GLint client_version) {
 	GLuint prog;
-	shader->program = prog = client_version > 2 ? link_program(smart_shadow_frag_gles3_src, client_version)
+	shader->program = prog = client_version > 2 ? link_program(drop_shadow_frag_gles3_src, client_version)
 		// TODO: GLES2
-		: link_program(smart_shadow_frag_gles3_src, client_version);
+		: link_program(drop_shadow_frag_gles3_src, client_version);
 	if (!shader->program) {
 		return false;
 	}
@@ -409,11 +409,11 @@ bool link_smart_shadow_program(struct smart_shadow_shader *shader, GLint client_
 	return true;
 }
 
-bool link_smart_shadow_final_program(struct smart_shadow_final_shader *shader, GLint client_version) {
+bool link_drop_shadow_final_program(struct drop_shadow_final_shader *shader, GLint client_version) {
 	GLuint prog;
-	shader->program = prog = client_version > 2 ? link_program(smart_shadow_final_frag_gles3_src, client_version)
+	shader->program = prog = client_version > 2 ? link_program(drop_shadow_final_frag_gles3_src, client_version)
 		// TODO: GLES2
-		: link_program(smart_shadow_final_frag_gles3_src, client_version);
+		: link_program(drop_shadow_final_frag_gles3_src, client_version);
 	if (!shader->program) {
 		return false;
 	}

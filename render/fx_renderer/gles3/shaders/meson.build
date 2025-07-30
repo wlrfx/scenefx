@@ -13,8 +13,8 @@ shaders = [
     'blur1.frag',
     'blur2.frag',
     'blur_effects.frag',
-    'smart_shadow.frag',
-    'smart_shadow_final.frag',
+    'drop_shadow.frag',
+    'drop_shadow_final.frag',
 ]
 
 foreach name : shaders

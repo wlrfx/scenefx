@@ -107,11 +107,7 @@ struct fx_render_blur_pass_options {
 struct fx_render_drop_shadow_options {
 	struct fx_render_texture_options tex_options;
 
-	// TODO: Make sure that this matches CSS drop-shadow
 	float blur_sigma;
-	// TODO:
-	float x_offset, y_offset;
-	// TODO:
 	struct wlr_render_color color;
 };
 

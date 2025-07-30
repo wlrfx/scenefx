@@ -2825,7 +2825,6 @@ static bool scene_output_has_blur(int list_len,
 			blur_size = shadow_size;
 			break;
 		default:
-			// TODO: Add support for other node types
 			goto fini;
 		}
 

@@ -4,7 +4,6 @@
 #include <stdbool.h>
 #include <wlr/util/addon.h>
 
-// TODO: Move this
 #define drop_shadow_calc_size(blur_sigma) (ceil(1.5f * blur_sigma) * 2)
 #define drop_shadow_downscale 0.5
 

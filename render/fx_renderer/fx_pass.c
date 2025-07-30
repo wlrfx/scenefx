@@ -1011,7 +1011,7 @@ bool fx_render_pass_add_optimized_blur(struct fx_gles_render_pass *pass,
 
 	// Update the optimized blur buffer if invalid
 	bool failed = false;
-	fx_framebuffer_get_or_create_custom(renderer, pass->output, NULL,
+	fx_framebuffer_get_or_create_custom(renderer, pass->output,
 			&pass->fx_effect_framebuffers->optimized_blur_buffer, &failed);
 	if (failed) {
 		goto finish;
@@ -1138,8 +1138,6 @@ static void fx_render_pass_add_drop_shadow_final(struct fx_gles_render_pass *pas
 	pop_fx_debug(renderer);
 }
 
-// TODO: Downsize it to 1/2 or 1/4 the size, similar to the kawase blur
-// TODO: Use Kawase blur instead?
 void fx_render_pass_add_drop_shadow(struct fx_gles_render_pass *pass,
 		struct fx_render_drop_shadow_options *fx_options) {
 	if (pass->buffer->renderer->basic_renderer) {
@@ -1171,9 +1169,6 @@ void fx_render_pass_add_drop_shadow(struct fx_gles_render_pass *pass,
 	pixman_region32_t clip_extended;
 	pixman_region32_init(&clip_extended);
 	wlr_region_expand(&clip_extended, &clip_scaled, blur_sigma);
-
-	// TODO: Use regular shadow if the base texture isn't transparent:
-	// - fx_get_texture(fx_options->tex_options.base.texture)->has_alpha
 
 	fx_framebuffer_bind(effects_buffer);
 
@@ -1386,12 +1381,9 @@ struct fx_gles_render_pass *fx_renderer_begin_buffer_pass(
 		if (fbos) {
 			pixman_region32_init(&fbos->blur_padding_region);
 
-			fx_framebuffer_get_or_create_custom(renderer, output, fx_options->swapchain,
-					&fbos->blur_saved_pixels_buffer, &failed);
-			fx_framebuffer_get_or_create_custom(renderer, output, fx_options->swapchain,
-					&fbos->effects_buffer, &failed);
-			fx_framebuffer_get_or_create_custom(renderer, output, fx_options->swapchain,
-					&fbos->effects_buffer_swapped, &failed);
+			fx_framebuffer_get_or_create_custom(renderer, output, &fbos->blur_saved_pixels_buffer, &failed);
+			fx_framebuffer_get_or_create_custom(renderer, output, &fbos->effects_buffer, &failed);
+			fx_framebuffer_get_or_create_custom(renderer, output, &fbos->effects_buffer_swapped, &failed);
 		}
 
 		if (failed) {

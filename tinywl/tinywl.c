@@ -966,7 +966,8 @@ static void server_new_xdg_toplevel(struct wl_listener *listener, void *data) {
 
 	float blur_sigma = 20.0f;
 	toplevel->shadow = wlr_scene_shadow_create(toplevel->scene_tree,
-			0, 0, toplevel->corner_radius, blur_sigma, (float[4]){ 0.f, 1.0f, 0.f, 1.0f });
+			0, 0, toplevel->corner_radius, blur_sigma, (float[4]){ 0.f, 1.0f, 0.f, 1.0f },
+			WLR_SCENE_SHADOW_TYPE_BOX);
 	wlr_scene_node_set_position(&toplevel->shadow->node, -BORDER_THICKNESS - blur_sigma,
 			-BORDER_THICKNESS - blur_sigma);
 

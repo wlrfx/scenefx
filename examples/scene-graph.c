@@ -139,7 +139,8 @@ static void server_handle_new_surface(struct wl_listener *listener,
 	/* Shadow dimensions will be set in surface.commit handler */
 	float blur_sigma = 20.0f;
 	surface->shadow = wlr_scene_shadow_create(&server->scene->tree,
-			0, 0, corner_radius, blur_sigma, (float[4]){ 1.0f, 0.f, 0.f, 1.0f });
+			0, 0, corner_radius, blur_sigma, (float[4]){ 1.0f, 0.f, 0.f, 1.0f },
+			WLR_SCENE_SHADOW_TYPE_BOX);
 	wlr_scene_node_set_position(&surface->shadow->node,
 			pos - blur_sigma, pos - blur_sigma);
 	surface->scene_surface =

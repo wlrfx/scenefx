@@ -1197,6 +1197,7 @@ void fx_render_pass_add_drop_shadow(struct fx_gles_render_pass *pass,
 	//
 	// Prepare for blurring
 	//
+	fx_options->tex_options.base.transform = WL_OUTPUT_TRANSFORM_NORMAL;
 	fx_options->tex_options.base.clip = &clip_extended;
 	fx_options->tex_options.base.src_box = (struct wlr_fbox) {
 		.x = 0, .y = 0, .width = monitor_box.width, .height = monitor_box.height,

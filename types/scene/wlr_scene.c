@@ -1998,9 +1998,6 @@ static void scene_entry_render(struct render_list_entry *entry, const struct ren
 		shadow_clipped_region_box.x += x;
 		shadow_clipped_region_box.y += y;
 
-		transform_output_box(&shadow_clipped_region_box, data);
-		corner_location_transform(node_transform, &shadow_clipped_corners);
-
 		// Drop Shadow
 		if (scene_shadow->type == WLR_SCENE_SHADOW_TYPE_DROP) {
 			struct wlr_scene_buffer *scene_buffer = scene_shadow->reference_buffer;
@@ -2017,13 +2014,13 @@ static void scene_entry_render(struct render_list_entry *entry, const struct ren
 				goto fallback_box_shadow;
 			}
 
-			const int shadow_size = drop_shadow_calc_size(scene_shadow->blur_sigma);
+			const int shadow_size = drop_shadow_calc_size(scene_shadow->blur_sigma) * data->scale;
 
 			// Optimization: Fallback to a regular box-shadow if the texture is fully opaque
 			struct fx_texture_attribs attribs;
 			fx_texture_get_attribs(texture, &attribs);
 			if (!attribs.has_alpha) {
-				const int size_diff = fabs(scene_shadow->blur_sigma - shadow_size) - 2;
+				const int size_diff = fabs(scene_shadow->blur_sigma - shadow_size);
 				dst_box.x += size_diff;
 				dst_box.y += size_diff;
 				dst_box.width -= size_diff * 2;
@@ -2080,6 +2077,10 @@ static void scene_entry_render(struct render_list_entry *entry, const struct ren
 
 fallback_box_shadow:
 		// Fallback to a regular box-shadow
+
+		transform_output_box(&shadow_clipped_region_box, data);
+		corner_location_transform(node_transform, &shadow_clipped_corners);
+
 		struct fx_render_box_shadow_options shadow_options = {
 			.box = dst_box,
 			.clipped_region = {

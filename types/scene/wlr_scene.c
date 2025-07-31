@@ -678,7 +678,8 @@ static bool scene_node_update_iterator(struct wlr_scene_node *node,
 	if (node->type == WLR_SCENE_NODE_BUFFER) {
 		struct wlr_scene_buffer *scene_buffer = wlr_scene_buffer_from_node(node);
 		if (SCENE_BUFFER_SHOULD_BLUR(scene_buffer, data->blur_data)) {
-			wlr_region_expand(&node->visible, &node->visible, blur_data_calc_size(data->blur_data));
+			wlr_region_expand(&node->visible, &node->visible,
+					blur_data_calc_size(data->blur_data));
 		}
 	} else if (node->type == WLR_SCENE_NODE_RECT) {
 		struct wlr_scene_rect *scene_rect = wlr_scene_rect_from_node(node);
@@ -1392,7 +1393,8 @@ void wlr_scene_buffer_set_buffer_with_options(struct wlr_scene_buffer *scene_buf
 
 		// Expand the damage when committed to, fixes blur artifacts
 		if (SCENE_BUFFER_SHOULD_BLUR(scene_buffer, &scene->blur_data)) {
-			wlr_region_expand(&output_damage, &output_damage, blur_data_calc_size(&scene->blur_data));
+			wlr_region_expand(&output_damage, &output_damage,
+					blur_data_calc_size(&scene->blur_data));
 		}
 
 		pixman_region32_translate(&output_damage,
@@ -2134,27 +2136,6 @@ fallback_box_shadow:
 		transform = wlr_output_transform_compose(transform, data->transform);
 		corner_location_transform(transform, &buffer_corners);
 
-		// Base texture rendering options
-		struct fx_render_texture_options tex_options = {
-			.base = (struct wlr_render_texture_options){
-				.texture = texture,
-				.src_box = scene_buffer->src_box,
-				.dst_box = dst_box,
-				.transform = transform,
-				.clip = &render_region, // Render with the smaller region, clipping CSD
-				.alpha = &scene_buffer->opacity,
-				.filter_mode = scene_buffer->filter_mode,
-				.blend_mode = !data->output->scene->calculate_visibility ||
-					!pixman_region32_empty(&opaque) ?
-					WLR_RENDER_BLEND_MODE_PREMULTIPLIED : WLR_RENDER_BLEND_MODE_NONE,
-				.wait_timeline = scene_buffer->wait_timeline,
-				.wait_point = scene_buffer->wait_point,
-			},
-			.clip_box = &dst_box,
-			.corners = buffer_corners,
-			.corner_radius = scene_buffer->corner_radius * data->scale,
-		};
-
 		// Blur
 		if (SCENE_BUFFER_SHOULD_BLUR(scene_buffer, &scene->blur_data)) {
 			pixman_region32_t opaque_region;
@@ -2199,6 +2180,27 @@ fallback_box_shadow:
 			}
 			pixman_region32_fini(&opaque_region);
 		}
+
+		// Base texture rendering options
+		struct fx_render_texture_options tex_options = {
+			.base = (struct wlr_render_texture_options){
+				.texture = texture,
+				.src_box = scene_buffer->src_box,
+				.dst_box = dst_box,
+				.transform = transform,
+				.clip = &render_region, // Render with the smaller region, clipping CSD
+				.alpha = &scene_buffer->opacity,
+				.filter_mode = scene_buffer->filter_mode,
+				.blend_mode = !data->output->scene->calculate_visibility ||
+					!pixman_region32_empty(&opaque) ?
+					WLR_RENDER_BLEND_MODE_PREMULTIPLIED : WLR_RENDER_BLEND_MODE_NONE,
+				.wait_timeline = scene_buffer->wait_timeline,
+				.wait_point = scene_buffer->wait_point,
+			},
+			.clip_box = &dst_box,
+			.corners = buffer_corners,
+			.corner_radius = scene_buffer->corner_radius * data->scale,
+		};
 
 		fx_render_pass_add_texture(data->render_pass, &tex_options);
 

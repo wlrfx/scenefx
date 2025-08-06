@@ -104,6 +104,13 @@ struct fx_render_blur_pass_options {
 	bool ignore_transparent;
 };
 
+struct fx_render_drop_shadow_options {
+	struct fx_render_texture_options tex_options;
+
+	float blur_sigma;
+	struct wlr_render_color color;
+};
+
 /**
  * Render a fx texture.
  */
@@ -139,6 +146,14 @@ void fx_render_pass_add_rounded_rect_grad(struct fx_gles_render_pass *render_pas
  */
 void fx_render_pass_add_box_shadow(struct fx_gles_render_pass *pass,
 		const struct fx_render_box_shadow_options *options);
+
+/**
+ * Render a drop shadow. Blurs a reference texture, turning it into a dynamic
+ * shadow which includes transparent regions such as any transparent hole in a
+ * surface.
+ */
+void fx_render_pass_add_drop_shadow(struct fx_gles_render_pass *pass,
+		struct fx_render_drop_shadow_options *fx_options);
 
 /**
  * Render blur.

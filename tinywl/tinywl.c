@@ -613,14 +613,14 @@ static void xdg_toplevel_commit(struct wl_listener *listener, void *data) {
 			.area = { BORDER_THICKNESS, BORDER_THICKNESS, geometry->width, geometry->height }
 	});
 
-	int blur_sigma = toplevel->shadow->blur_sigma;
+	const int blur_offset = wlr_scene_shadow_get_offset(toplevel->shadow);
 	wlr_scene_shadow_set_size(toplevel->shadow,
-			border_width + (blur_sigma * 2),
-			border_height + (blur_sigma * 2));
+			border_width + (blur_offset * 2),
+			border_height + (blur_offset * 2));
 	wlr_scene_shadow_set_clipped_region(toplevel->shadow, (struct clipped_region) {
 			.corner_radius = toplevel->corner_radius + BORDER_THICKNESS,
 			.corners = CORNER_LOCATION_ALL,
-			.area = { blur_sigma, blur_sigma, border_width, border_height }
+			.area = { blur_offset, blur_offset, border_width, border_height }
 	});
 }
 
@@ -968,8 +968,9 @@ static void server_new_xdg_toplevel(struct wl_listener *listener, void *data) {
 	toplevel->shadow = wlr_scene_shadow_create(toplevel->scene_tree,
 			0, 0, toplevel->corner_radius, blur_sigma, (float[4]){ 0.f, 1.0f, 0.f, 1.0f },
 			WLR_SCENE_SHADOW_TYPE_BOX);
-	wlr_scene_node_set_position(&toplevel->shadow->node, -BORDER_THICKNESS - blur_sigma,
-			-BORDER_THICKNESS - blur_sigma);
+	const int blur_offset = wlr_scene_shadow_get_offset(toplevel->shadow);
+	wlr_scene_node_set_position(&toplevel->shadow->node, -BORDER_THICKNESS - blur_offset,
+			-BORDER_THICKNESS - blur_offset);
 
 	// Lower the border below the XDG scene tree
 	wlr_scene_node_lower_to_bottom(&toplevel->border->node);

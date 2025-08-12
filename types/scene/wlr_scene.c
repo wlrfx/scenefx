@@ -971,7 +971,7 @@ void wlr_scene_rect_set_clipped_region(struct wlr_scene_rect *rect,
 
 struct wlr_scene_shadow *wlr_scene_shadow_create(struct wlr_scene_tree *parent,
 		int width, int height, int corner_radius, float blur_sigma,
-		const float color [static 4], enum wlr_scene_shadow_type type) {
+		const float color [static 4]) {
 	struct wlr_scene_shadow *scene_shadow = calloc(1, sizeof(*scene_shadow));
 	if (scene_shadow == NULL) {
 		return NULL;
@@ -989,7 +989,7 @@ struct wlr_scene_shadow *wlr_scene_shadow_create(struct wlr_scene_tree *parent,
 	scene_node_update(&scene_shadow->node, NULL);
 
 	scene_shadow->reference_buffer = NULL;
-	scene_shadow->type = type;
+	scene_shadow->type = WLR_SCENE_SHADOW_TYPE_BOX;
 
 	return scene_shadow;
 }
@@ -1050,7 +1050,7 @@ int wlr_scene_shadow_get_offset(struct wlr_scene_shadow *shadow) {
 	switch (shadow->type) {
 	case WLR_SCENE_SHADOW_TYPE_DROP:
 		return drop_shadow_calc_size(shadow->blur_sigma);
-	case WLR_SCENE_SHADOW_TYPE_BOX:
+	default:
 		return shadow->blur_sigma;
 	}
 }

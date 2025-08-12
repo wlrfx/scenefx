@@ -42,10 +42,10 @@
 
 #define SCENE_BUFFER_SHOULD_BLUR(scene_buffer, blur_data) \
 	(scene_buffer->backdrop_blur && is_scene_blur_enabled(blur_data) && \
-	 (!scene_buffer->buffer_is_opaque || scene_buffer->opacity < 1.0f))
+		(!scene_buffer->buffer_is_opaque || scene_buffer->opacity < 1.0f))
 #define SCENE_RECT_SHOULD_BLUR(scene_rect, blur_data) \
 	(scene_rect->backdrop_blur && is_scene_blur_enabled(blur_data) && \
-	 scene_rect->color[3] < 1.0f)
+		scene_rect->color[3] < 1.0f)
 
 struct wlr_scene_tree *wlr_scene_tree_from_node(struct wlr_scene_node *node) {
 	assert(node->type == WLR_SCENE_NODE_TREE);

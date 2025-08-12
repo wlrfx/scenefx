@@ -400,7 +400,6 @@ bool link_drop_shadow_program(struct drop_shadow_shader *shader, GLint client_ve
 
 	shader->proj = glGetUniformLocation(prog, "proj");
 	shader->tex = glGetUniformLocation(prog, "tex");
-	shader->color = glGetUniformLocation(prog, "color");
 	shader->blur_sigma = glGetUniformLocation(prog, "blur_sigma");
 	shader->direction = glGetUniformLocation(prog, "direction");
 	shader->pos_attrib = glGetAttribLocation(prog, "pos");

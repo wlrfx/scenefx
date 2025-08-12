@@ -175,7 +175,6 @@ struct drop_shadow_shader {
 	GLint proj;
 	GLint tex_proj;
 	GLint tex;
-	GLint color;
 	GLint blur_sigma;
 	GLint direction;
 	GLint pos_attrib;

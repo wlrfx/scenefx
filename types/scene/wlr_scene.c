@@ -2007,6 +2007,9 @@ static void scene_entry_render(struct render_list_entry *entry, const struct ren
 						" Please set the buffer before rendering. Rendering as a box-shadow...");
 				goto fallback_box_shadow;
 			}
+			if (!scene_buffer->node.enabled) {
+				goto fallback_box_shadow;
+			}
 			enum corner_location buffer_corners = scene_buffer->corners;
 
 			struct wlr_texture *texture = scene_buffer_get_texture(scene_buffer,

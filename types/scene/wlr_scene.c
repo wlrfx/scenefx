@@ -2043,37 +2043,35 @@ static void scene_entry_render(struct render_list_entry *entry, const struct ren
 			dst_box.height -= shadow_size * 2;
 
 			const float opacity = 1.0f;
-			struct fx_render_drop_shadow_options shadow_options = {
+			struct fx_render_texture_options shadow_options = {
 				// The same as the scene_buffer
 				// TODO: function to get this instead instead of copy/pasting?
-				.tex_options = {
-					.base = (struct wlr_render_texture_options){
-						.texture = texture,
-						.src_box = scene_buffer->src_box,
-						.dst_box = dst_box,
-						.transform = transform,
-						.clip = &render_region, // Render with the smaller region, clipping CSD
-						.alpha = &opacity,
-						.filter_mode = scene_buffer->filter_mode,
-						.blend_mode = !data->output->scene->calculate_visibility ||
-							!pixman_region32_empty(&opaque) ?
-							WLR_RENDER_BLEND_MODE_PREMULTIPLIED : WLR_RENDER_BLEND_MODE_NONE,
-						.wait_timeline = scene_buffer->wait_timeline,
-						.wait_point = scene_buffer->wait_point,
-					},
-					.clip_box = NULL,
-					.corners = buffer_corners,
-					.corner_radius = scene_buffer->corner_radius * data->scale,
+				.base = (struct wlr_render_texture_options){
+					.texture = texture,
+					.src_box = scene_buffer->src_box,
+					.dst_box = dst_box,
+					.transform = transform,
+					.clip = &render_region, // Render with the smaller region, clipping CSD
+					.alpha = &opacity,
+					.filter_mode = scene_buffer->filter_mode,
+					.blend_mode = !data->output->scene->calculate_visibility ||
+						!pixman_region32_empty(&opaque) ?
+						WLR_RENDER_BLEND_MODE_PREMULTIPLIED : WLR_RENDER_BLEND_MODE_NONE,
+					.wait_timeline = scene_buffer->wait_timeline,
+					.wait_point = scene_buffer->wait_point,
 				},
-				.blur_sigma = scene_shadow->blur_sigma,
-				.color = {
-					.r = scene_shadow->color[0],
-					.g = scene_shadow->color[1],
-					.b = scene_shadow->color[2],
-					.a = scene_shadow->color[3],
-				},
+				.clip_box = NULL,
+				.corners = buffer_corners,
+				.corner_radius = scene_buffer->corner_radius * data->scale,
 			};
-			fx_render_pass_add_drop_shadow(data->render_pass, &shadow_options);
+			struct wlr_render_color color = {
+				.r = scene_shadow->color[0],
+				.g = scene_shadow->color[1],
+				.b = scene_shadow->color[2],
+				.a = scene_shadow->color[3],
+			};
+			fx_render_pass_add_drop_shadow(data->render_pass,
+					&shadow_options, scene_shadow->blur_sigma, &color);
 			break;
 		}
 

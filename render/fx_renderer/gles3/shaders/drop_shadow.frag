@@ -8,7 +8,6 @@ uniform sampler2D tex;
 
 uniform vec2 size;
 uniform float blur_sigma;
-uniform vec4 color;
 uniform vec2 direction;
 
 out vec4 fragColor;

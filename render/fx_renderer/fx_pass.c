@@ -1027,9 +1027,9 @@ finish:
 }
 
 static void render_drop_shadow_blur_direction(struct fx_gles_render_pass *pass,
-		const struct fx_render_drop_shadow_options *fx_options,
+		const struct fx_render_texture_options *tex_options, const float blur_sigma,
 		bool is_horizontal) {
-	const struct wlr_render_texture_options *options = &fx_options->tex_options.base;
+	const struct wlr_render_texture_options *options = &tex_options->base;
 	struct fx_renderer *renderer = pass->buffer->renderer;
 	struct fx_texture *texture = fx_get_texture(options->texture);
 	assert(texture->has_alpha);
@@ -1067,8 +1067,7 @@ static void render_drop_shadow_blur_direction(struct fx_gles_render_pass *pass,
 	}
 
 	glUniform1i(shader->tex, 0);
-	glUniform4f(shader->color, fx_options->color.r, fx_options->color.g, fx_options->color.b, fx_options->color.a);
-	glUniform1f(shader->blur_sigma, fx_options->blur_sigma);
+	glUniform1f(shader->blur_sigma, blur_sigma);
 	glUniform2f(shader->direction, 1 - !is_horizontal, 1 - is_horizontal);
 	glUniform2f(shader->size, dst_box.width, dst_box.height);
 
@@ -1085,8 +1084,8 @@ static void render_drop_shadow_blur_direction(struct fx_gles_render_pass *pass,
 }
 
 static void fx_render_pass_add_drop_shadow_final(struct fx_gles_render_pass *pass,
-		const struct fx_render_drop_shadow_options *fx_options) {
-	const struct wlr_render_texture_options *options = &fx_options->tex_options.base;
+		const struct fx_render_texture_options *tex_options, const struct wlr_render_color *color) {
+	const struct wlr_render_texture_options *options = &tex_options->base;
 	struct fx_renderer *renderer = pass->buffer->renderer;
 	struct fx_texture *texture = fx_get_texture(options->texture);
 
@@ -1124,7 +1123,7 @@ static void fx_render_pass_add_drop_shadow_final(struct fx_gles_render_pass *pas
 	}
 
 	glUniform1i(shader->tex, 0);
-	glUniform4f(shader->color, fx_options->color.r, fx_options->color.g, fx_options->color.b, fx_options->color.a);
+	glUniform4f(shader->color, color->r, color->g, color->b, color->a);
 
 	set_proj_matrix(shader->proj, pass->projection_matrix, &dst_box);
 	set_tex_matrix(shader->tex_proj, options->transform, &src_fbox);
@@ -1139,7 +1138,8 @@ static void fx_render_pass_add_drop_shadow_final(struct fx_gles_render_pass *pas
 }
 
 void fx_render_pass_add_drop_shadow(struct fx_gles_render_pass *pass,
-		struct fx_render_drop_shadow_options *fx_options) {
+		struct fx_render_texture_options *tex_options, float blur_sigma,
+		struct wlr_render_color *color) {
 	if (pass->buffer->renderer->basic_renderer) {
 		wlr_log(WLR_ERROR, "Please use 'fx_renderer_begin_buffer_pass' instead of "
 				"'wlr_renderer_begin_buffer_pass' to use advanced effects");
@@ -1147,11 +1147,10 @@ void fx_render_pass_add_drop_shadow(struct fx_gles_render_pass *pass,
 	}
 	// Downsample the blur at half resolution to increase performance. No visual
 	// difference
-	fx_options->blur_sigma *= drop_shadow_downscale;
+	blur_sigma = drop_shadow_calc_size(blur_sigma * drop_shadow_downscale);
 
-	const float blur_sigma = drop_shadow_calc_size(fx_options->blur_sigma);
 	struct fx_renderer *renderer = pass->buffer->renderer;
-	struct wlr_box dst_box = fx_options->tex_options.base.dst_box;
+	struct wlr_box dst_box = tex_options->base.dst_box;
 
 	struct fx_framebuffer *effects_buffer_swapped = pass->fx_effect_framebuffers->effects_buffer_swapped;
 	struct fx_framebuffer *effects_buffer = pass->fx_effect_framebuffers->effects_buffer;
@@ -1161,7 +1160,7 @@ void fx_render_pass_add_drop_shadow(struct fx_gles_render_pass *pass,
 	pixman_region32_init_rect(&clip,
 			dst_box.x - blur_sigma, dst_box.y - blur_sigma,
 			dst_box.width + blur_sigma * 2, dst_box.height + blur_sigma * 2);
-	pixman_region32_intersect(&clip, &clip, fx_options->tex_options.base.clip);
+	pixman_region32_intersect(&clip, &clip, tex_options->base.clip);
 
 	pixman_region32_t clip_scaled;
 	pixman_region32_init(&clip_scaled);
@@ -1186,53 +1185,53 @@ void fx_render_pass_add_drop_shadow(struct fx_gles_render_pass *pass,
 	glDisable(GL_SCISSOR_TEST);
 
 	// Initially Render to the effects buffer
-	fx_options->tex_options.base.clip = &clip_scaled;
-	fx_options->tex_options.clip_box = NULL;
+	tex_options->base.clip = &clip_scaled;
+	tex_options->clip_box = NULL;
 
-	scale_box(&fx_options->tex_options.base.dst_box, drop_shadow_downscale);
-	fx_options->tex_options.base.blend_mode = WLR_RENDER_BLEND_MODE_NONE;
-	fx_options->tex_options.base.filter_mode = WLR_SCALE_FILTER_BILINEAR;
-	fx_render_pass_add_texture(pass, &fx_options->tex_options);
+	scale_box(&tex_options->base.dst_box, drop_shadow_downscale);
+	tex_options->base.blend_mode = WLR_RENDER_BLEND_MODE_NONE;
+	tex_options->base.filter_mode = WLR_SCALE_FILTER_BILINEAR;
+	fx_render_pass_add_texture(pass, tex_options);
 
 	//
 	// Prepare for blurring
 	//
-	fx_options->tex_options.base.transform = WL_OUTPUT_TRANSFORM_NORMAL;
-	fx_options->tex_options.base.clip = &clip_extended;
-	fx_options->tex_options.base.src_box = (struct wlr_fbox) {
+	tex_options->base.transform = WL_OUTPUT_TRANSFORM_NORMAL;
+	tex_options->base.clip = &clip_extended;
+	tex_options->base.src_box = (struct wlr_fbox) {
 		.x = 0, .y = 0, .width = monitor_box.width, .height = monitor_box.height,
 	};
-	fx_options->tex_options.base.dst_box = monitor_box;
+	tex_options->base.dst_box = monitor_box;
 
 	//
 	// Horizontal Pass
 	//
 	fx_framebuffer_bind(effects_buffer_swapped);
-	fx_options->tex_options.base.texture = fx_texture_from_buffer(&renderer->wlr_renderer,
+	tex_options->base.texture = fx_texture_from_buffer(&renderer->wlr_renderer,
 			effects_buffer->buffer);
-	render_drop_shadow_blur_direction(pass, fx_options, true);
+	render_drop_shadow_blur_direction(pass, tex_options, blur_sigma, true);
 
 	//
 	// Vertical Pass
 	//
 	fx_framebuffer_bind(effects_buffer);
-	fx_options->tex_options.base.texture = fx_texture_from_buffer(&renderer->wlr_renderer,
+	tex_options->base.texture = fx_texture_from_buffer(&renderer->wlr_renderer,
 			effects_buffer_swapped->buffer);
-	render_drop_shadow_blur_direction(pass, fx_options, false);
+	render_drop_shadow_blur_direction(pass, tex_options, blur_sigma, false);
 
 	//
 	// Final Render Pass
 	//
 	fx_framebuffer_bind(pass->buffer);
-	fx_options->tex_options.base.clip = &clip;
-	fx_options->tex_options.base.dst_box = monitor_box;
-	scale_box(&fx_options->tex_options.base.dst_box, 1 / drop_shadow_downscale);
-	fx_options->tex_options.base.src_box = (struct wlr_fbox) {
+	tex_options->base.clip = &clip;
+	tex_options->base.dst_box = monitor_box;
+	scale_box(&tex_options->base.dst_box, 1 / drop_shadow_downscale);
+	tex_options->base.src_box = (struct wlr_fbox) {
 		.x = 0, .y = 0, .width = monitor_box.width, .height = monitor_box.height,
 	};
-	fx_options->tex_options.base.texture = fx_texture_from_buffer(&renderer->wlr_renderer,
+	tex_options->base.texture = fx_texture_from_buffer(&renderer->wlr_renderer,
 			effects_buffer->buffer);
-	fx_render_pass_add_drop_shadow_final(pass, fx_options);
+	fx_render_pass_add_drop_shadow_final(pass, tex_options, color);
 
 	pixman_region32_fini(&clip_extended);
 	pixman_region32_fini(&clip_scaled);

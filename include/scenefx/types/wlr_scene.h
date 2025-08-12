@@ -544,11 +544,12 @@ void wlr_scene_rect_set_backdrop_blur_optimized(struct wlr_scene_rect *rect,
 		bool enabled);
 
 /**
- * Add a node displaying a shadow to the scene-graph.
+ * Add a node displaying a shadow to the scene-graph. The shadow type created is
+ * a regular box-shadow.
  */
 struct wlr_scene_shadow *wlr_scene_shadow_create(struct wlr_scene_tree *parent,
 		int width, int height, int corner_radius, float blur_sigma,
-		const float color[static 4], enum wlr_scene_shadow_type type);
+		const float color[static 4]);
 
 /**
  * Change the width and height of an existing shadow node.

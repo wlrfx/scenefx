@@ -1014,9 +1014,10 @@ void wlr_scene_shadow_set_corner_radius(struct wlr_scene_shadow *shadow, int cor
 }
 
 void wlr_scene_shadow_set_blur_sigma(struct wlr_scene_shadow *shadow, float blur_sigma) {
-	if (shadow->blur_sigma == blur_sigma || blur_sigma < 0) {
+	if (shadow->blur_sigma == blur_sigma) {
 		return;
 	}
+	assert(blur_sigma >= 0);
 
 	shadow->blur_sigma = blur_sigma;
 	scene_node_update(&shadow->node, NULL);
@@ -1988,9 +1989,7 @@ static void scene_entry_render(struct render_list_entry *entry, const struct ren
 		break;
 	case WLR_SCENE_NODE_SHADOW:;
 		struct wlr_scene_shadow *scene_shadow = wlr_scene_shadow_from_node(node);
-		if (scene_shadow->blur_sigma < 0 || scene_shadow->color[3] <= 0) {
-			break;
-		}
+		assert(scene_shadow->blur_sigma >= 0 && scene_shadow->color[3] > 0);
 
 		struct wlr_box shadow_clipped_region_box = scene_shadow->clipped_region.area;
 		int shadow_clipped_region_corner_radius = scene_shadow->clipped_region.corner_radius;

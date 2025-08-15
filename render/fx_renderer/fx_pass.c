@@ -1147,7 +1147,8 @@ void fx_render_pass_add_drop_shadow(struct fx_gles_render_pass *pass,
 	}
 	// Downsample the blur at half resolution to increase performance. No visual
 	// difference
-	blur_sigma = drop_shadow_calc_size(blur_sigma * drop_shadow_downscale);
+	blur_sigma = blur_sigma * drop_shadow_downscale;
+	const float blur_sample_size = drop_shadow_calc_size(blur_sigma);
 
 	struct fx_renderer *renderer = pass->buffer->renderer;
 	struct wlr_box dst_box = tex_options->base.dst_box;
@@ -1158,8 +1159,8 @@ void fx_render_pass_add_drop_shadow(struct fx_gles_render_pass *pass,
 
 	pixman_region32_t clip;
 	pixman_region32_init_rect(&clip,
-			dst_box.x - blur_sigma, dst_box.y - blur_sigma,
-			dst_box.width + blur_sigma * 2, dst_box.height + blur_sigma * 2);
+			dst_box.x - blur_sample_size, dst_box.y - blur_sample_size,
+			dst_box.width + blur_sample_size * 2, dst_box.height + blur_sample_size * 2);
 	pixman_region32_intersect(&clip, &clip, tex_options->base.clip);
 
 	pixman_region32_t clip_scaled;
@@ -1167,7 +1168,7 @@ void fx_render_pass_add_drop_shadow(struct fx_gles_render_pass *pass,
 	wlr_region_scale(&clip_scaled, &clip, drop_shadow_downscale);
 	pixman_region32_t clip_extended;
 	pixman_region32_init(&clip_extended);
-	wlr_region_expand(&clip_extended, &clip_scaled, blur_sigma);
+	wlr_region_expand(&clip_extended, &clip_scaled, blur_sample_size);
 
 	fx_framebuffer_bind(effects_buffer);
 

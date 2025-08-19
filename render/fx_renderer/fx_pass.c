@@ -1163,12 +1163,11 @@ void fx_render_pass_add_drop_shadow(struct fx_gles_render_pass *pass,
 			dst_box.width + blur_sample_size * 2, dst_box.height + blur_sample_size * 2);
 	pixman_region32_intersect(&clip, &clip, tex_options->base.clip);
 
-	pixman_region32_t clip_scaled;
-	pixman_region32_init(&clip_scaled);
-	wlr_region_scale(&clip_scaled, &clip, drop_shadow_downscale);
 	pixman_region32_t clip_extended;
 	pixman_region32_init(&clip_extended);
-	wlr_region_expand(&clip_extended, &clip_scaled, blur_sample_size);
+	// Downsample and extend the region to increase the sample size
+	wlr_region_scale(&clip_extended, &clip, drop_shadow_downscale);
+	wlr_region_expand(&clip_extended, &clip_extended, blur_sample_size);
 
 	fx_framebuffer_bind(effects_buffer);
 
@@ -1186,7 +1185,7 @@ void fx_render_pass_add_drop_shadow(struct fx_gles_render_pass *pass,
 	glDisable(GL_SCISSOR_TEST);
 
 	// Initially Render to the effects buffer
-	tex_options->base.clip = &clip_scaled;
+	tex_options->base.clip = &clip_extended;
 	tex_options->clip_box = NULL;
 
 	scale_box(&tex_options->base.dst_box, drop_shadow_downscale);
@@ -1235,7 +1234,6 @@ void fx_render_pass_add_drop_shadow(struct fx_gles_render_pass *pass,
 	fx_render_pass_add_drop_shadow_final(pass, tex_options, color);
 
 	pixman_region32_fini(&clip_extended);
-	pixman_region32_fini(&clip_scaled);
 	pixman_region32_fini(&clip);
 }
 

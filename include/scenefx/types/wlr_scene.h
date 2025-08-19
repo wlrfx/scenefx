@@ -170,8 +170,10 @@ struct wlr_scene_shadow {
 	float blur_sigma;
 
 	enum wlr_scene_shadow_type type;
-	// Used to draw a drop-shadow. If NULL, falls-back to a box-shadow
-	struct wlr_scene_buffer *reference_buffer;
+	struct {
+		// Used to draw a drop-shadow. If NULL, falls-back to a box-shadow
+		struct wlr_scene_buffer *reference_buffer;
+	} WLR_PRIVATE;
 
 	struct clipped_region clipped_region;
 };
@@ -253,6 +255,9 @@ struct wlr_scene_buffer {
 		// If is_single_pixel_buffer is set, contains the color of the buffer
 		// as {R, G, B, A} where the max value of each component is UINT32_MAX
 		uint32_t single_pixel_buffer_color[4];
+
+		/** May be NULL. Used to know which shadow's linked to this scene_buffer */
+		struct wlr_scene_shadow *linked_drop_shadow;
 	} WLR_PRIVATE;
 };
 

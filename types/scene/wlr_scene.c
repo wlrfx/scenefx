@@ -46,6 +46,10 @@
 #define SCENE_RECT_SHOULD_BLUR(scene_rect, blur_data) \
 	(scene_rect->backdrop_blur && is_scene_blur_enabled(blur_data) && \
 		scene_rect->color[3] < 1.0f)
+#define SCENE_SHADOW_IS_DROP(scene_shadow) \
+	(scene_shadow->type == WLR_SCENE_SHADOW_TYPE_DROP \
+		&& scene_shadow->reference_buffer \
+		&& scene_shadow->blur_sigma >= 0)
 
 struct wlr_scene_tree *wlr_scene_tree_from_node(struct wlr_scene_node *node) {
 	assert(node->type == WLR_SCENE_NODE_TREE);
@@ -185,6 +189,13 @@ void wlr_scene_node_destroy(struct wlr_scene_node *node) {
 		wl_list_for_each_safe(child, child_tmp,
 				&scene_tree->children, link) {
 			wlr_scene_node_destroy(child);
+		}
+	} else if (node->type == WLR_SCENE_NODE_SHADOW) {
+		// Remove the drop-shadows referenced buffers link to this node
+		struct wlr_scene_shadow *scene_shadow = wlr_scene_shadow_from_node(node);
+		if (scene_shadow->reference_buffer
+				&& scene_shadow->reference_buffer->linked_drop_shadow == scene_shadow) {
+			scene_shadow->reference_buffer->linked_drop_shadow = NULL;
 		}
 	}
 
@@ -1039,6 +1050,15 @@ void wlr_scene_shadow_set_reference_buffer(struct wlr_scene_shadow *shadow,
 				"Please change its type before calling this function");
 		return;
 	}
+
+	// Unlink the other drop shadow from the reference buffer if it exists
+	if (shadow->reference_buffer) {
+		shadow->reference_buffer->linked_drop_shadow = NULL;
+	}
+	if (ref_buffer) {
+		ref_buffer->linked_drop_shadow = shadow;
+	}
+
 	if (ref_buffer == shadow->reference_buffer) {
 		return;
 	}
@@ -1244,6 +1264,7 @@ struct wlr_scene_buffer *wlr_scene_buffer_create(struct wlr_scene_tree *parent,
 	scene_buffer->backdrop_blur_optimized = false;
 	scene_buffer->backdrop_blur_ignore_transparent = true;
 	scene_buffer->corners = CORNER_LOCATION_NONE;
+	scene_buffer->linked_drop_shadow = NULL;
 
 	scene_buffer_set_buffer(scene_buffer, buffer);
 	scene_node_update(&scene_buffer->node, NULL);
@@ -1391,6 +1412,28 @@ void wlr_scene_buffer_set_buffer_with_options(struct wlr_scene_buffer *scene_buf
 		pixman_region32_translate(&cull_region, -lx * output_scale, -ly * output_scale);
 		pixman_region32_intersect(&output_damage, &output_damage, &cull_region);
 		pixman_region32_fini(&cull_region);
+
+		// Also damage the linked drop-shadow
+		struct wlr_scene_shadow *scene_shadow = scene_buffer->linked_drop_shadow;
+		if (scene_shadow && SCENE_SHADOW_IS_DROP(scene_shadow)) {
+			int shadow_lx, shadow_ly;
+			if (wlr_scene_node_coords(&scene_shadow->node, &shadow_lx, &shadow_ly)) {
+				const int shadow_size = drop_shadow_calc_size(scene_shadow->blur_sigma);
+
+				// Copy the damaged region, translate it to the shadow nodes
+				// position, and add it to the original damage
+				pixman_region32_t shadow_damage;
+				pixman_region32_init(&shadow_damage);
+				pixman_region32_copy(&shadow_damage, &output_damage);
+				pixman_region32_translate(&shadow_damage,
+						((shadow_lx + shadow_size) - lx) * output_scale,
+						((shadow_ly + shadow_size) - ly) * output_scale);
+				wlr_region_expand(&shadow_damage, &shadow_damage,
+						drop_shadow_calc_size(scene_shadow->blur_sigma));
+
+				pixman_region32_union(&output_damage, &output_damage, &shadow_damage);
+			}
+		}
 
 		// Expand the damage when committed to, fixes blur artifacts
 		if (SCENE_BUFFER_SHOULD_BLUR(scene_buffer, &scene->blur_data)) {
@@ -2814,18 +2857,11 @@ static bool scene_output_has_blur(int list_len,
 			break;
 		case WLR_SCENE_NODE_SHADOW:;
 			struct wlr_scene_shadow *scene_shadow = wlr_scene_shadow_from_node(node);
-			if (scene_shadow->type != WLR_SCENE_SHADOW_TYPE_DROP
-					|| !scene_shadow->reference_buffer
-					|| scene_shadow->blur_sigma < 0) {
+			if (!SCENE_SHADOW_IS_DROP(scene_shadow)) {
 				goto fini;
 			}
 			node_blur_region(node, scene_output, &node_region);
-			const int shadow_size = drop_shadow_calc_size(scene_shadow->blur_sigma);
-			// Make sure to re-render the shadow due to it extending past
-			// the buffer
-			wlr_region_expand(&node_region, &node_region, shadow_size);
-
-			blur_size = shadow_size;
+			blur_size = drop_shadow_calc_size(scene_shadow->blur_sigma);
 			break;
 		default:
 			goto fini;

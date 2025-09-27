@@ -31,6 +31,7 @@
 #include "scenefx/types/fx/blur_data.h"
 #include "scenefx/types/fx/clipped_region.h"
 #include "scenefx/types/fx/corner_location.h"
+#include "types/linked_nodes.h"
 
 struct wlr_output;
 struct wlr_output_layout;
@@ -171,8 +172,8 @@ struct wlr_scene_shadow {
 
 	enum wlr_scene_shadow_type type;
 	struct {
-		// Used to draw a drop-shadow. If NULL, falls-back to a box-shadow
-		struct wlr_scene_buffer *reference_buffer;
+		// Used to draw a drop-shadow
+		struct linked_node buffer_link;
 	} WLR_PRIVATE;
 
 	struct clipped_region clipped_region;
@@ -256,8 +257,8 @@ struct wlr_scene_buffer {
 		// as {R, G, B, A} where the max value of each component is UINT32_MAX
 		uint32_t single_pixel_buffer_color[4];
 
-		/** May be NULL. Used to know which shadow's linked to this scene_buffer */
-		struct wlr_scene_shadow *linked_drop_shadow;
+		// Used to know which shadow's linked to this scene_buffer
+		struct linked_node drop_shadow_link;
 	} WLR_PRIVATE;
 };
 

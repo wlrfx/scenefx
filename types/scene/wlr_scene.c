@@ -24,6 +24,7 @@
 #include "scenefx/types/fx/blur_data.h"
 #include "scenefx/types/fx/clipped_region.h"
 #include "scenefx/types/fx/corner_location.h"
+#include "types/linked_nodes.h"
 #include "types/wlr_output.h"
 #include "types/wlr_scene.h"
 #include "util/array.h"
@@ -48,7 +49,7 @@
 		scene_rect->color[3] < 1.0f)
 #define SCENE_SHADOW_IS_DROP(scene_shadow) \
 	(scene_shadow->type == WLR_SCENE_SHADOW_TYPE_DROP \
-		&& scene_shadow->reference_buffer \
+		&& scene_shadow->buffer_link.link != NULL \
 		&& scene_shadow->blur_sigma >= 0)
 
 struct wlr_scene_tree *wlr_scene_tree_from_node(struct wlr_scene_node *node) {
@@ -193,10 +194,7 @@ void wlr_scene_node_destroy(struct wlr_scene_node *node) {
 	} else if (node->type == WLR_SCENE_NODE_SHADOW) {
 		// Remove the drop-shadows referenced buffers link to this node
 		struct wlr_scene_shadow *scene_shadow = wlr_scene_shadow_from_node(node);
-		if (scene_shadow->reference_buffer
-				&& scene_shadow->reference_buffer->linked_drop_shadow == scene_shadow) {
-			scene_shadow->reference_buffer->linked_drop_shadow = NULL;
-		}
+		linked_node_destroy(&scene_shadow->buffer_link);
 	}
 
 	assert(wl_list_empty(&node->events.destroy.listener_list));
@@ -999,7 +997,7 @@ struct wlr_scene_shadow *wlr_scene_shadow_create(struct wlr_scene_tree *parent,
 
 	scene_node_update(&scene_shadow->node, NULL);
 
-	scene_shadow->reference_buffer = NULL;
+	scene_shadow->buffer_link = linked_node_init();
 	scene_shadow->type = WLR_SCENE_SHADOW_TYPE_BOX;
 
 	return scene_shadow;
@@ -1051,19 +1049,8 @@ void wlr_scene_shadow_set_reference_buffer(struct wlr_scene_shadow *shadow,
 		return;
 	}
 
-	// Unlink the other drop shadow from the reference buffer if it exists
-	if (shadow->reference_buffer) {
-		shadow->reference_buffer->linked_drop_shadow = NULL;
-	}
-	if (ref_buffer) {
-		ref_buffer->linked_drop_shadow = shadow;
-	}
+	linked_node_init_link(&shadow->buffer_link, &ref_buffer->drop_shadow_link);
 
-	if (ref_buffer == shadow->reference_buffer) {
-		return;
-	}
-
-	shadow->reference_buffer = ref_buffer;
 	scene_node_update(&shadow->node, NULL);
 }
 
@@ -1264,7 +1251,7 @@ struct wlr_scene_buffer *wlr_scene_buffer_create(struct wlr_scene_tree *parent,
 	scene_buffer->backdrop_blur_optimized = false;
 	scene_buffer->backdrop_blur_ignore_transparent = true;
 	scene_buffer->corners = CORNER_LOCATION_NONE;
-	scene_buffer->linked_drop_shadow = NULL;
+	scene_buffer->drop_shadow_link = linked_node_init();
 
 	scene_buffer_set_buffer(scene_buffer, buffer);
 	scene_node_update(&scene_buffer->node, NULL);
@@ -1414,24 +1401,27 @@ void wlr_scene_buffer_set_buffer_with_options(struct wlr_scene_buffer *scene_buf
 		pixman_region32_fini(&cull_region);
 
 		// Also damage the linked drop-shadow
-		struct wlr_scene_shadow *scene_shadow = scene_buffer->linked_drop_shadow;
-		if (scene_shadow && SCENE_SHADOW_IS_DROP(scene_shadow)) {
-			int shadow_lx, shadow_ly;
-			if (wlr_scene_node_coords(&scene_shadow->node, &shadow_lx, &shadow_ly)) {
-				const int shadow_size = drop_shadow_calc_size(scene_shadow->blur_sigma);
+		struct linked_node *shadow_link = linked_nodes_get_sibling(&scene_buffer->drop_shadow_link);
+		if (shadow_link != NULL) {
+			struct wlr_scene_shadow *scene_shadow = wl_container_of(shadow_link, scene_shadow, buffer_link);
+			if (scene_shadow && SCENE_SHADOW_IS_DROP(scene_shadow)) {
+				int shadow_lx, shadow_ly;
+				if (wlr_scene_node_coords(&scene_shadow->node, &shadow_lx, &shadow_ly)) {
+					const int shadow_size = drop_shadow_calc_size(scene_shadow->blur_sigma);
 
-				// Copy the damaged region, translate it to the shadow nodes
-				// position, and add it to the original damage
-				pixman_region32_t shadow_damage;
-				pixman_region32_init(&shadow_damage);
-				pixman_region32_copy(&shadow_damage, &output_damage);
-				pixman_region32_translate(&shadow_damage,
-						((shadow_lx + shadow_size) - lx) * output_scale,
-						((shadow_ly + shadow_size) - ly) * output_scale);
-				wlr_region_expand(&shadow_damage, &shadow_damage,
-						drop_shadow_calc_size(scene_shadow->blur_sigma));
+					// Copy the damaged region, translate it to the shadow nodes
+					// position, and add it to the original damage
+					pixman_region32_t shadow_damage;
+					pixman_region32_init(&shadow_damage);
+					pixman_region32_copy(&shadow_damage, &output_damage);
+					pixman_region32_translate(&shadow_damage,
+							((shadow_lx + shadow_size) - lx) * output_scale,
+							((shadow_ly + shadow_size) - ly) * output_scale);
+					wlr_region_expand(&shadow_damage, &shadow_damage,
+							drop_shadow_calc_size(scene_shadow->blur_sigma));
 
-				pixman_region32_union(&output_damage, &output_damage, &shadow_damage);
+					pixman_region32_union(&output_damage, &output_damage, &shadow_damage);
+				}
 			}
 		}
 
@@ -2044,7 +2034,12 @@ static void scene_entry_render(struct render_list_entry *entry, const struct ren
 
 		// Drop Shadow
 		if (scene_shadow->type == WLR_SCENE_SHADOW_TYPE_DROP) {
-			struct wlr_scene_buffer *scene_buffer = scene_shadow->reference_buffer;
+			struct linked_node *buffer_link = linked_nodes_get_sibling(&scene_shadow->buffer_link);
+			struct wlr_scene_buffer *scene_buffer = NULL;
+			if (buffer_link != NULL) {
+				scene_buffer = wl_container_of(buffer_link, scene_buffer, drop_shadow_link);
+			}
+
 			if (!scene_buffer) {
 				wlr_log(WLR_ERROR, "Trying to render drop-shadow with NULL reference_buffer."
 						" Please set the buffer before rendering. Rendering as a box-shadow...");

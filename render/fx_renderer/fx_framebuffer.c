@@ -1,4 +1,3 @@
-#include <stdio.h>
 #include <stdlib.h>
 #include <wlr/interfaces/wlr_buffer.h>
 #include <wlr/render/allocator.h>
@@ -88,7 +87,7 @@ void fx_framebuffer_get_or_create_custom(struct fx_renderer *renderer,
 	int height = output->height;
 	struct wlr_buffer *wlr_buffer = NULL;
 
-	if (*fx_framebuffer == NULL) {
+	if (*fx_framebuffer == NULL || !(*fx_framebuffer)->initialized) {
 		wlr_buffer = wlr_allocator_create_buffer(allocator, width, height,
 				&swapchain->format);
 		if (wlr_buffer == NULL) {
@@ -149,6 +148,8 @@ struct fx_framebuffer *fx_framebuffer_get_or_create(struct fx_renderer *renderer
 	wlr_log(WLR_DEBUG, "Created GL FBO for buffer %dx%d",
 		wlr_buffer->width, wlr_buffer->height);
 
+	buffer->initialized = true;
+
 	return buffer;
 
 error_buffer:
@@ -161,6 +162,12 @@ void fx_framebuffer_bind(struct fx_framebuffer *fx_buffer) {
 }
 
 void fx_framebuffer_destroy(struct fx_framebuffer *fx_buffer) {
+	if (!fx_buffer->initialized) {
+		wlr_log(WLR_ERROR, "Trying to destroy uninitialized fx_framebuffer");
+		return;
+	}
+	fx_buffer->initialized = false;
+
 	// Release the framebuffer
 	wl_list_remove(&fx_buffer->link);
 	wlr_addon_finish(&fx_buffer->addon);

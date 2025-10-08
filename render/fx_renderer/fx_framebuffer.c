@@ -162,7 +162,7 @@ void fx_framebuffer_bind(struct fx_framebuffer *fx_buffer) {
 }
 
 void fx_framebuffer_destroy(struct fx_framebuffer *fx_buffer) {
-	if (!fx_buffer->initialized) {
+	if (!fx_buffer || !fx_buffer->initialized) {
 		wlr_log(WLR_ERROR, "Trying to destroy uninitialized fx_framebuffer");
 		return;
 	}

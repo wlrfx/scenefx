@@ -26,8 +26,6 @@ static void addon_handle_destroy(struct wlr_addon *addon) {
 	destroy_fx_framebuffer(&fbos->effects_buffer);
 	destroy_fx_framebuffer(&fbos->effects_buffer_swapped);
 
-	pixman_region32_fini(&fbos->blur_padding_region);
-
 	free(fbos);
 }
 

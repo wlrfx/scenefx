@@ -47,8 +47,6 @@ struct fx_framebuffer {
 	GLuint sb; // Stencil
 
 	struct wlr_addon addon;
-
-	bool initialized;
 };
 
 /** Should only be used with custom fbs */

@@ -87,7 +87,7 @@ void fx_framebuffer_get_or_create_custom(struct fx_renderer *renderer,
 	int height = output->height;
 	struct wlr_buffer *wlr_buffer = NULL;
 
-	if (*fx_framebuffer == NULL || !(*fx_framebuffer)->initialized) {
+	if (*fx_framebuffer == NULL) {
 		wlr_buffer = wlr_allocator_create_buffer(allocator, width, height,
 				&swapchain->format);
 		if (wlr_buffer == NULL) {
@@ -96,15 +96,16 @@ void fx_framebuffer_get_or_create_custom(struct fx_renderer *renderer,
 			return;
 		}
 	} else {
-		if ((wlr_buffer = (*fx_framebuffer)->buffer) &&
-				wlr_buffer->width == width &&
-				wlr_buffer->height == height) {
-			return;
+		if ((wlr_buffer = (*fx_framebuffer)->buffer)) {
+			if (wlr_buffer->width == width && wlr_buffer->height == height) {
+				return;
+			}
+			// Create a new wlr_buffer if it's null or if the output size has
+			// changed
+			wlr_buffer_drop(wlr_buffer);
 		}
-		// Create a new wlr_buffer if it's null or if the output size has
-		// changed
+
 		fx_framebuffer_destroy(*fx_framebuffer);
-		wlr_buffer_drop(wlr_buffer);
 		wlr_buffer = wlr_allocator_create_buffer(allocator,
 				width, height, &swapchain->format);
 	}
@@ -148,8 +149,6 @@ struct fx_framebuffer *fx_framebuffer_get_or_create(struct fx_renderer *renderer
 	wlr_log(WLR_DEBUG, "Created GL FBO for buffer %dx%d",
 		wlr_buffer->width, wlr_buffer->height);
 
-	buffer->initialized = true;
-
 	return buffer;
 
 error_buffer:
@@ -162,11 +161,11 @@ void fx_framebuffer_bind(struct fx_framebuffer *fx_buffer) {
 }
 
 void fx_framebuffer_destroy(struct fx_framebuffer *fx_buffer) {
-	if (!fx_buffer || !fx_buffer->initialized) {
-		wlr_log(WLR_ERROR, "Trying to destroy uninitialized fx_framebuffer");
+	if (!fx_buffer || !fx_buffer->buffer) {
+		wlr_log(WLR_ERROR, "Trying to destroy an already destroyed fx_framebuffer");
 		return;
 	}
-	fx_buffer->initialized = false;
+	fx_buffer->buffer = NULL;
 
 	// Release the framebuffer
 	wl_list_remove(&fx_buffer->link);

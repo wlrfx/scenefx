@@ -11,7 +11,7 @@ static inline void destroy_fx_framebuffer(struct fx_framebuffer **fx_buffer) {
 		return;
 	}
 
-	if ((*fx_buffer)->initialized) {
+	if ((*fx_buffer)->buffer) {
 		fx_framebuffer_destroy(*fx_buffer);
 	}
 	(*fx_buffer) = NULL;

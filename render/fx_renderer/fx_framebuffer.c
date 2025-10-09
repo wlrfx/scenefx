@@ -1,4 +1,3 @@
-#include <stdio.h>
 #include <stdlib.h>
 #include <wlr/interfaces/wlr_buffer.h>
 #include <wlr/render/allocator.h>
@@ -97,15 +96,16 @@ void fx_framebuffer_get_or_create_custom(struct fx_renderer *renderer,
 			return;
 		}
 	} else {
-		if ((wlr_buffer = (*fx_framebuffer)->buffer) &&
-				wlr_buffer->width == width &&
-				wlr_buffer->height == height) {
-			return;
+		if ((wlr_buffer = (*fx_framebuffer)->buffer)) {
+			if (wlr_buffer->width == width && wlr_buffer->height == height) {
+				return;
+			}
+			// Create a new wlr_buffer if it's null or if the output size has
+			// changed
+			wlr_buffer_drop(wlr_buffer);
 		}
-		// Create a new wlr_buffer if it's null or if the output size has
-		// changed
+
 		fx_framebuffer_destroy(*fx_framebuffer);
-		wlr_buffer_drop(wlr_buffer);
 		wlr_buffer = wlr_allocator_create_buffer(allocator,
 				width, height, &swapchain->format);
 	}
@@ -161,6 +161,12 @@ void fx_framebuffer_bind(struct fx_framebuffer *fx_buffer) {
 }
 
 void fx_framebuffer_destroy(struct fx_framebuffer *fx_buffer) {
+	if (!fx_buffer || !fx_buffer->buffer) {
+		wlr_log(WLR_ERROR, "Trying to destroy an already destroyed fx_framebuffer");
+		return;
+	}
+	fx_buffer->buffer = NULL;
+
 	// Release the framebuffer
 	wl_list_remove(&fx_buffer->link);
 	wlr_addon_finish(&fx_buffer->addon);

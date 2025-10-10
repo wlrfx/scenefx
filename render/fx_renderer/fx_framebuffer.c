@@ -162,11 +162,10 @@ void fx_framebuffer_bind(struct fx_framebuffer *fx_buffer) {
 }
 
 void fx_framebuffer_destroy(struct fx_framebuffer *fx_buffer) {
-	if (!fx_buffer || !fx_buffer->buffer) {
+	if (!fx_buffer) {
 		wlr_log(WLR_ERROR, "Trying to destroy an already destroyed fx_framebuffer");
 		return;
 	}
-	fx_buffer->buffer = NULL;
 
 	// Release the framebuffer
 	wl_list_remove(&fx_buffer->link);

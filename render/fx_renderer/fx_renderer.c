@@ -21,6 +21,7 @@
 #include "render/fx_renderer/shaders.h"
 #include "render/fx_renderer/fx_renderer.h"
 #include "render/fx_renderer/util.h"
+#include "scenefx/render/fx_renderer/fx_effect_framebuffers.h"
 #include "scenefx/render/fx_renderer/fx_renderer.h"
 #include "scenefx/render/pass.h"
 #include "util/time.h"
@@ -91,6 +92,11 @@ static void fx_renderer_destroy(struct wlr_renderer *wlr_renderer) {
 	struct fx_framebuffer *buffer, *buffer_tmp;
 	wl_list_for_each_safe(buffer, buffer_tmp, &renderer->buffers, link) {
 		fx_framebuffer_destroy(buffer);
+	}
+
+	struct fx_effect_framebuffers *fbos, *fbos_tmp;
+	wl_list_for_each_safe(fbos, fbos_tmp, &renderer->effect_fbos, link) {
+		fx_effect_framebuffers_destroy(fbos);
 	}
 
 	push_fx_debug(renderer);
@@ -406,6 +412,7 @@ struct wlr_renderer *fx_renderer_create_egl(struct wlr_egl *egl) {
 
 	wl_list_init(&renderer->buffers);
 	wl_list_init(&renderer->textures);
+	wl_list_init(&renderer->effect_fbos);
 
 	renderer->egl = egl;
 	renderer->exts_str = exts_str;

@@ -103,9 +103,10 @@ void fx_framebuffer_get_or_create_custom(struct fx_renderer *renderer,
 			// Create a new wlr_buffer if it's null or if the output size has
 			// changed
 			wlr_buffer_drop(wlr_buffer);
+		} else {
+			fx_framebuffer_destroy(*fx_framebuffer);
 		}
 
-		fx_framebuffer_destroy(*fx_framebuffer);
 		wlr_buffer = wlr_allocator_create_buffer(allocator,
 				width, height, &swapchain->format);
 	}

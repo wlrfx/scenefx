@@ -190,6 +190,7 @@ struct fx_renderer {
 
 	struct wl_list buffers; // fx_framebuffer.link
 	struct wl_list textures; // fx_texture.link
+	struct wl_list effect_fbos; // fx_effect_framebuffers.link
 
 	// Set to true when 'wlr_renderer_begin_buffer_pass' is called instead of
 	// our custom 'fx_renderer_begin_buffer_pass' function

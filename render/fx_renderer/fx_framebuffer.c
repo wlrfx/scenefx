@@ -111,8 +111,7 @@ void fx_framebuffer_get_or_create_custom(struct fx_renderer *renderer,
 			fx_framebuffer_destroy(*fx_framebuffer);
 		}
 
-		wlr_buffer = wlr_allocator_create_buffer(allocator,
-				width, height, &swapchain->format);
+		wlr_buffer = wlr_allocator_create_buffer(allocator, width, height, format);
 	}
 	*fx_framebuffer = fx_framebuffer_get_or_create(renderer, wlr_buffer);
 	fx_framebuffer_get_fbo(*fx_framebuffer);

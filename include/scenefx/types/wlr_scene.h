@@ -31,7 +31,7 @@
 #include "scenefx/types/fx/blur_data.h"
 #include "scenefx/types/fx/clipped_region.h"
 #include "scenefx/types/fx/corner_location.h"
-#include "types/linked_nodes.h"
+#include "types/linked_node.h"
 
 struct wlr_output;
 struct wlr_output_layout;
@@ -157,11 +157,6 @@ struct wlr_scene_rect {
 	struct clipped_region clipped_region;
 };
 
-enum wlr_scene_shadow_type {
-	WLR_SCENE_SHADOW_TYPE_DROP,
-	WLR_SCENE_SHADOW_TYPE_BOX,
-};
-
 /** A scene-graph node displaying a shadow */
 struct wlr_scene_shadow {
 	struct wlr_scene_node node;
@@ -170,7 +165,6 @@ struct wlr_scene_shadow {
 	float color[4];
 	float blur_sigma;
 
-	enum wlr_scene_shadow_type type;
 	struct {
 		// Used to draw a drop-shadow
 		struct linked_node buffer_link;
@@ -595,21 +589,6 @@ void wlr_scene_shadow_set_reference_buffer(struct wlr_scene_shadow *shadow,
  * Proper Shadow Node size: 100px + offset x 100px + offset = the correct size
  */
 int wlr_scene_shadow_get_offset(struct wlr_scene_shadow *shadow);
-
-/**
- * Sets the type of shadow that's being used
- *
- * If set to the drop-shadow type, the shadow will be a blurred version of
- * the buffer (a drop-shadow, like in CSS). This type of shadow adapts to the
- * buffer, ignoring transparent regions. An example would be text shadows, or
- * weirdly shaped bars/docks. NOTE: Will ignore the clipped_region.
- *
- * Otherwise, a regular faster and simpler box-shadow will be drawn.
- *
- * NOTE: Please use the `wlr_scene_shadow_get_offset` function to get a dynamic
- * offset depending on the type.
- */
-void wlr_scene_shadow_set_type(struct wlr_scene_shadow *shadow, enum wlr_scene_shadow_type type);
 
 /**
  * Sets the region where to clip the shadow.

@@ -24,7 +24,7 @@
 #include "scenefx/types/fx/blur_data.h"
 #include "scenefx/types/fx/clipped_region.h"
 #include "scenefx/types/fx/corner_location.h"
-#include "types/linked_nodes.h"
+#include "types/linked_node.h"
 #include "types/wlr_output.h"
 #include "types/wlr_scene.h"
 #include "util/array.h"
@@ -48,9 +48,7 @@
 	(scene_rect->backdrop_blur && is_scene_blur_enabled(blur_data) && \
 		scene_rect->color[3] < 1.0f)
 #define SCENE_SHADOW_IS_DROP(scene_shadow) \
-	(scene_shadow->type == WLR_SCENE_SHADOW_TYPE_DROP \
-		&& scene_shadow->buffer_link.link != NULL \
-		&& scene_shadow->blur_sigma >= 0)
+	(scene_shadow->buffer_link.link != NULL && scene_shadow->blur_sigma >= 0)
 
 struct wlr_scene_tree *wlr_scene_tree_from_node(struct wlr_scene_node *node) {
 	assert(node->type == WLR_SCENE_NODE_TREE);
@@ -998,7 +996,6 @@ struct wlr_scene_shadow *wlr_scene_shadow_create(struct wlr_scene_tree *parent,
 	scene_node_update(&scene_shadow->node, NULL);
 
 	scene_shadow->buffer_link = linked_node_init();
-	scene_shadow->type = WLR_SCENE_SHADOW_TYPE_BOX;
 
 	return scene_shadow;
 }
@@ -1043,33 +1040,29 @@ void wlr_scene_shadow_set_color(struct wlr_scene_shadow *shadow, const float col
 
 void wlr_scene_shadow_set_reference_buffer(struct wlr_scene_shadow *shadow,
 		struct wlr_scene_buffer *ref_buffer) {
-	if (shadow->type != WLR_SCENE_SHADOW_TYPE_DROP) {
-		wlr_log(WLR_ERROR, "Trying to set a reference buffer to a shadow with type of box."
-				"Please change its type before calling this function");
-		return;
+	struct linked_node *buffer_link = linked_nodes_get_sibling(&shadow->buffer_link);
+	if (buffer_link) {
+		struct wlr_scene_buffer *scene_buffer = wl_container_of(buffer_link, scene_buffer, drop_shadow_link);
+		if (scene_buffer != NULL && scene_buffer == ref_buffer) {
+			// Skip
+			return;
+		}
+		linked_node_unlink(&shadow->buffer_link, buffer_link);
 	}
 
+	if (!ref_buffer) {
+		return;
+	}
 	linked_node_init_link(&shadow->buffer_link, &ref_buffer->drop_shadow_link);
 
 	scene_node_update(&shadow->node, NULL);
 }
 
 int wlr_scene_shadow_get_offset(struct wlr_scene_shadow *shadow) {
-	switch (shadow->type) {
-	case WLR_SCENE_SHADOW_TYPE_DROP:
+	if (shadow->buffer_link.link) {
 		return drop_shadow_calc_size(shadow->blur_sigma);
-	default:
-		return shadow->blur_sigma;
 	}
-}
-
-void wlr_scene_shadow_set_type(struct wlr_scene_shadow *shadow, enum wlr_scene_shadow_type type) {
-	if (type == shadow->type) {
-		return;
-	}
-
-	shadow->type = type;
-	scene_node_update(&shadow->node, NULL);
+	return shadow->blur_sigma;
 }
 
 void wlr_scene_shadow_set_clipped_region(struct wlr_scene_shadow *shadow,
@@ -2033,7 +2026,7 @@ static void scene_entry_render(struct render_list_entry *entry, const struct ren
 		shadow_clipped_region_box.y += y;
 
 		// Drop Shadow
-		if (scene_shadow->type == WLR_SCENE_SHADOW_TYPE_DROP) {
+		if (SCENE_SHADOW_IS_DROP(scene_shadow)) {
 			struct linked_node *buffer_link = linked_nodes_get_sibling(&scene_shadow->buffer_link);
 			struct wlr_scene_buffer *scene_buffer = NULL;
 			if (buffer_link != NULL) {

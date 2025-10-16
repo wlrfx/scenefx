@@ -2411,15 +2411,6 @@ struct render_list_constructor_data {
 	bool fractional_scale;
 };
 
-static bool scene_buffer_is_black_opaque(struct wlr_scene_buffer *scene_buffer) {
-	return scene_buffer->is_single_pixel_buffer &&
-		scene_buffer->single_pixel_buffer_color[0] == 0 &&
-		scene_buffer->single_pixel_buffer_color[1] == 0 &&
-		scene_buffer->single_pixel_buffer_color[2] == 0 &&
-		scene_buffer->single_pixel_buffer_color[3] == UINT32_MAX &&
-		scene_buffer->opacity == 1.0;
-}
-
 static bool construct_render_list_iterator(struct wlr_scene_node *node,
 		int lx, int ly, void *_data) {
 	struct render_list_constructor_data *data = _data;
@@ -2428,29 +2419,8 @@ static bool construct_render_list_iterator(struct wlr_scene_node *node,
 		return false;
 	}
 
-	// While rendering, the background should always be black. If we see a
-	// black rect, we can ignore rendering everything under the rect, and
-	// unless fractional scale is used even the rect itself (to avoid running
-	// into issues regarding damage region expansion).
-	if (node->type == WLR_SCENE_NODE_RECT && data->calculate_visibility &&
-			(!data->fractional_scale || data->render_list->size == 0)) {
-		struct wlr_scene_rect *rect = wlr_scene_rect_from_node(node);
-		float *black = (float[4]){ 0.f, 0.f, 0.f, 1.f };
-
-		if (memcmp(rect->color, black, sizeof(float) * 4) == 0) {
-			return false;
-		}
-	}
-
-	// Apply the same special-case to black opaque single-pixel buffers
-	if (node->type == WLR_SCENE_NODE_BUFFER && data->calculate_visibility &&
-			(!data->fractional_scale || data->render_list->size == 0)) {
-		struct wlr_scene_buffer *scene_buffer = wlr_scene_buffer_from_node(node);
-
-		if (scene_buffer_is_black_opaque(scene_buffer)) {
-			return false;
-		}
-	}
+	// Note: wlroots scene api has a check for black colors here, and skips rendering it
+	//   This does -NOT- apply to scenefx, it will instead cause it to be transparent
 
 	pixman_region32_t intersection;
 	pixman_region32_init(&intersection);

@@ -9,6 +9,7 @@
  * them.
  */
 struct fx_effect_framebuffers {
+	struct wl_list link; // fx_renderer.effect_buffers
 	struct wlr_addon addon;
 
 	// Contains the blurred background for tiled windows
@@ -28,6 +29,7 @@ struct fx_effect_framebuffers {
 	pixman_region32_t blur_padding_region;
 };
 
+void fx_effect_framebuffers_destroy(struct fx_effect_framebuffers *fbos);
 struct fx_effect_framebuffers *fx_effect_framebuffers_try_get(struct wlr_output *output);
 
 #endif

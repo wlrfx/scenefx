@@ -30,11 +30,7 @@ struct fx_render_texture_options fx_render_texture_options_default(
 		.corners = CORNER_LOCATION_NONE,
 		.discard_transparent = false,
 		.clip_box = NULL,
-		.clipped_region = {
-			.area = (struct wlr_box){0},
-			.corner_radius = 0,
-			.corners = CORNER_LOCATION_NONE,
-		},
+		.clipped_region = {0},
 	};
 	memcpy(&options.base, base, sizeof(*base));
 	return options;

@@ -347,10 +347,29 @@ void fx_render_pass_add_texture(struct fx_gles_render_pass *pass,
 		|| fx_options->discard_transparent;
 	setup_blending(!has_alpha ? WLR_RENDER_BLEND_MODE_NONE : options->blend_mode);
 
+	pixman_region32_t clip_region;
+	if (options->clip) {
+		pixman_region32_init(&clip_region);
+		pixman_region32_copy(&clip_region, options->clip);
+	} else {
+		pixman_region32_init_rect(&clip_region, dst_box.x, dst_box.y, dst_box.width, dst_box.height);
+	}
 	const struct wlr_box clipped_region_box = fx_options->clipped_region.area;
 	enum corner_location clipped_region_corners = fx_options->clipped_region.corners;
 	int clipped_region_corner_radius = clipped_region_corners != CORNER_LOCATION_NONE ?
 		fx_options->clipped_region.corner_radius : 0;
+	if (!wlr_box_empty(&clipped_region_box)) {
+		pixman_region32_t user_clip_region;
+		pixman_region32_init_rect(
+			&user_clip_region,
+			clipped_region_box.x + clipped_region_corner_radius * 0.3,
+			clipped_region_box.y + clipped_region_corner_radius * 0.3,
+			fmax(clipped_region_box.width - clipped_region_corner_radius * 0.6, 0),
+			fmax(clipped_region_box.height - clipped_region_corner_radius * 0.6, 0)
+		);
+		pixman_region32_subtract(&clip_region, &clip_region, &user_clip_region);
+		pixman_region32_fini(&user_clip_region);
+	}
 
 	glUseProgram(shader->program);
 
@@ -398,7 +417,8 @@ void fx_render_pass_add_texture(struct fx_gles_render_pass *pass,
 	set_proj_matrix(shader->proj, pass->projection_matrix, &dst_box);
 	set_tex_matrix(shader->tex_proj, options->transform, &src_fbox);
 
-	render(&dst_box, options->clip, shader->pos_attrib);
+	render(&dst_box, &clip_region, shader->pos_attrib);
+	pixman_region32_fini(&clip_region);
 
 	glBindTexture(texture->target, 0);
 	pop_fx_debug(renderer);

@@ -155,6 +155,7 @@ struct wlr_scene_rect {
 	bool backdrop_blur_optimized;
 	float backdrop_blur_strength;
 	float backdrop_blur_alpha;
+	bool backdrop_blur_prefer_source;
 	struct linked_node_list_child backdrop_blur_source;
 
 	bool accepts_input;
@@ -231,6 +232,7 @@ struct wlr_scene_buffer {
 	int corner_radius;
 	bool backdrop_blur;
 	bool backdrop_blur_optimized;
+	bool backdrop_blur_prefer_source;
 	bool backdrop_blur_ignore_transparent;
 	float backdrop_blur_strength;
 	float backdrop_blur_alpha;
@@ -548,6 +550,9 @@ void wlr_scene_rect_set_color(struct wlr_scene_rect *rect, const float color[sta
 void wlr_scene_rect_set_backdrop_blur(struct wlr_scene_rect *rect,
 		bool enabled);
 
+void wlr_scene_rect_set_backdrop_blur_prefer_source(struct wlr_scene_rect *rect,
+		bool enabled);
+
 /**
 * Sets whether the backdrop blur should use optimized blur or not
 */
@@ -764,6 +769,9 @@ void wlr_scene_buffer_set_corner_radius(struct wlr_scene_buffer *scene_buffer,
 * Sets whether or not the buffer should render backdrop blur
 */
 void wlr_scene_buffer_set_backdrop_blur(struct wlr_scene_buffer *scene_buffer,
+		bool enabled);
+
+void wlr_scene_buffer_set_backdrop_blur_prefer_source(struct wlr_scene_buffer *scene_buffer,
 		bool enabled);
 
 /**

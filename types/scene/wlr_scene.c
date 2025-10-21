@@ -849,6 +849,7 @@ struct wlr_scene_rect *wlr_scene_rect_create(struct wlr_scene_tree *parent,
 	scene_rect->backdrop_blur_optimized = false;
 	scene_rect->backdrop_blur_strength = 1.0f;
 	scene_rect->backdrop_blur_alpha = 1.0f;
+	scene_rect->backdrop_blur_prefer_source = true;
 	scene_rect->backdrop_blur_source = linked_list_node_child_init();
 
 	scene_node_update(&scene_rect->node, NULL);
@@ -883,6 +884,15 @@ void wlr_scene_rect_set_backdrop_blur(struct wlr_scene_rect *rect,
 		return;
 	}
 	rect->backdrop_blur = enabled;
+	scene_node_update(&rect->node, NULL);
+}
+
+void wlr_scene_rect_set_backdrop_blur_prefer_source(struct wlr_scene_rect *rect,
+		bool enabled) {
+	if (rect->backdrop_blur_prefer_source == enabled) {
+		return;
+	}
+	rect->backdrop_blur_prefer_source = enabled;
 	scene_node_update(&rect->node, NULL);
 }
 
@@ -1318,6 +1328,7 @@ struct wlr_scene_buffer *wlr_scene_buffer_create(struct wlr_scene_tree *parent,
 	scene_buffer->corner_radius = 0;
 	scene_buffer->backdrop_blur = false;
 	scene_buffer->backdrop_blur_optimized = false;
+	scene_buffer->backdrop_blur_prefer_source = true;
 	scene_buffer->backdrop_blur_ignore_transparent = true;
 	scene_buffer->backdrop_blur_strength = 1.0f;
 	scene_buffer->backdrop_blur_alpha = 1.0f;
@@ -1606,6 +1617,15 @@ void wlr_scene_buffer_set_backdrop_blur(struct wlr_scene_buffer *scene_buffer,
 		return;
 	}
 	scene_buffer->backdrop_blur = enabled;
+	scene_node_update(&scene_buffer->node, NULL);
+}
+
+void wlr_scene_buffer_set_backdrop_blur_prefer_source(struct wlr_scene_buffer *scene_buffer,
+		bool enabled) {
+	if (scene_buffer->backdrop_blur_prefer_source == enabled) {
+		return;
+	}
+	scene_buffer->backdrop_blur_prefer_source = enabled;
 	scene_node_update(&scene_buffer->node, NULL);
 }
 
@@ -2002,9 +2022,11 @@ static void scene_entry_render(struct render_list_entry *entry, const struct ren
 			logical_to_buffer_coords(&opaque_region, data, false);
 
 			struct wlr_texture *blur_source_texture = NULL;
-			struct wlr_scene_blur_source *source = get_source_blur(&scene_rect->node, &scene_rect->backdrop_blur_source);
-			if (source != NULL) {
-				blur_source_texture = source->blur_texture;
+			if (scene_rect->backdrop_blur_prefer_source) {
+				struct wlr_scene_blur_source *source = get_source_blur(&scene_rect->node, &scene_rect->backdrop_blur_source);
+				if (source != NULL) {
+					blur_source_texture = source->blur_texture;
+				}
 			}
 
 			struct fx_render_blur_pass_options blur_options = {
@@ -2239,9 +2261,11 @@ static void scene_entry_render(struct render_list_entry *entry, const struct ren
 						-scene_buffer->src_box.x, -scene_buffer->src_box.y);
 
 				struct wlr_texture *blur_source_texture = NULL;
-				struct wlr_scene_blur_source *source = get_source_blur(&scene_buffer->node, &scene_buffer->backdrop_blur_source);
-				if (source != NULL) {
-					blur_source_texture = source->blur_texture;
+				if (scene_buffer->backdrop_blur_prefer_source) {
+					struct wlr_scene_blur_source *source = get_source_blur(&scene_buffer->node, &scene_buffer->backdrop_blur_source);
+					if (source != NULL) {
+						blur_source_texture = source->blur_texture;
+					}
 				}
 
 				// TODO: should I be configurable? We should probably move blur to a node

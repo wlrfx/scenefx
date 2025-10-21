@@ -1244,6 +1244,7 @@ struct wlr_scene_blur_source *wlr_scene_blur_source_create(
 	blur_source->width = width;
 	blur_source->height = height;
 	blur_source->blur_texture = NULL;
+	blur_source->blur_texture_region = (struct wlr_box){0};
 
 	linked_node_list_init(&blur_source->rect_targets);
 	linked_node_list_init(&blur_source->buffer_targets);
@@ -2024,7 +2025,7 @@ static void scene_entry_render(struct render_list_entry *entry, const struct ren
 			struct wlr_texture *blur_source_texture = NULL;
 			if (scene_rect->backdrop_blur_prefer_source) {
 				struct wlr_scene_blur_source *source = get_source_blur(&scene_rect->node, &scene_rect->backdrop_blur_source);
-				if (source != NULL) {
+				if (source != NULL && wlr_box_contains_box(&source->blur_texture_region, &dst_box)) {
 					blur_source_texture = source->blur_texture;
 				}
 			}
@@ -2145,6 +2146,7 @@ static void scene_entry_render(struct render_list_entry *entry, const struct ren
 			wlr_texture_destroy(blur_source->blur_texture);
 		}
 		blur_source->blur_texture = blur_source_texture;
+		blur_source->blur_texture_region = dst_box;
 
 		break;
 	case WLR_SCENE_NODE_OPTIMIZED_BLUR:;
@@ -2263,7 +2265,7 @@ static void scene_entry_render(struct render_list_entry *entry, const struct ren
 				struct wlr_texture *blur_source_texture = NULL;
 				if (scene_buffer->backdrop_blur_prefer_source) {
 					struct wlr_scene_blur_source *source = get_source_blur(&scene_buffer->node, &scene_buffer->backdrop_blur_source);
-					if (source != NULL) {
+					if (source != NULL && wlr_box_contains_box(&source->blur_texture_region, &dst_box)) {
 						blur_source_texture = source->blur_texture;
 					}
 				}

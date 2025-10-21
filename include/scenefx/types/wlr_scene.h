@@ -191,6 +191,7 @@ struct wlr_scene_blur_source {
 
 	// TODO: should this be stored in a render data struct instead?
 	struct wlr_texture* blur_texture;
+	struct wlr_box blur_texture_region;
 };
 
 struct wlr_scene_outputs_update_event {

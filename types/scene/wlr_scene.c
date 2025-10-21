@@ -204,6 +204,9 @@ void wlr_scene_node_destroy(struct wlr_scene_node *node) {
 			wlr_texture_destroy(blur_source->blur_texture);
 			blur_source->blur_texture = NULL;
 		}
+	} else if (node->type == WLR_SCENE_NODE_RECT) {
+		struct wlr_scene_rect *rect = wlr_scene_rect_from_node(node);
+		linked_node_list_child_destroy(&rect->backdrop_blur_source);
 	}
 
 	assert(wl_list_empty(&node->events.destroy.listener_list));

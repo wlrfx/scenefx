@@ -74,8 +74,8 @@ void linked_node_list_child_destroy(struct linked_node_list_child *child);
 
 void linked_node_list_destroy(struct linked_node_list *linked_list);
 
-#define linked_node_list_for_each(pos, list, link) \
-	struct linked_node_list_entry *__entry = NULL; \
-	wl_list_for_each(__entry, &list->list, link) pos = wl_container_of(__entry->child, pos, link)
+#define linked_node_list_for_each(tmp, pos, linked_list, linked_list_link) \
+	struct linked_node_list_entry *tmp; \
+	wl_list_for_each(tmp, &(linked_list)->list, link) if ((pos = wl_container_of(tmp->child, pos, linked_list_link)) || true)
 
 #endif

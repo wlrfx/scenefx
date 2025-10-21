@@ -1880,7 +1880,6 @@ static void scene_entry_render(struct render_list_entry *entry, const struct ren
 
 		corner_location_transform(node_transform, &rect_corners);
 
-
 		struct wlr_box rect_clipped_region_box = scene_rect->clipped_region.area;
 		int rect_clipped_region_corner_radius = scene_rect->clipped_region.corner_radius;
 		enum corner_location rect_clipped_corners = scene_rect->clipped_region.corners;

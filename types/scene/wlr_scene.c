@@ -2635,7 +2635,21 @@ static bool scene_node_invisible(struct wlr_scene_node *node) {
 		return false;
 	} else if (node->type == WLR_SCENE_NODE_BLUR_SOURCE) {
 		struct wlr_scene_blur_source *blur_source = wlr_scene_blur_source_from_node(node);
-		return linked_node_list_is_empty(&blur_source->buffer_targets) && linked_node_list_is_empty(&blur_source->rect_targets);
+		struct wlr_scene_rect *rect;
+		linked_node_list_for_each(rect_entry, rect, &blur_source->rect_targets, backdrop_blur_source) {
+			if (rect->backdrop_blur_prefer_source && rect->backdrop_blur) {
+				return false;
+			}
+		}
+
+		struct wlr_scene_buffer *buffer;
+		linked_node_list_for_each(buffer_entry, buffer, &blur_source->buffer_targets, backdrop_blur_source) {
+			if (buffer->backdrop_blur_prefer_source && buffer->backdrop_blur) {
+				return false;
+			}
+		}
+
+		return true;
 	} else if (node->type == WLR_SCENE_NODE_BUFFER) {
 		struct wlr_scene_buffer *buffer = wlr_scene_buffer_from_node(node);
 

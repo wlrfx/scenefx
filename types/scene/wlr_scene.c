@@ -1935,6 +1935,20 @@ struct render_list_entry {
 	int x, y;
 };
 
+static struct wlr_scene_blur_source *get_source_blur(struct wlr_scene_node *node, struct linked_node_list_child *link) {
+	struct linked_node_list *parent = linked_node_list_get_parent(link);
+	if (parent != NULL) {
+		struct wlr_scene_blur_source *source;
+		if (node->type == WLR_SCENE_NODE_RECT) {
+			return wl_container_of(parent, source, rect_targets);
+		} else if (node->type == WLR_SCENE_NODE_BUFFER) {
+			return wl_container_of(parent, source, buffer_targets);
+		}
+	}
+
+	return NULL;
+}
+
 static void scene_entry_render(struct render_list_entry *entry, const struct render_data *data) {
 	struct wlr_scene_node *node = entry->node;
 
@@ -1987,11 +2001,9 @@ static void scene_entry_render(struct render_list_entry *entry, const struct ren
 			scene_node_opaque_region(node, x, y, &opaque_region);
 			logical_to_buffer_coords(&opaque_region, data, false);
 
-			struct linked_node_list *parent = linked_node_list_get_parent(&scene_rect->backdrop_blur_source);
 			struct wlr_texture *blur_source_texture = NULL;
-			if (parent != NULL) {
-				struct wlr_scene_blur_source *source;
-				source = wl_container_of(parent, source, rect_targets);
+			struct wlr_scene_blur_source *source = get_source_blur(&scene_rect->node, &scene_rect->backdrop_blur_source);
+			if (source != NULL) {
 				blur_source_texture = source->blur_texture;
 			}
 
@@ -2226,11 +2238,9 @@ static void scene_entry_render(struct render_list_entry *entry, const struct ren
 				pixman_region32_translate(&opaque_region,
 						-scene_buffer->src_box.x, -scene_buffer->src_box.y);
 
-				struct linked_node_list *parent = linked_node_list_get_parent(&scene_buffer->backdrop_blur_source);
 				struct wlr_texture *blur_source_texture = NULL;
-				if (parent != NULL) {
-					struct wlr_scene_blur_source *source;
-					source = wl_container_of(parent, source, buffer_targets);
+				struct wlr_scene_blur_source *source = get_source_blur(&scene_buffer->node, &scene_buffer->backdrop_blur_source);
+				if (source != NULL) {
 					blur_source_texture = source->blur_texture;
 				}
 

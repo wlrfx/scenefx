@@ -151,6 +151,8 @@ struct wlr_scene_rect {
 	enum corner_location corners;
 	bool backdrop_blur;
 	bool backdrop_blur_optimized;
+	float backdrop_blur_strength;
+	float backdrop_blur_alpha;
 
 	bool accepts_input;
 	struct clipped_region clipped_region;
@@ -215,6 +217,8 @@ struct wlr_scene_buffer {
 	bool backdrop_blur;
 	bool backdrop_blur_optimized;
 	bool backdrop_blur_ignore_transparent;
+	float backdrop_blur_strength;
+	float backdrop_blur_alpha;
 	enum corner_location corners;
 
 	float opacity;
@@ -535,6 +539,27 @@ void wlr_scene_rect_set_backdrop_blur_optimized(struct wlr_scene_rect *rect,
 		bool enabled);
 
 /**
+ * Sets the blur strength from 1.0f -> 0.0f. This adjusts how strong the blur is
+ * relative to the base 1.0 value.
+ *
+ * Can be used combined with backdrop_blur_alpha to create a good looking
+ * fade-out effect.
+ */
+void wlr_scene_rect_set_backdrop_blur_strength(struct wlr_scene_rect *rect,
+		float strength);
+
+/**
+ * Sets the blur alpha from 1.0f -> 0.0f. This adjusts the actual alpha of the blur.
+ * Default is 1.0f.
+ *
+ * Lower values without also adjusting the backdrop_blur_strength will look off.
+ *
+ * Can be used combined with backdrop_blur_strength to create a good looking
+ * fade-out effect.
+ */
+void wlr_scene_rect_set_backdrop_blur_alpha(struct wlr_scene_rect *rect,
+		float alpha);
+/**
  * Add a node displaying a shadow to the scene-graph.
  */
 struct wlr_scene_shadow *wlr_scene_shadow_create(struct wlr_scene_tree *parent,
@@ -719,6 +744,28 @@ void wlr_scene_buffer_set_backdrop_blur_optimized(struct wlr_scene_buffer *scene
 */
 void wlr_scene_buffer_set_backdrop_blur_ignore_transparent(
 		struct wlr_scene_buffer *scene_buffer, bool enabled);
+
+/**
+ * Sets the blur strength from 1.0f -> 0.0f. This adjusts how strong the blur is
+ * relative to the base 1.0 value.
+ *
+ * Can be used combined with backdrop_blur_alpha to create a good looking
+ * fade-out effect.
+ */
+void wlr_scene_buffer_set_backdrop_blur_strength(struct wlr_scene_buffer *scene_buffer,
+		float strength);
+
+/**
+ * Sets the blur alpha from 1.0f -> 0.0f. This adjusts the actual alpha of the blur.
+ * Default is 1.0f.
+ *
+ * Lower values without also adjusting the backdrop_blur_strength will look off.
+ *
+ * Can be used combined with backdrop_blur_strength to create a good looking
+ * fade-out effect.
+ */
+void wlr_scene_buffer_set_backdrop_blur_alpha(struct wlr_scene_buffer *scene_buffer,
+		float alpha);
 
 /**
  * Calls the buffer's frame_done signal.

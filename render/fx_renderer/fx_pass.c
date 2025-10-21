@@ -909,13 +909,16 @@ static struct fx_framebuffer *get_main_buffer_blur(struct fx_gles_render_pass *p
 	return fx_options->current_buffer;
 }
 
-void fx_render_pass_add_blur(struct fx_gles_render_pass *pass,
-		struct fx_render_blur_pass_options *fx_options) {
+struct wlr_texture *fx_render_pass_create_blur_texture(struct fx_gles_render_pass *pass,
+	struct fx_render_blur_pass_options *fx_options)
+{
 	if (pass->buffer->renderer->basic_renderer) {
 		wlr_log(WLR_ERROR, "Please use 'fx_renderer_begin_buffer_pass' instead of "
 				"'wlr_renderer_begin_buffer_pass' to use advanced effects");
-		return;
+		return NULL;
 	}
+
+	struct wlr_texture *texture = NULL;
 	struct fx_renderer *renderer = pass->buffer->renderer;
 	struct fx_render_texture_options *tex_options = &fx_options->tex_options;
 	const struct wlr_render_texture_options *options = &tex_options->base;
@@ -960,18 +963,31 @@ void fx_render_pass_add_blur(struct fx_gles_render_pass *pass,
 			goto damage_finish;
 		}
 	}
-	struct wlr_texture *wlr_texture =
+
+	texture =
 		fx_texture_from_buffer(&renderer->wlr_renderer, buffer->buffer);
-	struct fx_texture *blur_texture = fx_get_texture(wlr_texture);
+	struct fx_texture *blur_texture = fx_get_texture(texture);
 	blur_texture->has_alpha = true;
+
+damage_finish:
+	pixman_region32_fini(&translucent_region);
+	return texture;
+}
+
+void fx_render_pass_add_blur(struct fx_gles_render_pass *pass,
+		struct fx_render_blur_pass_options *fx_options) {
+	struct wlr_texture *wlr_texture = fx_render_pass_create_blur_texture(pass, fx_options);
+	struct fx_texture *blur_texture = fx_get_texture(wlr_texture);
+
+	struct fx_render_texture_options *tex_options = &fx_options->tex_options;
 
 	// Get a stencil of the window ignoring transparent regions
 	if (fx_options->ignore_transparent && fx_options->tex_options.base.texture) {
 		stencil_mask_init();
 
-		struct fx_render_texture_options tex_options = fx_options->tex_options;
-		tex_options.discard_transparent = true;
-		fx_render_pass_add_texture(pass, &tex_options);
+		struct fx_render_texture_options stencil_tex_options = fx_options->tex_options;
+		stencil_tex_options.discard_transparent = true;
+		fx_render_pass_add_texture(pass, &stencil_tex_options);
 
 		stencil_mask_close(true);
 	}
@@ -981,8 +997,8 @@ void fx_render_pass_add_blur(struct fx_gles_render_pass *pass,
 	tex_options->base.src_box = (struct wlr_fbox) {
 		.x = 0,
 		.y = 0,
-		.width = buffer->buffer->width,
-		.height = buffer->buffer->height,
+		.width = wlr_texture->width,
+		.height = wlr_texture->height,
 	};
 	tex_options->base.texture = &blur_texture->wlr_texture;
 	fx_render_pass_add_texture(pass, tex_options);
@@ -993,9 +1009,6 @@ void fx_render_pass_add_blur(struct fx_gles_render_pass *pass,
 	if (fx_options->ignore_transparent && fx_options->tex_options.base.texture) {
 		stencil_mask_fini();
 	}
-
-damage_finish:
-	pixman_region32_fini(&translucent_region);
 }
 
 bool fx_render_pass_add_optimized_blur(struct fx_gles_render_pass *pass,

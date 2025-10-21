@@ -160,4 +160,10 @@ void fx_renderer_read_to_buffer(struct fx_gles_render_pass *pass,
 		pixman_region32_t *region, struct fx_framebuffer *dst_buffer,
 		struct fx_framebuffer *src_buffer);
 
+/**
+ * Render the blur texture and return it
+ */
+struct wlr_texture *fx_render_pass_create_blur_texture(struct fx_gles_render_pass *pass,
+                                                       struct fx_render_blur_pass_options *fx_options);
+
 #endif

@@ -2,6 +2,7 @@
  * This an unstable interface of wlroots. No guarantees are made regarding the
  * future consistency of this API.
  */
+#include "types/linked_node.h"
 #ifndef WLR_USE_UNSTABLE
 #error "Add -DWLR_USE_UNSTABLE to enable unstable wlroots features"
 #endif
@@ -154,6 +155,7 @@ struct wlr_scene_rect {
 	bool backdrop_blur_optimized;
 	float backdrop_blur_strength;
 	float backdrop_blur_alpha;
+	struct linked_node_list_child backdrop_blur_source;
 
 	bool accepts_input;
 	struct clipped_region clipped_region;
@@ -182,6 +184,9 @@ struct wlr_scene_optimized_blur {
 struct wlr_scene_blur_source {
 	struct wlr_scene_node node;
 	int width, height;
+
+	struct linked_node_list rect_targets;
+	struct linked_node_list buffer_targets;
 
 	// TODO: should this be stored in a render data struct instead?
 	struct wlr_texture* blur_texture;
@@ -229,6 +234,7 @@ struct wlr_scene_buffer {
 	bool backdrop_blur_ignore_transparent;
 	float backdrop_blur_strength;
 	float backdrop_blur_alpha;
+	struct linked_node_list_child backdrop_blur_source;
 	enum corner_location corners;
 
 	float opacity;
@@ -644,6 +650,15 @@ void wlr_scene_optimized_blur_mark_dirty(struct wlr_scene_optimized_blur *blur_n
 
 struct wlr_scene_blur_source *wlr_scene_blur_source_create(
 		struct wlr_scene_tree *parent, int width, int height);
+
+bool wlr_scene_blur_source_has_target(struct wlr_scene_blur_source *blur_source,
+		struct wlr_scene_node *node);
+
+void wlr_scene_blur_source_add_target(struct wlr_scene_blur_source *blur_source,
+		struct wlr_scene_node *node);
+
+void wlr_scene_blur_source_remove_target(struct wlr_scene_blur_source *blur_source,
+		struct wlr_scene_node *node);
 
 void wlr_scene_blur_source_set_size(struct wlr_scene_blur_source *blur_node,
 		int width, int height);

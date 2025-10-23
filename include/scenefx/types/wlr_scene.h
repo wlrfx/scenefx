@@ -151,11 +151,8 @@ struct wlr_scene_rect {
 	float color[4];
 	int corner_radius;
 	enum corner_location corners;
-	bool backdrop_blur;
-	bool backdrop_blur_optimized;
-	float backdrop_blur_strength;
 	float backdrop_blur_alpha;
-	bool backdrop_blur_prefer_source;
+	bool backdrop_blur;
 	struct linked_node_list_child backdrop_blur_source;
 
 	bool accepts_input;
@@ -185,6 +182,13 @@ struct wlr_scene_optimized_blur {
 struct wlr_scene_blur_source {
 	struct wlr_scene_node node;
 	int width, height;
+
+	float alpha;
+	float strength;
+	enum corner_location corners;
+	int corner_radius;
+
+	bool should_only_blur_bottom_layer;
 
 	struct linked_node_list rect_targets;
 	struct linked_node_list buffer_targets;
@@ -232,9 +236,7 @@ struct wlr_scene_buffer {
 
 	int corner_radius;
 	bool backdrop_blur;
-	bool backdrop_blur_optimized;
 	bool backdrop_blur_ignore_transparent;
-	float backdrop_blur_strength;
 	float backdrop_blur_alpha;
 	struct linked_node_list_child backdrop_blur_source;
 	enum corner_location corners;

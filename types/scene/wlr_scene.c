@@ -849,10 +849,7 @@ struct wlr_scene_rect *wlr_scene_rect_create(struct wlr_scene_tree *parent,
 	scene_rect->accepts_input = true;
 	scene_rect->clipped_region = clipped_region_get_default();
 	scene_rect->backdrop_blur = false;
-	scene_rect->backdrop_blur_optimized = false;
-	scene_rect->backdrop_blur_strength = 1.0f;
 	scene_rect->backdrop_blur_alpha = 1.0f;
-	scene_rect->backdrop_blur_prefer_source = true;
 	scene_rect->backdrop_blur_source = linked_list_node_child_init();
 
 	scene_node_update(&scene_rect->node, NULL);
@@ -887,24 +884,6 @@ void wlr_scene_rect_set_backdrop_blur(struct wlr_scene_rect *rect,
 		return;
 	}
 	rect->backdrop_blur = enabled;
-	scene_node_update(&rect->node, NULL);
-}
-
-void wlr_scene_rect_set_backdrop_blur_optimized(struct wlr_scene_rect *rect,
-		bool enabled) {
-	if (rect->backdrop_blur_optimized == enabled) {
-		return;
-	}
-	rect->backdrop_blur_optimized = enabled;
-	scene_node_update(&rect->node, NULL);
-}
-
-void wlr_scene_rect_set_backdrop_blur_strength(struct wlr_scene_rect *rect,
-		float strength) {
-	if (rect->backdrop_blur_strength == strength) {
-		return;
-	}
-	rect->backdrop_blur_strength = strength;
 	scene_node_update(&rect->node, NULL);
 }
 
@@ -1237,6 +1216,14 @@ struct wlr_scene_blur_source *wlr_scene_blur_source_create(
 
 	blur_source->width = width;
 	blur_source->height = height;
+
+	blur_source->alpha = 1.0f;
+	blur_source->strength = 1.0f;
+	blur_source->corner_radius = 0;
+	blur_source->corners = CORNER_LOCATION_NONE;
+
+	blur_source->should_only_blur_bottom_layer = false;
+
 	blur_source->blur_texture = NULL;
 	blur_source->blur_texture_region = (struct wlr_box){0};
 
@@ -1322,9 +1309,7 @@ struct wlr_scene_buffer *wlr_scene_buffer_create(struct wlr_scene_tree *parent,
 
 	scene_buffer->corner_radius = 0;
 	scene_buffer->backdrop_blur = false;
-	scene_buffer->backdrop_blur_optimized = false;
 	scene_buffer->backdrop_blur_ignore_transparent = true;
-	scene_buffer->backdrop_blur_strength = 1.0f;
 	scene_buffer->backdrop_blur_alpha = 1.0f;
 	scene_buffer->backdrop_blur_source = linked_list_node_child_init();
 	scene_buffer->corners = CORNER_LOCATION_NONE;
@@ -1614,15 +1599,6 @@ void wlr_scene_buffer_set_backdrop_blur(struct wlr_scene_buffer *scene_buffer,
 	scene_node_update(&scene_buffer->node, NULL);
 }
 
-void wlr_scene_buffer_set_backdrop_blur_optimized(struct wlr_scene_buffer *scene_buffer,
-		bool enabled) {
-	if (scene_buffer->backdrop_blur_optimized == enabled) {
-		return;
-	}
-	scene_buffer->backdrop_blur_optimized = enabled;
-	scene_node_update(&scene_buffer->node, NULL);
-}
-
 void wlr_scene_buffer_set_backdrop_blur_ignore_transparent(
 		struct wlr_scene_buffer *scene_buffer, bool enabled) {
 	if (scene_buffer->backdrop_blur_ignore_transparent == enabled) {
@@ -1630,15 +1606,6 @@ void wlr_scene_buffer_set_backdrop_blur_ignore_transparent(
 	}
 
 	scene_buffer->backdrop_blur_ignore_transparent = enabled;
-	scene_node_update(&scene_buffer->node, NULL);
-}
-
-void wlr_scene_buffer_set_backdrop_blur_strength(struct wlr_scene_buffer *scene_buffer,
-		float strength) {
-	if (scene_buffer->backdrop_blur_strength == strength) {
-		return;
-	}
-	scene_buffer->backdrop_blur_strength = strength;
 	scene_node_update(&scene_buffer->node, NULL);
 }
 
@@ -2083,7 +2050,6 @@ static void scene_entry_render(struct render_list_entry *entry, const struct ren
 		}
 		break;
 	case WLR_SCENE_NODE_BLUR_SOURCE:;
-		const float opacity = 1.0f;
 		enum wl_output_transform blur_target_transform =
 			wlr_output_transform_invert(data->transform);
 		blur_target_transform = wlr_output_transform_compose(blur_target_transform, data->transform);
@@ -2093,6 +2059,8 @@ static void scene_entry_render(struct render_list_entry *entry, const struct ren
 		scene_node_opaque_region(node, x, y, &opaque_region);
 		logical_to_buffer_coords(&opaque_region, data, false);
 
+		struct wlr_scene_blur_source *blur_source = wlr_scene_blur_source_from_node(node);
+
 		struct fx_render_blur_pass_options blur_options = {
 			.tex_options = {
 				.base = (struct wlr_render_texture_options) {
@@ -2101,24 +2069,24 @@ static void scene_entry_render(struct render_list_entry *entry, const struct ren
 					.dst_box = dst_box,
 					.transform = WL_OUTPUT_TRANSFORM_NORMAL,
 					.clip = &render_region,
-					.alpha = &opacity,
+					.alpha = &blur_source->alpha,
 					.filter_mode = WLR_SCALE_FILTER_BILINEAR,
 					.blend_mode = WLR_RENDER_BLEND_MODE_PREMULTIPLIED,
 				},
 				.clip_box = &dst_box,
-				.corner_radius = 0,
-				.corners = CORNER_LOCATION_NONE,
+				.corner_radius = blur_source->corner_radius,
+				.corners = blur_source->corners,
 				.discard_transparent = false,
 			},
 			.opaque_region = &opaque_region,
-			.use_optimized_blur = false,
+			.use_optimized_blur = blur_source->should_only_blur_bottom_layer,
 			.ignore_transparent = false,
 			.blur_data = &scene->blur_data,
+			.blur_strength = blur_source->strength,
 		};
 
 		pixman_region32_fini(&opaque_region);
 
-		struct wlr_scene_blur_source *blur_source = wlr_scene_blur_source_from_node(node);
 		struct wlr_texture *blur_source_texture = fx_render_pass_create_blur_texture(data->render_pass, &blur_options);
 
 		if (blur_source->blur_texture != NULL)

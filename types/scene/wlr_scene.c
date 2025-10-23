@@ -43,11 +43,11 @@
 #define HIGHLIGHT_DAMAGE_FADEOUT_TIME   250
 
 #define SCENE_BUFFER_SHOULD_BLUR(scene_buffer, blur_data) \
-	scene_buffer->backdrop_blur && is_scene_blur_enabled(blur_data) && \
-		(!scene_buffer->buffer_is_opaque || scene_buffer->opacity < 1.0f)
+	scene_buffer->backdrop_blur && linked_node_list_child_has_parent(&scene_buffer->backdrop_blur_source) && \
+	    is_scene_blur_enabled(blur_data) && (!scene_buffer->buffer_is_opaque || scene_buffer->opacity < 1.0f)
 #define SCENE_RECT_SHOULD_BLUR(scene_rect, blur_data) \
-	scene_rect->backdrop_blur && is_scene_blur_enabled(blur_data) && \
-		scene_rect->color[3] < 1.0f
+	scene_rect->backdrop_blur && linked_node_list_child_has_parent(&scene_rect->backdrop_blur_source) && \
+	    is_scene_blur_enabled(blur_data) && scene_rect->color[3] < 1.0f
 
 struct wlr_scene_tree *wlr_scene_tree_from_node(struct wlr_scene_node *node) {
 	assert(node->type == WLR_SCENE_NODE_TREE);
@@ -890,15 +890,6 @@ void wlr_scene_rect_set_backdrop_blur(struct wlr_scene_rect *rect,
 	scene_node_update(&rect->node, NULL);
 }
 
-void wlr_scene_rect_set_backdrop_blur_prefer_source(struct wlr_scene_rect *rect,
-		bool enabled) {
-	if (rect->backdrop_blur_prefer_source == enabled) {
-		return;
-	}
-	rect->backdrop_blur_prefer_source = enabled;
-	scene_node_update(&rect->node, NULL);
-}
-
 void wlr_scene_rect_set_backdrop_blur_optimized(struct wlr_scene_rect *rect,
 		bool enabled) {
 	if (rect->backdrop_blur_optimized == enabled) {
@@ -1332,7 +1323,6 @@ struct wlr_scene_buffer *wlr_scene_buffer_create(struct wlr_scene_tree *parent,
 	scene_buffer->corner_radius = 0;
 	scene_buffer->backdrop_blur = false;
 	scene_buffer->backdrop_blur_optimized = false;
-	scene_buffer->backdrop_blur_prefer_source = true;
 	scene_buffer->backdrop_blur_ignore_transparent = true;
 	scene_buffer->backdrop_blur_strength = 1.0f;
 	scene_buffer->backdrop_blur_alpha = 1.0f;
@@ -1621,15 +1611,6 @@ void wlr_scene_buffer_set_backdrop_blur(struct wlr_scene_buffer *scene_buffer,
 		return;
 	}
 	scene_buffer->backdrop_blur = enabled;
-	scene_node_update(&scene_buffer->node, NULL);
-}
-
-void wlr_scene_buffer_set_backdrop_blur_prefer_source(struct wlr_scene_buffer *scene_buffer,
-		bool enabled) {
-	if (scene_buffer->backdrop_blur_prefer_source == enabled) {
-		return;
-	}
-	scene_buffer->backdrop_blur_prefer_source = enabled;
 	scene_node_update(&scene_buffer->node, NULL);
 }
 
@@ -2026,39 +2007,36 @@ static void scene_entry_render(struct render_list_entry *entry, const struct ren
 			logical_to_buffer_coords(&opaque_region, data, false);
 
 			struct wlr_texture *blur_source_texture = NULL;
-			if (scene_rect->backdrop_blur_prefer_source) {
-				struct wlr_scene_blur_source *source = get_source_blur(&scene_rect->node, &scene_rect->backdrop_blur_source);
-				if (source != NULL && wlr_box_contains_box(&source->blur_texture_region, &dst_box)) {
-					blur_source_texture = source->blur_texture;
-				}
+			struct wlr_scene_blur_source *source = get_source_blur(&scene_rect->node, &scene_rect->backdrop_blur_source);
+			if (source != NULL && wlr_box_contains_box(&source->blur_texture_region, &dst_box)) {
+				blur_source_texture = source->blur_texture;
 			}
 
-			struct fx_render_blur_pass_options blur_options = {
-				.tex_options = {
-					.base = (struct wlr_render_texture_options) {
-						.texture = NULL,
-						.src_box = (struct wlr_fbox){0},
-						.dst_box = dst_box,
-						.transform = WL_OUTPUT_TRANSFORM_NORMAL,
-						.clip = &render_region,
-						.alpha = &scene_rect->backdrop_blur_alpha,
-						.filter_mode = WLR_SCALE_FILTER_BILINEAR,
-						.blend_mode = WLR_RENDER_BLEND_MODE_PREMULTIPLIED,
+			if (blur_source_texture != NULL) {
+				struct fx_render_apply_blur_pass_options blur_options = {
+					.tex_options = {
+						.base = (struct wlr_render_texture_options) {
+							.texture = NULL,
+							.src_box = (struct wlr_fbox){0},
+							.dst_box = dst_box,
+							.transform = WL_OUTPUT_TRANSFORM_NORMAL,
+							.clip = &render_region,
+							.alpha = &scene_rect->backdrop_blur_alpha,
+							.filter_mode = WLR_SCALE_FILTER_BILINEAR,
+							.blend_mode = WLR_RENDER_BLEND_MODE_PREMULTIPLIED,
+						},
+						.clip_box = &dst_box,
+						.corner_radius = scene_rect->corner_radius * data->scale,
+						.corners = rect_corners,
+						.discard_transparent = false,
 					},
-					.clip_box = &dst_box,
-					.corner_radius = scene_rect->corner_radius * data->scale,
-					.corners = rect_corners,
-					.discard_transparent = false,
-				},
-				.opaque_region = &opaque_region,
-				.use_optimized_blur = scene_rect->backdrop_blur_optimized,
-				.blur_data = &scene->blur_data,
-				.ignore_transparent = false,
-				.blur_strength = scene_rect->backdrop_blur_strength,
-				.blur_source = blur_source_texture,
-			};
-			// Render the actual blur behind the surface
-			fx_render_pass_add_blur(data->render_pass, &blur_options);
+					.opaque_region = &opaque_region,
+					.ignore_transparent = false,
+					.blur_source = blur_source_texture,
+				};
+				// Render the actual blur behind the surface
+				fx_render_pass_apply_blur(data->render_pass, &blur_options);
+			}
 
 			pixman_region32_fini(&opaque_region);
 		}
@@ -2136,7 +2114,6 @@ static void scene_entry_render(struct render_list_entry *entry, const struct ren
 			.use_optimized_blur = false,
 			.ignore_transparent = false,
 			.blur_data = &scene->blur_data,
-			.blur_source = NULL,
 		};
 
 		pixman_region32_fini(&opaque_region);
@@ -2175,7 +2152,6 @@ static void scene_entry_render(struct render_list_entry *entry, const struct ren
 				},
 				.blur_data = &scene->blur_data,
 				.blur_strength = 1.0f,
-				.blur_source = NULL,
 			};
 			bool result = fx_render_pass_add_optimized_blur(data->render_pass, &blur_options);
 			if (result) {
@@ -2266,41 +2242,35 @@ static void scene_entry_render(struct render_list_entry *entry, const struct ren
 						-scene_buffer->src_box.x, -scene_buffer->src_box.y);
 
 				struct wlr_texture *blur_source_texture = NULL;
-				if (scene_buffer->backdrop_blur_prefer_source) {
-					struct wlr_scene_blur_source *source = get_source_blur(&scene_buffer->node, &scene_buffer->backdrop_blur_source);
-					if (source != NULL && wlr_box_contains_box(&source->blur_texture_region, &dst_box)) {
-						blur_source_texture = source->blur_texture;
-					}
+				struct wlr_scene_blur_source *source = get_source_blur(&scene_buffer->node, &scene_buffer->backdrop_blur_source);
+				if (source != NULL && wlr_box_contains_box(&source->blur_texture_region, &dst_box)) {
+					blur_source_texture = source->blur_texture;
 				}
 
-				// TODO: should I be configurable? We should probably move blur to a node
-				float blur_alpha = 1.0;
-				struct fx_render_blur_pass_options blur_options = {
-					.tex_options = {
-						.base = (struct wlr_render_texture_options) {
-							.texture = texture,
-							.src_box = scene_buffer->src_box,
-							.dst_box = dst_box,
-							.transform = WL_OUTPUT_TRANSFORM_NORMAL,
-							.clip = &render_region, // Render with the smaller region, clipping CSD
-							.alpha = &scene_buffer->backdrop_blur_alpha,
-							.filter_mode = WLR_SCALE_FILTER_BILINEAR,
+				if (blur_source_texture != NULL) {
+					struct fx_render_apply_blur_pass_options blur_options = {
+						.tex_options = {
+							.base = (struct wlr_render_texture_options) {
+								.texture = texture,
+								.src_box = scene_buffer->src_box,
+								.dst_box = dst_box,
+								.transform = WL_OUTPUT_TRANSFORM_NORMAL,
+								.clip = &render_region, // Render with the smaller region, clipping CSD
+								.alpha = &scene_buffer->backdrop_blur_alpha,
+								.filter_mode = WLR_SCALE_FILTER_BILINEAR,
+							},
+							.clip_box = &dst_box,
+							.corner_radius = scene_buffer->corner_radius * data->scale,
+							.corners = buffer_corners,
+							.discard_transparent = false,
 						},
-						.clip_box = &dst_box,
-						.corner_radius = scene_buffer->corner_radius * data->scale,
-						.corners = buffer_corners,
-						.discard_transparent = false,
-					},
-					.opaque_region = &opaque_region,
-					.use_optimized_blur = scene_buffer->backdrop_blur_optimized,
-					.blur_data = &scene->blur_data,
-					.ignore_transparent = scene_buffer->backdrop_blur_ignore_transparent,
-					.blur_strength = scene_buffer->backdrop_blur_strength,
-					.blur_source = blur_source_texture,
-				};
-				// Render the actual blur behind the surface
-				fx_render_pass_add_blur(data->render_pass, &blur_options);
-
+						.opaque_region = &opaque_region,
+						.ignore_transparent = scene_buffer->backdrop_blur_ignore_transparent,
+						.blur_source = blur_source_texture,
+					};
+					// Render the actual blur behind the surface
+					fx_render_pass_apply_blur(data->render_pass, &blur_options);
+				}
 			}
 			pixman_region32_fini(&opaque_region);
 		}
@@ -2642,14 +2612,14 @@ static bool scene_node_invisible(struct wlr_scene_node *node) {
 		struct wlr_scene_blur_source *blur_source = wlr_scene_blur_source_from_node(node);
 		struct wlr_scene_rect *rect;
 		linked_node_list_for_each(rect_entry, rect, &blur_source->rect_targets, backdrop_blur_source) {
-			if (rect->backdrop_blur_prefer_source && rect->backdrop_blur) {
+			if (rect->backdrop_blur) {
 				return false;
 			}
 		}
 
 		struct wlr_scene_buffer *buffer;
 		linked_node_list_for_each(buffer_entry, buffer, &blur_source->buffer_targets, backdrop_blur_source) {
-			if (buffer->backdrop_blur_prefer_source && buffer->backdrop_blur) {
+			if (buffer->backdrop_blur) {
 				return false;
 			}
 		}

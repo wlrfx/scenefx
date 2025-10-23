@@ -143,6 +143,10 @@ void linked_node_list_unlink(struct linked_node_list *linked_list, struct linked
 	linked_node_list_entry_destroy(node->link);
 }
 
+bool linked_node_list_child_has_parent(struct linked_node_list_child *child) {
+	return child->link != NULL && child->link->list != NULL;
+}
+
 void linked_node_list_child_destroy(struct linked_node_list_child *child) {
 	if (child->link == NULL) return;
 	linked_node_list_entry_destroy(child->link);

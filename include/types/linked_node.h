@@ -70,6 +70,8 @@ struct linked_node_list *linked_node_list_get_parent(struct linked_node_list_chi
 
 void linked_node_list_unlink(struct linked_node_list *linked_list, struct linked_node_list_child* node);
 
+bool linked_node_list_child_has_parent(struct linked_node_list_child *child);
+
 void linked_node_list_child_destroy(struct linked_node_list_child *child);
 
 void linked_node_list_destroy(struct linked_node_list *linked_list);

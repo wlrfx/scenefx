@@ -974,16 +974,9 @@ damage_finish:
 	return texture;
 }
 
-void fx_render_pass_add_blur(struct fx_gles_render_pass *pass,
-		struct fx_render_blur_pass_options *fx_options) {
-	struct wlr_texture *wlr_texture;
-	bool keep_texture = false;
-	if (fx_options->blur_source == NULL) {
-		wlr_texture = fx_render_pass_create_blur_texture(pass, fx_options);
-	} else {
-		wlr_texture = fx_options->blur_source;
-		keep_texture = true;
-	}
+void fx_render_pass_apply_blur(struct fx_gles_render_pass *pass,
+		struct fx_render_apply_blur_pass_options *fx_options) {
+	struct wlr_texture *wlr_texture = fx_options->blur_source;
 	struct fx_texture *blur_texture = fx_get_texture(wlr_texture);
 
 	struct fx_render_texture_options *tex_options = &fx_options->tex_options;
@@ -1009,10 +1002,6 @@ void fx_render_pass_add_blur(struct fx_gles_render_pass *pass,
 	};
 	tex_options->base.texture = &blur_texture->wlr_texture;
 	fx_render_pass_add_texture(pass, tex_options);
-
-	if (!keep_texture) {
-		wlr_texture_destroy(&blur_texture->wlr_texture);
-	}
 
 	// Finish stenciling
 	if (fx_options->ignore_transparent && fx_options->tex_options.base.texture) {

@@ -103,6 +103,12 @@ struct fx_render_blur_pass_options {
 	bool use_optimized_blur;
 	bool ignore_transparent;
 	float blur_strength;
+};
+
+struct fx_render_apply_blur_pass_options {
+	struct fx_render_texture_options tex_options;
+	pixman_region32_t *opaque_region;
+	bool ignore_transparent;
 	struct wlr_texture *blur_source;
 };
 
@@ -145,8 +151,8 @@ void fx_render_pass_add_box_shadow(struct fx_gles_render_pass *pass,
 /**
  * Render blur.
  */
-void fx_render_pass_add_blur(struct fx_gles_render_pass *pass,
-		struct fx_render_blur_pass_options *fx_options);
+void fx_render_pass_apply_blur(struct fx_gles_render_pass *pass,
+		struct fx_render_apply_blur_pass_options *fx_options);
 
 /**
  * Render optimized blur.

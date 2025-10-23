@@ -670,6 +670,9 @@ void wlr_scene_blur_source_remove_target(struct wlr_scene_blur_source *blur_sour
 void wlr_scene_blur_source_set_size(struct wlr_scene_blur_source *blur_node,
 		int width, int height);
 
+void wlr_scene_blur_source_set_only_blur_bottom_layer(struct wlr_scene_blur_source *blur_node,
+		bool only_blur_bottom_later);
+
 /**
  * Add a node displaying a buffer to the scene-graph.
  *

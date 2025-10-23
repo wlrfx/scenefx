@@ -1287,6 +1287,16 @@ void wlr_scene_blur_source_set_size(struct wlr_scene_blur_source *blur_node,
 	blur_node->height = height;
 }
 
+void wlr_scene_blur_source_set_only_blur_bottom_layer(struct wlr_scene_blur_source *blur_node,
+		bool only_blur_bottom_later) {
+	assert(blur_node);
+	if (blur_node->should_only_blur_bottom_layer == only_blur_bottom_later) {
+		return;
+	}
+
+	blur_node->should_only_blur_bottom_layer = only_blur_bottom_later;
+}
+
 struct wlr_scene_buffer *wlr_scene_buffer_create(struct wlr_scene_tree *parent,
 		struct wlr_buffer *buffer) {
 	struct wlr_scene_buffer *scene_buffer = calloc(1, sizeof(*scene_buffer));

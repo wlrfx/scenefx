@@ -2,6 +2,7 @@
  * This an unstable interface of wlroots. No guarantees are made regarding the
  * future consistency of this API.
  */
+#include "types/linked_node.h"
 #ifndef WLR_USE_UNSTABLE
 #error "Add -DWLR_USE_UNSTABLE to enable unstable wlroots features"
 #endif
@@ -60,6 +61,7 @@ enum wlr_scene_node_type {
 	WLR_SCENE_NODE_SHADOW,
 	WLR_SCENE_NODE_BUFFER,
 	WLR_SCENE_NODE_OPTIMIZED_BLUR,
+	WLR_SCENE_NODE_BLUR_SOURCE,
 };
 
 /** A node is an object in the scene. */
@@ -149,10 +151,9 @@ struct wlr_scene_rect {
 	float color[4];
 	int corner_radius;
 	enum corner_location corners;
-	bool backdrop_blur;
-	bool backdrop_blur_optimized;
-	float backdrop_blur_strength;
 	float backdrop_blur_alpha;
+	bool backdrop_blur;
+	struct linked_node_list_child backdrop_blur_source;
 
 	bool accepts_input;
 	struct clipped_region clipped_region;
@@ -175,6 +176,26 @@ struct wlr_scene_optimized_blur {
 	int width, height;
 
 	bool dirty;
+};
+
+/** A scene-graph node create a blur texture for other scene-graph nodes to use */
+struct wlr_scene_blur_source {
+	struct wlr_scene_node node;
+	int width, height;
+
+	float alpha;
+	float strength;
+	enum corner_location corners;
+	int corner_radius;
+
+	bool should_only_blur_bottom_layer;
+
+	struct linked_node_list rect_targets;
+	struct linked_node_list buffer_targets;
+
+	// TODO: should this be stored in a render data struct instead?
+	struct wlr_texture* blur_texture;
+	struct wlr_box blur_texture_region;
 };
 
 struct wlr_scene_outputs_update_event {
@@ -215,10 +236,9 @@ struct wlr_scene_buffer {
 
 	int corner_radius;
 	bool backdrop_blur;
-	bool backdrop_blur_optimized;
 	bool backdrop_blur_ignore_transparent;
-	float backdrop_blur_strength;
 	float backdrop_blur_alpha;
+	struct linked_node_list_child backdrop_blur_source;
 	enum corner_location corners;
 
 	float opacity;
@@ -532,6 +552,9 @@ void wlr_scene_rect_set_color(struct wlr_scene_rect *rect, const float color[sta
 void wlr_scene_rect_set_backdrop_blur(struct wlr_scene_rect *rect,
 		bool enabled);
 
+void wlr_scene_rect_set_backdrop_blur_prefer_source(struct wlr_scene_rect *rect,
+		bool enabled);
+
 /**
 * Sets whether the backdrop blur should use optimized blur or not
 */
@@ -605,6 +628,9 @@ void wlr_scene_shadow_set_clipped_region(struct wlr_scene_shadow *shadow,
 struct wlr_scene_optimized_blur *wlr_scene_optimized_blur_from_node(
 		struct wlr_scene_node *node);
 
+struct wlr_scene_blur_source *wlr_scene_blur_source_from_node(
+		struct wlr_scene_node *node);
+
 /**
  * Add a node indicating to the renderer to render optimized blur to the scene-graph.
  * NOTE: Has to be positioned where to draw the optimized blur. This allows
@@ -628,6 +654,24 @@ void wlr_scene_optimized_blur_set_size(struct wlr_scene_optimized_blur *blur_nod
  * wallpaper.
  */
 void wlr_scene_optimized_blur_mark_dirty(struct wlr_scene_optimized_blur *blur_node);
+
+struct wlr_scene_blur_source *wlr_scene_blur_source_create(
+		struct wlr_scene_tree *parent, int width, int height);
+
+bool wlr_scene_blur_source_has_target(struct wlr_scene_blur_source *blur_source,
+		struct wlr_scene_node *node);
+
+void wlr_scene_blur_source_add_target(struct wlr_scene_blur_source *blur_source,
+		struct wlr_scene_node *node);
+
+void wlr_scene_blur_source_remove_target(struct wlr_scene_blur_source *blur_source,
+		struct wlr_scene_node *node);
+
+void wlr_scene_blur_source_set_size(struct wlr_scene_blur_source *blur_node,
+		int width, int height);
+
+void wlr_scene_blur_source_set_only_blur_bottom_layer(struct wlr_scene_blur_source *blur_node,
+		bool only_blur_bottom_later);
 
 /**
  * Add a node displaying a buffer to the scene-graph.
@@ -730,6 +774,9 @@ void wlr_scene_buffer_set_corner_radius(struct wlr_scene_buffer *scene_buffer,
 * Sets whether or not the buffer should render backdrop blur
 */
 void wlr_scene_buffer_set_backdrop_blur(struct wlr_scene_buffer *scene_buffer,
+		bool enabled);
+
+void wlr_scene_buffer_set_backdrop_blur_prefer_source(struct wlr_scene_buffer *scene_buffer,
 		bool enabled);
 
 /**

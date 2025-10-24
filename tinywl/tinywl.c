@@ -109,6 +109,7 @@ struct tinywl_toplevel {
 	int corner_radius;
 	struct wlr_scene_shadow *shadow;
 	struct wlr_scene_rect *border;
+	struct wlr_scene_blur_source *blur;
 };
 
 struct tinywl_popup {
@@ -806,8 +807,8 @@ static void iter_xdg_scene_buffers(struct wlr_scene_buffer *buffer, int sx,
 			wlr_scene_buffer_set_corner_radius(buffer, toplevel->corner_radius,
 					CORNER_LOCATION_BOTTOM);
 
+			wlr_scene_blur_source_add_target(toplevel->blur, &buffer->node);
 			wlr_scene_buffer_set_backdrop_blur(buffer, true);
-			wlr_scene_buffer_set_backdrop_blur_optimized(buffer, true);
 			wlr_scene_buffer_set_backdrop_blur_ignore_transparent(buffer, true);
 		}
 	}
@@ -957,6 +958,8 @@ static void server_new_xdg_toplevel(struct wl_listener *listener, void *data) {
 	/* Set the scene_nodes decoration data */
 	toplevel->opacity = 1;
 	toplevel->corner_radius = 20;
+
+	toplevel->blur = wlr_scene_blur_source_create(toplevel->scene_tree, 0, 0);
 
 	toplevel->border = wlr_scene_rect_create(toplevel->scene_tree, 0, 0,
 			(float[4]){ 1.0f, 0.f, 0.f, 1.0f });

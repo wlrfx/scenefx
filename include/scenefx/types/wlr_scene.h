@@ -59,6 +59,7 @@ enum wlr_scene_node_type {
 	WLR_SCENE_NODE_RECT,
 	WLR_SCENE_NODE_SHADOW,
 	WLR_SCENE_NODE_BUFFER,
+	WLR_SCENE_NODE_BUFFER_CROSSFADE,
 	WLR_SCENE_NODE_OPTIMIZED_BLUR,
 };
 
@@ -167,6 +168,44 @@ struct wlr_scene_shadow {
 	float blur_sigma;
 
 	struct clipped_region clipped_region;
+};
+
+/** A scene-graph node displaying a crossfaded texture between two buffers */
+struct wlr_scene_buffer_crossfade {
+	struct wlr_scene_node node;
+
+	// May be NULL
+	struct wlr_buffer *buffer;
+
+	int corner_radius;
+	bool backdrop_blur;
+	bool backdrop_blur_optimized;
+	bool backdrop_blur_ignore_transparent;
+	float backdrop_blur_strength;
+	float backdrop_blur_alpha;
+	enum corner_location corners;
+
+	float opacity;
+	enum wlr_scale_filter_mode filter_mode;
+	struct wlr_fbox src_box;
+	int dst_width, dst_height;
+	enum wl_output_transform transform;
+	pixman_region32_t opaque_region;
+
+	struct {
+		struct wlr_texture *textureA;
+		struct wlr_texture *textureB;
+
+		// TODO: needed?
+		int buffer_width, buffer_height;
+		bool buffer_is_opaque;
+
+		// True if the underlying buffer is a wlr_single_pixel_buffer_v1
+		bool is_single_pixel_buffer;
+		// If is_single_pixel_buffer is set, contains the color of the buffer
+		// as {R, G, B, A} where the max value of each component is UINT32_MAX
+		uint32_t single_pixel_buffer_color[4];
+	} WLR_PRIVATE;
 };
 
 /** A scene-graph node telling SceneFX to render the optimized blur */

@@ -2153,13 +2153,10 @@ static void scene_entry_render(struct render_list_entry *entry, const struct ren
 			.blur_strength = blur_source->strength,
 		};
 
-		struct wlr_texture *blur_source_texture = fx_render_pass_create_blur_texture(data->render_pass, &blur_options);
-
-		if (blur_source->blur_texture != NULL)
-		{
+		if (blur_source->blur_texture != NULL) {
 			wlr_texture_destroy(blur_source->blur_texture);
 		}
-		blur_source->blur_texture = blur_source_texture;
+		blur_source->blur_texture = fx_render_pass_create_blur_texture(data->render_pass, &blur_options);
 		pixman_region32_copy(&blur_source->blur_texture_region, &render_region);
 
 		break;

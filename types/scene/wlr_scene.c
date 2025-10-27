@@ -1987,7 +1987,7 @@ struct render_list_entry {
 static bool does_blur_intersect(pixman_region32_t *region, struct wlr_scene_blur_source *blur) {
 	pixman_region32_t available_blur_region;
 	pixman_region32_init(&available_blur_region);
-	pixman_region32_intersect(&available_blur_region, region, wlr_scene_blur_source_get_target_region(blur));
+	pixman_region32_intersect(&available_blur_region, region, &blur->blur_texture_region);
 	return pixman_region32_not_empty(&available_blur_region);
 }
 
@@ -2121,15 +2121,6 @@ static void scene_entry_render(struct render_list_entry *entry, const struct ren
 		}
 		break;
 	case WLR_SCENE_NODE_BLUR_SOURCE:;
-		enum wl_output_transform blur_target_transform =
-			wlr_output_transform_invert(data->transform);
-		blur_target_transform = wlr_output_transform_compose(blur_target_transform, data->transform);
-
-		pixman_region32_t opaque_region;
-		pixman_region32_init(&opaque_region);
-		scene_node_opaque_region(node, x, y, &opaque_region);
-		logical_to_buffer_coords(&opaque_region, data, false);
-
 		struct wlr_scene_blur_source *blur_source = wlr_scene_blur_source_from_node(node);
 		pixman_region32_t *blur_source_region = wlr_scene_blur_source_get_target_region(blur_source);
 		pixman_region32_t blur_region;
@@ -2156,14 +2147,11 @@ static void scene_entry_render(struct render_list_entry *entry, const struct ren
 				.corners = blur_source->corners,
 				.discard_transparent = false,
 			},
-			.opaque_region = &opaque_region,
 			.use_optimized_blur = blur_source->should_only_blur_bottom_layer,
 			.ignore_transparent = false,
 			.blur_data = &scene->blur_data,
 			.blur_strength = blur_source->strength,
 		};
-
-		pixman_region32_fini(&opaque_region);
 
 		struct wlr_texture *blur_source_texture = fx_render_pass_create_blur_texture(data->render_pass, &blur_options);
 

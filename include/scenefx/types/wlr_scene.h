@@ -190,12 +190,14 @@ struct wlr_scene_blur_source {
 
 	bool should_only_blur_bottom_layer;
 
-	struct linked_node_list rect_targets;
-	struct linked_node_list buffer_targets;
+	pixman_region32_t blur_region_requested;
+	bool blur_region_dirty;
+
+	struct linked_node_list targets;
 
 	// TODO: should this be stored in a render data struct instead?
 	struct wlr_texture* blur_texture;
-	struct wlr_box blur_texture_region;
+	pixman_region32_t blur_texture_region;
 };
 
 struct wlr_scene_outputs_update_event {
@@ -666,6 +668,12 @@ void wlr_scene_blur_source_add_target(struct wlr_scene_blur_source *blur_source,
 
 void wlr_scene_blur_source_remove_target(struct wlr_scene_blur_source *blur_source,
 		struct wlr_scene_node *node);
+
+struct wlr_scene_blur_source *wlr_scene_blur_source_get_for_target_node(struct wlr_scene_node *node);
+
+void wlr_scene_blur_source_mark_dirty(struct wlr_scene_blur_source *blur_source);
+
+struct pixman_region32 *wlr_scene_blur_source_get_target_region(struct wlr_scene_blur_source *blur_source);
 
 void wlr_scene_blur_source_set_size(struct wlr_scene_blur_source *blur_node,
 		int width, int height);

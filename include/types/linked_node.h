@@ -13,8 +13,6 @@ struct linked_node {
 
 /**
  * A list of nodes linked between two objects. Can be used to safely couple 1 object to a list of objects
- *
- * Note: this object is mostly for type safety
  */
 struct linked_node_list {
 	struct wl_list list;
@@ -27,6 +25,7 @@ struct linked_node_list {
  */
 struct linked_node_list_child {
 	struct linked_node_list_entry *link;
+	struct wlr_scene_node *node;
 };
 
 /**
@@ -40,7 +39,7 @@ struct linked_node_list_entry {
 
 #define linked_node_init() \
 	((struct linked_node) { \
-		.link = NULL \
+		.link = NULL, \
 	})
 
 void linked_node_init_link(struct linked_node *main_node,
@@ -53,9 +52,10 @@ void linked_node_unlink(struct linked_node *main_node,
 
 void linked_node_destroy(struct linked_node *node);
 
-#define linked_list_node_child_init() \
+#define linked_list_node_child_init(carrier) \
 	((struct linked_node_list_child) { \
-	.link = NULL \
+		.link = NULL, \
+		.node = carrier \
 	})
 
 void linked_node_list_init(struct linked_node_list *list);
@@ -76,8 +76,8 @@ void linked_node_list_child_destroy(struct linked_node_list_child *child);
 
 void linked_node_list_destroy(struct linked_node_list *linked_list);
 
-#define linked_node_list_for_each(tmp, pos, linked_list, linked_list_link) \
+#define linked_node_list_for_each(tmp, pos, linked_list) \
 	struct linked_node_list_entry *tmp; \
-	wl_list_for_each(tmp, &(linked_list)->list, link) if ((pos = wl_container_of(tmp->child, pos, linked_list_link)) || true)
+	wl_list_for_each(tmp, &(linked_list)->list, link) if ((pos = tmp->child->node) || true)
 
 #endif

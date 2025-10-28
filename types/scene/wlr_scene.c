@@ -1295,6 +1295,20 @@ void wlr_scene_blur_source_mark_dirty(struct wlr_scene_blur_source *blur_source)
 	blur_source->blur_region_dirty = true;
 }
 
+void wlr_scene_blur_source_set_alpha(struct wlr_scene_blur_source *blur_source, float alpha) {
+	blur_source->alpha = alpha;
+}
+
+void wlr_scene_blur_source_set_corner_radius(struct wlr_scene_blur_source *blur_source,
+	int radii, enum corner_location corners) {
+	blur_source->corner_radius = radii;
+	blur_source->corners = corners;
+}
+
+void wlr_scene_blur_source_set_strength(struct wlr_scene_blur_source *blur_source, float strength) {
+	blur_source->strength = strength;
+}
+
 struct pixman_region32 *wlr_scene_blur_source_get_target_region(struct wlr_scene_blur_source *blur_source) {
 	if (!blur_source->blur_region_dirty) {
 		return &blur_source->blur_region_requested;

@@ -638,36 +638,80 @@ void wlr_scene_optimized_blur_set_size(struct wlr_scene_optimized_blur *blur_nod
  */
 void wlr_scene_optimized_blur_mark_dirty(struct wlr_scene_optimized_blur *blur_node);
 
+/**
+ * Create a new blur source node, this node allows rendering of blur before any of the content of the rest of the
+ * tree is rendered, causing the blur to be clean of spilling
+ */
 struct wlr_scene_blur_source *wlr_scene_blur_source_create(
 		struct wlr_scene_tree *parent, int width, int height);
 
+/**
+ * Checks if the node is targeted by the blur source
+ */
 bool wlr_scene_blur_source_has_target(struct wlr_scene_blur_source *blur_source,
 		struct wlr_scene_node *node);
 
+/**
+ * Add a node as target for the blur source, this allows it to make sure the region of that node gets rendered
+ */
 void wlr_scene_blur_source_add_target(struct wlr_scene_blur_source *blur_source,
 		struct wlr_scene_node *node);
 
+/**
+ * Remove a node from the target list
+ */
 void wlr_scene_blur_source_remove_target(struct wlr_scene_blur_source *blur_source,
-		struct wlr_scene_node *node);
+                                         struct wlr_scene_node *node);
 
+/**
+ * Gets the blur source for a node, NULL if none is assigned or an invalid type is given
+ */
 struct wlr_scene_blur_source *wlr_scene_blur_source_get_for_target_node(struct wlr_scene_node *node);
 
+/**
+ * Mark the source as dirty, causing the target region to be recalculated
+ */
 void wlr_scene_blur_source_mark_dirty(struct wlr_scene_blur_source *blur_source);
 
+/**
+ * Sets the alpha at which the blur would be applied
+ */
 void wlr_scene_blur_source_set_alpha(struct wlr_scene_blur_source *blur_source, float alpha);
 
+/**
+* Sets the corner radius and which corners to round of this blur source
+*/
 void wlr_scene_blur_source_set_corner_radius(struct wlr_scene_blur_source *blur_source,
 	int radii, enum corner_location corners);
 
+
+/**
+ * Sets the blur strength from 1.0f -> 0.0f. This adjusts how strong the blur is
+ * relative to the base 1.0 value.
+ *
+ * Can be used combined with backdrop_blur_alpha to create a good-looking
+ * fade-out effect.
+ */
 void wlr_scene_blur_source_set_strength(struct wlr_scene_blur_source *blur_source, float strength);
 
+/**
+ * Get the region that will be blurred, coordinates are absolute to the tree root
+ */
 struct pixman_region32 *wlr_scene_blur_source_get_target_region(struct wlr_scene_blur_source *blur_source);
 
+/**
+ * Set the size of this blur source
+ */
 void wlr_scene_blur_source_set_size(struct wlr_scene_blur_source *blur_node,
-		int width, int height);
+                                    int width, int height);
 
+/**
+ * Set if the blur source should only blur the bottom layer
+ *
+ * Other terms used for this are: xray or optimized blur
+ */
 void wlr_scene_blur_source_set_only_blur_bottom_layer(struct wlr_scene_blur_source *blur_node,
-		bool only_blur_bottom_later);
+                                                      bool only_blur_bottom_later);
 
 /**
  * Add a node displaying a buffer to the scene-graph.

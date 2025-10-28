@@ -1323,6 +1323,20 @@ struct pixman_region32 *wlr_scene_blur_source_get_target_region(struct wlr_scene
 	int x,y, width, height;
 	linked_node_list_for_each(entry_x, node, &blur_source->targets) {
 		if (wlr_scene_node_coords(node, &x, &y)) {
+			if (node->type == WLR_SCENE_NODE_BUFFER) {
+				struct wlr_scene_buffer *buffer = wlr_scene_buffer_from_node(node);
+				if (!buffer->backdrop_blur) {
+					continue;
+				}
+			}
+
+			if (node->type == WLR_SCENE_NODE_RECT) {
+				struct wlr_scene_rect *rect = wlr_scene_rect_from_node(node);
+				if (!rect->backdrop_blur) {
+					continue;
+				}
+			}
+
 			scene_node_get_size(node, &width, &height);
 			pixman_region32_union_rect(blur_region, blur_region, x, y, width, height);
 		}

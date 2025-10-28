@@ -1314,7 +1314,7 @@ struct pixman_region32 *wlr_scene_blur_source_get_target_region(struct wlr_scene
 		return &blur_source->blur_region_requested;
 	}
 
-	blur_source->blur_region_dirty = true;
+	blur_source->blur_region_dirty = false;
 
 	pixman_region32_t *blur_region = &blur_source->blur_region_requested;
 	pixman_region32_clear(blur_region);

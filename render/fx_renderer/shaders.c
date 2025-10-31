@@ -385,3 +385,41 @@ bool link_blur_effects_program(struct blur_effects_shader *shader, GLint client_
 
 	return true;
 }
+
+bool link_tex_crossfade_program(struct tex_crossfade_shader *shader, GLint client_version, enum fx_tex_shader_source source) {
+	GLchar frag_src_part[2048];
+	GLchar frag_src[4096];
+	if (client_version > 2) {
+		snprintf(frag_src_part, sizeof(frag_src_part),
+			tex_frag_gles3_src, source);
+		snprintf(frag_src, sizeof(frag_src),
+			"%s\n%s\n", frag_src_part, corner_alpha_frag_gles3_src);
+	} else {
+		snprintf(frag_src_part, sizeof(frag_src_part),
+			tex_frag_gles2_src, source);
+		snprintf(frag_src, sizeof(frag_src),
+			"%s\n%s\n", frag_src_part, corner_alpha_frag_gles2_src);
+	}
+
+	GLuint prog;
+	shader->program = prog = link_program(frag_src, client_version);
+	if (!shader->program) {
+		return false;
+	}
+
+	shader->proj = glGetUniformLocation(prog, "proj");
+	shader->tex_prev = glGetUniformLocation(prog, "tex");
+	shader->tex_next = glGetUniformLocation(prog, "tex");
+	shader->alpha = glGetUniformLocation(prog, "alpha");
+	shader->pos_attrib = glGetAttribLocation(prog, "pos");
+	shader->tex_proj = glGetUniformLocation(prog, "tex_proj");
+	shader->size = glGetUniformLocation(prog, "size");
+	shader->position = glGetUniformLocation(prog, "position");
+	shader->radius_top_left = glGetUniformLocation(prog, "radius_top_left");
+	shader->radius_top_right = glGetUniformLocation(prog, "radius_top_right");
+	shader->radius_bottom_left = glGetUniformLocation(prog, "radius_bottom_left");
+	shader->radius_bottom_right = glGetUniformLocation(prog, "radius_bottom_right");
+	shader->discard_transparent = glGetUniformLocation(prog, "discard_transparent");
+
+	return true;
+}

@@ -2436,6 +2436,9 @@ static bool scene_node_invisible(struct wlr_scene_node *node) {
 		struct wlr_scene_buffer *buffer = wlr_scene_buffer_from_node(node);
 
 		return buffer->buffer == NULL && buffer->texture == NULL;
+	} else if (node->type == WLR_SCENE_NODE_BUFFER_CROSSFADE) {
+		// TODO
+		return false;
 	}
 
 	return false;

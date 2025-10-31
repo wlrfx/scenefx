@@ -170,4 +170,24 @@ struct blur_effects_shader {
 
 bool link_blur_effects_program(struct blur_effects_shader *shader, GLint client_version);
 
+struct tex_crossfade_shader {
+	GLuint program;
+	GLint proj;
+	GLint tex_proj;
+	GLint tex_prev;
+	GLint tex_next;
+	GLint alpha;
+	GLint pos_attrib;
+	GLint size;
+	GLint position;
+	GLint radius_top_left;
+	GLint radius_top_right;
+	GLint radius_bottom_left;
+	GLint radius_bottom_right;
+
+	GLint discard_transparent;
+};
+
+bool link_tex_crossfade_program(struct tex_crossfade_shader *shader, GLint client_version, enum fx_tex_shader_source source);
+
 #endif

@@ -186,6 +186,9 @@ struct fx_renderer {
 		struct blur_shader blur1;
 		struct blur_shader blur2;
 		struct blur_effects_shader blur_effects;
+		struct tex_crossfade_shader tex_crossfade_rgba;
+		struct tex_crossfade_shader tex_crossfade_rgbx;
+		struct tex_crossfade_shader tex_crossfade_ext;
 	} shaders;
 
 	struct wl_list buffers; // fx_framebuffer.link

@@ -191,10 +191,11 @@ struct wlr_scene_buffer_crossfade {
 	int dst_width, dst_height;
 	enum wl_output_transform transform;
 	pixman_region32_t opaque_region;
+	float progress;
 
 	struct {
-		struct wlr_texture *textureA;
-		struct wlr_texture *textureB;
+		struct wlr_texture *texture_prev;
+		struct wlr_texture *texture_next;
 
 		// TODO: needed?
 		int buffer_width, buffer_height;
@@ -520,6 +521,12 @@ struct wlr_scene_rect *wlr_scene_rect_from_node(struct wlr_scene_node *node);
  * is not legal to feed a node that does not represent a wlr_scene_shadow.
  */
 struct wlr_scene_shadow *wlr_scene_shadow_from_node(struct wlr_scene_node *node);
+
+/**
+ * If this node represents a wlr_scene_buffer_crossfade, that buffer_crossfade will be
+ * returned. It is not legal to feed a node that does not represent a wlr_scene_buffer_crossfade.
+ */
+struct wlr_scene_buffer_crossfade *wlr_scene_buffer_crossfade_from_node(struct wlr_scene_node *node);
 
 /**
  * If this buffer is backed by a surface, then the struct wlr_scene_surface is

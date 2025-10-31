@@ -80,6 +80,12 @@ struct wlr_scene_shadow *wlr_scene_shadow_from_node(struct wlr_scene_node *node)
 	return shadow;
 }
 
+struct wlr_scene_buffer_crossfade *wlr_scene_buffer_crossfade_from_node(struct wlr_scene_node *node) {
+	assert(node->type == WLR_SCENE_NODE_BUFFER_CROSSFADE);
+	struct wlr_scene_buffer_crossfade *buffer_crossfade = wl_container_of(node, buffer_crossfade, node);
+	return buffer_crossfade;
+}
+
 struct wlr_scene *scene_node_get_root(struct wlr_scene_node *node) {
 	struct wlr_scene_tree *tree;
 	if (node->type == WLR_SCENE_NODE_TREE) {
@@ -2424,21 +2430,19 @@ static bool scene_node_invisible(struct wlr_scene_node *node) {
 		return true;
 	} else if (node->type == WLR_SCENE_NODE_RECT) {
 		struct wlr_scene_rect *rect = wlr_scene_rect_from_node(node);
-
 		return rect->color[3] == 0.f;
 	} else if (node->type == WLR_SCENE_NODE_SHADOW) {
 		struct wlr_scene_shadow *shadow = wlr_scene_shadow_from_node(node);
-
 		return shadow->color[3] == 0.f;
 	} else if (node->type == WLR_SCENE_NODE_OPTIMIZED_BLUR) {
 		return false;
 	} else if (node->type == WLR_SCENE_NODE_BUFFER) {
 		struct wlr_scene_buffer *buffer = wlr_scene_buffer_from_node(node);
-
 		return buffer->buffer == NULL && buffer->texture == NULL;
 	} else if (node->type == WLR_SCENE_NODE_BUFFER_CROSSFADE) {
-		// TODO
-		return false;
+		struct wlr_scene_buffer_crossfade *buffer_crossfade = wlr_scene_buffer_crossfade_from_node(node);
+		return buffer_crossfade->texture_prev == NULL &&
+			(buffer_crossfade->texture_next == NULL || buffer_crossfade->progress == 0.0);
 	}
 
 	return false;

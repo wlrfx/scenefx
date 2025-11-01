@@ -43,6 +43,9 @@
 #define SCENE_BUFFER_SHOULD_BLUR(scene_buffer, blur_data) \
 	scene_buffer->backdrop_blur && is_scene_blur_enabled(blur_data) && \
 		(!scene_buffer->buffer_is_opaque || scene_buffer->opacity < 1.0f)
+// TODO: check buffer_prev and buffer_next for is_opaque
+#define SCENE_BUFFER_CROSSFADE_SHOULD_BLUR(scene_buffer_crossfade, blur_data) \
+	scene_buffer_crossfade->backdrop_blur && is_scene_blur_enabled(blur_data)
 #define SCENE_RECT_SHOULD_BLUR(scene_rect, blur_data) \
 	scene_rect->backdrop_blur && is_scene_blur_enabled(blur_data) && \
 		scene_rect->color[3] < 1.0f
@@ -78,6 +81,12 @@ struct wlr_scene_shadow *wlr_scene_shadow_from_node(struct wlr_scene_node *node)
 	assert(node->type == WLR_SCENE_NODE_SHADOW);
 	struct wlr_scene_shadow *shadow = wl_container_of(node, shadow, node);
 	return shadow;
+}
+
+struct wlr_scene_buffer_crossfade *wlr_scene_buffer_crossfade_from_node(struct wlr_scene_node *node) {
+	assert(node->type == WLR_SCENE_NODE_BUFFER_CROSSFADE);
+	struct wlr_scene_buffer_crossfade *buffer_crossfade = wl_container_of(node, buffer_crossfade, node);
+	return buffer_crossfade;
 }
 
 struct wlr_scene *scene_node_get_root(struct wlr_scene_node *node) {
@@ -269,6 +278,7 @@ static bool _scene_nodes_in_box(struct wlr_scene_node *node, struct wlr_box *box
 	case WLR_SCENE_NODE_RECT:
 	case WLR_SCENE_NODE_SHADOW:
 	case WLR_SCENE_NODE_BUFFER:;
+	case WLR_SCENE_NODE_BUFFER_CROSSFADE:;
 		struct wlr_box node_box = { .x = lx, .y = ly };
 		scene_node_get_size(node, &node_box.width, &node_box.height);
 
@@ -683,6 +693,12 @@ static bool scene_node_update_iterator(struct wlr_scene_node *node,
 	} else if (node->type == WLR_SCENE_NODE_RECT) {
 		struct wlr_scene_rect *scene_rect = wlr_scene_rect_from_node(node);
 		if (SCENE_RECT_SHOULD_BLUR(scene_rect, data->blur_data)) {
+			wlr_region_expand(&node->visible, &node->visible,
+					blur_data_calc_size(data->blur_data));
+		}
+	} else if (node->type == WLR_SCENE_NODE_BUFFER_CROSSFADE) {
+		struct wlr_scene_buffer_crossfade *scene_buffer_crossfade = wlr_scene_buffer_crossfade_from_node(node);
+		if (SCENE_BUFFER_CROSSFADE_SHOULD_BLUR(scene_buffer_crossfade, data->blur_data)) {
 			wlr_region_expand(&node->visible, &node->visible,
 					blur_data_calc_size(data->blur_data));
 		}
@@ -1610,6 +1626,12 @@ static void scene_node_get_size(struct wlr_scene_node *node,
 			wlr_output_transform_coords(scene_buffer->transform, width, height);
 		}
 		break;
+	case WLR_SCENE_NODE_BUFFER_CROSSFADE:;
+		struct wlr_scene_buffer_crossfade *scene_buffer_crossfade = wlr_scene_buffer_crossfade_from_node(node);
+		assert(scene_buffer_crossfade->dst_width > 0 && scene_buffer_crossfade->dst_height > 0);
+		*width = scene_buffer_crossfade->dst_width;
+		*height = scene_buffer_crossfade->dst_height;
+		break;
 	}
 }
 
@@ -2134,6 +2156,56 @@ static void scene_entry_render(struct render_list_entry *entry, const struct ren
 			});
 		}
 		break;
+
+	case WLR_SCENE_NODE_BUFFER_CROSSFADE:;
+		struct wlr_scene_buffer_crossfade *scene_buffer_crossfade = wlr_scene_buffer_crossfade_from_node(node);
+		// Blur
+		if (SCENE_BUFFER_CROSSFADE_SHOULD_BLUR(scene_buffer_crossfade, &scene->blur_data)) {
+			pixman_region32_t opaque_region;
+			pixman_region32_init(&opaque_region);
+
+			bool has_alpha = !pixman_region32_empty(&opaque);
+			scene_node_opaque_region(node, x, y, &opaque_region);
+			logical_to_buffer_coords(&opaque_region, data, false);
+
+			if (has_alpha) {
+				// Translate the opaque_region by the potential clipping offset.
+				// Fixes GTK CSD offsetting the opaque_region
+				pixman_region32_translate(&opaque_region,
+						-scene_buffer_crossfade->src_box.x, -scene_buffer_crossfade->src_box.y);
+
+				const float alpha = 1.0f;
+				struct fx_render_blur_pass_options blur_options = {
+					.tex_options = {
+						.base = (struct wlr_render_texture_options) {
+							.texture = texture,
+							.src_box = scene_buffer_crossfade->src_box,
+							.dst_box = dst_box,
+							.transform = WL_OUTPUT_TRANSFORM_NORMAL,
+							.clip = &render_region, // Render with the smaller region, clipping CSD
+							.alpha = &alpha,
+							.filter_mode = WLR_SCALE_FILTER_BILINEAR,
+						},
+						.clip_box = &dst_box,
+						.corner_radius = scene_buffer_crossfade->corner_radius * data->scale,
+						.corners = buffer_corners,
+						.discard_transparent = false,
+					},
+					.opaque_region = &opaque_region,
+					.use_optimized_blur = scene_buffer_crossfade->backdrop_blur_optimized,
+					.blur_data = &scene->blur_data,
+					.ignore_transparent = false,
+					.blur_strength = 1.0f,
+				};
+				// Render the actual blur behind the surface
+				fx_render_pass_add_blur(data->render_pass, &blur_options);
+
+			}
+			pixman_region32_fini(&opaque_region);
+		}
+
+		// TODO: render the actual buffer crossfade
+		break;
 	}
 
 	pixman_region32_fini(&opaque);
@@ -2424,18 +2496,19 @@ static bool scene_node_invisible(struct wlr_scene_node *node) {
 		return true;
 	} else if (node->type == WLR_SCENE_NODE_RECT) {
 		struct wlr_scene_rect *rect = wlr_scene_rect_from_node(node);
-
 		return rect->color[3] == 0.f;
 	} else if (node->type == WLR_SCENE_NODE_SHADOW) {
 		struct wlr_scene_shadow *shadow = wlr_scene_shadow_from_node(node);
-
 		return shadow->color[3] == 0.f;
 	} else if (node->type == WLR_SCENE_NODE_OPTIMIZED_BLUR) {
 		return false;
 	} else if (node->type == WLR_SCENE_NODE_BUFFER) {
 		struct wlr_scene_buffer *buffer = wlr_scene_buffer_from_node(node);
-
 		return buffer->buffer == NULL && buffer->texture == NULL;
+	} else if (node->type == WLR_SCENE_NODE_BUFFER_CROSSFADE) {
+		struct wlr_scene_buffer_crossfade *buffer_crossfade = wlr_scene_buffer_crossfade_from_node(node);
+		return buffer_crossfade->buffer_prev == NULL &&
+			(buffer_crossfade->buffer_next == NULL || buffer_crossfade->progress == 0.0);
 	}
 
 	return false;
@@ -2720,6 +2793,12 @@ static bool scene_output_has_blur(int list_len,
 		case WLR_SCENE_NODE_OPTIMIZED_BLUR:;
 			struct wlr_scene_optimized_blur *scene_blur = wlr_scene_optimized_blur_from_node(node);
 			if (scene_blur->dirty) {
+				apply_blur_region(node, scene_output, blur_region);
+			}
+			break;
+		case WLR_SCENE_NODE_BUFFER_CROSSFADE:;
+			struct wlr_scene_buffer_crossfade *scene_buffer_crossfade = wlr_scene_buffer_crossfade_from_node(node);
+			if (SCENE_BUFFER_CROSSFADE_SHOULD_BLUR(scene_buffer_crossfade, &scene_output->scene->blur_data)) {
 				apply_blur_region(node, scene_output, blur_region);
 			}
 			break;

@@ -174,39 +174,21 @@ struct wlr_scene_shadow {
 struct wlr_scene_buffer_crossfade {
 	struct wlr_scene_node node;
 
-	// May be NULL
-	struct wlr_buffer *buffer;
+	struct wlr_buffer *buffer_prev; // can be NULL
+	struct wlr_buffer *buffer_next; // can be NULL
+	float progress;
 
 	int corner_radius;
+	enum corner_location corners;
 	bool backdrop_blur;
 	bool backdrop_blur_optimized;
-	bool backdrop_blur_ignore_transparent;
-	float backdrop_blur_strength;
-	float backdrop_blur_alpha;
-	enum corner_location corners;
-
 	float opacity;
-	enum wlr_scale_filter_mode filter_mode;
+
 	struct wlr_fbox src_box;
 	int dst_width, dst_height;
 	enum wl_output_transform transform;
+
 	pixman_region32_t opaque_region;
-	float progress;
-
-	struct {
-		struct wlr_texture *texture_prev;
-		struct wlr_texture *texture_next;
-
-		// TODO: needed?
-		int buffer_width, buffer_height;
-		bool buffer_is_opaque;
-
-		// True if the underlying buffer is a wlr_single_pixel_buffer_v1
-		bool is_single_pixel_buffer;
-		// If is_single_pixel_buffer is set, contains the color of the buffer
-		// as {R, G, B, A} where the max value of each component is UINT32_MAX
-		uint32_t single_pixel_buffer_color[4];
-	} WLR_PRIVATE;
 };
 
 /** A scene-graph node telling SceneFX to render the optimized blur */
@@ -674,6 +656,67 @@ void wlr_scene_optimized_blur_set_size(struct wlr_scene_optimized_blur *blur_nod
  * wallpaper.
  */
 void wlr_scene_optimized_blur_mark_dirty(struct wlr_scene_optimized_blur *blur_node);
+
+/**
+ * Add a node displaying a buffer crossfade to the scene-graph.
+ */
+struct wlr_scene_buffer_crossfade *wlr_scene_buffer_crossfade_create(struct wlr_scene_tree *parent,
+	struct wlr_buffer *from_buffer, struct wlr_buffer *to_buffer);
+
+/**
+ * Set the source rectangle describing the region of the buffer crossfade which will be
+ * sampled to render this node. This allows cropping the buffer crossfade.
+ *
+ * If NULL, the whole buffer crossfade is sampled. By default, the source box is NULL.
+ */
+void wlr_scene_buffer_crossfade_set_source_box(
+	struct wlr_scene_buffer_crossfade *scene_buffer_crossfade, const struct wlr_fbox *box);
+
+/**
+ * Set the destination size describing the region of the scene-graph the buffer crossfade
+ * will be painted onto. This allows scaling the buffer crossfade.
+ *
+ * If zero, the destination size will be the buffer size. By default, the
+ * destination size is zero.
+ */
+void wlr_scene_buffer_crossfade_set_dest_size(
+	struct wlr_scene_buffer_crossfade *scene_buffer_crossfade, int width, int height);
+
+/**
+ * Set a transform which will be applied to the buffer crossfade.
+ */
+void wlr_scene_buffer_crossfade_set_transform(
+	struct wlr_scene_buffer_crossfade *scene_buffer_crossfade,enum wl_output_transform transform);
+
+/**
+* Sets the opacity of this buffer crossfade.
+*/
+void wlr_scene_buffer_crossfade_set_opacity(
+	struct wlr_scene_buffer_crossfade *scene_buffer_crossfade, float opacity);
+
+/**
+ * Sets the buffer crossfade's corner radius.
+ */
+void *wlr_scene_buffer_crossfade_set_corner_radius(
+	struct wlr_scene_buffer_crossfade *scene_buffer_crossfade, int corner_radius);
+
+/**
+ * If the buffer crossfade should have backdrop blur.
+ */
+void *wlr_scene_buffer_crossfade_set_backdrop_blur(
+	struct wlr_scene_buffer_crossfade *scene_buffer_crossfade, bool enabled);
+
+/**
+ * If the buffer crossfade's backdrop blur should be optimized.
+ */
+void *wlr_scene_buffer_crossfade_set_backdrop_blur_optimized(
+	struct wlr_scene_buffer_crossfade *scene_buffer_crossfade, bool enabled);
+
+/**
+ * Set the progress of the crossfade between the prev and next buffers (0-1)
+ */
+void *wlr_scene_buffer_crossfade_set_progress(
+	struct wlr_scene_buffer_crossfade *scene_buffer_crossfade, float progress);
 
 /**
  * Add a node displaying a buffer to the scene-graph.

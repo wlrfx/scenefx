@@ -2156,6 +2156,56 @@ static void scene_entry_render(struct render_list_entry *entry, const struct ren
 			});
 		}
 		break;
+
+	case WLR_SCENE_NODE_BUFFER_CROSSFADE:;
+		struct wlr_scene_buffer_crossfade *scene_buffer_crossfade = wlr_scene_buffer_crossfade_from_node(node);
+		// Blur
+		if (SCENE_BUFFER_CROSSFADE_SHOULD_BLUR(scene_buffer_crossfade, &scene->blur_data)) {
+			pixman_region32_t opaque_region;
+			pixman_region32_init(&opaque_region);
+
+			bool has_alpha = !pixman_region32_empty(&opaque);
+			scene_node_opaque_region(node, x, y, &opaque_region);
+			logical_to_buffer_coords(&opaque_region, data, false);
+
+			if (has_alpha) {
+				// Translate the opaque_region by the potential clipping offset.
+				// Fixes GTK CSD offsetting the opaque_region
+				pixman_region32_translate(&opaque_region,
+						-scene_buffer_crossfade->src_box.x, -scene_buffer_crossfade->src_box.y);
+
+				const float alpha = 1.0f;
+				struct fx_render_blur_pass_options blur_options = {
+					.tex_options = {
+						.base = (struct wlr_render_texture_options) {
+							.texture = texture,
+							.src_box = scene_buffer_crossfade->src_box,
+							.dst_box = dst_box,
+							.transform = WL_OUTPUT_TRANSFORM_NORMAL,
+							.clip = &render_region, // Render with the smaller region, clipping CSD
+							.alpha = &alpha,
+							.filter_mode = WLR_SCALE_FILTER_BILINEAR,
+						},
+						.clip_box = &dst_box,
+						.corner_radius = scene_buffer_crossfade->corner_radius * data->scale,
+						.corners = buffer_corners,
+						.discard_transparent = false,
+					},
+					.opaque_region = &opaque_region,
+					.use_optimized_blur = scene_buffer_crossfade->backdrop_blur_optimized,
+					.blur_data = &scene->blur_data,
+					.ignore_transparent = false,
+					.blur_strength = 1.0f,
+				};
+				// Render the actual blur behind the surface
+				fx_render_pass_add_blur(data->render_pass, &blur_options);
+
+			}
+			pixman_region32_fini(&opaque_region);
+		}
+
+		// TODO: render the actual buffer crossfade
+		break;
 	}
 
 	pixman_region32_fini(&opaque);

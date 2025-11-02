@@ -622,7 +622,8 @@ struct wlr_scene_blur_source *wlr_scene_blur_source_create(struct wlr_scene_tree
 
 void wlr_scene_blur_source_set_size(struct wlr_scene_blur_source *blur_source, int width, int height);
 
-void wlr_scene_blur_source_set_corner_radius(struct wlr_scene_blur_source *blur_source, int corner_radius);
+void wlr_scene_blur_source_set_corner_radius(struct wlr_scene_blur_source *blur_source, int corner_radius,
+		enum corner_location corners);
 
 void wlr_scene_blur_source_set_should_only_blur_bottom_layer(struct wlr_scene_blur_source *blur_source,
 	bool should_only_blur_bottom_layer);

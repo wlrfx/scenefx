@@ -33,6 +33,8 @@
 
 #include <wlr/config.h>
 
+#include "types/linked_node.h"
+
 #if WLR_HAS_XWAYLAND
 #include <wlr/xwayland/xwayland.h>
 #endif
@@ -79,6 +81,13 @@ struct wlr_scene_shadow *wlr_scene_shadow_from_node(struct wlr_scene_node *node)
 	struct wlr_scene_shadow *shadow = wl_container_of(node, shadow, node);
 	return shadow;
 }
+
+struct wlr_scene_blur_source *wlr_scene_blur_source_from_node(struct wlr_scene_node *node) {
+	assert(node->type == WLR_SCENE_NODE_BLUR_SOURCE);
+	struct wlr_scene_blur_source *blur_source = wl_container_of(node, blur_source, node);
+	return blur_source;
+}
+
 
 struct wlr_scene *scene_node_get_root(struct wlr_scene_node *node) {
 	struct wlr_scene_tree *tree;
@@ -1075,6 +1084,104 @@ static void mark_all_optimized_blur_nodes_dirty(struct wlr_scene_node *node) {
 			mark_all_optimized_blur_nodes_dirty(child);
 		}
 	}
+}
+
+struct wlr_scene_blur_source *wlr_scene_blur_source_create(struct wlr_scene_tree *parent,
+	   int width, int height) {
+	struct wlr_scene_blur_source *blur_source = calloc(1, sizeof(*blur_source));
+	if (blur_source == NULL) {
+		return NULL;
+	}
+	assert(parent);
+	scene_node_init(&blur_source->node, WLR_SCENE_NODE_BLUR_SOURCE, parent);
+
+	blur_source->alpha = 1.0f;
+	blur_source->strength = 1.0f;
+	blur_source->corner_radius = 0;
+	blur_source->clipped_region = (struct clipped_region){0};
+	blur_source->corners = CORNER_LOCATION_NONE;
+	blur_source->should_only_blur_bottom_layer = false;
+	blur_source->transparency_mask_source = NULL;
+	blur_source->width = width;
+	blur_source->height = height;
+
+	scene_node_update(&blur_source->node, NULL);
+
+	return blur_source;
+}
+
+void wlr_scene_blur_source_set_size(struct wlr_scene_blur_source *blur_source, int width, int height) {
+	if (blur_source->width == width && blur_source->height == height) {
+		return;
+	}
+
+	blur_source->width = width;
+	blur_source->height = height;
+
+	scene_node_update(&blur_source->node, NULL);
+}
+
+void wlr_scene_blur_source_set_corner_radius(struct wlr_scene_blur_source *blur_source, int corner_radius) {
+	if (blur_source->corner_radius == corner_radius) {
+		return;
+	}
+
+	blur_source->corner_radius = corner_radius;
+	scene_node_update(&blur_source->node, NULL);
+}
+
+void wlr_scene_blur_source_set_should_only_blur_bottom_layer(struct wlr_scene_blur_source *blur_source,
+	bool should_only_blur_bottom_layer) {
+	if (blur_source->should_only_blur_bottom_layer == should_only_blur_bottom_layer) {
+		return;
+	}
+
+	blur_source->should_only_blur_bottom_layer = should_only_blur_bottom_layer;
+	scene_node_update(&blur_source->node, NULL);
+}
+
+void wlr_scene_blur_source_set_transparency_mask_source(struct wlr_scene_blur_source *blur_source,
+	struct wlr_scene_node *source) {
+	if (blur_source->transparency_mask_source == source) {
+		return;
+	}
+
+	blur_source->transparency_mask_source = source;
+	scene_node_update(&blur_source->node, NULL);
+}
+
+void wlr_scene_blur_source_set_alpha(struct wlr_scene_blur_source *blur_source, float alpha) {
+	if (blur_source->alpha == alpha) {
+		return;
+	}
+
+	blur_source->alpha = alpha;
+	scene_node_update(&blur_source->node, NULL);
+}
+
+void wlr_scene_blur_source_set_strength(struct wlr_scene_blur_source *blur_source, float strength) {
+	if (blur_source->strength == strength) {
+		return;
+	}
+
+	blur_source->strength = strength;
+	scene_node_update(&blur_source->node, NULL);
+}
+
+void wlr_scene_blur_source_set_clipped_region(struct wlr_scene_blur_source *blur_source,
+		struct clipped_region clipped_region) {
+	if (blur_source->clipped_region.corner_radius == clipped_region.corner_radius &&
+		blur_source->clipped_region.corners == clipped_region.corners &&
+		wlr_box_equal(&blur_source->clipped_region.area, &clipped_region.area)) {
+		return;
+		}
+
+	if (clipped_region.corner_radius && clipped_region.corners == CORNER_LOCATION_NONE) {
+		wlr_log(WLR_ERROR, "Applying corner radius without specifying which"
+				" corners to round for blur source: %p", blur_source);
+	}
+	blur_source->clipped_region = clipped_region;
+	scene_node_update(&blur_source->node, NULL);
 }
 
 void wlr_scene_set_blur_data(struct wlr_scene *scene, int num_passes,
@@ -2144,6 +2251,34 @@ static void scene_entry_render(struct render_list_entry *entry, const struct ren
 			});
 		}
 		break;
+	case WLR_SCENE_NODE_BLUR_SOURCE:;
+		struct wlr_scene_blur_source *blur_source = wlr_scene_blur_source_from_node(node);
+
+		struct fx_render_blur_pass_options blur_options = {
+			.tex_options = {
+				.base = (struct wlr_render_texture_options) {
+					.texture = NULL,
+					.src_box = (struct wlr_fbox){0},
+					.dst_box = dst_box,
+					.transform = WL_OUTPUT_TRANSFORM_NORMAL,
+					.clip = &render_region,
+					.alpha = &blur_source->alpha,
+					.filter_mode = WLR_SCALE_FILTER_BILINEAR,
+					.blend_mode = WLR_RENDER_BLEND_MODE_PREMULTIPLIED,
+				},
+				.clip_box = &dst_box,
+				.corner_radius = blur_source->corner_radius * data->scale,
+				.corners = blur_source->corners,
+				.discard_transparent = false,
+			},
+			.opaque_region = NULL,
+			.use_optimized_blur = blur_source->should_only_blur_bottom_layer,
+			.blur_data = &scene->blur_data,
+			.ignore_transparent = false,
+			.blur_strength = blur_source->strength,
+		};
+		// Render the actual blur behind the surface
+		fx_render_pass_add_blur(data->render_pass, &blur_options);
 	}
 
 	pixman_region32_fini(&opaque);

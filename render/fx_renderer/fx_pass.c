@@ -965,7 +965,11 @@ void fx_render_pass_add_blur(struct fx_gles_render_pass *pass,
 
 	// Gets the translucent region
 	pixman_box32_t surface_box = { 0, 0, dst_box.width, dst_box.height };
-	pixman_region32_copy(&translucent_region, fx_options->opaque_region);
+
+	if (fx_options->opaque_region != NULL) {
+		pixman_region32_copy(&translucent_region, fx_options->opaque_region);
+	}
+
 	pixman_region32_inverse(&translucent_region, &translucent_region, &surface_box);
 	if (!pixman_region32_not_empty(&translucent_region)) {
 		goto damage_finish;

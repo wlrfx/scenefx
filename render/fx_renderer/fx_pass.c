@@ -605,15 +605,15 @@ void fx_render_pass_add_rounded_rect_grad(struct fx_gles_render_pass *pass,
 	glUniform2f(shader.grad_box, fx_options->gradient.range.x, fx_options->gradient.range.y);
 	glUniform2f(shader.origin, fx_options->gradient.origin[0], fx_options->gradient.origin[1]);
 
-	enum corner_location corners = fx_options->corners;
+	enum corner_location corners = fx_options->rounded_rect_options.corners;
 	glUniform1f(shader.radius_top_left, (CORNER_LOCATION_TOP_LEFT & corners) == CORNER_LOCATION_TOP_LEFT ?
-			fx_options->corner_radius : 0);
+			fx_options->rounded_rect_options.corner_radius : 0);
 	glUniform1f(shader.radius_top_right, (CORNER_LOCATION_TOP_RIGHT & corners) == CORNER_LOCATION_TOP_RIGHT ?
-			fx_options->corner_radius : 0);
+			fx_options->rounded_rect_options.corner_radius : 0);
 	glUniform1f(shader.radius_bottom_left, (CORNER_LOCATION_BOTTOM_LEFT & corners) == CORNER_LOCATION_BOTTOM_LEFT ?
-			fx_options->corner_radius : 0);
+			fx_options->rounded_rect_options.corner_radius : 0);
 	glUniform1f(shader.radius_bottom_right, (CORNER_LOCATION_BOTTOM_RIGHT & corners) == CORNER_LOCATION_BOTTOM_RIGHT ?
-			fx_options->corner_radius : 0);
+			fx_options->rounded_rect_options.corner_radius : 0);
 
 	render(&box, options->clip, shader.pos_attrib);
 

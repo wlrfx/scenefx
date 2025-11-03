@@ -60,7 +60,7 @@ enum wlr_scene_node_type {
 	WLR_SCENE_NODE_SHADOW,
 	WLR_SCENE_NODE_BUFFER,
 	WLR_SCENE_NODE_OPTIMIZED_BLUR,
-	WLR_SCENE_NODE_BLUR_SOURCE,
+	WLR_SCENE_NODE_BLUR,
 };
 
 /** A node is an object in the scene. */
@@ -170,7 +170,7 @@ struct wlr_scene_shadow {
 	struct clipped_region clipped_region;
 };
 
-struct wlr_scene_blur_source {
+struct wlr_scene_blur {
 	struct wlr_scene_node node;
 	int width, height;
 	int corner_radius;
@@ -231,11 +231,6 @@ struct wlr_scene_buffer {
 	struct wlr_scene_output *primary_output;
 
 	int corner_radius;
-	bool backdrop_blur;
-	bool backdrop_blur_optimized;
-	bool backdrop_blur_ignore_transparent;
-	float backdrop_blur_strength;
-	float backdrop_blur_alpha;
 	enum corner_location corners;
 
 	float opacity;
@@ -499,7 +494,7 @@ struct wlr_scene_rect *wlr_scene_rect_from_node(struct wlr_scene_node *node);
  */
 struct wlr_scene_shadow *wlr_scene_shadow_from_node(struct wlr_scene_node *node);
 
-struct wlr_scene_blur_source *wlr_scene_blur_source_from_node(struct wlr_scene_node *node);
+struct wlr_scene_blur *wlr_scene_blur_from_node(struct wlr_scene_node *node);
 
 /**
  * If this buffer is backed by a surface, then the struct wlr_scene_surface is
@@ -617,25 +612,25 @@ void wlr_scene_shadow_set_clipped_region(struct wlr_scene_shadow *shadow,
 		struct clipped_region clipped_region);
 
 
-struct wlr_scene_blur_source *wlr_scene_blur_source_create(struct wlr_scene_tree *parent,
+struct wlr_scene_blur *wlr_scene_blur_create(struct wlr_scene_tree *parent,
 	   int width, int height);
 
-void wlr_scene_blur_source_set_size(struct wlr_scene_blur_source *blur_source, int width, int height);
+void wlr_scene_blur_set_size(struct wlr_scene_blur *blur, int width, int height);
 
-void wlr_scene_blur_source_set_corner_radius(struct wlr_scene_blur_source *blur_source, int corner_radius,
+void wlr_scene_blur_set_corner_radius(struct wlr_scene_blur *blur, int corner_radius,
 		enum corner_location corners);
 
-void wlr_scene_blur_source_set_should_only_blur_bottom_layer(struct wlr_scene_blur_source *blur_source,
+void wlr_scene_blur_set_should_only_blur_bottom_layer(struct wlr_scene_blur *blur,
 	bool should_only_blur_bottom_layer);
 
-void wlr_scene_blur_source_set_transparency_mask_source(struct wlr_scene_blur_source *blur_source,
+void wlr_scene_blur_set_transparency_mask_source(struct wlr_scene_blur *blur,
 	struct wlr_scene_node *source);
 
-void wlr_scene_blur_source_set_alpha(struct wlr_scene_blur_source *blur_source, float alpha);
+void wlr_scene_blur_set_alpha(struct wlr_scene_blur *blur, float alpha);
 
-void wlr_scene_blur_source_set_strength(struct wlr_scene_blur_source *blur_source, float strength);
+void wlr_scene_blur_set_strength(struct wlr_scene_blur *blur, float strength);
 
-void wlr_scene_blur_source_set_clipped_region(struct wlr_scene_blur_source *blur_source,
+void wlr_scene_blur_set_clipped_region(struct wlr_scene_blur *blur,
 		struct clipped_region clipped_region);
 
 /**

@@ -8,11 +8,9 @@ vec4 gradient(vec4 colors[LEN], int count, vec2 size, vec2 grad_box,
 	float rad = radians(degree);
 
 	if (is_linear) {
-		uv *= vec2(1.0)/vec2(abs(cos(rad)) + abs(sin(rad)));
-
+		uv *= vec2(1.0) / vec2(abs(cos(rad)) + abs(sin(rad)));
 		vec2 rotated = vec2(uv.x * cos(rad) - uv.y * sin(rad) + origin.x,
-						uv.x * sin(rad) + uv.y * cos(rad) + origin.y);
-
+				uv.x * sin(rad) + uv.y * cos(rad) + origin.y);
 		step = rotated.x;
 	} else {
 		vec2 uv = normal - origin;
@@ -24,19 +22,19 @@ vec4 gradient(vec4 colors[LEN], int count, vec2 size, vec2 grad_box,
 	}
 
 	if (!should_blend) {
-		float smooth = 1.0 / float(count);
-		int ind = int(step / smooth);
+		float smooth_fac = 1.0 / float(count);
+		int ind = int(step / smooth_fac);
 
 		return colors[ind];
 	}
 
-	float smooth = 1.0 / float(count - 1);
-    int ind = int(step / smooth);
-    float at = float(ind) * smooth;
+	float smooth_fac = 1.0 / float(count - 1);
+    int ind = int(step / smooth_fac);
+    float at = float(ind) * smooth_fac;
 
 	vec4 color = colors[ind];
-	if(ind > 0) color = mix(colors[ind - 1], color, smoothstep(at - smooth_fac, at, step));
-	if(ind <= count - 1) color = mix(color, colors[ind + 1], smoothstep(at, at + smooth_fac, step));
+	if (ind > 0) color = mix(colors[ind - 1], color, smoothstep(at - smooth_fac, at, step));
+	if (ind <= count - 1) color = mix(color, colors[ind + 1], smoothstep(at, at + smooth_fac, step));
 
 	return color;
 }

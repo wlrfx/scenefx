@@ -849,11 +849,23 @@ void wlr_scene_rect_set_size(struct wlr_scene_rect *rect, int width, int height)
 }
 
 void wlr_scene_rect_set_color(struct wlr_scene_rect *rect, const float color[static 4]) {
-	if (memcmp(rect->color, color, sizeof(rect->color)) == 0) {
+	if (rect->fill_type == SOLID_COLOR && memcmp(rect->color, color, sizeof(rect->color)) == 0) {
 		return;
 	}
 
 	memcpy(rect->color, color, sizeof(rect->color));
+	scene_node_update(&rect->node, NULL);
+}
+
+void wlr_scene_rect_set_gradient(struct wlr_scene_rect *rect, const struct gradient gradient) {
+	// TODO: proper check
+	if (rect->fill_type == GRADIENT && false) {
+		return;
+	}
+
+	rect->fill_type = GRADIENT;
+	rect->gradient = gradient;
+
 	scene_node_update(&rect->node, NULL);
 }
 
@@ -1870,6 +1882,7 @@ static void scene_entry_render(struct render_list_entry *entry, const struct ren
 		wlr_output_transform_compose(WL_OUTPUT_TRANSFORM_NORMAL, data->transform);
 
 	struct wlr_scene *scene = data->output->scene;
+	// TODO: function for each case?
 	switch (node->type) {
 	case WLR_SCENE_NODE_TREE:
 		assert(false);
@@ -1928,15 +1941,18 @@ static void scene_entry_render(struct render_list_entry *entry, const struct ren
 		transform_output_box(&rect_clipped_region_box, data);
 		corner_location_transform(node_transform, &rect_clipped_corners);
 
+		struct wlr_render_color rect_color = { 0.0, 0.0, 0.0, 1.0 };
+		if (scene_rect->fill_type == SOLID_COLOR) {
+			rect_color.r = scene_rect->color[0];
+			rect_color.g = scene_rect->color[1];
+			rect_color.b = scene_rect->color[2];
+			rect_color.a = scene_rect->color[3];
+		}
+
 		struct fx_render_rect_options rect_options = {
 			.base = {
 				.box = dst_box,
-				.color = {
-					.r = scene_rect->color[0],
-					.g = scene_rect->color[1],
-					.b = scene_rect->color[2],
-					.a = scene_rect->color[3],
-				},
+				.color = rect_color,
 				.clip = &render_region,
 			},
 			.clipped_region = {
@@ -1953,9 +1969,21 @@ static void scene_entry_render(struct render_list_entry *entry, const struct ren
 				.corners = rect_corners,
 				.clipped_region = rect_options.clipped_region,
 			};
-			fx_render_pass_add_rounded_rect(data->render_pass, &rounded_rect_options);
+			if (scene_rect->fill_type == SOLID_COLOR) {
+				fx_render_pass_add_rounded_rect(data->render_pass, &rounded_rect_options);
+			} else {
+				struct fx_render_rounded_rect_grad_options rounded_rect_grad_options = {
+						rounded_rect_options, scene_rect->gradient };
+				fx_render_pass_add_rounded_rect_grad(data->render_pass, &rounded_rect_grad_options);
+			}
 		} else {
-			fx_render_pass_add_rect(data->render_pass, &rect_options);
+			if (scene_rect->fill_type == SOLID_COLOR) {
+				fx_render_pass_add_rect(data->render_pass, &rect_options);
+			} else {
+				struct fx_render_rect_grad_options rect_grad_options = {
+					rect_options, scene_rect->gradient };
+				fx_render_pass_add_rect_grad(data->render_pass, &rect_grad_options);
+			}
 		}
 		break;
 	case WLR_SCENE_NODE_OPTIMIZED_BLUR:;

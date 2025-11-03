@@ -46,10 +46,10 @@ struct quad_grad_shader {
 	GLint degree;
 	GLint grad_box;
 	GLint pos_attrib;
-	GLint linear;
+	GLint is_linear;
 	GLint origin;
 	GLint count;
-	GLint blend;
+	GLint should_blend;
 };
 
 bool link_quad_grad_program(struct quad_grad_shader *shader, GLint client_version, int max_len);
@@ -89,10 +89,10 @@ struct quad_grad_round_shader {
 	GLint grad_size;
 	GLint degree;
 	GLint grad_box;
-	GLint linear;
+	GLint is_linear;
 	GLint origin;
 	GLint count;
-	GLint blend;
+	GLint should_blend;
 
 	GLint radius_top_left;
 	GLint radius_top_right;

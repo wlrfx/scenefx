@@ -450,7 +450,7 @@ void fx_render_pass_add_rect(struct fx_gles_render_pass *pass,
 
 void fx_render_pass_add_rect_grad(struct fx_gles_render_pass *pass,
 		const struct fx_render_rect_grad_options *fx_options) {
-	const struct wlr_render_rect_options *options = &fx_options->base;
+	const struct wlr_render_rect_options *options = &fx_options->rect_options.base;
 
 	struct fx_renderer *renderer = pass->buffer->renderer;
 
@@ -479,8 +479,8 @@ void fx_render_pass_add_rect_grad(struct fx_gles_render_pass *pass,
 	glUniform1i(renderer->shaders.quad_grad.count, fx_options->gradient.count);
 	glUniform2f(renderer->shaders.quad_grad.size, fx_options->gradient.range.width, fx_options->gradient.range.height);
 	glUniform1f(renderer->shaders.quad_grad.degree, fx_options->gradient.degree);
-	glUniform1f(renderer->shaders.quad_grad.linear, fx_options->gradient.linear);
-	glUniform1f(renderer->shaders.quad_grad.blend, fx_options->gradient.blend);
+	glUniform1f(renderer->shaders.quad_grad.is_linear, fx_options->gradient.is_linear);
+	glUniform1f(renderer->shaders.quad_grad.should_blend, fx_options->gradient.should_blend);
 	glUniform2f(renderer->shaders.quad_grad.grad_box, fx_options->gradient.range.x, fx_options->gradient.range.y);
 	glUniform2f(renderer->shaders.quad_grad.origin, fx_options->gradient.origin[0], fx_options->gradient.origin[1]);
 
@@ -566,7 +566,7 @@ void fx_render_pass_add_rounded_rect(struct fx_gles_render_pass *pass,
 
 void fx_render_pass_add_rounded_rect_grad(struct fx_gles_render_pass *pass,
 		const struct fx_render_rounded_rect_grad_options *fx_options) {
-	const struct wlr_render_rect_options *options = &fx_options->base;
+	const struct wlr_render_rect_options *options = &fx_options->rounded_rect_options.base;
 
 	struct fx_renderer *renderer = pass->buffer->renderer;
 
@@ -600,20 +600,20 @@ void fx_render_pass_add_rounded_rect_grad(struct fx_gles_render_pass *pass,
 	glUniform1i(shader.count, fx_options->gradient.count);
 	glUniform2f(shader.grad_size, fx_options->gradient.range.width, fx_options->gradient.range.height);
 	glUniform1f(shader.degree, fx_options->gradient.degree);
-	glUniform1f(shader.linear, fx_options->gradient.linear);
-	glUniform1f(shader.blend, fx_options->gradient.blend);
+	glUniform1f(shader.is_linear, fx_options->gradient.is_linear);
+	glUniform1f(shader.should_blend, fx_options->gradient.should_blend);
 	glUniform2f(shader.grad_box, fx_options->gradient.range.x, fx_options->gradient.range.y);
 	glUniform2f(shader.origin, fx_options->gradient.origin[0], fx_options->gradient.origin[1]);
 
-	enum corner_location corners = fx_options->corners;
+	enum corner_location corners = fx_options->rounded_rect_options.corners;
 	glUniform1f(shader.radius_top_left, (CORNER_LOCATION_TOP_LEFT & corners) == CORNER_LOCATION_TOP_LEFT ?
-			fx_options->corner_radius : 0);
+			fx_options->rounded_rect_options.corner_radius : 0);
 	glUniform1f(shader.radius_top_right, (CORNER_LOCATION_TOP_RIGHT & corners) == CORNER_LOCATION_TOP_RIGHT ?
-			fx_options->corner_radius : 0);
+			fx_options->rounded_rect_options.corner_radius : 0);
 	glUniform1f(shader.radius_bottom_left, (CORNER_LOCATION_BOTTOM_LEFT & corners) == CORNER_LOCATION_BOTTOM_LEFT ?
-			fx_options->corner_radius : 0);
+			fx_options->rounded_rect_options.corner_radius : 0);
 	glUniform1f(shader.radius_bottom_right, (CORNER_LOCATION_BOTTOM_RIGHT & corners) == CORNER_LOCATION_BOTTOM_RIGHT ?
-			fx_options->corner_radius : 0);
+			fx_options->rounded_rect_options.corner_radius : 0);
 
 	render(&box, options->clip, shader.pos_attrib);
 

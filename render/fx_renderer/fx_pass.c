@@ -17,6 +17,7 @@
 #include "render/pass.h"
 #include "scenefx/render/fx_renderer/fx_renderer.h"
 #include "scenefx/render/fx_renderer/fx_effect_framebuffers.h"
+#include "scenefx/render/pass.h"
 #include "scenefx/types/fx/corner_location.h"
 #include "scenefx/types/fx/blur_data.h"
 #include "util/matrix.h"
@@ -28,7 +29,6 @@ struct fx_render_texture_options fx_render_texture_options_default(
 	struct fx_render_texture_options options = {
 		.corner_radius = 0,
 		.corners = CORNER_LOCATION_NONE,
-		.discard_transparent = false,
 		.clip_box = NULL,
 	};
 	memcpy(&options.base, base, sizeof(*base));
@@ -342,8 +342,7 @@ void fx_render_pass_add_texture(struct fx_gles_render_pass *pass,
 
 	bool has_alpha = texture->has_alpha
 		|| alpha < 1.0
-		|| fx_options->corner_radius > 0
-		|| fx_options->discard_transparent;
+		|| fx_options->corner_radius > 0;
 	setup_blending(!has_alpha ? WLR_RENDER_BLEND_MODE_NONE : options->blend_mode);
 
 	glUseProgram(shader->program);
@@ -368,7 +367,6 @@ void fx_render_pass_add_texture(struct fx_gles_render_pass *pass,
 	glUniform1f(shader->alpha, alpha);
 	glUniform2f(shader->size, clip_box->width, clip_box->height);
 	glUniform2f(shader->position, clip_box->x, clip_box->y);
-	glUniform1f(shader->discard_transparent, fx_options->discard_transparent);
 	glUniform1f(shader->radius_top_left, (CORNER_LOCATION_TOP_LEFT & corners) == CORNER_LOCATION_TOP_LEFT ?
 			fx_options->corner_radius : 0);
 	glUniform1f(shader->radius_top_right, (CORNER_LOCATION_TOP_RIGHT & corners) == CORNER_LOCATION_TOP_RIGHT ?
@@ -909,6 +907,90 @@ static struct fx_framebuffer *get_main_buffer_blur(struct fx_gles_render_pass *p
 	return fx_options->current_buffer;
 }
 
+static void fx_render_pass_add_discard_transparent(struct fx_gles_render_pass *pass,
+		struct wlr_render_texture_options *options) {
+	struct fx_renderer *renderer = pass->buffer->renderer;
+	struct fx_texture *texture = fx_get_texture(options->texture);
+
+	struct discard_transparent_shader *shader = NULL;
+
+	switch (texture->target) {
+	case GL_TEXTURE_2D:
+		if (texture->has_alpha) {
+			shader = &renderer->shaders.discard_transparent_rgba;
+		} else {
+			shader = &renderer->shaders.discard_transparent_rgbx;
+		}
+		break;
+	case GL_TEXTURE_EXTERNAL_OES:
+		// EGL_EXT_image_dma_buf_import_modifiers requires
+		// GL_OES_EGL_image_external
+		assert(renderer->exts.OES_egl_image_external);
+		shader = &renderer->shaders.discard_transparent_ext;
+		break;
+	default:
+		abort();
+	}
+
+	struct wlr_box dst_box;
+	struct wlr_fbox src_fbox;
+	wlr_render_texture_options_get_src_box(options, &src_fbox);
+	wlr_render_texture_options_get_dst_box(options, &dst_box);
+
+	src_fbox.x /= options->texture->width;
+	src_fbox.y /= options->texture->height;
+	src_fbox.width /= options->texture->width;
+	src_fbox.height /= options->texture->height;
+
+	push_fx_debug(renderer);
+
+	if (options->wait_timeline != NULL) {
+		int sync_file_fd =
+			wlr_drm_syncobj_timeline_export_sync_file(options->wait_timeline, options->wait_point);
+		if (sync_file_fd < 0) {
+			return;
+		}
+
+		EGLSyncKHR sync = wlr_egl_create_sync(renderer->egl, sync_file_fd);
+		close(sync_file_fd);
+		if (sync == EGL_NO_SYNC_KHR) {
+			return;
+		}
+
+		bool ok = wlr_egl_wait_sync(renderer->egl, sync);
+		wlr_egl_destroy_sync(renderer->egl, sync);
+		if (!ok) {
+			return;
+		}
+	}
+
+	glUseProgram(shader->program);
+
+	glActiveTexture(GL_TEXTURE0);
+	glBindTexture(texture->target, texture->tex);
+
+	switch (options->filter_mode) {
+	case WLR_SCALE_FILTER_BILINEAR:
+		glTexParameteri(texture->target, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+		glTexParameteri(texture->target, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+		break;
+	case WLR_SCALE_FILTER_NEAREST:
+		glTexParameteri(texture->target, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+		glTexParameteri(texture->target, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+		break;
+	}
+
+	glUniform1i(shader->tex, 0);
+
+	set_proj_matrix(shader->proj, pass->projection_matrix, &dst_box);
+	set_tex_matrix(shader->tex_proj, options->transform, &src_fbox);
+
+	render(&dst_box, options->clip, shader->pos_attrib);
+
+	glBindTexture(texture->target, 0);
+	pop_fx_debug(renderer);
+}
+
 void fx_render_pass_add_blur(struct fx_gles_render_pass *pass,
 		struct fx_render_blur_pass_options *fx_options) {
 	if (pass->buffer->renderer->basic_renderer) {
@@ -965,14 +1047,13 @@ void fx_render_pass_add_blur(struct fx_gles_render_pass *pass,
 	struct fx_texture *blur_texture = fx_get_texture(wlr_texture);
 	blur_texture->has_alpha = true;
 
+	bool should_ignore_transparent = fx_options->ignore_transparent &&
+			tex_options->base.texture;
+
 	// Get a stencil of the window ignoring transparent regions
-	if (fx_options->ignore_transparent && fx_options->tex_options.base.texture) {
+	if (should_ignore_transparent) {
 		stencil_mask_init();
-
-		struct fx_render_texture_options tex_options = fx_options->tex_options;
-		tex_options.discard_transparent = true;
-		fx_render_pass_add_texture(pass, &tex_options);
-
+		fx_render_pass_add_discard_transparent(pass, &tex_options->base);
 		stencil_mask_close(true);
 	}
 
@@ -990,7 +1071,7 @@ void fx_render_pass_add_blur(struct fx_gles_render_pass *pass,
 	wlr_texture_destroy(&blur_texture->wlr_texture);
 
 	// Finish stenciling
-	if (fx_options->ignore_transparent && fx_options->tex_options.base.texture) {
+	if (should_ignore_transparent) {
 		stencil_mask_fini();
 	}
 

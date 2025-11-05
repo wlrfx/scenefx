@@ -574,24 +574,64 @@ void wlr_scene_shadow_set_color(struct wlr_scene_shadow *shadow, const float col
 void wlr_scene_shadow_set_clipped_region(struct wlr_scene_shadow *shadow,
 		struct clipped_region clipped_region);
 
+/**
+ * Add a node displaying a blur to the scene-graph.
+ */
 struct wlr_scene_blur *wlr_scene_blur_create(struct wlr_scene_tree *parent,
 	   int width, int height);
 
+/**
+ * Change the width and height of an existing blur node.
+ */
 void wlr_scene_blur_set_size(struct wlr_scene_blur *blur, int width, int height);
 
+/**
+ * Change the corner radius of an existing blur node.
+ */
 void wlr_scene_blur_set_corner_radius(struct wlr_scene_blur *blur, int corner_radius,
 		enum corner_location corners);
 
+/**
+ * Make the blur node only blur the bottom layer of the scene
+ */
 void wlr_scene_blur_set_should_only_blur_bottom_layer(struct wlr_scene_blur *blur,
 	bool should_only_blur_bottom_layer);
 
+/**
+ * Set the transparency mask source for the blur, only rendering blur where the
+ * Mask source is actually rendering (e.g. skip transparent spaces)
+ */
 void wlr_scene_blur_set_transparency_mask_source(struct wlr_scene_blur *blur,
 	struct wlr_scene_node *source);
 
+/**
+ * Sets the blur alpha from 1.0f -> 0.0f. This adjusts the actual alpha of the blur.
+ * Default is 1.0f.
+ *
+ * Lower values without also adjusting the strength will look off.
+ *
+ * Can be used combined with strength to create a good-looking
+ * fade-out effect.
+ */
 void wlr_scene_blur_set_alpha(struct wlr_scene_blur *blur, float alpha);
 
+/**
+ * Sets the blur strength from 1.0f -> 0.0f. This adjusts how strong the blur is
+ * relative to the base 1.0 value.
+ *
+ * Can be used combined with alpha to create a good-looking
+ * fade-out effect.
+ */
 void wlr_scene_blur_set_strength(struct wlr_scene_blur *blur, float strength);
 
+/**
+ * Sets the region where to clip the blur.
+ *
+ * For there to be corner rounding of the clipped region, the corner radius and
+ * corners must be non-zero.
+ *
+ * NOTE: The positioning is node-relative.
+ */
 void wlr_scene_blur_set_clipped_region(struct wlr_scene_blur *blur,
 		struct clipped_region clipped_region);
 

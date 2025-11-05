@@ -38,7 +38,7 @@ void linked_node_init_link(struct linked_node *node_1,
         struct linked_node *node_2) {
     if (node_1->link || node_2->link) {
         assert(linked_nodes_are_linked(node_1, node_2));
-        linked_node_unlink(node_1, node_2);
+        return;
     }
 
     struct link *link = link_init(node_1, node_2);
@@ -57,15 +57,6 @@ struct linked_node *linked_nodes_get_sibling(struct linked_node *node) {
         return link->node_2;
     }
     return link->node_1;
-}
-
-void linked_node_orphan(struct linked_node *node) {
-	struct linked_node *sibling = linked_nodes_get_sibling(node);
-	if (sibling == NULL) {
-		return;
-	}
-
-	linked_node_unlink(sibling, node);
 }
 
 void linked_node_unlink(struct linked_node *node_1,

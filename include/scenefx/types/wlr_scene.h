@@ -574,7 +574,6 @@ void wlr_scene_shadow_set_color(struct wlr_scene_shadow *shadow, const float col
 void wlr_scene_shadow_set_clipped_region(struct wlr_scene_shadow *shadow,
 		struct clipped_region clipped_region);
 
-
 struct wlr_scene_blur *wlr_scene_blur_create(struct wlr_scene_tree *parent,
 	   int width, int height);
 

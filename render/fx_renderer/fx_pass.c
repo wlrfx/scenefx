@@ -342,8 +342,7 @@ void fx_render_pass_add_texture(struct fx_gles_render_pass *pass,
 
 	bool has_alpha = texture->has_alpha
 		|| alpha < 1.0
-		|| fx_options->corner_radius > 0
-		|| fx_options->discard_transparent;
+		|| fx_options->corner_radius > 0;
 	setup_blending(!has_alpha ? WLR_RENDER_BLEND_MODE_NONE : options->blend_mode);
 
 	glUseProgram(shader->program);
@@ -384,6 +383,121 @@ void fx_render_pass_add_texture(struct fx_gles_render_pass *pass,
 	render(&dst_box, options->clip, shader->pos_attrib);
 
 	glBindTexture(texture->target, 0);
+	pop_fx_debug(renderer);
+}
+
+void fx_render_pass_add_texture_crossfade(struct fx_gles_render_pass *pass,
+		const struct fx_render_texture_crossfade_options *options) {
+	struct fx_renderer *renderer = pass->buffer->renderer;
+	struct fx_texture *texture_prev = fx_get_texture(options->texture_prev);
+	struct fx_texture *texture_next = fx_get_texture(options->texture_next);
+
+	struct tex_crossfade_shader *shader = NULL;
+
+	assert(texture_prev->target == texture_next->target);
+	switch (texture_next->target) {
+	case GL_TEXTURE_2D:
+		if (texture_prev->has_alpha || texture_next->has_alpha) {
+			shader = &renderer->shaders.tex_crossfade_rgba;
+		} else {
+			shader = &renderer->shaders.tex_crossfade_rgbx;
+		}
+		break;
+	case GL_TEXTURE_EXTERNAL_OES:
+		// EGL_EXT_image_dma_buf_import_modifiers requires
+		// GL_OES_EGL_image_external
+		assert(renderer->exts.OES_egl_image_external);
+		shader = &renderer->shaders.tex_crossfade_ext;
+		break;
+	default:
+		abort();
+	}
+
+	// TODO: wlr_render_texture_options_get_src_box / wlr_render_texture_options_get_dst_box
+	struct wlr_box dst_box = options->dst_box;
+	struct wlr_fbox src_fbox = options->src_box;
+	// TODO: wlr_render_texture_options_get_alpha
+	const float alpha = 1.0f;
+
+	/* TODO: take into account prev and next
+	src_fbox.x /= options->texture->width;
+	src_fbox.y /= options->texture->height;
+	src_fbox.width /= options->texture->width;
+	src_fbox.height /= options->texture->height;
+	*/
+
+	push_fx_debug(renderer);
+
+	if (options->wait_timeline != NULL) {
+		int sync_file_fd =
+			wlr_drm_syncobj_timeline_export_sync_file(options->wait_timeline, options->wait_point);
+		if (sync_file_fd < 0) {
+			return;
+		}
+
+		EGLSyncKHR sync = wlr_egl_create_sync(renderer->egl, sync_file_fd);
+		close(sync_file_fd);
+		if (sync == EGL_NO_SYNC_KHR) {
+			return;
+		}
+
+		bool ok = wlr_egl_wait_sync(renderer->egl, sync);
+		wlr_egl_destroy_sync(renderer->egl, sync);
+		if (!ok) {
+			return;
+		}
+	}
+
+	bool has_alpha = texture_prev->has_alpha
+		|| texture_next->has_alpha
+		|| alpha < 1.0
+		|| options->corner_radius > 0;
+	setup_blending(!has_alpha ? WLR_RENDER_BLEND_MODE_NONE : options->blend_mode);
+
+	glUseProgram(shader->program);
+
+	glActiveTexture(GL_TEXTURE0);
+	glBindTexture(texture_prev->target, texture_prev->tex);
+	glActiveTexture(GL_TEXTURE1);
+	glBindTexture(texture_next->target, texture_next->tex);
+
+	/* TODO
+	switch (options->filter_mode) {
+	case WLR_SCALE_FILTER_BILINEAR:
+		glTexParameteri(texture->target, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+		glTexParameteri(texture->target, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+		break;
+	case WLR_SCALE_FILTER_NEAREST:
+		glTexParameteri(texture->target, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+		glTexParameteri(texture->target, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+		break;
+	}
+	*/
+
+	enum corner_location corners = options->corners;
+
+	glUniform1i(shader->tex_prev, 0);
+	glUniform1i(shader->tex_next, 1);
+	glUniform1f(shader->alpha, alpha);
+	glUniform2f(shader->size, dst_box.width, dst_box.height);
+	glUniform2f(shader->position, dst_box.x, dst_box.y);
+	glUniform1f(shader->radius_top_left, (CORNER_LOCATION_TOP_LEFT & corners) == CORNER_LOCATION_TOP_LEFT ?
+			options->corner_radius : 0);
+	glUniform1f(shader->radius_top_right, (CORNER_LOCATION_TOP_RIGHT & corners) == CORNER_LOCATION_TOP_RIGHT ?
+			options->corner_radius : 0);
+	glUniform1f(shader->radius_bottom_left, (CORNER_LOCATION_BOTTOM_LEFT & corners) == CORNER_LOCATION_BOTTOM_LEFT ?
+			options->corner_radius : 0);
+	glUniform1f(shader->radius_bottom_right, (CORNER_LOCATION_BOTTOM_RIGHT & corners) == CORNER_LOCATION_BOTTOM_RIGHT ?
+			options->corner_radius : 0);
+	glUniform1f(shader->progress, options->progress);
+
+	set_proj_matrix(shader->proj, pass->projection_matrix, &dst_box);
+	set_tex_matrix(shader->tex_proj, options->transform, &src_fbox);
+
+	render(&dst_box, options->clip, shader->pos_attrib);
+
+	glBindTexture(texture_prev->target, 0);
+	glBindTexture(texture_next->target, 1);
 	pop_fx_debug(renderer);
 }
 

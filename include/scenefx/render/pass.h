@@ -60,6 +60,23 @@ struct fx_render_texture_options {
 	bool discard_transparent;
 };
 
+struct fx_render_texture_crossfade_options {
+	struct wlr_texture *texture_prev;
+	struct wlr_texture *texture_next;
+	struct wlr_fbox src_box;
+	struct wlr_box dst_box;
+	const pixman_region32_t *clip;
+	enum wl_output_transform transform;
+	enum wlr_scale_filter_mode filter_mode;
+	enum wlr_render_blend_mode blend_mode;
+	struct wlr_drm_syncobj_timeline *wait_timeline;
+	uint64_t wait_point;
+	const float *alpha;
+	const enum corner_location corners;
+	const int corner_radius;
+	const float progress;
+};
+
 struct fx_render_rect_options {
 	struct wlr_render_rect_options base;
 	struct clipped_region clipped_region;
@@ -110,6 +127,12 @@ struct fx_render_blur_pass_options {
  */
 void fx_render_pass_add_texture(struct fx_gles_render_pass *render_pass,
 	const struct fx_render_texture_options *options);
+
+/**
+ * Render a crossfade between two fx textures.
+ */
+void fx_render_pass_add_texture_crossfade(struct fx_gles_render_pass *pass,
+	const struct fx_render_texture_crossfade_options *options);
 
 /**
  * Render a rectangle.

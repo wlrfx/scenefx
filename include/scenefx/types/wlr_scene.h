@@ -174,21 +174,18 @@ struct wlr_scene_shadow {
 struct wlr_scene_buffer_crossfade {
 	struct wlr_scene_node node;
 
-	struct wlr_buffer *buffer_prev; // can be NULL
-	struct wlr_buffer *buffer_next; // can be NULL
+	// TODO: buffer instead of scene_buffer
+	struct wlr_scene_buffer *scene_buffer_prev; // can be NULL
+	struct wlr_scene_buffer *scene_buffer_next; // can be NULL
 	float progress;
 
 	int corner_radius;
 	enum corner_location corners;
-	bool backdrop_blur;
-	bool backdrop_blur_optimized;
 	float opacity;
 
 	struct wlr_fbox src_box;
 	int dst_width, dst_height;
 	enum wl_output_transform transform;
-
-	pixman_region32_t opaque_region;
 };
 
 /** A scene-graph node telling SceneFX to render the optimized blur */
@@ -699,18 +696,6 @@ void wlr_scene_buffer_crossfade_set_opacity(
  */
 void *wlr_scene_buffer_crossfade_set_corner_radius(
 	struct wlr_scene_buffer_crossfade *scene_buffer_crossfade, int corner_radius);
-
-/**
- * If the buffer crossfade should have backdrop blur.
- */
-void *wlr_scene_buffer_crossfade_set_backdrop_blur(
-	struct wlr_scene_buffer_crossfade *scene_buffer_crossfade, bool enabled);
-
-/**
- * If the buffer crossfade's backdrop blur should be optimized.
- */
-void *wlr_scene_buffer_crossfade_set_backdrop_blur_optimized(
-	struct wlr_scene_buffer_crossfade *scene_buffer_crossfade, bool enabled);
 
 /**
  * Set the progress of the crossfade between the prev and next buffers (0-1)

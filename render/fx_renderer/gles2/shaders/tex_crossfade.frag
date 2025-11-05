@@ -38,8 +38,6 @@ uniform float radius_top_right;
 uniform float radius_bottom_left;
 uniform float radius_bottom_right;
 
-uniform bool discard_transparent;
-
 vec4 sample_texture_prev() {
 #if SOURCE == SOURCE_TEXTURE_RGBA || SOURCE == SOURCE_TEXTURE_EXTERNAL
 	return texture2D(tex_prev, v_texcoord);

@@ -184,8 +184,7 @@ struct tex_crossfade_shader {
 	GLint radius_top_right;
 	GLint radius_bottom_left;
 	GLint radius_bottom_right;
-
-	GLint discard_transparent;
+	GLint progress;
 };
 
 bool link_tex_crossfade_program(struct tex_crossfade_shader *shader, GLint client_version, enum fx_tex_shader_source source);

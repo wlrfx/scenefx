@@ -157,6 +157,7 @@ void wlr_scene_node_destroy(struct wlr_scene_node *node) {
 		scene_buffer_set_texture(scene_buffer, NULL);
 		pixman_region32_fini(&scene_buffer->opaque_region);
 		wlr_drm_syncobj_timeline_unref(scene_buffer->wait_timeline);
+		linked_node_destroy(&scene_buffer->blur);
 
 		assert(wl_list_empty(&scene_buffer->events.output_leave.listener_list));
 		assert(wl_list_empty(&scene_buffer->events.output_enter.listener_list));
@@ -185,6 +186,9 @@ void wlr_scene_node_destroy(struct wlr_scene_node *node) {
 				&scene_tree->children, link) {
 			wlr_scene_node_destroy(child);
 		}
+	} else if (node->type == WLR_SCENE_NODE_BLUR) {
+		struct wlr_scene_blur *blur = wlr_scene_blur_from_node(node);
+		linked_node_destroy(&blur->transparency_mask_source);
 	}
 
 	assert(wl_list_empty(&node->events.destroy.listener_list));
@@ -1042,7 +1046,7 @@ struct wlr_scene_blur *wlr_scene_blur_create(struct wlr_scene_tree *parent,
 	blur->clipped_region = (struct clipped_region){0};
 	blur->corners = CORNER_LOCATION_NONE;
 	blur->should_only_blur_bottom_layer = false;
-	blur->transparency_mask_source = NULL;
+	blur->transparency_mask_source = linked_node_init();;
 	blur->width = width;
 	blur->height = height;
 
@@ -1084,13 +1088,34 @@ void wlr_scene_blur_set_should_only_blur_bottom_layer(struct wlr_scene_blur *blu
 }
 
 void wlr_scene_blur_set_transparency_mask_source(struct wlr_scene_blur *blur,
-	struct wlr_scene_node *source) {
-	if (blur->transparency_mask_source == source) {
+       struct wlr_scene_buffer *source) {
+	if (source == NULL && blur->transparency_mask_source.link == NULL) {
 		return;
 	}
 
-	blur->transparency_mask_source = source;
+	if (source != NULL && linked_nodes_are_linked(&blur->transparency_mask_source, &source->blur)) {
+		return;
+	}
+
+	linked_node_destroy(&blur->transparency_mask_source);
+	linked_node_destroy(&source->blur);
+
+	if (source != NULL) {
+		linked_node_init_link(&blur->transparency_mask_source, &source->blur);
+	}
+
 	scene_node_update(&blur->node, NULL);
+}
+
+struct wlr_scene_buffer *wlr_scene_blur_get_transparency_mask_source(
+	struct wlr_scene_blur *blur) {
+	struct linked_node *node = linked_nodes_get_sibling(&blur->transparency_mask_source);
+	if (node == NULL) {
+		return NULL;
+	}
+
+	struct wlr_scene_buffer *output = wl_container_of(node, output, blur);
+	return output;
 }
 
 void wlr_scene_blur_set_alpha(struct wlr_scene_blur *blur, float alpha) {
@@ -1274,6 +1299,8 @@ struct wlr_scene_buffer *wlr_scene_buffer_create(struct wlr_scene_tree *parent,
 
 	scene_buffer->corner_radius = 0;
 	scene_buffer->corners = CORNER_LOCATION_NONE;
+
+	scene_buffer->blur = linked_node_init();
 
 	scene_buffer_set_buffer(scene_buffer, buffer);
 	scene_node_update(&scene_buffer->node, NULL);
@@ -2055,10 +2082,16 @@ static void scene_entry_render(struct render_list_entry *entry, const struct ren
 	case WLR_SCENE_NODE_BLUR:;
 		struct wlr_scene_blur *blur = wlr_scene_blur_from_node(node);
 
+		struct wlr_texture *tex = NULL;
+		struct wlr_scene_buffer *mask = wlr_scene_blur_get_transparency_mask_source(blur);
+		if (mask != NULL) {
+			tex = scene_buffer_get_texture(mask, data->output->output->renderer);
+		}
+
 		struct fx_render_blur_pass_options blur_options = {
 			.tex_options = {
 				.base = (struct wlr_render_texture_options) {
-					.texture = NULL,
+					.texture = tex,
 					.src_box = (struct wlr_fbox){0},
 					.dst_box = dst_box,
 					.transform = WL_OUTPUT_TRANSFORM_NORMAL,
@@ -2075,7 +2108,7 @@ static void scene_entry_render(struct render_list_entry *entry, const struct ren
 			.opaque_region = NULL,
 			.use_optimized_blur = blur->should_only_blur_bottom_layer,
 			.blur_data = &scene->blur_data,
-			.ignore_transparent = false,
+			.ignore_transparent = mask != NULL,
 			.blur_strength = blur->strength,
 		};
 		fx_render_pass_add_blur(data->render_pass, &blur_options);

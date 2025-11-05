@@ -2,6 +2,7 @@
  * This an unstable interface of wlroots. No guarantees are made regarding the
  * future consistency of this API.
  */
+#include "types/linked_node.h"
 #ifndef WLR_USE_UNSTABLE
 #error "Add -DWLR_USE_UNSTABLE to enable unstable wlroots features"
 #endif
@@ -179,7 +180,7 @@ struct wlr_scene_blur {
 
 	bool should_only_blur_bottom_layer;
 
-	struct wlr_scene_node *transparency_mask_source;
+	struct linked_node transparency_mask_source;
 };
 
 /** A scene-graph node telling SceneFX to render the optimized blur */
@@ -235,6 +236,8 @@ struct wlr_scene_buffer {
 	int dst_width, dst_height;
 	enum wl_output_transform transform;
 	pixman_region32_t opaque_region;
+
+	struct linked_node blur;
 
 	struct {
 		uint64_t active_outputs;
@@ -602,7 +605,13 @@ void wlr_scene_blur_set_should_only_blur_bottom_layer(struct wlr_scene_blur *blu
  * Mask source is actually rendering (e.g. skip transparent spaces)
  */
 void wlr_scene_blur_set_transparency_mask_source(struct wlr_scene_blur *blur,
-	struct wlr_scene_node *source);
+	   struct wlr_scene_buffer *source);
+
+/**
+ * get the transparency mask source for the blur
+ */
+struct wlr_scene_buffer *wlr_scene_blur_get_transparency_mask_source(
+	struct wlr_scene_blur *blur);
 
 /**
  * Sets the blur alpha from 1.0f -> 0.0f. This adjusts the actual alpha of the blur.

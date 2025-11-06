@@ -3,7 +3,7 @@
 #include <stdlib.h>
 #include <wlr/util/log.h>
 
-#include "types/linked_node.h"
+#include "scenefx/types/linked_node.h"
 
 struct link {
     struct linked_node *node_1;

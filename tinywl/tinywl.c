@@ -107,6 +107,7 @@ struct tinywl_toplevel {
 
 	float opacity;
 	int corner_radius;
+	struct wlr_scene_blur *blur;
 	struct wlr_scene_shadow *shadow;
 	struct wlr_scene_rect *border;
 };
@@ -599,6 +600,7 @@ static void xdg_toplevel_commit(struct wl_listener *listener, void *data) {
 
 	struct wlr_box *geometry = &toplevel->xdg_toplevel->base->geometry;
 	wlr_scene_subsurface_tree_set_clip(&toplevel->xdg_scene_tree->node, geometry);
+	wlr_scene_blur_set_size(toplevel->blur, geometry->width, geometry->height);
 
 	int border_width = geometry->width + (BORDER_THICKNESS * 2);
 	int border_height = geometry->height + (BORDER_THICKNESS * 2);
@@ -806,9 +808,7 @@ static void iter_xdg_scene_buffers(struct wlr_scene_buffer *buffer, int sx,
 			wlr_scene_buffer_set_corner_radius(buffer, toplevel->corner_radius,
 					CORNER_LOCATION_BOTTOM);
 
-			wlr_scene_buffer_set_backdrop_blur(buffer, true);
-			wlr_scene_buffer_set_backdrop_blur_optimized(buffer, true);
-			wlr_scene_buffer_set_backdrop_blur_ignore_transparent(buffer, true);
+			wlr_scene_blur_set_transparency_mask_source(toplevel->blur, buffer);
 		}
 	}
 }
@@ -957,6 +957,9 @@ static void server_new_xdg_toplevel(struct wl_listener *listener, void *data) {
 	/* Set the scene_nodes decoration data */
 	toplevel->opacity = 1;
 	toplevel->corner_radius = 20;
+
+	toplevel->blur = wlr_scene_blur_create(toplevel->scene_tree, 0, 0);
+	wlr_scene_blur_set_should_only_blur_bottom_layer(toplevel->blur, true);
 
 	toplevel->border = wlr_scene_rect_create(toplevel->scene_tree, 0, 0,
 			(float[4]){ 1.0f, 0.f, 0.f, 1.0f });

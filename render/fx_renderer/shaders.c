@@ -298,6 +298,13 @@ bool link_tex_program(struct tex_shader *shader, GLint client_version, enum fx_t
 	shader->radius_bottom_right = glGetUniformLocation(prog, "radius_bottom_right");
 	shader->discard_transparent = glGetUniformLocation(prog, "discard_transparent");
 
+	shader->clip_size = glGetUniformLocation(prog, "clip_size");
+	shader->clip_position = glGetUniformLocation(prog, "clip_position");
+	shader->clip_radius_top_left = glGetUniformLocation(prog, "clip_radius_top_left");
+	shader->clip_radius_top_right = glGetUniformLocation(prog, "clip_radius_top_right");
+	shader->clip_radius_bottom_left = glGetUniformLocation(prog, "clip_radius_bottom_left");
+	shader->clip_radius_bottom_right = glGetUniformLocation(prog, "clip_radius_bottom_right");
+
 	return true;
 }
 

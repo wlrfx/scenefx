@@ -58,6 +58,7 @@ struct fx_render_texture_options {
 	enum corner_location corners;
 	int corner_radius;
 	bool discard_transparent;
+	struct clipped_region clipped_region;
 };
 
 struct fx_render_texture_crossfade_options {
@@ -120,6 +121,9 @@ struct fx_render_blur_pass_options {
 	bool use_optimized_blur;
 	bool ignore_transparent;
 	float blur_strength;
+	int corner_radius;
+	enum corner_location corners;
+	struct clipped_region clipped_region;
 };
 
 /**

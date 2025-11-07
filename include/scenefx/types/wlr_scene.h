@@ -31,6 +31,7 @@
 #include "scenefx/types/fx/blur_data.h"
 #include "scenefx/types/fx/clipped_region.h"
 #include "scenefx/types/fx/corner_location.h"
+#include "scenefx/types/linked_node.h"
 
 struct wlr_output;
 struct wlr_output_layout;
@@ -61,6 +62,7 @@ enum wlr_scene_node_type {
 	WLR_SCENE_NODE_BUFFER,
 	WLR_SCENE_NODE_BUFFER_CROSSFADE,
 	WLR_SCENE_NODE_OPTIMIZED_BLUR,
+	WLR_SCENE_NODE_BLUR,
 };
 
 /** A node is an object in the scene. */
@@ -150,10 +152,6 @@ struct wlr_scene_rect {
 	float color[4];
 	int corner_radius;
 	enum corner_location corners;
-	bool backdrop_blur;
-	bool backdrop_blur_optimized;
-	float backdrop_blur_strength;
-	float backdrop_blur_alpha;
 
 	bool accepts_input;
 	struct clipped_region clipped_region;
@@ -186,6 +184,22 @@ struct wlr_scene_buffer_crossfade {
 	struct wlr_fbox src_box;
 	int dst_width, dst_height;
 	enum wl_output_transform transform;
+};
+
+struct wlr_scene_blur {
+	struct wlr_scene_node node;
+	int width, height;
+	int corner_radius;
+
+	enum corner_location corners;
+	struct clipped_region clipped_region;
+
+	float strength;
+	float alpha;
+
+	bool should_only_blur_bottom_layer;
+
+	struct linked_node transparency_mask_source;
 };
 
 /** A scene-graph node telling SceneFX to render the optimized blur */
@@ -233,11 +247,6 @@ struct wlr_scene_buffer {
 	struct wlr_scene_output *primary_output;
 
 	int corner_radius;
-	bool backdrop_blur;
-	bool backdrop_blur_optimized;
-	bool backdrop_blur_ignore_transparent;
-	float backdrop_blur_strength;
-	float backdrop_blur_alpha;
 	enum corner_location corners;
 
 	float opacity;
@@ -246,6 +255,8 @@ struct wlr_scene_buffer {
 	int dst_width, dst_height;
 	enum wl_output_transform transform;
 	pixman_region32_t opaque_region;
+
+	struct linked_node blur;
 
 	struct {
 		uint64_t active_outputs;
@@ -501,6 +512,8 @@ struct wlr_scene_rect *wlr_scene_rect_from_node(struct wlr_scene_node *node);
  */
 struct wlr_scene_shadow *wlr_scene_shadow_from_node(struct wlr_scene_node *node);
 
+struct wlr_scene_blur *wlr_scene_blur_from_node(struct wlr_scene_node *node);
+
 /**
  * If this node represents a wlr_scene_buffer_crossfade, that buffer_crossfade will be
  * returned. It is not legal to feed a node that does not represent a wlr_scene_buffer_crossfade.
@@ -552,39 +565,6 @@ void wlr_scene_rect_set_clipped_region(struct wlr_scene_rect *rect,
 void wlr_scene_rect_set_color(struct wlr_scene_rect *rect, const float color[static 4]);
 
 /**
-* Sets whether or not the buffer should render backdrop blur
-*/
-void wlr_scene_rect_set_backdrop_blur(struct wlr_scene_rect *rect,
-		bool enabled);
-
-/**
-* Sets whether the backdrop blur should use optimized blur or not
-*/
-void wlr_scene_rect_set_backdrop_blur_optimized(struct wlr_scene_rect *rect,
-		bool enabled);
-
-/**
- * Sets the blur strength from 1.0f -> 0.0f. This adjusts how strong the blur is
- * relative to the base 1.0 value.
- *
- * Can be used combined with backdrop_blur_alpha to create a good looking
- * fade-out effect.
- */
-void wlr_scene_rect_set_backdrop_blur_strength(struct wlr_scene_rect *rect,
-		float strength);
-
-/**
- * Sets the blur alpha from 1.0f -> 0.0f. This adjusts the actual alpha of the blur.
- * Default is 1.0f.
- *
- * Lower values without also adjusting the backdrop_blur_strength will look off.
- *
- * Can be used combined with backdrop_blur_strength to create a good looking
- * fade-out effect.
- */
-void wlr_scene_rect_set_backdrop_blur_alpha(struct wlr_scene_rect *rect,
-		float alpha);
-/**
  * Add a node displaying a shadow to the scene-graph.
  */
 struct wlr_scene_shadow *wlr_scene_shadow_create(struct wlr_scene_tree *parent,
@@ -620,6 +600,73 @@ void wlr_scene_shadow_set_color(struct wlr_scene_shadow *shadow, const float col
  * NOTE: The positioning is node-relative.
  */
 void wlr_scene_shadow_set_clipped_region(struct wlr_scene_shadow *shadow,
+		struct clipped_region clipped_region);
+
+/**
+ * Add a node displaying a blur to the scene-graph.
+ */
+struct wlr_scene_blur *wlr_scene_blur_create(struct wlr_scene_tree *parent,
+	   int width, int height);
+
+/**
+ * Change the width and height of an existing blur node.
+ */
+void wlr_scene_blur_set_size(struct wlr_scene_blur *blur, int width, int height);
+
+/**
+ * Change the corner radius of an existing blur node.
+ */
+void wlr_scene_blur_set_corner_radius(struct wlr_scene_blur *blur, int corner_radius,
+		enum corner_location corners);
+
+/**
+ * Make the blur node only blur the bottom layer of the scene
+ */
+void wlr_scene_blur_set_should_only_blur_bottom_layer(struct wlr_scene_blur *blur,
+	bool should_only_blur_bottom_layer);
+
+/**
+ * Set the transparency mask source for the blur, only rendering blur where the
+ * Mask source is actually rendering (e.g. skip transparent spaces)
+ */
+void wlr_scene_blur_set_transparency_mask_source(struct wlr_scene_blur *blur,
+	   struct wlr_scene_buffer *source);
+
+/**
+ * get the transparency mask source for the blur
+ */
+struct wlr_scene_buffer *wlr_scene_blur_get_transparency_mask_source(
+	struct wlr_scene_blur *blur);
+
+/**
+ * Sets the blur alpha from 1.0f -> 0.0f. This adjusts the actual alpha of the blur.
+ * Default is 1.0f.
+ *
+ * Lower values without also adjusting the strength will look off.
+ *
+ * Can be used combined with strength to create a good-looking
+ * fade-out effect.
+ */
+void wlr_scene_blur_set_alpha(struct wlr_scene_blur *blur, float alpha);
+
+/**
+ * Sets the blur strength from 1.0f -> 0.0f. This adjusts how strong the blur is
+ * relative to the base 1.0 value.
+ *
+ * Can be used combined with alpha to create a good-looking
+ * fade-out effect.
+ */
+void wlr_scene_blur_set_strength(struct wlr_scene_blur *blur, float strength);
+
+/**
+ * Sets the region where to clip the blur.
+ *
+ * For there to be corner rounding of the clipped region, the corner radius and
+ * corners must be non-zero.
+ *
+ * NOTE: The positioning is node-relative.
+ */
+void wlr_scene_blur_set_clipped_region(struct wlr_scene_blur *blur,
 		struct clipped_region clipped_region);
 
 /**
@@ -799,47 +846,6 @@ void wlr_scene_buffer_set_filter_mode(struct wlr_scene_buffer *scene_buffer,
 */
 void wlr_scene_buffer_set_corner_radius(struct wlr_scene_buffer *scene_buffer,
 		int radii, enum corner_location corners);
-
-/**
-* Sets whether or not the buffer should render backdrop blur
-*/
-void wlr_scene_buffer_set_backdrop_blur(struct wlr_scene_buffer *scene_buffer,
-		bool enabled);
-
-/**
-* Sets whether the backdrop blur should use optimized blur or not
-*/
-void wlr_scene_buffer_set_backdrop_blur_optimized(struct wlr_scene_buffer *scene_buffer,
-		bool enabled);
-
-/**
-* Sets whether the backdrop blur should not render in fully transparent
-* segments.
-*/
-void wlr_scene_buffer_set_backdrop_blur_ignore_transparent(
-		struct wlr_scene_buffer *scene_buffer, bool enabled);
-
-/**
- * Sets the blur strength from 1.0f -> 0.0f. This adjusts how strong the blur is
- * relative to the base 1.0 value.
- *
- * Can be used combined with backdrop_blur_alpha to create a good looking
- * fade-out effect.
- */
-void wlr_scene_buffer_set_backdrop_blur_strength(struct wlr_scene_buffer *scene_buffer,
-		float strength);
-
-/**
- * Sets the blur alpha from 1.0f -> 0.0f. This adjusts the actual alpha of the blur.
- * Default is 1.0f.
- *
- * Lower values without also adjusting the backdrop_blur_strength will look off.
- *
- * Can be used combined with backdrop_blur_strength to create a good looking
- * fade-out effect.
- */
-void wlr_scene_buffer_set_backdrop_blur_alpha(struct wlr_scene_buffer *scene_buffer,
-		float alpha);
 
 /**
  * Calls the buffer's frame_done signal.

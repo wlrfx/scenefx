@@ -2143,6 +2143,12 @@ static void scene_entry_render(struct render_list_entry *entry, const struct ren
 			}
 		}
 
+		pixman_region32_t opaque_region;
+		pixman_region32_init(&opaque_region);
+		// opaque_region will return the mask if used
+		scene_node_opaque_region(node, x, y, &opaque_region);
+		logical_to_buffer_coords(&opaque_region, data, false);
+
 		struct fx_render_blur_pass_options blur_options = {
 			.tex_options = {
 				.base = (struct wlr_render_texture_options) {
@@ -2160,13 +2166,17 @@ static void scene_entry_render(struct render_list_entry *entry, const struct ren
 				.corners = blur->corners,
 				.discard_transparent = false,
 			},
-			.opaque_region = NULL,
+			.opaque_region = &opaque_region,
 			.use_optimized_blur = blur->should_only_blur_bottom_layer,
 			.blur_data = &scene->blur_data,
 			.ignore_transparent = tex != NULL,
 			.blur_strength = blur->strength,
 		};
+
+		// add blur will fast return if opaque region == render region
+		// so dont overdo the check here
 		fx_render_pass_add_blur(data->render_pass, &blur_options);
+		pixman_region32_fini(&opaque_region);
 	}
 
 	pixman_region32_fini(&opaque);

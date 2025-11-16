@@ -1650,6 +1650,7 @@ static void scene_node_get_size(struct wlr_scene_node *node,
 		assert(scene_buffer_crossfade->dst_width > 0 && scene_buffer_crossfade->dst_height > 0);
 		*width = scene_buffer_crossfade->dst_width;
 		*height = scene_buffer_crossfade->dst_height;
+		break;
 	case WLR_SCENE_NODE_BLUR:;
 		struct wlr_scene_blur *blur = wlr_scene_blur_from_node(node);
 		*width = blur->width;

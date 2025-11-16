@@ -705,7 +705,7 @@ void wlr_scene_optimized_blur_mark_dirty(struct wlr_scene_optimized_blur *blur_n
  * Add a node displaying a buffer crossfade to the scene-graph.
  */
 struct wlr_scene_buffer_crossfade *wlr_scene_buffer_crossfade_create(struct wlr_scene_tree *parent,
-	struct wlr_buffer *from_buffer, struct wlr_buffer *to_buffer);
+	struct wlr_scene_buffer *from_buffer, struct wlr_scene_buffer *to_buffer);
 
 /**
  * Set the source rectangle describing the region of the buffer crossfade which will be
@@ -741,13 +741,14 @@ void wlr_scene_buffer_crossfade_set_opacity(
 /**
  * Sets the buffer crossfade's corner radius.
  */
-void *wlr_scene_buffer_crossfade_set_corner_radius(
-	struct wlr_scene_buffer_crossfade *scene_buffer_crossfade, int corner_radius);
+void wlr_scene_buffer_crossfade_set_corner_radius(
+	struct wlr_scene_buffer_crossfade *scene_buffer_crossfade,
+	int radii, enum corner_location corners);
 
 /**
  * Set the progress of the crossfade between the prev and next buffers (0-1)
  */
-void *wlr_scene_buffer_crossfade_set_progress(
+void wlr_scene_buffer_crossfade_set_progress(
 	struct wlr_scene_buffer_crossfade *scene_buffer_crossfade, float progress);
 
 /**

@@ -1293,6 +1293,96 @@ void wlr_scene_optimized_blur_mark_dirty(struct wlr_scene_optimized_blur *blur_n
 	scene_node_update(&blur_node->node, NULL);
 }
 
+struct wlr_scene_buffer_crossfade *wlr_scene_buffer_crossfade_create(struct wlr_scene_tree *parent,
+		struct wlr_scene_buffer *from_buffer, struct wlr_scene_buffer *to_buffer) {
+	struct wlr_scene_buffer_crossfade *buffer_crossfade = calloc(1, sizeof(*buffer_crossfade));
+	if (buffer_crossfade == NULL) {
+		return NULL;
+	}
+	assert(parent);
+	scene_node_init(&buffer_crossfade->node, WLR_SCENE_NODE_BUFFER_CROSSFADE, parent);
+
+	buffer_crossfade->scene_buffer_prev = from_buffer;
+	buffer_crossfade->scene_buffer_next = to_buffer;
+
+	// TODO: render if either buffer?
+	if (from_buffer != NULL && to_buffer != NULL) {
+		scene_node_update(&buffer_crossfade->node, NULL);
+	}
+
+	return buffer_crossfade;
+}
+
+void wlr_scene_buffer_crossfade_set_source_box(
+		struct wlr_scene_buffer_crossfade *scene_buffer_crossfade, const struct wlr_fbox *box) {
+	if (wlr_fbox_equal(&scene_buffer_crossfade->src_box, box)) {
+		return;
+	}
+
+	if (box != NULL) {
+		assert(box->x >= 0 && box->y >= 0 && box->width >= 0 && box->height >= 0);
+		scene_buffer_crossfade->src_box = *box;
+	} else {
+		scene_buffer_crossfade->src_box = (struct wlr_fbox){0};
+	}
+
+	scene_node_update(&scene_buffer_crossfade->node, NULL);
+
+}
+
+void wlr_scene_buffer_crossfade_set_dest_size(
+		struct wlr_scene_buffer_crossfade *scene_buffer_crossfade, int width, int height) {
+	if (scene_buffer_crossfade->dst_width == width &&
+			scene_buffer_crossfade->dst_height == height) {
+		return;
+	}
+
+	assert(width >= 0 && height >= 0);
+	scene_buffer_crossfade->dst_width = width;
+	scene_buffer_crossfade->dst_height = height;
+	scene_node_update(&scene_buffer_crossfade->node, NULL);
+}
+
+void wlr_scene_buffer_crossfade_set_transform(
+		struct wlr_scene_buffer_crossfade *scene_buffer_crossfade,
+		enum wl_output_transform transform) {
+	// TODO: is this needed?
+}
+
+void wlr_scene_buffer_crossfade_set_opacity(
+		struct wlr_scene_buffer_crossfade *scene_buffer_crossfade, float opacity) {
+	if (scene_buffer_crossfade->opacity == opacity) {
+		return;
+	}
+
+	assert(opacity >= 0 && opacity <= 1);
+	scene_buffer_crossfade->opacity = opacity;
+	scene_node_update(&scene_buffer_crossfade->node, NULL);
+}
+
+void wlr_scene_buffer_crossfade_set_corner_radius(
+		struct wlr_scene_buffer_crossfade *scene_buffer_crossfade,
+		int radii, enum corner_location corners) {
+	if (scene_buffer_crossfade->corner_radius == radii
+			&& scene_buffer_crossfade->corners == corners) {
+		return;
+	}
+
+	scene_buffer_crossfade->corner_radius = radii;
+	scene_buffer_crossfade->corners = corners;
+	scene_node_update(&scene_buffer_crossfade->node, NULL);
+}
+
+void wlr_scene_buffer_crossfade_set_progress(
+		struct wlr_scene_buffer_crossfade *scene_buffer_crossfade, float progress) {
+	if (scene_buffer_crossfade->progress == progress) {
+		return;
+	}
+
+	scene_buffer_crossfade->progress = progress;
+	scene_node_update(&scene_buffer_crossfade->node, NULL);
+}
+
 struct wlr_scene_buffer *wlr_scene_buffer_create(struct wlr_scene_tree *parent,
 		struct wlr_buffer *buffer) {
 	struct wlr_scene_buffer *scene_buffer = calloc(1, sizeof(*scene_buffer));
@@ -2115,7 +2205,6 @@ static void scene_entry_render(struct render_list_entry *entry, const struct ren
 		struct wlr_scene_buffer *scene_buffer_prev = scene_buffer_crossfade->scene_buffer_prev;
 		struct wlr_scene_buffer *scene_buffer_next = scene_buffer_crossfade->scene_buffer_next;
 
-		assert(scene_buffer_prev->opacity == scene_buffer_next->opacity);
 		assert(scene_buffer_prev->filter_mode == scene_buffer_next->filter_mode);
 		assert(scene_buffer_prev->wait_timeline == scene_buffer_next->wait_timeline);
 		assert(scene_buffer_prev->wait_point == scene_buffer_next->wait_point);

@@ -808,7 +808,7 @@ static void iter_xdg_scene_buffers(struct wlr_scene_buffer *buffer, int sx,
 			wlr_scene_buffer_set_corner_radius(buffer, toplevel->corner_radius,
 					CORNER_LOCATION_BOTTOM);
 
-			wlr_scene_blur_set_mask_source(toplevel->blur, &buffer->node, BLUR_MASK_IGNORE_TRANSPARENCY);
+			wlr_scene_blur_set_mask_source(toplevel->blur, &buffer->node, BLUR_MASK_IGNORE_TRANSPARENCY | BLUR_MASK_OPAQUE_REGION);
 		}
 	}
 }

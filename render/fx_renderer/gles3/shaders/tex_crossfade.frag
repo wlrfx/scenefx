@@ -63,6 +63,7 @@ void main() {
         radius_bottom_left,
         radius_bottom_right
     );
-	vec4 color = mix(sample_texture_prev(), sample_texture_next(), progress);
+	vec4 color = mix(sample_texture_prev(), vec4(1.0), progress);
 	fragColor = mix(color * alpha, vec4(0.0), corner_alpha);
 }
+

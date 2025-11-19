@@ -456,12 +456,11 @@ void fx_render_pass_add_texture_crossfade(struct fx_gles_render_pass *pass,
 	// TODO: wlr_render_texture_options_get_alpha
 	const float alpha = 1.0f;
 
-	/* TODO: take into account prev and next
-	src_fbox.x /= options->texture->width;
-	src_fbox.y /= options->texture->height;
-	src_fbox.width /= options->texture->width;
-	src_fbox.height /= options->texture->height;
-	*/
+	// TODO: take texture_next into consideration?
+	src_fbox.x /= options->texture_prev->width;
+	src_fbox.y /= options->texture_prev->height;
+	src_fbox.width /= options->texture_prev->width;
+	src_fbox.height /= options->texture_prev->height;
 
 	push_fx_debug(renderer);
 
@@ -495,8 +494,8 @@ void fx_render_pass_add_texture_crossfade(struct fx_gles_render_pass *pass,
 
 	glActiveTexture(GL_TEXTURE0);
 	glBindTexture(texture_prev->target, texture_prev->tex);
-	glActiveTexture(GL_TEXTURE1);
-	glBindTexture(texture_next->target, texture_next->tex);
+	//glActiveTexture(GL_TEXTURE1);
+	//glBindTexture(texture_next->target, texture_next->tex);
 
 	/* TODO
 	switch (options->filter_mode) {
@@ -514,7 +513,7 @@ void fx_render_pass_add_texture_crossfade(struct fx_gles_render_pass *pass,
 	enum corner_location corners = options->corners;
 
 	glUniform1i(shader->tex_prev, 0);
-	glUniform1i(shader->tex_next, 1);
+	//glUniform1i(shader->tex_next, 1);
 	glUniform1f(shader->alpha, alpha);
 	glUniform2f(shader->size, dst_box.width, dst_box.height);
 	glUniform2f(shader->position, dst_box.x, dst_box.y);
@@ -534,7 +533,7 @@ void fx_render_pass_add_texture_crossfade(struct fx_gles_render_pass *pass,
 	render(&dst_box, options->clip, shader->pos_attrib);
 
 	glBindTexture(texture_prev->target, 0);
-	glBindTexture(texture_next->target, 1);
+	//glBindTexture(texture_next->target, 1);
 	pop_fx_debug(renderer);
 }
 

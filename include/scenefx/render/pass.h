@@ -75,6 +75,7 @@ struct fx_render_rounded_rect_options {
 	struct wlr_render_rect_options base;
 	int corner_radius;
 	enum corner_location corners;
+	struct wlr_render_color outer_color;
 	struct clipped_region clipped_region;
 };
 

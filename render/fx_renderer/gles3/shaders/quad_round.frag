@@ -1,9 +1,17 @@
 #version 300 es
 
+#define HAS_OUTER_COLOR %d
+
+
+
 precision highp float;
 
 in vec4 v_color;
 in vec2 v_texcoord;
+
+#if HAS_OUTER_COLOR
+uniform vec4 outer_color;
+#endif
 
 uniform vec2 size;
 uniform vec2 position;
@@ -33,6 +41,10 @@ void main() {
         radius_bottom_right
     );
 
+    #if !HAS_OUTER_COLOR
+    vec4 outer_color = vec4(0.0);
+    #endif
+
     // Clipping
     float clip_corner_alpha = corner_alpha(
         clip_size - 1.0,
@@ -43,5 +55,5 @@ void main() {
         clip_radius_bottom_right
     );
 
-    fragColor = mix(v_color, vec4(0.0), quad_corner_alpha) * clip_corner_alpha;
+    fragColor = mix(v_color, outer_color, quad_corner_alpha) * clip_corner_alpha;
 }

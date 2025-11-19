@@ -183,13 +183,18 @@ bool link_quad_grad_program(struct quad_grad_shader *shader, GLint client_versio
 	return true;
 }
 
-bool link_quad_round_program(struct quad_round_shader *shader, GLint client_version) {
-	GLchar quad_src[4096];
+bool link_quad_round_program(struct quad_round_shader *shader, GLint client_version, bool has_outer_color) {
+	GLchar quad_src_part[4096];
+	GLchar quad_src[4096 + 2048];
 	if (client_version > 2) {
-		snprintf(quad_src, sizeof(quad_src), "%s\n%s", quad_round_frag_gles3_src,
+		snprintf(quad_src_part, sizeof(quad_src_part),
+			quad_round_frag_gles3_src, has_outer_color);
+		snprintf(quad_src, sizeof(quad_src), "%s\n%s", quad_src_part,
 			corner_alpha_frag_gles3_src);
 	} else {
-		snprintf(quad_src, sizeof(quad_src), "%s\n%s", quad_round_frag_gles2_src,
+		snprintf(quad_src_part, sizeof(quad_src_part),
+			quad_round_frag_gles2_src, has_outer_color);
+		snprintf(quad_src, sizeof(quad_src), "%s\n%s", quad_src_part,
 			corner_alpha_frag_gles2_src);
 	}
 
@@ -201,6 +206,11 @@ bool link_quad_round_program(struct quad_round_shader *shader, GLint client_vers
 
 	shader->proj = glGetUniformLocation(prog, "proj");
 	shader->color = glGetUniformLocation(prog, "color");
+
+	if (has_outer_color) {
+		shader->outer_color = glGetUniformLocation(prog, "outer_color");
+	}
+
 	shader->pos_attrib = glGetAttribLocation(prog, "pos");
 	shader->size = glGetUniformLocation(prog, "size");
 	shader->position = glGetUniformLocation(prog, "position");

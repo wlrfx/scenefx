@@ -565,7 +565,9 @@ void fx_render_pass_add_rounded_rect(struct fx_gles_render_pass *pass,
 	push_fx_debug(renderer);
 	setup_blending(WLR_RENDER_BLEND_MODE_PREMULTIPLIED);
 
-	struct quad_round_shader shader = renderer->shaders.quad_round;
+	bool has_outer_color = fx_options->outer_color.a > 0.0;
+
+	struct quad_round_shader shader = has_outer_color ? renderer->shaders.quad_round_outer_color : renderer->shaders.quad_round;
 
 	glUseProgram(shader.program);
 
@@ -594,6 +596,10 @@ void fx_render_pass_add_rounded_rect(struct fx_gles_render_pass *pass,
 			fx_options->corner_radius : 0);
 	glUniform1f(shader.radius_bottom_right, (CORNER_LOCATION_BOTTOM_RIGHT & corners) == CORNER_LOCATION_BOTTOM_RIGHT ?
 			fx_options->corner_radius : 0);
+
+	if (has_outer_color) {
+		glUniform4f(shader.outer_color, fx_options->outer_color.r, fx_options->outer_color.g, fx_options->outer_color.b, fx_options->outer_color.a);
+	}
 
 	render(&box, &clip_region, renderer->shaders.quad_round.pos_attrib);
 	pixman_region32_fini(&clip_region);

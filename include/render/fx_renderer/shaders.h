@@ -58,6 +58,7 @@ struct quad_round_shader {
 	GLuint program;
 	GLint proj;
 	GLint color;
+	GLint outer_color;
 	GLint pos_attrib;
 	GLint size;
 	GLint position;
@@ -75,7 +76,7 @@ struct quad_round_shader {
 	GLint clip_radius_bottom_right;
 };
 
-bool link_quad_round_program(struct quad_round_shader *shader, GLint client_version);
+bool link_quad_round_program(struct quad_round_shader *shader, GLint client_version, bool has_outer_color);
 
 struct quad_grad_round_shader {
 	GLuint program;

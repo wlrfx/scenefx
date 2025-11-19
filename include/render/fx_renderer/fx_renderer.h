@@ -178,6 +178,7 @@ struct fx_renderer {
 		struct quad_shader quad;
 		struct quad_grad_shader quad_grad;
 		struct quad_round_shader quad_round;
+		struct quad_round_shader quad_round_outer_color;
 		struct quad_grad_round_shader quad_grad_round;
 		struct tex_shader tex_rgba;
 		struct tex_shader tex_rgbx;

@@ -2085,17 +2085,25 @@ static void scene_entry_render(struct render_list_entry *entry, const struct ren
 
 		struct wlr_texture *tex = NULL;
 		struct wlr_scene_buffer *mask = wlr_scene_blur_get_transparency_mask_source(blur);
+
+		enum wl_output_transform mask_transform = WL_OUTPUT_TRANSFORM_NORMAL;
+
+		struct wlr_fbox mask_src_box = {0};
+
 		if (mask != NULL) {
 			tex = scene_buffer_get_texture(mask, data->output->output->renderer);
+			mask_transform = wlr_output_transform_invert(mask->transform);
+			mask_transform = wlr_output_transform_compose(mask_transform, data->transform);
+			mask_src_box = mask->src_box;
 		}
 
 		struct fx_render_blur_pass_options blur_options = {
 			.tex_options = {
 				.base = (struct wlr_render_texture_options) {
 					.texture = tex,
-					.src_box = (struct wlr_fbox){0},
+					.src_box = mask_src_box,
 					.dst_box = dst_box,
-					.transform = WL_OUTPUT_TRANSFORM_NORMAL,
+					.transform = mask_transform,
 					.clip = &render_region,
 					.alpha = &blur->alpha,
 					.filter_mode = WLR_SCALE_FILTER_BILINEAR,

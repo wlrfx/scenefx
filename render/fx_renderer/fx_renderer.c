@@ -413,6 +413,7 @@ struct wlr_renderer *fx_renderer_create_egl(struct wlr_egl *egl) {
 	wl_list_init(&renderer->buffers);
 	wl_list_init(&renderer->textures);
 	wl_list_init(&renderer->effect_fbos);
+	wl_list_init(&renderer->blur_shader_data);
 
 	renderer->egl = egl;
 	renderer->exts_str = exts_str;

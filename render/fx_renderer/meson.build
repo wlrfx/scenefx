@@ -14,6 +14,7 @@ scenefx_files += files(
 	'fx_effect_framebuffers.c',
 	'fx_texture.c',
 	'fx_renderer.c',
+	'fx_blur.c',
 )
 
 if 'gles2' in renderers or 'auto' in renderers

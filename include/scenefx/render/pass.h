@@ -107,8 +107,22 @@ struct fx_render_blur_pass_options {
 	int corner_radius;
 	enum corner_location corners;
 	struct clipped_region clipped_region;
+	char* blur_id;
 };
 
+struct fx_blur_impl {
+	char *name;
+	bool (*init)(int client_version, void ** data);
+	int (*get_expansion)(struct fx_gles_render_pass *, struct fx_render_blur_pass_options *, void *);
+	bool (*prepare)(pixman_region32_t *damage, struct fx_gles_render_pass *, struct fx_render_blur_pass_options *, void *);
+	void (*execute)(pixman_region32_t *damage, struct wlr_box *box, struct fx_gles_render_pass *, struct fx_render_blur_pass_options *, void *);
+	void (*destroy)(void *);
+};
+
+void fx_set_tex_matrix(GLint loc, enum wl_output_transform trans,
+		const struct wlr_fbox *box);
+void fx_set_proj_matrix(GLint loc, float proj[9], const struct wlr_box *box);
+void fx_render(const struct wlr_box *box, const pixman_region32_t *clip, GLint attrib);
 /**
  * Render a fx texture.
  */

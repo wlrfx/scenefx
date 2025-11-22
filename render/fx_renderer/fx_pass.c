@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <assert.h>
+#include <blur_effects_frag_gles2_src.h>
 #include <pixman.h>
 #include <time.h>
 #include <unistd.h>
@@ -15,6 +16,7 @@
 #include "render/fx_renderer/fx_renderer.h"
 #include "render/fx_renderer/shaders.h"
 #include "render/pass.h"
+#include "scenefx/render/fx_renderer/fx_blur.h"
 #include "scenefx/render/fx_renderer/fx_renderer.h"
 #include "scenefx/render/fx_renderer/fx_effect_framebuffers.h"
 #include "scenefx/types/fx/corner_location.h"
@@ -188,7 +190,7 @@ static void stencil_mask_fini(void) {
 	glDisable(GL_STENCIL_TEST);
 }
 
-static void render(const struct wlr_box *box, const pixman_region32_t *clip, GLint attrib) {
+void fx_render(const struct wlr_box *box, const pixman_region32_t *clip, GLint attrib) {
 	pixman_region32_t region;
 	pixman_region32_init_rect(&region, box->x, box->y, box->width, box->height);
 
@@ -237,7 +239,7 @@ static void render(const struct wlr_box *box, const pixman_region32_t *clip, GLi
 	pixman_region32_fini(&region);
 }
 
-static void set_proj_matrix(GLint loc, float proj[9], const struct wlr_box *box) {
+void fx_set_proj_matrix(GLint loc, float proj[9], const struct wlr_box *box) {
 	float gl_matrix[9];
 	wlr_matrix_identity(gl_matrix);
 	wlr_matrix_translate(gl_matrix, box->x, box->y);
@@ -246,7 +248,7 @@ static void set_proj_matrix(GLint loc, float proj[9], const struct wlr_box *box)
 	glUniformMatrix3fv(loc, 1, GL_FALSE, gl_matrix);
 }
 
-static void set_tex_matrix(GLint loc, enum wl_output_transform trans,
+void fx_set_tex_matrix(GLint loc, enum wl_output_transform trans,
 		const struct wlr_fbox *box) {
 	float tex_matrix[9];
 	wlr_matrix_identity(tex_matrix);
@@ -414,10 +416,10 @@ void fx_render_pass_add_texture(struct fx_gles_render_pass *pass,
 	glUniform1f(shader->clip_radius_bottom_right, (CORNER_LOCATION_BOTTOM_RIGHT & clipped_region_corners) == CORNER_LOCATION_BOTTOM_RIGHT ?
 			clipped_region_corner_radius : 0);
 
-	set_proj_matrix(shader->proj, pass->projection_matrix, &dst_box);
-	set_tex_matrix(shader->tex_proj, options->transform, &src_fbox);
+	fx_set_proj_matrix(shader->proj, pass->projection_matrix, &dst_box);
+	fx_set_tex_matrix(shader->tex_proj, options->transform, &src_fbox);
 
-	render(&dst_box, &clip_region, shader->pos_attrib);
+	fx_render(&dst_box, &clip_region, shader->pos_attrib);
 	pixman_region32_fini(&clip_region);
 
 	glBindTexture(texture->target, 0);
@@ -466,7 +468,7 @@ void fx_render_pass_add_rect(struct fx_gles_render_pass *pass,
 
 	struct quad_shader shader = renderer->shaders.quad;
 	glUseProgram(shader.program);
-	set_proj_matrix(shader.proj, pass->projection_matrix, &box);
+	fx_set_proj_matrix(shader.proj, pass->projection_matrix, &box);
 	glUniform4f(shader.color, color->r, color->g, color->b, color->a);
 	glUniform2f(shader.clip_size, clipped_region_box.width, clipped_region_box.height);
 	glUniform2f(shader.clip_position, clipped_region_box.x, clipped_region_box.y);
@@ -479,7 +481,7 @@ void fx_render_pass_add_rect(struct fx_gles_render_pass *pass,
 	glUniform1f(shader.clip_radius_bottom_right, (CORNER_LOCATION_BOTTOM_RIGHT & clipped_region_corners) == CORNER_LOCATION_BOTTOM_RIGHT ?
 			clipped_region_corner_radius : 0);
 
-	render(&box, &clip_region, renderer->shaders.quad.pos_attrib);
+	fx_render(&box, &clip_region, renderer->shaders.quad.pos_attrib);
 	pixman_region32_fini(&clip_region);
 
 	pop_fx_debug(renderer);
@@ -511,7 +513,7 @@ void fx_render_pass_add_rect_grad(struct fx_gles_render_pass *pass,
 
 	glUseProgram(renderer->shaders.quad_grad.program);
 
-	set_proj_matrix(renderer->shaders.quad_grad.proj, pass->projection_matrix, &box);
+	fx_set_proj_matrix(renderer->shaders.quad_grad.proj, pass->projection_matrix, &box);
 	glUniform4fv(renderer->shaders.quad_grad.colors, fx_options->gradient.count, (GLfloat*)fx_options->gradient.colors);
 	glUniform1i(renderer->shaders.quad_grad.count, fx_options->gradient.count);
 	glUniform2f(renderer->shaders.quad_grad.size, fx_options->gradient.range.width, fx_options->gradient.range.height);
@@ -521,7 +523,7 @@ void fx_render_pass_add_rect_grad(struct fx_gles_render_pass *pass,
 	glUniform2f(renderer->shaders.quad_grad.grad_box, fx_options->gradient.range.x, fx_options->gradient.range.y);
 	glUniform2f(renderer->shaders.quad_grad.origin, fx_options->gradient.origin[0], fx_options->gradient.origin[1]);
 
-	render(&box, options->clip, renderer->shaders.quad_grad.pos_attrib);
+	fx_render(&box, options->clip, renderer->shaders.quad_grad.pos_attrib);
 
 	pop_fx_debug(renderer);
 }
@@ -569,7 +571,7 @@ void fx_render_pass_add_rounded_rect(struct fx_gles_render_pass *pass,
 
 	glUseProgram(shader.program);
 
-	set_proj_matrix(shader.proj, pass->projection_matrix, &box);
+	fx_set_proj_matrix(shader.proj, pass->projection_matrix, &box);
 	glUniform4f(shader.color, color->r, color->g, color->b, color->a);
 
 	glUniform2f(shader.size, box.width, box.height);
@@ -595,7 +597,7 @@ void fx_render_pass_add_rounded_rect(struct fx_gles_render_pass *pass,
 	glUniform1f(shader.radius_bottom_right, (CORNER_LOCATION_BOTTOM_RIGHT & corners) == CORNER_LOCATION_BOTTOM_RIGHT ?
 			fx_options->corner_radius : 0);
 
-	render(&box, &clip_region, renderer->shaders.quad_round.pos_attrib);
+	fx_render(&box, &clip_region, renderer->shaders.quad_round.pos_attrib);
 	pixman_region32_fini(&clip_region);
 
 	pop_fx_debug(renderer);
@@ -628,7 +630,7 @@ void fx_render_pass_add_rounded_rect_grad(struct fx_gles_render_pass *pass,
 	struct quad_grad_round_shader shader = renderer->shaders.quad_grad_round;
 	glUseProgram(shader.program);
 
-	set_proj_matrix(shader.proj, pass->projection_matrix, &box);
+	fx_set_proj_matrix(shader.proj, pass->projection_matrix, &box);
 
 	glUniform2f(shader.size, box.width, box.height);
 	glUniform2f(shader.position, box.x, box.y);
@@ -652,7 +654,7 @@ void fx_render_pass_add_rounded_rect_grad(struct fx_gles_render_pass *pass,
 	glUniform1f(shader.radius_bottom_right, (CORNER_LOCATION_BOTTOM_RIGHT & corners) == CORNER_LOCATION_BOTTOM_RIGHT ?
 			fx_options->corner_radius : 0);
 
-	render(&box, options->clip, shader.pos_attrib);
+	fx_render(&box, options->clip, shader.pos_attrib);
 
 	pop_fx_debug(renderer);
 }
@@ -697,7 +699,7 @@ void fx_render_pass_add_box_shadow(struct fx_gles_render_pass *pass,
 	glUseProgram(renderer->shaders.box_shadow.program);
 
 	const struct wlr_render_color *color = &options->color;
-	set_proj_matrix(renderer->shaders.box_shadow.proj, pass->projection_matrix, &box);
+	fx_set_proj_matrix(renderer->shaders.box_shadow.proj, pass->projection_matrix, &box);
 	glUniform4f(renderer->shaders.box_shadow.color, color->r, color->g, color->b, color->a);
 	glUniform1f(renderer->shaders.box_shadow.blur_sigma, options->blur_sigma);
 	glUniform2f(renderer->shaders.box_shadow.size, box.width, box.height);
@@ -720,7 +722,7 @@ void fx_render_pass_add_box_shadow(struct fx_gles_render_pass *pass,
 	glUniform2f(renderer->shaders.box_shadow.clip_position, clipped_region_box.x, clipped_region_box.y);
 	glUniform2f(renderer->shaders.box_shadow.clip_size, clipped_region_box.width, clipped_region_box.height);
 
-	render(&box, &clip_region, renderer->shaders.box_shadow.pos_attrib);
+	fx_render(&box, &clip_region, renderer->shaders.box_shadow.pos_attrib);
 	pixman_region32_fini(&clip_region);
 
 	glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
@@ -792,10 +794,10 @@ static void render_blur_segments(struct fx_gles_render_pass *pass,
 				0.5f / (options->texture->height * 2.0f));
 	}
 
-	set_proj_matrix(shader->proj, pass->projection_matrix, &dst_box);
-	set_tex_matrix(shader->tex_proj, options->transform, &src_fbox);
+	fx_set_proj_matrix(shader->proj, pass->projection_matrix, &dst_box);
+	fx_set_tex_matrix(shader->tex_proj, options->transform, &src_fbox);
 
-	render(&dst_box, options->clip, shader->pos_attrib);
+	fx_render(&dst_box, options->clip, shader->pos_attrib);
 
 	glBindTexture(texture->target, 0);
 	pop_fx_debug(renderer);
@@ -855,10 +857,10 @@ static void render_blur_effects(struct fx_gles_render_pass *pass,
 	glUniform1f(shader.contrast, blur_data->contrast);
 	glUniform1f(shader.saturation, blur_data->saturation);
 
-	set_proj_matrix(shader.proj, pass->projection_matrix, &dst_box);
-	set_tex_matrix(shader.tex_proj, options->transform, &src_fbox);
+	fx_set_proj_matrix(shader.proj, pass->projection_matrix, &dst_box);
+	fx_set_tex_matrix(shader.tex_proj, options->transform, &src_fbox);
 
-	render(&dst_box, options->clip, shader.pos_attrib);
+	fx_render(&dst_box, options->clip, shader.pos_attrib);
 
 	glBindTexture(texture->target, 0);
 	pop_fx_debug(renderer);
@@ -866,18 +868,81 @@ static void render_blur_effects(struct fx_gles_render_pass *pass,
 	wlr_texture_destroy(options->texture);
 }
 
+static int dual_kawase_expansion(struct fx_gles_render_pass *pass, struct fx_render_blur_pass_options *fx_options, void *data) {
+	return blur_data_calc_size(fx_options->blur_data);
+}
+
+static bool dual_kawase_prepare(pixman_region32_t *damage, struct fx_gles_render_pass *pass, struct fx_render_blur_pass_options *fx_options, void *data) {
+	struct fx_renderer *renderer = pass->buffer->renderer;
+	struct blur_data *blur_data = fx_options->blur_data;
+	if (fx_options->blur_strength <= 0 || blur_data->num_passes <= 0 || blur_data->radius <= 0) {
+		return false;
+	}
+
+	// damage region will be scaled, make a temp
+	pixman_region32_t scaled_damage;
+	pixman_region32_init(&scaled_damage);
+
+	fx_options->tex_options.base.clip = &scaled_damage;
+	// Downscale
+	for (int i = 0; i < blur_data->num_passes; ++i) {
+		wlr_region_scale(&scaled_damage, damage, 1.0f / (1 << (i + 1)));
+		render_blur_segments(pass, fx_options, &renderer->shaders.blur1);
+	}
+
+	// Upscale
+	for (int i = blur_data->num_passes - 1; i >= 0; --i) {
+		// when upsampling we make the region twice as big
+		wlr_region_scale(&scaled_damage, damage, 1.0f / (1 << i));
+		render_blur_segments(pass, fx_options, &renderer->shaders.blur2);
+	}
+
+	pixman_region32_fini(&scaled_damage);
+	return true;
+}
+
+static void dual_kawase_execute(pixman_region32_t *damage, struct wlr_box *box, struct fx_gles_render_pass *pass, struct fx_render_blur_pass_options *fx_options, void *data) {
+	fx_options->tex_options.base.clip = damage;
+	render_blur_effects(pass, fx_options);
+}
+
+static const struct fx_blur_impl dual_kawase_impl = {
+	.name = "dual_kawase",
+	.init = NULL,
+	.get_expansion = dual_kawase_expansion,
+	.prepare = dual_kawase_prepare,
+	.execute = dual_kawase_execute,
+};
+
 // Blurs the main_buffer content and returns the blurred framebuffer.
 // Returns NULL when the blur parameters reach 0.
 static struct fx_framebuffer *get_main_buffer_blur(struct fx_gles_render_pass *pass,
 		struct fx_render_blur_pass_options *fx_options) {
 	struct fx_renderer *renderer = pass->buffer->renderer;
 	struct wlr_box monitor_box = get_monitor_box(pass->output);
+	struct wlr_box original_box = fx_options->tex_options.base.dst_box;
+
+	const struct fx_blur_impl *blur = &dual_kawase_impl;
+	void *blur_user_data = NULL;
+
+	if (fx_options->blur_id != NULL) {
+		struct fx_blur_plugin_info *found = fx_renderer_get_plugin(&renderer->wlr_renderer, fx_options->blur_id);
+		if (found == NULL) {
+			wlr_log(WLR_ERROR, "invalid custom blur given");
+			return NULL;
+		}
+
+		if (!(found->state & BLUR_READY)) {
+			wlr_log(WLR_ERROR, "custom blur %s hasn't been readied for renderer", found->id);
+			return NULL;
+		}
+
+		blur_user_data = found->user_data;
+		blur = found->blur_impl;
+	}
 
 	// We don't want to affect the reference blur_data
 	struct blur_data blur_data = blur_data_apply_strength(fx_options->blur_data, fx_options->blur_strength);
-	if (fx_options->blur_strength <= 0 || blur_data.num_passes <= 0 || blur_data.radius <= 0) {
-		return NULL;
-	}
 	fx_options->blur_data = &blur_data;
 
 	pixman_region32_t damage;
@@ -886,11 +951,9 @@ static struct fx_framebuffer *get_main_buffer_blur(struct fx_gles_render_pass *p
 	wlr_region_transform(&damage, &damage, fx_options->tex_options.base.transform,
 			monitor_box.width, monitor_box.height);
 
-	wlr_region_expand(&damage, &damage, blur_data_calc_size(&blur_data));
-
-	// damage region will be scaled, make a temp
-	pixman_region32_t scaled_damage;
-	pixman_region32_init(&scaled_damage);
+	if (blur->get_expansion != NULL) {
+		wlr_region_expand(&damage, &damage, blur->get_expansion(pass, fx_options, blur_user_data));
+	}
 
 	fx_options->tex_options.base.src_box = (struct wlr_fbox) {
 		monitor_box.x,
@@ -899,25 +962,12 @@ static struct fx_framebuffer *get_main_buffer_blur(struct fx_gles_render_pass *p
 		monitor_box.height,
 	};
 	fx_options->tex_options.base.dst_box = monitor_box;
-	// Clip the blur to the damage
-	fx_options->tex_options.base.clip = &scaled_damage;
 	// Artifacts with NEAREST filter
 	fx_options->tex_options.base.filter_mode = WLR_SCALE_FILTER_BILINEAR;
 
-	// Downscale
-	for (int i = 0; i < blur_data.num_passes; ++i) {
-		wlr_region_scale(&scaled_damage, &damage, 1.0f / (1 << (i + 1)));
-		render_blur_segments(pass, fx_options, &renderer->shaders.blur1);
+	if (blur->prepare != NULL && !blur->prepare(&damage, pass, fx_options, &blur_user_data)) {
+		return NULL;
 	}
-
-	// Upscale
-	for (int i = blur_data.num_passes - 1; i >= 0; --i) {
-		// when upsampling we make the region twice as big
-		wlr_region_scale(&scaled_damage, &damage, 1.0f / (1 << i));
-		render_blur_segments(pass, fx_options, &renderer->shaders.blur2);
-	}
-
-	pixman_region32_fini(&scaled_damage);
 
 	// Render additional blur effects like saturation, noise, contrast, etc...
 	if (blur_data_should_parameters_blur_effects(&blur_data)
@@ -927,10 +977,11 @@ static struct fx_framebuffer *get_main_buffer_blur(struct fx_gles_render_pass *p
 		} else {
 			fx_framebuffer_bind(pass->fx_effect_framebuffers->effects_buffer);
 		}
-		fx_options->tex_options.base.clip = &damage;
 		fx_options->tex_options.base.texture = fx_texture_from_buffer(
 				&renderer->wlr_renderer, fx_options->current_buffer->buffer);
-		render_blur_effects(pass, fx_options);
+
+		blur->execute(&damage, &original_box, pass, fx_options, blur_user_data);
+
 		if (fx_options->current_buffer != pass->fx_effect_framebuffers->effects_buffer) {
 			fx_options->current_buffer = pass->fx_effect_framebuffers->effects_buffer;
 		} else {
@@ -995,6 +1046,7 @@ void fx_render_pass_add_blur(struct fx_gles_render_pass *pass,
 		} else {
 			blur_options.current_buffer = pass->buffer;
 		}
+		blur_options.blur_id = blur_options.blur_data->id;
 		buffer = get_main_buffer_blur(pass, &blur_options);
 		if (!buffer) {
 			goto damage_finish;
@@ -1058,6 +1110,7 @@ bool fx_render_pass_add_optimized_blur(struct fx_gles_render_pass *pass,
 	struct fx_render_blur_pass_options blur_options = *fx_options;
 	blur_options.current_buffer = pass->buffer;
 	blur_options.tex_options.base.clip = &clip;
+	blur_options.blur_id = blur_options.blur_data->id;
 	struct fx_framebuffer *buffer = get_main_buffer_blur(pass, &blur_options);
 
 	// Update the optimized blur buffer if invalid

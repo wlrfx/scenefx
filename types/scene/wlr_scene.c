@@ -2847,6 +2847,7 @@ bool wlr_scene_output_build_state(struct wlr_scene_output *scene_output,
 
 	if (debug_damage == WLR_SCENE_DEBUG_DAMAGE_RERENDER) {
 		scene_output_damage_whole(scene_output);
+		mark_all_optimized_blur_nodes_dirty(&scene_output->scene->tree.node);
 	}
 
 	struct timespec now;

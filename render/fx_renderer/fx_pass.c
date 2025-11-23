@@ -2,7 +2,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <assert.h>
-#include <blur_effects_frag_gles2_src.h>
 #include <pixman.h>
 #include <time.h>
 #include <unistd.h>
@@ -929,12 +928,12 @@ static struct fx_framebuffer *get_main_buffer_blur(struct fx_gles_render_pass *p
 		struct fx_blur_plugin_info *found = fx_renderer_get_plugin(&renderer->wlr_renderer, fx_options->blur_id);
 		if (found == NULL) {
 			wlr_log(WLR_ERROR, "invalid custom blur given");
-			return NULL;
+			return fx_options->current_buffer;
 		}
 
 		if (!(found->state & BLUR_READY)) {
 			wlr_log(WLR_ERROR, "custom blur %s hasn't been readied for renderer", found->id);
-			return NULL;
+			return fx_options->current_buffer;
 		}
 
 		blur_user_data = found->user_data;
@@ -965,8 +964,8 @@ static struct fx_framebuffer *get_main_buffer_blur(struct fx_gles_render_pass *p
 	// Artifacts with NEAREST filter
 	fx_options->tex_options.base.filter_mode = WLR_SCALE_FILTER_BILINEAR;
 
-	if (blur->prepare != NULL && !blur->prepare(&damage, pass, fx_options, &blur_user_data)) {
-		return NULL;
+	if (blur->prepare != NULL && !blur->prepare(&damage, pass, fx_options, blur_user_data)) {
+		return fx_options->current_buffer;
 	}
 
 	// Render additional blur effects like saturation, noise, contrast, etc...
@@ -1027,7 +1026,15 @@ void fx_render_pass_add_blur(struct fx_gles_render_pass *pass,
 
 	const bool has_strength = fx_options->blur_strength < 1.0;
 	struct fx_framebuffer *buffer = pass->fx_effect_framebuffers->optimized_blur_buffer;
-	if (!buffer || !fx_options->use_optimized_blur || has_strength) {
+	bool use_optimized_blur = buffer && fx_options->use_optimized_blur && !has_strength;
+	if (use_optimized_blur && fx_options->blur_data->id != NULL) {
+		struct fx_blur_plugin_info *info = fx_renderer_get_plugin(&renderer->wlr_renderer, fx_options->blur_data->id);
+		if (info->blur_impl->supports_optimized_blur && !info->blur_impl->supports_optimized_blur(info->user_data)) {
+			use_optimized_blur = false;
+		}
+	}
+
+	if (!use_optimized_blur) {
 		if (!buffer) {
 			wlr_log(WLR_ERROR, "Warning: Failed to use optimized blur");
 		}
@@ -1036,7 +1043,9 @@ void fx_render_pass_add_blur(struct fx_gles_render_pass *pass,
 
 		// Render the blur into its own buffer
 		struct fx_render_blur_pass_options blur_options = *fx_options;
+		blur_options.blur_id = blur_options.blur_data->id;
 		blur_options.tex_options.base.clip = &translucent_region;
+
 		if (fx_options->use_optimized_blur && has_strength
 				// If the optimized blur hasn't been rendered yet
 				&& pass->fx_effect_framebuffers->optimized_no_blur_buffer) {
@@ -1046,7 +1055,6 @@ void fx_render_pass_add_blur(struct fx_gles_render_pass *pass,
 		} else {
 			blur_options.current_buffer = pass->buffer;
 		}
-		blur_options.blur_id = blur_options.blur_data->id;
 		buffer = get_main_buffer_blur(pass, &blur_options);
 		if (!buffer) {
 			goto damage_finish;

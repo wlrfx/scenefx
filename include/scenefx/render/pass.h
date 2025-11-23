@@ -112,7 +112,8 @@ struct fx_render_blur_pass_options {
 
 struct fx_blur_impl {
 	char *name;
-	bool (*init)(int client_version, void ** data);
+	bool (*init)(int client_version, char *id, void ** data);
+	bool (*supports_optimized_blur)(void *);
 	int (*get_expansion)(struct fx_gles_render_pass *, struct fx_render_blur_pass_options *, void *);
 	bool (*prepare)(pixman_region32_t *damage, struct fx_gles_render_pass *, struct fx_render_blur_pass_options *, void *);
 	void (*execute)(pixman_region32_t *damage, struct wlr_box *box, struct fx_gles_render_pass *, struct fx_render_blur_pass_options *, void *);

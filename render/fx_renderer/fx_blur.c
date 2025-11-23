@@ -98,7 +98,7 @@ bool fx_blur_plugin_link(struct wlr_renderer *renderer, struct fx_blur_plugin_in
 	eglQueryContext(fx_renderer->egl->display, fx_renderer->egl->context,
 		EGL_CONTEXT_CLIENT_VERSION, &client_version);
 
-	bool res = info->blur_impl->init(client_version, &info->user_data);
+	bool res = info->blur_impl->init(client_version, info->id, &info->user_data);
 	if (!res) {
 		return false;
 	}

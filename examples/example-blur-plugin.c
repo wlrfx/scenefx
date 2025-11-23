@@ -39,7 +39,7 @@ static  char* invert_gles3_src =
 	"	fragColor = texture(tex, inverted_coord);\n"
 	"}\n";
 
-static bool invert_init(int client_version, void** user_data)
+static bool invert_init(int client_version, char *id, void** user_data)
 {
 	struct invert_data* v = malloc(sizeof(struct invert_data));
 	if (!v)
@@ -67,6 +67,8 @@ static void invert_execute(pixman_region32_t* damage, struct wlr_box* box,
                            struct fx_render_blur_pass_options* fx_options,
                            void* data)
 {
+	fx_options->tex_options.base.clip = damage;
+
 	struct fx_render_texture_options* tex_options = &fx_options->tex_options;
 	struct wlr_render_texture_options* options = &tex_options->base;
 	struct fx_texture* texture = fx_get_texture(options->texture);

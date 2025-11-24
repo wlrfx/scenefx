@@ -36,6 +36,8 @@ uniform float radius_top_right;
 uniform float radius_bottom_left;
 uniform float radius_bottom_right;
 
+out vec4 fragColor;
+
 vec4 sample_texture_prev() {
 #if SOURCE == SOURCE_TEXTURE_RGBA || SOURCE == SOURCE_TEXTURE_EXTERNAL
 	return texture2D(tex_prev, v_texcoord);
@@ -63,7 +65,7 @@ void main() {
         radius_bottom_left,
         radius_bottom_right
     );
-	vec4 color = mix(sample_texture_prev(), vec4(1.0), progress);
+	vec4 color = mix(sample_texture_prev(), sample_texture_next(), progress);
 	fragColor = mix(color * alpha, vec4(0.0), corner_alpha);
 }
 

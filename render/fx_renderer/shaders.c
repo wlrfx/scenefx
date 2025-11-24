@@ -16,6 +16,7 @@
 #include "quad_round_frag_gles3_src.h"
 #include "quad_grad_round_frag_gles3_src.h"
 #include "tex_frag_gles3_src.h"
+#include "tex_crossfade_frag_gles3_src.h"
 #include "box_shadow_frag_gles3_src.h"
 #include "blur1_frag_gles3_src.h"
 #include "blur2_frag_gles3_src.h"
@@ -29,6 +30,7 @@
 #include "quad_round_frag_gles2_src.h"
 #include "quad_grad_round_frag_gles2_src.h"
 #include "tex_frag_gles2_src.h"
+#include "tex_crossfade_frag_gles2_src.h"
 #include "box_shadow_frag_gles2_src.h"
 #include "blur1_frag_gles2_src.h"
 #include "blur2_frag_gles2_src.h"
@@ -398,12 +400,12 @@ bool link_tex_crossfade_program(struct tex_crossfade_shader *shader, GLint clien
 	GLchar frag_src[4096];
 	if (client_version > 2) {
 		snprintf(frag_src_part, sizeof(frag_src_part),
-			tex_frag_gles3_src, source);
+			tex_crossfade_frag_gles3_src, source);
 		snprintf(frag_src, sizeof(frag_src),
 			"%s\n%s\n", frag_src_part, corner_alpha_frag_gles3_src);
 	} else {
 		snprintf(frag_src_part, sizeof(frag_src_part),
-			tex_frag_gles2_src, source);
+			tex_crossfade_frag_gles2_src, source);
 		snprintf(frag_src, sizeof(frag_src),
 			"%s\n%s\n", frag_src_part, corner_alpha_frag_gles2_src);
 	}

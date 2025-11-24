@@ -490,30 +490,38 @@ void fx_render_pass_add_texture_crossfade(struct fx_gles_render_pass *pass,
 		|| options->corner_radius > 0;
 	setup_blending(!has_alpha ? WLR_RENDER_BLEND_MODE_NONE : options->blend_mode);
 
+
+	pixman_region32_t clip_region;
+	if (options->clip) {
+		pixman_region32_init(&clip_region);
+		pixman_region32_copy(&clip_region, options->clip);
+	} else {
+		pixman_region32_init_rect(&clip_region, dst_box.x, dst_box.y, dst_box.width, dst_box.height);
+	}
+
 	glUseProgram(shader->program);
 
 	glActiveTexture(GL_TEXTURE0);
 	glBindTexture(texture_prev->target, texture_prev->tex);
-	//glActiveTexture(GL_TEXTURE1);
-	//glBindTexture(texture_next->target, texture_next->tex);
+	glActiveTexture(GL_TEXTURE1);
+	glBindTexture(texture_next->target, texture_next->tex);
 
-	/* TODO
+	// TODO: tex_next
 	switch (options->filter_mode) {
 	case WLR_SCALE_FILTER_BILINEAR:
-		glTexParameteri(texture->target, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-		glTexParameteri(texture->target, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+		glTexParameteri(texture_prev->target, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+		glTexParameteri(texture_prev->target, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 		break;
 	case WLR_SCALE_FILTER_NEAREST:
-		glTexParameteri(texture->target, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-		glTexParameteri(texture->target, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+		glTexParameteri(texture_prev->target, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+		glTexParameteri(texture_prev->target, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 		break;
 	}
-	*/
 
 	enum corner_location corners = options->corners;
 
 	glUniform1i(shader->tex_prev, 0);
-	//glUniform1i(shader->tex_next, 1);
+	glUniform1i(shader->tex_next, 1);
 	glUniform1f(shader->alpha, alpha);
 	glUniform2f(shader->size, dst_box.width, dst_box.height);
 	glUniform2f(shader->position, dst_box.x, dst_box.y);
@@ -530,10 +538,11 @@ void fx_render_pass_add_texture_crossfade(struct fx_gles_render_pass *pass,
 	set_proj_matrix(shader->proj, pass->projection_matrix, &dst_box);
 	set_tex_matrix(shader->tex_proj, options->transform, &src_fbox);
 
-	render(&dst_box, options->clip, shader->pos_attrib);
+	render(&dst_box, &clip_region, shader->pos_attrib);
+	pixman_region32_fini(&clip_region);
 
 	glBindTexture(texture_prev->target, 0);
-	//glBindTexture(texture_next->target, 1);
+	glBindTexture(texture_next->target, 1);
 	pop_fx_debug(renderer);
 }
 

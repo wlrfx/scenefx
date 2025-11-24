@@ -30,7 +30,6 @@
 
 #include "scenefx/types/fx/blur_data.h"
 #include "scenefx/types/fx/clipped_region.h"
-#include "scenefx/types/fx/corner_location.h"
 #include "scenefx/types/linked_node.h"
 
 struct wlr_output;
@@ -149,8 +148,7 @@ struct wlr_scene_rect {
 	struct wlr_scene_node node;
 	int width, height;
 	float color[4];
-	int corner_radius;
-	enum corner_location corners;
+	struct fx_corner_radii corners;
 
 	bool accepts_input;
 	struct clipped_region clipped_region;
@@ -170,9 +168,8 @@ struct wlr_scene_shadow {
 struct wlr_scene_blur {
 	struct wlr_scene_node node;
 	int width, height;
-	int corner_radius;
 
-	enum corner_location corners;
+	struct fx_corner_radii corners;
 	struct clipped_region clipped_region;
 
 	float strength;
@@ -227,8 +224,7 @@ struct wlr_scene_buffer {
 	 */
 	struct wlr_scene_output *primary_output;
 
-	int corner_radius;
-	enum corner_location corners;
+	struct fx_corner_radii corners;
 
 	float opacity;
 	enum wlr_scale_filter_mode filter_mode;
@@ -516,10 +512,14 @@ struct wlr_scene_rect *wlr_scene_rect_create(struct wlr_scene_tree *parent,
 void wlr_scene_rect_set_size(struct wlr_scene_rect *rect, int width, int height);
 
 /**
- * Change the corner radius of an existing rectangle node.
+ * Change the corner radius of all corners of an existing rectangle node.
  */
-void wlr_scene_rect_set_corner_radius(struct wlr_scene_rect *rect, int corner_radius,
-		enum corner_location corners);
+void wlr_scene_rect_set_corner_radius(struct wlr_scene_rect *rect, int corner_radius);
+
+/**
+ * Change the rounded corners of an existing rectangle node.
+ */
+void wlr_scene_rect_set_corner_radii(struct wlr_scene_rect *rect, struct fx_corner_radii);
 
 /**
  * Sets the region where to clip the rect.
@@ -589,10 +589,14 @@ struct wlr_scene_blur *wlr_scene_blur_create(struct wlr_scene_tree *parent,
 void wlr_scene_blur_set_size(struct wlr_scene_blur *blur, int width, int height);
 
 /**
- * Change the corner radius of an existing blur node.
+ * Change the corner radius of all corners of an existing blur node.
  */
-void wlr_scene_blur_set_corner_radius(struct wlr_scene_blur *blur, int corner_radius,
-		enum corner_location corners);
+void wlr_scene_blur_set_corner_radius(struct wlr_scene_blur *blur, int corner_radius);
+
+/**
+ * Change the corners of an existing blur node.
+ */
+void wlr_scene_blur_set_corner_radii(struct wlr_scene_blur *blur, struct fx_corner_radii);
 
 /**
  * Make the blur node only blur the bottom layer of the scene
@@ -768,11 +772,16 @@ void wlr_scene_buffer_set_filter_mode(struct wlr_scene_buffer *scene_buffer,
 	enum wlr_scale_filter_mode filter_mode);
 
 /**
-* Sets the corner radius and which corners to round of this buffer
+* Sets the corner radius of all corners to round of this buffer
 */
 void wlr_scene_buffer_set_corner_radius(struct wlr_scene_buffer *scene_buffer,
-		int radii, enum corner_location corners);
+		int radii);
 
+/**
+* Sets the corner radii of this buffer
+*/
+void wlr_scene_buffer_set_corner_radii(struct wlr_scene_buffer *scene_buffer,
+	struct fx_corner_radii corner_radii);
 /**
  * Calls the buffer's frame_done signal.
  */

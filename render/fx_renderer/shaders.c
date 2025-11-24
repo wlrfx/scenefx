@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <wlr/util/log.h>
+#include <scenefx/types/fx/clipped_region.h>
 
 #include "render/fx_renderer/shaders.h"
 
@@ -115,6 +116,29 @@ void load_gl_proc(void *proc_ptr, const char *name) {
 	*(void **)proc_ptr = proc;
 }
 
+
+void uniform_corner_radii_set_location(
+	struct shader_corner_radii *corners,
+	GLuint program,
+	const char *top_left,
+	const char *top_right,
+	const char *bottom_left,
+	const char *bottom_right) {
+	corners->top_left = glGetUniformLocation(program, top_left);
+	corners->top_right = glGetUniformLocation(program, top_right);
+	corners->bottom_left = glGetUniformLocation(program, bottom_left);
+	corners->bottom_right = glGetUniformLocation(program, bottom_right);
+}
+
+void uniform_corner_radii_set(
+	struct shader_corner_radii *uniform,
+	struct fx_corner_fradii *corners
+) {
+	glUniform1f(uniform->top_left, corners->top_left);
+	glUniform1f(uniform->top_right, corners->top_right);
+	glUniform1f(uniform->bottom_left, corners->bottom_left);
+	glUniform1f(uniform->bottom_right, corners->bottom_right);
+}
 // Shaders
 
 bool link_quad_program(struct quad_shader *shader, GLint client_version) {
@@ -138,10 +162,14 @@ bool link_quad_program(struct quad_shader *shader, GLint client_version) {
 	shader->pos_attrib = glGetAttribLocation(prog, "pos");
 	shader->clip_size = glGetUniformLocation(prog, "clip_size");
 	shader->clip_position = glGetUniformLocation(prog, "clip_position");
-	shader->clip_radius_top_left = glGetUniformLocation(prog, "clip_radius_top_left");
-	shader->clip_radius_top_right = glGetUniformLocation(prog, "clip_radius_top_right");
-	shader->clip_radius_bottom_left = glGetUniformLocation(prog, "clip_radius_bottom_left");
-	shader->clip_radius_bottom_right = glGetUniformLocation(prog, "clip_radius_bottom_right");
+	uniform_corner_radii_set_location(
+		&shader->clip_radius,
+		prog,
+		"clip_radius_top_left",
+		"clip_radius_top_right",
+		"clip_radius_bottom_left",
+		"clip_radius_bottom_right"
+	);
 
 	return true;
 }
@@ -204,17 +232,25 @@ bool link_quad_round_program(struct quad_round_shader *shader, GLint client_vers
 	shader->pos_attrib = glGetAttribLocation(prog, "pos");
 	shader->size = glGetUniformLocation(prog, "size");
 	shader->position = glGetUniformLocation(prog, "position");
-	shader->radius_top_left = glGetUniformLocation(prog, "radius_top_left");
-	shader->radius_top_right = glGetUniformLocation(prog, "radius_top_right");
-	shader->radius_bottom_left = glGetUniformLocation(prog, "radius_bottom_left");
-	shader->radius_bottom_right = glGetUniformLocation(prog, "radius_bottom_right");
+	uniform_corner_radii_set_location(
+		&shader->radius,
+		prog,
+		"radius_top_left",
+		"radius_top_right",
+		"radius_bottom_left",
+		"radius_bottom_right"
+	);
 
 	shader->clip_size = glGetUniformLocation(prog, "clip_size");
 	shader->clip_position = glGetUniformLocation(prog, "clip_position");
-	shader->clip_radius_top_left = glGetUniformLocation(prog, "clip_radius_top_left");
-	shader->clip_radius_top_right = glGetUniformLocation(prog, "clip_radius_top_right");
-	shader->clip_radius_bottom_left = glGetUniformLocation(prog, "clip_radius_bottom_left");
-	shader->clip_radius_bottom_right = glGetUniformLocation(prog, "clip_radius_bottom_right");
+	uniform_corner_radii_set_location(
+		&shader->clip_radius,
+		prog,
+		"clip_radius_top_left",
+		"clip_radius_top_right",
+		"clip_radius_bottom_left",
+		"clip_radius_bottom_right"
+	);
 
 	return true;
 }
@@ -245,10 +281,14 @@ bool link_quad_grad_round_program(struct quad_grad_round_shader *shader, GLint c
 	shader->pos_attrib = glGetAttribLocation(prog, "pos");
 	shader->size = glGetUniformLocation(prog, "size");
 	shader->position = glGetUniformLocation(prog, "position");
-	shader->radius_top_left = glGetUniformLocation(prog, "radius_top_left");
-	shader->radius_top_right = glGetUniformLocation(prog, "radius_top_right");
-	shader->radius_bottom_left = glGetUniformLocation(prog, "radius_bottom_left");
-	shader->radius_bottom_right = glGetUniformLocation(prog, "radius_bottom_right");
+	uniform_corner_radii_set_location(
+		&shader->radius,
+		prog,
+		"radius_top_left",
+		"radius_top_right",
+		"radius_bottom_left",
+		"radius_bottom_right"
+	);
 
 	shader->grad_size = glGetUniformLocation(prog, "grad_size");
 	shader->colors = glGetUniformLocation(prog, "colors");
@@ -292,18 +332,27 @@ bool link_tex_program(struct tex_shader *shader, GLint client_version, enum fx_t
 	shader->tex_proj = glGetUniformLocation(prog, "tex_proj");
 	shader->size = glGetUniformLocation(prog, "size");
 	shader->position = glGetUniformLocation(prog, "position");
-	shader->radius_top_left = glGetUniformLocation(prog, "radius_top_left");
-	shader->radius_top_right = glGetUniformLocation(prog, "radius_top_right");
-	shader->radius_bottom_left = glGetUniformLocation(prog, "radius_bottom_left");
-	shader->radius_bottom_right = glGetUniformLocation(prog, "radius_bottom_right");
+	uniform_corner_radii_set_location(
+		&shader->radius,
+		prog,
+		"radius_top_left",
+		"radius_top_right",
+		"radius_bottom_left",
+		"radius_bottom_right"
+	);
+
 	shader->discard_transparent = glGetUniformLocation(prog, "discard_transparent");
 
 	shader->clip_size = glGetUniformLocation(prog, "clip_size");
 	shader->clip_position = glGetUniformLocation(prog, "clip_position");
-	shader->clip_radius_top_left = glGetUniformLocation(prog, "clip_radius_top_left");
-	shader->clip_radius_top_right = glGetUniformLocation(prog, "clip_radius_top_right");
-	shader->clip_radius_bottom_left = glGetUniformLocation(prog, "clip_radius_bottom_left");
-	shader->clip_radius_bottom_right = glGetUniformLocation(prog, "clip_radius_bottom_right");
+	uniform_corner_radii_set_location(
+		&shader->clip_radius,
+		prog,
+		"clip_radius_top_left",
+		"clip_radius_top_right",
+		"clip_radius_bottom_left",
+		"clip_radius_bottom_right"
+	);
 
 	return true;
 }
@@ -332,10 +381,14 @@ bool link_box_shadow_program(struct box_shadow_shader *shader, GLint client_vers
 	shader->corner_radius = glGetUniformLocation(prog, "corner_radius");
 	shader->clip_position = glGetUniformLocation(prog, "clip_position");
 	shader->clip_size = glGetUniformLocation(prog, "clip_size");
-	shader->clip_radius_top_left = glGetUniformLocation(prog, "clip_radius_top_left");
-	shader->clip_radius_top_right = glGetUniformLocation(prog, "clip_radius_top_right");
-	shader->clip_radius_bottom_left = glGetUniformLocation(prog, "clip_radius_bottom_left");
-	shader->clip_radius_bottom_right = glGetUniformLocation(prog, "clip_radius_bottom_right");
+	uniform_corner_radii_set_location(
+		&shader->clip_radius,
+		prog,
+		"clip_radius_top_left",
+		"clip_radius_top_right",
+		"clip_radius_bottom_left",
+		"clip_radius_bottom_right"
+	);
 
 	return true;
 }

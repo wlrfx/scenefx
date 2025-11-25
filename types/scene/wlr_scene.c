@@ -1928,7 +1928,8 @@ static bool scene_node_at_iterator(struct wlr_scene_node *node,
 			return false;
 		}
 	} else if (node->type == WLR_SCENE_NODE_SHADOW
-			|| node->type == WLR_SCENE_NODE_OPTIMIZED_BLUR) {
+			|| node->type == WLR_SCENE_NODE_OPTIMIZED_BLUR
+			|| node->type == WLR_SCENE_NODE_BLUR) {
 		// Disable interaction
 		return false;
 	}

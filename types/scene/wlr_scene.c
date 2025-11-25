@@ -358,7 +358,7 @@ static void scene_node_opaque_region(struct wlr_scene_node *node, int x, int y,
 		break;
 	case WLR_SCENE_NODE_BUFFER_CROSSFADE:
 		// TODO
-		break;
+		return;
 	case WLR_SCENE_NODE_OPTIMIZED_BLUR:
 	case WLR_SCENE_NODE_BLUR:
 		// Always transparent
@@ -1304,6 +1304,10 @@ struct wlr_scene_buffer_crossfade *wlr_scene_buffer_crossfade_create(struct wlr_
 
 	buffer_crossfade->scene_buffer_prev = from_buffer;
 	buffer_crossfade->scene_buffer_next = to_buffer;
+	buffer_crossfade->opacity = 1.0f;
+	buffer_crossfade->corner_radius = 0;
+	buffer_crossfade->corners = CORNER_LOCATION_NONE;
+	buffer_crossfade->progress = 0;
 
 	// TODO: render if either buffer?
 	if (from_buffer != NULL && to_buffer != NULL) {
@@ -1737,7 +1741,7 @@ static void scene_node_get_size(struct wlr_scene_node *node,
 		break;
 	case WLR_SCENE_NODE_BUFFER_CROSSFADE:;
 		struct wlr_scene_buffer_crossfade *scene_buffer_crossfade = wlr_scene_buffer_crossfade_from_node(node);
-		assert(scene_buffer_crossfade->dst_width > 0 && scene_buffer_crossfade->dst_height > 0);
+		assert(scene_buffer_crossfade->dst_width >= 0 && scene_buffer_crossfade->dst_height >= 0);
 		*width = scene_buffer_crossfade->dst_width;
 		*height = scene_buffer_crossfade->dst_height;
 		break;
@@ -2128,7 +2132,6 @@ static void scene_entry_render(struct render_list_entry *entry, const struct ren
 
 	case WLR_SCENE_NODE_BUFFER:;
 		struct wlr_scene_buffer *scene_buffer = wlr_scene_buffer_from_node(node);
-		enum corner_location buffer_corners = scene_buffer->corners;
 
 		if (scene_buffer->is_single_pixel_buffer) {
 			// TODO: Render blur/rounded corners/etc here:
@@ -2158,6 +2161,7 @@ static void scene_entry_render(struct render_list_entry *entry, const struct ren
 		enum wl_output_transform transform =
 			wlr_output_transform_invert(scene_buffer->transform);
 		transform = wlr_output_transform_compose(transform, data->transform);
+		enum corner_location buffer_corners = scene_buffer->corners;
 		corner_location_transform(transform, &buffer_corners);
 
 		struct fx_render_texture_options tex_options = {
@@ -2200,15 +2204,12 @@ static void scene_entry_render(struct render_list_entry *entry, const struct ren
 	case WLR_SCENE_NODE_BUFFER_CROSSFADE:;
 		struct wlr_scene_buffer_crossfade *scene_buffer_crossfade = wlr_scene_buffer_crossfade_from_node(node);
 
-		enum corner_location corner_location = scene_buffer_crossfade->corners;
-		corner_location_transform(node_transform, &corner_location);
-
 		struct wlr_scene_buffer *scene_buffer_prev = scene_buffer_crossfade->scene_buffer_prev;
 		struct wlr_scene_buffer *scene_buffer_next = scene_buffer_crossfade->scene_buffer_next;
-
-		assert(scene_buffer_prev->filter_mode == scene_buffer_next->filter_mode);
-		assert(scene_buffer_prev->wait_timeline == scene_buffer_next->wait_timeline);
-		assert(scene_buffer_prev->wait_point == scene_buffer_next->wait_point);
+		if (scene_buffer_prev == NULL || scene_buffer_next == NULL) {
+			scene_output_damage(data->output, &render_region);
+			break;
+		}
 
 		struct wlr_texture *texture_prev = scene_buffer_get_texture(scene_buffer_prev,
 			data->output->output->renderer);
@@ -2218,6 +2219,13 @@ static void scene_entry_render(struct render_list_entry *entry, const struct ren
 			scene_output_damage(data->output, &render_region);
 			break;
 		}
+
+		// TODO: is this needed?
+		assert(scene_buffer_prev->wait_timeline == scene_buffer_next->wait_timeline);
+		assert(scene_buffer_prev->wait_point == scene_buffer_next->wait_point);
+
+		enum corner_location corner_location = scene_buffer_crossfade->corners;
+		corner_location_transform(node_transform, &corner_location);
 
 		struct fx_render_texture_crossfade_options tex_crossfade_options = {
 			.texture_prev = texture_prev,
@@ -2575,8 +2583,9 @@ static bool scene_node_invisible(struct wlr_scene_node *node) {
 		struct wlr_scene_buffer *buffer = wlr_scene_buffer_from_node(node);
 		return buffer->buffer == NULL && buffer->texture == NULL;
 	} else if (node->type == WLR_SCENE_NODE_BUFFER_CROSSFADE) {
-		//struct wlr_scene_buffer_crossfade *buffer_crossfade = wlr_scene_buffer_crossfade_from_node(node);
-		return  false; // TODO
+		struct wlr_scene_buffer_crossfade *buffer_crossfade = wlr_scene_buffer_crossfade_from_node(node);
+		return (buffer_crossfade->scene_buffer_prev->buffer == NULL && buffer_crossfade->scene_buffer_prev->texture == NULL) ||
+				(buffer_crossfade->scene_buffer_next->buffer == NULL && buffer_crossfade->scene_buffer_next->texture == NULL);
 	}
 
 	return false;

@@ -454,7 +454,7 @@ void fx_render_pass_add_texture_crossfade(struct fx_gles_render_pass *pass,
 	struct wlr_box dst_box = options->dst_box;
 	struct wlr_fbox src_fbox = options->src_box;
 	// TODO: wlr_render_texture_options_get_alpha
-	const float alpha = 1.0f;
+	float alpha = options->alpha != NULL ? *options->alpha : 1;
 
 	// TODO: take texture_next into consideration?
 	src_fbox.x /= options->texture_prev->width;
@@ -506,15 +506,18 @@ void fx_render_pass_add_texture_crossfade(struct fx_gles_render_pass *pass,
 	glActiveTexture(GL_TEXTURE1);
 	glBindTexture(texture_next->target, texture_next->tex);
 
-	// TODO: tex_next
 	switch (options->filter_mode) {
 	case WLR_SCALE_FILTER_BILINEAR:
 		glTexParameteri(texture_prev->target, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
 		glTexParameteri(texture_prev->target, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+		glTexParameteri(texture_next->target, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+		glTexParameteri(texture_next->target, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 		break;
 	case WLR_SCALE_FILTER_NEAREST:
 		glTexParameteri(texture_prev->target, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
 		glTexParameteri(texture_prev->target, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+		glTexParameteri(texture_next->target, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+		glTexParameteri(texture_next->target, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 		break;
 	}
 

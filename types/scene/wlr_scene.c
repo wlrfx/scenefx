@@ -2070,6 +2070,9 @@ static void scene_entry_render(struct render_list_entry *entry, const struct ren
 			tex = scene_buffer_get_texture(mask, data->output->output->renderer);
 		}
 
+		struct fx_corner_radii blur_corners = blur->corners;
+		fx_corner_radii_transform(node_transform, &blur_corners);
+
 		struct fx_render_blur_pass_options blur_options = {
 			.tex_options = {
 				.base = (struct wlr_render_texture_options) {
@@ -2083,7 +2086,7 @@ static void scene_entry_render(struct render_list_entry *entry, const struct ren
 					.blend_mode = WLR_RENDER_BLEND_MODE_PREMULTIPLIED,
 				},
 				.clip_box = &dst_box,
-				.corners = fx_corner_radii_scale(blur->corners, data->scale),
+				.corners = fx_corner_radii_scale(blur_corners, data->scale),
 				.discard_transparent = false,
 			},
 			.opaque_region = NULL,

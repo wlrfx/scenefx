@@ -172,7 +172,7 @@ struct wlr_scene_shadow {
 struct wlr_scene_buffer_crossfade {
 	struct wlr_scene_node node;
 
-	// TODO: buffer instead of scene_buffer
+	// TODO: buffer instead of scene_buffer?
 	struct wlr_scene_buffer *scene_buffer_prev; // can be NULL
 	struct wlr_scene_buffer *scene_buffer_next; // can be NULL
 	float progress;
@@ -183,7 +183,6 @@ struct wlr_scene_buffer_crossfade {
 
 	struct wlr_fbox src_box;
 	int dst_width, dst_height;
-	enum wl_output_transform transform;
 };
 
 struct wlr_scene_blur {
@@ -725,12 +724,6 @@ void wlr_scene_buffer_crossfade_set_source_box(
  */
 void wlr_scene_buffer_crossfade_set_dest_size(
 	struct wlr_scene_buffer_crossfade *scene_buffer_crossfade, int width, int height);
-
-/**
- * Set a transform which will be applied to the buffer crossfade.
- */
-void wlr_scene_buffer_crossfade_set_transform(
-	struct wlr_scene_buffer_crossfade *scene_buffer_crossfade,enum wl_output_transform transform);
 
 /**
 * Sets the opacity of this buffer crossfade.

@@ -357,8 +357,29 @@ static void scene_node_opaque_region(struct wlr_scene_node *node, int x, int y,
 		}
 		break;
 	case WLR_SCENE_NODE_BUFFER_CROSSFADE:
-		// TODO
-		return;
+		struct wlr_scene_buffer_crossfade *scene_buffer_crossfade =
+			wlr_scene_buffer_crossfade_from_node(node);
+
+		if (!scene_buffer_crossfade->scene_buffer_prev ||
+				!scene_buffer_crossfade->scene_buffer_next) {
+			return;
+		}
+
+		if (scene_buffer_crossfade->opacity != 1) {
+			return;
+		}
+
+		if (scene_buffer_crossfade->corner_radius > 0) {
+			// TODO: this is incorrect
+			return;
+		}
+
+		if (!scene_buffer_crossfade->scene_buffer_prev->buffer_is_opaque ||
+				!scene_buffer_crossfade->scene_buffer_next->buffer_is_opaque) {
+			// TODO
+			return;
+		}
+		break;
 	case WLR_SCENE_NODE_OPTIMIZED_BLUR:
 	case WLR_SCENE_NODE_BLUR:
 		// Always transparent
@@ -1347,12 +1368,6 @@ void wlr_scene_buffer_crossfade_set_dest_size(
 	scene_node_update(&scene_buffer_crossfade->node, NULL);
 }
 
-void wlr_scene_buffer_crossfade_set_transform(
-		struct wlr_scene_buffer_crossfade *scene_buffer_crossfade,
-		enum wl_output_transform transform) {
-	// TODO: is this needed?
-}
-
 void wlr_scene_buffer_crossfade_set_opacity(
 		struct wlr_scene_buffer_crossfade *scene_buffer_crossfade, float opacity) {
 	if (scene_buffer_crossfade->opacity == opacity) {
@@ -2134,7 +2149,7 @@ static void scene_entry_render(struct render_list_entry *entry, const struct ren
 		struct wlr_scene_buffer *scene_buffer = wlr_scene_buffer_from_node(node);
 
 		if (scene_buffer->is_single_pixel_buffer) {
-			// TODO: Render blur/rounded corners/etc here:
+			// TODO: Render rounded corners/etc here:
 
 			// Render the buffer as a rect, this is likely to be more efficient
 			wlr_render_pass_add_rect(&data->render_pass->base, &(struct wlr_render_rect_options){
@@ -2219,10 +2234,6 @@ static void scene_entry_render(struct render_list_entry *entry, const struct ren
 			scene_output_damage(data->output, &render_region);
 			break;
 		}
-
-		// TODO: is this needed?
-		assert(scene_buffer_prev->wait_timeline == scene_buffer_next->wait_timeline);
-		assert(scene_buffer_prev->wait_point == scene_buffer_next->wait_point);
 
 		enum corner_location corner_location = scene_buffer_crossfade->corners;
 		corner_location_transform(node_transform, &corner_location);

@@ -2132,22 +2132,72 @@ static void scene_entry_render(struct render_list_entry *entry, const struct ren
 		break;
 	case WLR_SCENE_NODE_BLUR:;
 		struct wlr_scene_blur *blur = wlr_scene_blur_from_node(node);
-
 		struct wlr_texture *tex = NULL;
-		if (blur->mask_type & BLUR_MASK_IGNORE_TRANSPARENCY) {
-			struct wlr_scene_node *mask = wlr_scene_blur_get_mask_source(blur);
+		struct wlr_scene_node *mask = wlr_scene_blur_get_mask_source(blur);
 
-			if (mask != NULL && mask->type == WLR_SCENE_NODE_BUFFER) {
-				struct wlr_scene_buffer *buffer = wlr_scene_buffer_from_node(mask);
-				tex = scene_buffer_get_texture(buffer, data->output->output->renderer);
-			}
+		if (blur->mask_type & BLUR_MASK_IGNORE_TRANSPARENCY && mask != NULL && mask->type == WLR_SCENE_NODE_BUFFER) {
+			struct wlr_scene_buffer *buffer = wlr_scene_buffer_from_node(mask);
+			tex = scene_buffer_get_texture(buffer, data->output->output->renderer);
 		}
 
 		pixman_region32_t opaque_region;
 		pixman_region32_init(&opaque_region);
-		// opaque_region will return the mask if used
-		scene_node_opaque_region(node, x, y, &opaque_region);
+
+		if (blur->mask_type & BLUR_MASK_OPAQUE_REGION && mask != NULL && mask->type == WLR_SCENE_NODE_BUFFER) {
+			int mask_width, mask_height, mask_x, mask_y;
+			struct wlr_scene_buffer *buffer = wlr_scene_buffer_from_node(mask);
+			if (buffer->opacity == 1) {
+				scene_node_get_size(mask, &mask_width, &mask_height);
+				wlr_scene_node_coords(mask, &mask_x, &mask_y);
+				pixman_region32_t opaque_mask_region;
+				pixman_region32_init(&opaque_mask_region);
+
+				if (buffer->buffer_is_opaque) {
+					pixman_region32_union_rect(&opaque_mask_region, &opaque_mask_region,
+						0,
+						0,
+						mask_width,
+						mask_height
+					);
+				} else {
+					pixman_region32_union(&opaque_mask_region, &opaque_mask_region, &buffer->opaque_region);
+				}
+
+				// make sure that the blur is still rendered _behind_ the corners
+				if (mask_x != x || mask_y != y || mask_width != dst_box.width || mask_height != dst_box.height || buffer->corner_radius > blur->corner_radius || (buffer->corners & blur->corners) != blur->corners) {
+					int buffer_corner = buffer->corner_radius;
+					pixman_region32_t corners;
+					pixman_region32_init(&corners);
+					if (buffer->corners & CORNER_LOCATION_TOP_LEFT) pixman_region32_union_rect(&corners, &corners, 0, 0, buffer_corner, buffer_corner);
+					if (buffer->corners & CORNER_LOCATION_TOP_RIGHT) pixman_region32_union_rect(&corners, &corners, mask_width - buffer_corner, 0, buffer_corner, buffer_corner);
+					if (buffer->corners & CORNER_LOCATION_BOTTOM_LEFT) pixman_region32_union_rect(&corners, &corners, 0, mask_height - buffer_corner, buffer_corner, buffer_corner);
+					if (buffer->corners & CORNER_LOCATION_BOTTOM_RIGHT) pixman_region32_union_rect(&corners, &corners, mask_width - buffer_corner, mask_height - buffer_corner, buffer_corner, buffer_corner);
+					pixman_region32_subtract(&opaque_mask_region, &opaque_mask_region, &corners);
+					pixman_region32_fini(&corners);
+				}
+
+				pixman_region32_translate(&opaque_mask_region, mask_x, mask_y);
+				pixman_region32_union(&opaque_region, &opaque_region, &opaque_mask_region);
+				pixman_region32_fini(&opaque_mask_region);
+			}
+		}
+
 		logical_to_buffer_coords(&opaque_region, data, false);
+
+		pixman_region32_t blur_render_area;
+		pixman_region32_init(&blur_render_area);
+		pixman_region32_subtract(&blur_render_area, &render_region, &opaque_region);
+		// the render region has been expanded since it samples from the expanded area
+		// but the region being actually rendered is different, so restrict it to that
+		pixman_region32_intersect_rect(&blur_render_area, &blur_render_area, x, y, dst_box.width, dst_box.height);
+
+		if (pixman_region32_empty(&blur_render_area)) {
+			pixman_region32_fini(&opaque_region);
+			pixman_region32_fini(&blur_render_area);
+			break;
+		}
+
+		pixman_region32_fini(&blur_render_area);
 
 		struct fx_render_blur_pass_options blur_options = {
 			.tex_options = {

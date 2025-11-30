@@ -2184,12 +2184,16 @@ static void scene_entry_render(struct render_list_entry *entry, const struct ren
 
 		logical_to_buffer_coords(&opaque_region, data, false);
 
-		pixman_region32_t blur_render_area;
+		pixman_region32_t blur_render_area, blur_node;
 		pixman_region32_init(&blur_render_area);
 		pixman_region32_subtract(&blur_render_area, &render_region, &opaque_region);
+
 		// the render region has been expanded since it samples from the expanded area
 		// but the region being actually rendered is different, so restrict it to that
-		pixman_region32_intersect_rect(&blur_render_area, &blur_render_area, x, y, dst_box.width, dst_box.height);
+		pixman_region32_init_rect(&blur_node, x, y, dst_box.width, dst_box.height);
+		logical_to_buffer_coords(&blur_node, data, false);
+		pixman_region32_intersect(&blur_render_area, &blur_render_area, &blur_node);
+		pixman_region32_fini(&blur_node);
 
 		if (pixman_region32_empty(&blur_render_area)) {
 			pixman_region32_fini(&opaque_region);

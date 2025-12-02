@@ -336,7 +336,6 @@ static void scene_node_opaque_region(struct wlr_scene_node *node, int x, int y,
 		}
 
 		if (!wlr_box_empty(&scene_rect->clipped_region.area)) {
-			// Subtract the clipped region from a otherwise fully opaque rect
 			struct wlr_box *clipped = &scene_rect->clipped_region.area;
 			pixman_region32_t clipped_region;
 			pixman_region32_init_rect(&clipped_region, clipped->x + x, clipped->y + y,

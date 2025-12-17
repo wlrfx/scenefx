@@ -59,6 +59,10 @@ struct fx_render_texture_options {
 	int corner_radius;
 	bool discard_transparent;
 	struct clipped_region clipped_region;
+	// Color-key transparency
+	bool colorkey_enabled;
+	float colorkey_src[4];  // Source RGBA to match
+	float colorkey_dst[4];  // Destination RGBA replacement
 };
 
 struct fx_render_rect_options {

@@ -344,7 +344,8 @@ void fx_render_pass_add_texture(struct fx_gles_render_pass *pass,
 	bool has_alpha = texture->has_alpha
 		|| alpha < 1.0
 		|| fx_options->corner_radius > 0
-		|| fx_options->discard_transparent;
+		|| fx_options->discard_transparent
+		|| (fx_options->colorkey_enabled && fx_options->colorkey_dst[3] < 1.0);
 	setup_blending(!has_alpha ? WLR_RENDER_BLEND_MODE_NONE : options->blend_mode);
 
 	pixman_region32_t clip_region;
@@ -394,6 +395,12 @@ void fx_render_pass_add_texture(struct fx_gles_render_pass *pass,
 	glUniform2f(shader->size, clip_box->width, clip_box->height);
 	glUniform2f(shader->position, clip_box->x, clip_box->y);
 	glUniform1f(shader->discard_transparent, fx_options->discard_transparent);
+
+	// Color-key transparency
+	glUniform1i(shader->colorkey_enabled, fx_options->colorkey_enabled);
+	glUniform4fv(shader->colorkey_src, 1, fx_options->colorkey_src);
+	glUniform4fv(shader->colorkey_dst, 1, fx_options->colorkey_dst);
+
 	glUniform1f(shader->radius_top_left, (CORNER_LOCATION_TOP_LEFT & corners) == CORNER_LOCATION_TOP_LEFT ?
 			fx_options->corner_radius : 0);
 	glUniform1f(shader->radius_top_right, (CORNER_LOCATION_TOP_RIGHT & corners) == CORNER_LOCATION_TOP_RIGHT ?

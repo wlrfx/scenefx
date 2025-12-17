@@ -42,6 +42,11 @@ uniform float clip_radius_bottom_right;
 
 uniform bool discard_transparent;
 
+// Color-key transparency
+uniform bool colorkey_enabled;
+uniform vec4 colorkey_src;
+uniform vec4 colorkey_dst;
+
 out vec4 fragColor;
 
 vec4 sample_texture() {
@@ -55,6 +60,17 @@ vec4 sample_texture() {
 float corner_alpha(vec2 size, vec2 position, float round_tl, float round_tr, float round_bl, float round_br);
 
 void main() {
+    vec4 c = sample_texture();
+
+    // Color-key transparency: replace matching colors
+    if (colorkey_enabled) {
+        // Use small epsilon for float comparison (~1/255 tolerance)
+        vec4 diff = abs(c - colorkey_src);
+        if (all(lessThan(diff, vec4(0.004)))) {
+            c = colorkey_dst;
+        }
+    }
+
     float quad_corner_alpha = corner_alpha(
         size - 0.5,
         position + 0.25,
@@ -74,7 +90,7 @@ void main() {
         clip_radius_bottom_right
     );
 
-	fragColor = mix(sample_texture() * alpha, vec4(0.0), quad_corner_alpha) * clip_corner_alpha;
+	fragColor = mix(c * alpha, vec4(0.0), quad_corner_alpha) * clip_corner_alpha;
 
 	if (discard_transparent && fragColor.a == 0.0) {
 		discard;

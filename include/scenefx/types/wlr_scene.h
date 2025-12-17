@@ -231,6 +231,12 @@ struct wlr_scene_buffer {
 	enum corner_location corners;
 
 	float opacity;
+
+	// Color-key transparency: replace colorkey_src color with colorkey_dst
+	bool colorkey_enabled;
+	float colorkey_src[4];  // Source RGBA to match (normalized 0.0-1.0)
+	float colorkey_dst[4];  // Destination RGBA replacement (normalized 0.0-1.0)
+
 	enum wlr_scale_filter_mode filter_mode;
 	struct wlr_fbox src_box;
 	int dst_width, dst_height;
@@ -760,6 +766,16 @@ void wlr_scene_buffer_set_transform(struct wlr_scene_buffer *scene_buffer,
 */
 void wlr_scene_buffer_set_opacity(struct wlr_scene_buffer *scene_buffer,
 	float opacity);
+
+/**
+ * Sets color-key transparency for this buffer.
+ * Pixels matching colorkey_src (within tolerance) are replaced with colorkey_dst.
+ * Colors are specified as normalized RGBA values (0.0-1.0).
+ * Set enabled to false to disable colorkey transparency.
+ */
+void wlr_scene_buffer_set_colorkey(struct wlr_scene_buffer *scene_buffer,
+	bool enabled, const float colorkey_src[static 4],
+	const float colorkey_dst[static 4]);
 
 /**
 * Sets the filter mode to use when scaling the buffer

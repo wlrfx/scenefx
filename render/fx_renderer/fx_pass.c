@@ -285,19 +285,33 @@ void fx_render_pass_add_texture(struct fx_gles_render_pass *pass,
 
 	struct tex_shader *shader = NULL;
 
+	bool has_clip = !wlr_box_empty(&fx_options->clipped_region.area);
+
 	switch (texture->target) {
 	case GL_TEXTURE_2D:
 		if (texture->has_alpha) {
-			shader = &renderer->shaders.tex_rgba;
+			if (has_clip) {
+				shader = &renderer->shaders.tex_clip_rgba;
+			} else {
+				shader = &renderer->shaders.tex_rgba;
+			}
 		} else {
-			shader = &renderer->shaders.tex_rgbx;
+			if (has_clip) {
+				shader = &renderer->shaders.tex_clip_rgbx;
+			} else {
+				shader = &renderer->shaders.tex_rgbx;
+			}
 		}
 		break;
 	case GL_TEXTURE_EXTERNAL_OES:
 		// EGL_EXT_image_dma_buf_import_modifiers requires
 		// GL_OES_EGL_image_external
 		assert(renderer->exts.OES_egl_image_external);
-		shader = &renderer->shaders.tex_ext;
+		if (has_clip) {
+			shader = &renderer->shaders.tex_clip_ext;
+		} else {
+			shader = &renderer->shaders.tex_ext;
+		}
 		break;
 	default:
 		abort();
@@ -403,16 +417,18 @@ void fx_render_pass_add_texture(struct fx_gles_render_pass *pass,
 	glUniform1f(shader->radius_bottom_right, (CORNER_LOCATION_BOTTOM_RIGHT & corners) == CORNER_LOCATION_BOTTOM_RIGHT ?
 			fx_options->corner_radius : 0);
 
-	glUniform2f(shader->clip_size, clipped_region_box.width, clipped_region_box.height);
-	glUniform2f(shader->clip_position, clipped_region_box.x, clipped_region_box.y);
-	glUniform1f(shader->clip_radius_top_left, (CORNER_LOCATION_TOP_LEFT & clipped_region_corners) == CORNER_LOCATION_TOP_LEFT ?
-			clipped_region_corner_radius : 0);
-	glUniform1f(shader->clip_radius_top_right, (CORNER_LOCATION_TOP_RIGHT & clipped_region_corners) == CORNER_LOCATION_TOP_RIGHT ?
-			clipped_region_corner_radius : 0);
-	glUniform1f(shader->clip_radius_bottom_left, (CORNER_LOCATION_BOTTOM_LEFT & clipped_region_corners) == CORNER_LOCATION_BOTTOM_LEFT ?
-			clipped_region_corner_radius : 0);
-	glUniform1f(shader->clip_radius_bottom_right, (CORNER_LOCATION_BOTTOM_RIGHT & clipped_region_corners) == CORNER_LOCATION_BOTTOM_RIGHT ?
-			clipped_region_corner_radius : 0);
+	if (has_clip) {
+		glUniform2f(shader->clip_size, clipped_region_box.width, clipped_region_box.height);
+		glUniform2f(shader->clip_position, clipped_region_box.x, clipped_region_box.y);
+		glUniform1f(shader->clip_radius_top_left, (CORNER_LOCATION_TOP_LEFT & clipped_region_corners) == CORNER_LOCATION_TOP_LEFT ?
+				clipped_region_corner_radius : 0);
+		glUniform1f(shader->clip_radius_top_right, (CORNER_LOCATION_TOP_RIGHT & clipped_region_corners) == CORNER_LOCATION_TOP_RIGHT ?
+				clipped_region_corner_radius : 0);
+		glUniform1f(shader->clip_radius_bottom_left, (CORNER_LOCATION_BOTTOM_LEFT & clipped_region_corners) == CORNER_LOCATION_BOTTOM_LEFT ?
+				clipped_region_corner_radius : 0);
+		glUniform1f(shader->clip_radius_bottom_right, (CORNER_LOCATION_BOTTOM_RIGHT & clipped_region_corners) == CORNER_LOCATION_BOTTOM_RIGHT ?
+				clipped_region_corner_radius : 0);
+	}
 
 	set_proj_matrix(shader->proj, pass->projection_matrix, &dst_box);
 	set_tex_matrix(shader->tex_proj, options->transform, &src_fbox);

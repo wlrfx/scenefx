@@ -21,6 +21,7 @@
 
 #include <pixman.h>
 #include <time.h>
+#include <limits.h>
 #include <wayland-server-core.h>
 #include <wlr/render/wlr_renderer.h>
 #include <wlr/types/wlr_damage_ring.h>
@@ -154,6 +155,7 @@ struct wlr_scene_rect {
 
 	bool accepts_input;
 	struct clipped_region clipped_region;
+	struct linked_node blur;
 };
 
 /** A scene-graph node displaying a shadow */
@@ -165,6 +167,13 @@ struct wlr_scene_shadow {
 	float blur_sigma;
 
 	struct clipped_region clipped_region;
+};
+
+enum blur_mask_type {
+	BLUR_MASK_NONE				  = 0,
+	BLUR_MASK_IGNORE_TRANSPARENCY = 1,
+	BLUR_MASK_OPAQUE_REGION       = 2,
+	BLUR_MASK_ALL			      = INT_MAX,
 };
 
 struct wlr_scene_blur {
@@ -180,7 +189,11 @@ struct wlr_scene_blur {
 
 	bool should_only_blur_bottom_layer;
 
-	struct linked_node transparency_mask_source;
+	struct linked_node mask_source;
+	// store which node is stored with `mask_source`
+	// So we don't call `wlr_container_of` with the wrong type
+	enum wlr_scene_node_type mask_node_type;
+	enum blur_mask_type mask_type;
 };
 
 /** A scene-graph node telling SceneFX to render the optimized blur */
@@ -601,16 +614,15 @@ void wlr_scene_blur_set_should_only_blur_bottom_layer(struct wlr_scene_blur *blu
 	bool should_only_blur_bottom_layer);
 
 /**
- * Set the transparency mask source for the blur, only rendering blur where the
- * Mask source is actually rendering (e.g. skip transparent spaces)
+ * Set the mask source for the blur, reducing rendering area based on mask type
  */
-void wlr_scene_blur_set_transparency_mask_source(struct wlr_scene_blur *blur,
-	   struct wlr_scene_buffer *source);
+void wlr_scene_blur_set_mask_source(struct wlr_scene_blur *blur,
+	   struct wlr_scene_node *source, enum blur_mask_type mask_type);
 
 /**
  * get the transparency mask source for the blur
  */
-struct wlr_scene_buffer *wlr_scene_blur_get_transparency_mask_source(
+struct wlr_scene_node *wlr_scene_blur_get_mask_source(
 	struct wlr_scene_blur *blur);
 
 /**

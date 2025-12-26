@@ -8,6 +8,7 @@
 #include <wlr/types/wlr_buffer.h>
 
 struct fx_renderer;
+struct fx_framebuffer;
 
 struct wlr_renderer *fx_renderer_create_with_drm_fd(int drm_fd);
 struct wlr_renderer *fx_renderer_create(struct wlr_backend *backend);
@@ -17,6 +18,10 @@ struct fx_renderer *fx_get_renderer(struct wlr_renderer *wlr_renderer);
 bool fx_renderer_check_ext(struct wlr_renderer *renderer, const char *ext);
 GLuint fx_renderer_get_buffer_fbo(struct wlr_renderer *renderer, struct wlr_buffer *buffer);
 
+struct fx_renderer * fx_framebuffer_get_renderer(struct fx_framebuffer* framebuffer);
+struct fx_texture *fx_get_texture(struct wlr_texture *wlr_texture);
+GLuint fx_texture_get_target(struct fx_texture *fx_texture);
+GLuint fx_texture_get_texture(struct fx_texture *fx_texture);
 //
 // fx_texture
 //

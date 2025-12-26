@@ -94,8 +94,6 @@ bool wlr_renderer_is_fx(struct wlr_renderer *wlr_renderer);
 
 struct fx_render_timer *fx_get_render_timer(struct wlr_render_timer *timer);
 
-struct fx_texture *fx_get_texture(struct wlr_texture *wlr_texture);
-
 struct wlr_renderer *fx_renderer_create_egl(struct wlr_egl *egl);
 
 struct wlr_egl *wlr_fx_renderer_get_egl(struct wlr_renderer *renderer);
@@ -191,6 +189,7 @@ struct fx_renderer {
 	struct wl_list buffers; // fx_framebuffer.link
 	struct wl_list textures; // fx_texture.link
 	struct wl_list effect_fbos; // fx_effect_framebuffers.link
+	struct wl_list blur_shader_data; // fx_blur_plugin_info.link
 
 	// Set to true when 'wlr_renderer_begin_buffer_pass' is called instead of
 	// our custom 'fx_renderer_begin_buffer_pass' function

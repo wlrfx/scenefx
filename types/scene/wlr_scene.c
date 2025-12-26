@@ -1235,6 +1235,23 @@ void wlr_scene_set_blur_saturation(struct wlr_scene *scene, float saturation) {
 	scene_node_update(&scene->tree.node, NULL);
 }
 
+void wlr_scene_set_blur_id(struct wlr_scene *scene, char * id) {
+	struct blur_data *buff_data = &scene->blur_data;
+	if (buff_data->id) {
+		free(buff_data->id);
+	}
+
+	if (id != NULL) {
+		buff_data->id = malloc(strlen(id) + 1);
+		strcpy(buff_data->id, id);
+	} else {
+		buff_data->id = NULL;
+	}
+
+	mark_all_optimized_blur_nodes_dirty(&scene->tree.node);
+	scene_node_update(&scene->tree.node, NULL);
+}
+
 struct wlr_scene_optimized_blur *wlr_scene_optimized_blur_create(
 		struct wlr_scene_tree *parent, int width, int height) {
 	struct wlr_scene_optimized_blur *scene_blur = calloc(1, sizeof(*scene_blur));
@@ -2830,6 +2847,7 @@ bool wlr_scene_output_build_state(struct wlr_scene_output *scene_output,
 
 	if (debug_damage == WLR_SCENE_DEBUG_DAMAGE_RERENDER) {
 		scene_output_damage_whole(scene_output);
+		mark_all_optimized_blur_nodes_dirty(&scene_output->scene->tree.node);
 	}
 
 	struct timespec now;

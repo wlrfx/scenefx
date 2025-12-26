@@ -5,6 +5,7 @@
 #include <wlr/util/addon.h>
 
 struct blur_data {
+	char *id;
 	int num_passes;
 	float radius;
 	float noise;

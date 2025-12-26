@@ -22,6 +22,14 @@ struct fx_texture *fx_get_texture(struct wlr_texture *wlr_texture) {
 	return texture;
 }
 
+GLuint fx_texture_get_target(struct fx_texture* fx_texture) {
+	return fx_texture->target;
+}
+
+GLuint fx_texture_get_texture(struct fx_texture* fx_texture) {
+	return fx_texture->tex;
+}
+
 static bool fx_texture_update_from_buffer(struct wlr_texture *wlr_texture,
 		struct wlr_buffer *buffer, const pixman_region32_t *damage) {
 	struct fx_texture *texture = fx_get_texture(wlr_texture);

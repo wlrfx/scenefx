@@ -340,6 +340,11 @@ static void scene_node_opaque_region(struct wlr_scene_node *node, int x, int y,
 			return;
 		}
 
+		// Colorkey with transparent destination means buffer is not opaque
+		if (scene_buffer->colorkey_enabled && scene_buffer->colorkey_dst[3] < 1.0f) {
+			return;
+		}
+
 		if (!scene_buffer->buffer_is_opaque) {
 			pixman_region32_copy(opaque, &scene_buffer->opaque_region);
 			pixman_region32_intersect_rect(opaque, opaque, 0, 0, width, height);
@@ -1550,6 +1555,34 @@ void wlr_scene_buffer_set_opacity(struct wlr_scene_buffer *scene_buffer,
 	scene_node_update(&scene_buffer->node, NULL);
 }
 
+void wlr_scene_buffer_set_colorkey(struct wlr_scene_buffer *scene_buffer,
+		bool enabled, const float colorkey_src[static 4],
+		const float colorkey_dst[static 4]) {
+	bool changed = scene_buffer->colorkey_enabled != enabled;
+	if (enabled) {
+		for (int i = 0; i < 4; i++) {
+			if (scene_buffer->colorkey_src[i] != colorkey_src[i] ||
+					scene_buffer->colorkey_dst[i] != colorkey_dst[i]) {
+				changed = true;
+				break;
+			}
+		}
+	}
+
+	if (!changed) {
+		return;
+	}
+
+	scene_buffer->colorkey_enabled = enabled;
+	if (enabled) {
+		for (int i = 0; i < 4; i++) {
+			scene_buffer->colorkey_src[i] = colorkey_src[i];
+			scene_buffer->colorkey_dst[i] = colorkey_dst[i];
+		}
+	}
+	scene_node_update(&scene_buffer->node, NULL);
+}
+
 void wlr_scene_buffer_set_filter_mode(struct wlr_scene_buffer *scene_buffer,
 		enum wlr_scale_filter_mode filter_mode) {
 	if (scene_buffer->filter_mode == filter_mode) {
@@ -2063,6 +2096,19 @@ static void scene_entry_render(struct render_list_entry *entry, const struct ren
 			.corners = buffer_corners,
 			.corner_radius = scene_buffer->corner_radius * data->scale,
 			.clipped_region = {0},
+			.colorkey_enabled = scene_buffer->colorkey_enabled,
+			.colorkey_src = {
+				scene_buffer->colorkey_src[0],
+				scene_buffer->colorkey_src[1],
+				scene_buffer->colorkey_src[2],
+				scene_buffer->colorkey_src[3],
+			},
+			.colorkey_dst = {
+				scene_buffer->colorkey_dst[0],
+				scene_buffer->colorkey_dst[1],
+				scene_buffer->colorkey_dst[2],
+				scene_buffer->colorkey_dst[3],
+			},
 		};
 
 		fx_render_pass_add_texture(data->render_pass, &tex_options);

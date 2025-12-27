@@ -79,6 +79,23 @@ static int fx_get_drm_fd(struct wlr_renderer *wlr_renderer) {
 	return renderer->drm_fd;
 }
 
+static void destroy_shaders(struct fx_renderer *renderer) {
+	glDeleteProgram(renderer->shaders.quad.program);
+	glDeleteProgram(renderer->shaders.quad_round.program);
+	glDeleteProgram(renderer->shaders.quad_grad.program);
+	glDeleteProgram(renderer->shaders.quad_grad_round.program);
+	glDeleteProgram(renderer->shaders.tex_rgba.program);
+	glDeleteProgram(renderer->shaders.tex_rgbx.program);
+	glDeleteProgram(renderer->shaders.tex_ext.program);
+	glDeleteProgram(renderer->shaders.box_shadow.program);
+	glDeleteProgram(renderer->shaders.blur1.program);
+	glDeleteProgram(renderer->shaders.blur2.program);
+	glDeleteProgram(renderer->shaders.blur_effects.program);
+	glDeleteProgram(renderer->shaders.tex_crossfade_rgba.program);
+	glDeleteProgram(renderer->shaders.tex_crossfade_rgbx.program);
+	glDeleteProgram(renderer->shaders.tex_crossfade_ext.program);
+}
+
 static void fx_renderer_destroy(struct wlr_renderer *wlr_renderer) {
 	struct fx_renderer *renderer = fx_get_renderer(wlr_renderer);
 
@@ -100,10 +117,7 @@ static void fx_renderer_destroy(struct wlr_renderer *wlr_renderer) {
 	}
 
 	push_fx_debug(renderer);
-	glDeleteProgram(renderer->shaders.quad.program);
-	glDeleteProgram(renderer->shaders.tex_rgba.program);
-	glDeleteProgram(renderer->shaders.tex_rgbx.program);
-	glDeleteProgram(renderer->shaders.tex_ext.program);
+	destroy_shaders(renderer);
 	pop_fx_debug(renderer);
 
 	if (renderer->exts.KHR_debug) {
@@ -374,21 +388,24 @@ static bool link_shaders(struct fx_renderer *renderer) {
 		goto error;
 	}
 
+	// Tex crossfade shaders
+	if (!link_tex_crossfade_program(&renderer->shaders.tex_crossfade_rgba, (GLint) client_version, SHADER_SOURCE_TEXTURE_RGBA)) {
+		wlr_log(WLR_ERROR, "could not link tex_crossfade_rgba shader");
+		goto error;
+	}
+	if (!link_tex_crossfade_program(&renderer->shaders.tex_crossfade_rgbx, (GLint) client_version, SHADER_SOURCE_TEXTURE_RGBX)) {
+		wlr_log(WLR_ERROR, "could not link tex_crossfade_rgbx shader");
+		goto error;
+	}
+	if (!link_tex_crossfade_program(&renderer->shaders.tex_crossfade_ext, (GLint) client_version, SHADER_SOURCE_TEXTURE_RGBX)) {
+		wlr_log(WLR_ERROR, "could not link tex_crossfade_ext shader");
+		goto error;
+	}
+
 	return true;
 
 error:
-	glDeleteProgram(renderer->shaders.quad.program);
-	glDeleteProgram(renderer->shaders.quad_round.program);
-	glDeleteProgram(renderer->shaders.quad_grad.program);
-	glDeleteProgram(renderer->shaders.quad_grad_round.program);
-	glDeleteProgram(renderer->shaders.tex_rgba.program);
-	glDeleteProgram(renderer->shaders.tex_rgbx.program);
-	glDeleteProgram(renderer->shaders.tex_ext.program);
-	glDeleteProgram(renderer->shaders.box_shadow.program);
-	glDeleteProgram(renderer->shaders.blur1.program);
-	glDeleteProgram(renderer->shaders.blur2.program);
-	glDeleteProgram(renderer->shaders.blur_effects.program);
-
+	destroy_shaders(renderer);
 	return false;
 }
 

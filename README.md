@@ -9,7 +9,7 @@ Plenty of popular wayland compositors are using SceneFX to render eyecandy, incl
 - [SwayFX](https://github.com/WillPower3309/swayfx)
 - [MangoWC](https://github.com/DreamMaoMao/mangowc)
 - [mwc](https://github.com/nikoloc/mwc)
-- dwl [with a patch](https://codeberg.org/dwl/dwl-patches/src/branch/main/patches/scenefx)
+- dwl [with a patch](https://codeberg.org/dwl/dwl-patches/src/branch/main/stale-patches/scenefx)
 
 ## Installation
 <a href="https://repology.org/project/scenefx/versions"><img src="https://repology.org/badge/vertical-allrepos/scenefx.svg"/></a>

@@ -188,7 +188,7 @@ void wlr_scene_node_destroy(struct wlr_scene_node *node) {
 		}
 	} else if (node->type == WLR_SCENE_NODE_BLUR) {
 		struct wlr_scene_blur *blur = wlr_scene_blur_from_node(node);
-		linked_node_destroy(&blur->transparency_mask_source);
+		linked_node_destroy(&blur->mask_source);
 	}
 
 	assert(wl_list_empty(&node->events.destroy.listener_list));
@@ -346,8 +346,19 @@ static void scene_node_opaque_region(struct wlr_scene_node *node, int x, int y,
 			pixman_region32_translate(opaque, x, y);
 			return;
 		}
-	} else if (node->type == WLR_SCENE_NODE_OPTIMIZED_BLUR || node->type == WLR_SCENE_NODE_BLUR) {
+	} else if (node->type == WLR_SCENE_NODE_OPTIMIZED_BLUR) {
 		// Always transparent
+		return;
+	} else if (node->type == WLR_SCENE_NODE_BLUR) {
+		struct wlr_scene_blur *blur = wlr_scene_blur_from_node(node);
+		struct wlr_scene_node *mask_node;
+		if (!(blur->mask_type & BLUR_MASK_OPAQUE_REGION) || !((mask_node = wlr_scene_blur_get_mask_source(blur)))) {
+			return;
+		}
+
+		int mx, my;
+		wlr_scene_node_coords(mask_node, &mx, &my);
+		scene_node_opaque_region(mask_node, mx, my, opaque);
 		return;
 	}
 
@@ -1046,7 +1057,7 @@ struct wlr_scene_blur *wlr_scene_blur_create(struct wlr_scene_tree *parent,
 	blur->clipped_region = (struct clipped_region){0};
 	blur->corners = CORNER_LOCATION_NONE;
 	blur->should_only_blur_bottom_layer = false;
-	blur->transparency_mask_source = linked_node_init();;
+	blur->mask_source = linked_node_init();;
 	blur->width = width;
 	blur->height = height;
 
@@ -1087,35 +1098,74 @@ void wlr_scene_blur_set_should_only_blur_bottom_layer(struct wlr_scene_blur *blu
 	scene_node_update(&blur->node, NULL);
 }
 
-void wlr_scene_blur_set_transparency_mask_source(struct wlr_scene_blur *blur,
-       struct wlr_scene_buffer *source) {
-	if (source == NULL && blur->transparency_mask_source.link == NULL) {
+static struct linked_node *get_blur_linked_node_for_node(struct wlr_scene_node *node) {
+	if (node == NULL) {
+		return NULL;
+	}
+
+	switch (node->type) {
+	case WLR_SCENE_NODE_BUFFER:
+		return &wlr_scene_buffer_from_node(node)->blur;
+	case WLR_SCENE_NODE_RECT:
+		return &wlr_scene_rect_from_node(node)->blur;
+	default:
+		return NULL;
+	}
+}
+
+void wlr_scene_blur_set_mask_source(struct wlr_scene_blur *blur,
+	   struct wlr_scene_node *source, enum blur_mask_type mask_type) {
+
+	struct linked_node *linked_node = get_blur_linked_node_for_node(source);
+	if (linked_node == NULL && blur->mask_source.link == NULL) {
+		blur->mask_type = mask_type;
 		return;
 	}
 
-	if (source != NULL && linked_nodes_are_linked(&blur->transparency_mask_source, &source->blur)) {
+	bool same_nodes = false;
+	if (linked_node != NULL && linked_nodes_are_linked(&blur->mask_source, linked_node)) {
+		same_nodes = true;
+	}
+
+	if (mask_type != blur->mask_type) {
+		blur->mask_type = mask_type;
+	} else if (same_nodes) {
 		return;
 	}
 
-	linked_node_destroy(&blur->transparency_mask_source);
-	linked_node_destroy(&source->blur);
+	if (!same_nodes) {
+		linked_node_destroy(&blur->mask_source);
 
-	if (source != NULL) {
-		linked_node_init_link(&blur->transparency_mask_source, &source->blur);
+		if (linked_node != NULL) {
+			linked_node_destroy(linked_node);
+		}
+	}
+
+	if (linked_node != NULL) {
+		blur->mask_node_type = source->type;
+		linked_node_init_link(&blur->mask_source, linked_node);
 	}
 
 	scene_node_update(&blur->node, NULL);
 }
 
-struct wlr_scene_buffer *wlr_scene_blur_get_transparency_mask_source(
+struct wlr_scene_node *wlr_scene_blur_get_mask_source(
 	struct wlr_scene_blur *blur) {
-	struct linked_node *node = linked_nodes_get_sibling(&blur->transparency_mask_source);
+	struct linked_node *node = linked_nodes_get_sibling(&blur->mask_source);
 	if (node == NULL) {
 		return NULL;
 	}
 
-	struct wlr_scene_buffer *output = wl_container_of(node, output, blur);
-	return output;
+	switch (blur->mask_node_type) {
+	case WLR_SCENE_NODE_BUFFER:
+		struct wlr_scene_buffer *buffer = wl_container_of(node, buffer, blur);
+		return &buffer->node;
+	case WLR_SCENE_NODE_BLUR:
+		struct wlr_scene_rect *rect = wl_container_of(node, rect, blur);
+		return &rect->node;
+	default:
+		assert(false);
+	}
 }
 
 void wlr_scene_blur_set_alpha(struct wlr_scene_blur *blur, float alpha) {
@@ -2082,12 +2132,76 @@ static void scene_entry_render(struct render_list_entry *entry, const struct ren
 		break;
 	case WLR_SCENE_NODE_BLUR:;
 		struct wlr_scene_blur *blur = wlr_scene_blur_from_node(node);
-
 		struct wlr_texture *tex = NULL;
-		struct wlr_scene_buffer *mask = wlr_scene_blur_get_transparency_mask_source(blur);
-		if (mask != NULL) {
-			tex = scene_buffer_get_texture(mask, data->output->output->renderer);
+		struct wlr_scene_node *mask = wlr_scene_blur_get_mask_source(blur);
+
+		if (blur->mask_type & BLUR_MASK_IGNORE_TRANSPARENCY && mask != NULL && mask->type == WLR_SCENE_NODE_BUFFER) {
+			struct wlr_scene_buffer *buffer = wlr_scene_buffer_from_node(mask);
+			tex = scene_buffer_get_texture(buffer, data->output->output->renderer);
 		}
+
+		pixman_region32_t opaque_region;
+		pixman_region32_init(&opaque_region);
+
+		if (blur->mask_type & BLUR_MASK_OPAQUE_REGION && mask != NULL && mask->type == WLR_SCENE_NODE_BUFFER) {
+			int mask_width, mask_height, mask_x, mask_y;
+			struct wlr_scene_buffer *buffer = wlr_scene_buffer_from_node(mask);
+			if (buffer->opacity == 1) {
+				scene_node_get_size(mask, &mask_width, &mask_height);
+				wlr_scene_node_coords(mask, &mask_x, &mask_y);
+				pixman_region32_t opaque_mask_region;
+				pixman_region32_init(&opaque_mask_region);
+
+				if (buffer->buffer_is_opaque) {
+					pixman_region32_union_rect(&opaque_mask_region, &opaque_mask_region,
+						0,
+						0,
+						mask_width,
+						mask_height
+					);
+				} else {
+					pixman_region32_union(&opaque_mask_region, &opaque_mask_region, &buffer->opaque_region);
+				}
+
+				// make sure that the blur is still rendered _behind_ the corners
+				if (mask_x != x || mask_y != y || mask_width != dst_box.width || mask_height != dst_box.height || buffer->corner_radius > blur->corner_radius || (buffer->corners & blur->corners) != blur->corners) {
+					int buffer_corner = buffer->corner_radius;
+					pixman_region32_t corners;
+					pixman_region32_init(&corners);
+					if (buffer->corners & CORNER_LOCATION_TOP_LEFT) pixman_region32_union_rect(&corners, &corners, 0, 0, buffer_corner, buffer_corner);
+					if (buffer->corners & CORNER_LOCATION_TOP_RIGHT) pixman_region32_union_rect(&corners, &corners, mask_width - buffer_corner, 0, buffer_corner, buffer_corner);
+					if (buffer->corners & CORNER_LOCATION_BOTTOM_LEFT) pixman_region32_union_rect(&corners, &corners, 0, mask_height - buffer_corner, buffer_corner, buffer_corner);
+					if (buffer->corners & CORNER_LOCATION_BOTTOM_RIGHT) pixman_region32_union_rect(&corners, &corners, mask_width - buffer_corner, mask_height - buffer_corner, buffer_corner, buffer_corner);
+					pixman_region32_subtract(&opaque_mask_region, &opaque_mask_region, &corners);
+					pixman_region32_fini(&corners);
+				}
+
+				pixman_region32_translate(&opaque_mask_region, mask_x, mask_y);
+				pixman_region32_union(&opaque_region, &opaque_region, &opaque_mask_region);
+				pixman_region32_fini(&opaque_mask_region);
+			}
+		}
+
+		logical_to_buffer_coords(&opaque_region, data, false);
+
+		pixman_region32_t blur_render_area, blur_node;
+		pixman_region32_init(&blur_render_area);
+		pixman_region32_subtract(&blur_render_area, &render_region, &opaque_region);
+
+		// the render region has been expanded since it samples from the expanded area
+		// but the region being actually rendered is different, so restrict it to that
+		pixman_region32_init_rect(&blur_node, x, y, dst_box.width, dst_box.height);
+		logical_to_buffer_coords(&blur_node, data, false);
+		pixman_region32_intersect(&blur_render_area, &blur_render_area, &blur_node);
+		pixman_region32_fini(&blur_node);
+
+		if (pixman_region32_empty(&blur_render_area)) {
+			pixman_region32_fini(&opaque_region);
+			pixman_region32_fini(&blur_render_area);
+			break;
+		}
+
+		pixman_region32_fini(&blur_render_area);
 
 		struct fx_render_blur_pass_options blur_options = {
 			.tex_options = {
@@ -2106,13 +2220,14 @@ static void scene_entry_render(struct render_list_entry *entry, const struct ren
 				.corners = blur->corners,
 				.discard_transparent = false,
 			},
-			.opaque_region = NULL,
+			.opaque_region = &opaque_region,
 			.use_optimized_blur = blur->should_only_blur_bottom_layer,
 			.blur_data = &scene->blur_data,
-			.ignore_transparent = mask != NULL,
+			.ignore_transparent = tex != NULL,
 			.blur_strength = blur->strength,
 		};
 		fx_render_pass_add_blur(data->render_pass, &blur_options);
+		pixman_region32_fini(&opaque_region);
 	}
 
 	pixman_region32_fini(&opaque);

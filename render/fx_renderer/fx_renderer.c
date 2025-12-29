@@ -341,16 +341,29 @@ static bool link_shaders(struct fx_renderer *renderer) {
 	}
 
 	// fragment shaders
-	if (!link_tex_program(&renderer->shaders.tex_rgba, (GLint) client_version, SHADER_SOURCE_TEXTURE_RGBA)) {
+	if (!link_tex_program(&renderer->shaders.tex_rgba, (GLint) client_version, SHADER_SOURCE_TEXTURE_RGBA, false)) {
 		wlr_log(WLR_ERROR, "Could not link tex_RGBA shader");
 		goto error;
 	}
-	if (!link_tex_program(&renderer->shaders.tex_rgbx, (GLint) client_version, SHADER_SOURCE_TEXTURE_RGBX)) {
+	if (!link_tex_program(&renderer->shaders.tex_rgbx, (GLint) client_version, SHADER_SOURCE_TEXTURE_RGBX, false)) {
 		wlr_log(WLR_ERROR, "Could not link tex_RGBX shader");
 		goto error;
 	}
-	if (!link_tex_program(&renderer->shaders.tex_ext, (GLint) client_version, SHADER_SOURCE_TEXTURE_EXTERNAL)) {
+	if (!link_tex_program(&renderer->shaders.tex_ext, (GLint) client_version, SHADER_SOURCE_TEXTURE_EXTERNAL, false)) {
 		wlr_log(WLR_ERROR, "Could not link tex_EXTERNAL shader");
+		goto error;
+	}
+
+	if (!link_tex_program(&renderer->shaders.tex_clip_rgba, (GLint) client_version, SHADER_SOURCE_TEXTURE_RGBA, true)) {
+		wlr_log(WLR_ERROR, "Could not link tex_clip_RGBA shader");
+		goto error;
+	}
+	if (!link_tex_program(&renderer->shaders.tex_clip_rgbx, (GLint) client_version, SHADER_SOURCE_TEXTURE_RGBX, true)) {
+		wlr_log(WLR_ERROR, "Could not link tex_clip_RGBX shader");
+		goto error;
+	}
+	if (!link_tex_program(&renderer->shaders.tex_clip_ext, (GLint) client_version, SHADER_SOURCE_TEXTURE_EXTERNAL, true)) {
+		wlr_log(WLR_ERROR, "Could not link tex_clip_EXTERNAL shader");
 		goto error;
 	}
 

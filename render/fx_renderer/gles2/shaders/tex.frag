@@ -1,4 +1,5 @@
 #define SOURCE %d
+#define HAS_CLIP %d
 
 #define SOURCE_TEXTURE_RGBA 1
 #define SOURCE_TEXTURE_RGBX 2
@@ -35,12 +36,14 @@ uniform float radius_top_right;
 uniform float radius_bottom_left;
 uniform float radius_bottom_right;
 
+#if HAS_CLIP
 uniform vec2 clip_size;
 uniform vec2 clip_position;
 uniform float clip_radius_top_left;
 uniform float clip_radius_top_right;
 uniform float clip_radius_bottom_left;
 uniform float clip_radius_bottom_right;
+#endif
 
 uniform bool discard_transparent;
 
@@ -64,6 +67,7 @@ void main() {
         radius_bottom_right
     );
 
+#if HAS_CLIP
     // Clipping
     float clip_corner_alpha = corner_alpha(
         clip_size - 1.0,
@@ -75,6 +79,9 @@ void main() {
     );
 
 	gl_FragColor = mix(sample_texture() * alpha, vec4(0.0), quad_corner_alpha) * clip_corner_alpha;
+#else
+    gl_FragColor = mix(sample_texture() * alpha, vec4(0.0), quad_corner_alpha);
+#endif
 
 	if (discard_transparent && gl_FragColor.a == 0.0) {
 		discard;

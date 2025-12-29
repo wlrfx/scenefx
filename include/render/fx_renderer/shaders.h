@@ -120,6 +120,11 @@ struct tex_shader {
 
 	GLint discard_transparent;
 
+	// Color-key transparency
+	GLint colorkey_enabled;
+	GLint colorkey_src;
+	GLint colorkey_dst;
+
 	GLint clip_size;
 	GLint clip_position;
 	GLint clip_radius_top_left;

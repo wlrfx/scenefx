@@ -265,8 +265,8 @@ bool link_quad_grad_round_program(struct quad_grad_round_shader *shader, GLint c
 }
 
 bool link_tex_program(struct tex_shader *shader, GLint client_version, enum fx_tex_shader_source source) {
-	GLchar frag_src_part[2048];
-	GLchar frag_src[4096];
+	GLchar frag_src_part[4096];
+	GLchar frag_src[8192];
 	if (client_version > 2) {
 		snprintf(frag_src_part, sizeof(frag_src_part),
 			tex_frag_gles3_src, source);
@@ -297,6 +297,11 @@ bool link_tex_program(struct tex_shader *shader, GLint client_version, enum fx_t
 	shader->radius_bottom_left = glGetUniformLocation(prog, "radius_bottom_left");
 	shader->radius_bottom_right = glGetUniformLocation(prog, "radius_bottom_right");
 	shader->discard_transparent = glGetUniformLocation(prog, "discard_transparent");
+
+	// Color-key transparency
+	shader->colorkey_enabled = glGetUniformLocation(prog, "colorkey_enabled");
+	shader->colorkey_src = glGetUniformLocation(prog, "colorkey_src");
+	shader->colorkey_dst = glGetUniformLocation(prog, "colorkey_dst");
 
 	shader->clip_size = glGetUniformLocation(prog, "clip_size");
 	shader->clip_position = glGetUniformLocation(prog, "clip_position");

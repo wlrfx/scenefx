@@ -60,6 +60,7 @@ enum wlr_scene_node_type {
 	WLR_SCENE_NODE_RECT,
 	WLR_SCENE_NODE_SHADOW,
 	WLR_SCENE_NODE_BUFFER,
+	WLR_SCENE_NODE_BUFFER_CROSSFADE,
 	WLR_SCENE_NODE_OPTIMIZED_BLUR,
 	WLR_SCENE_NODE_BLUR,
 };
@@ -165,6 +166,23 @@ struct wlr_scene_shadow {
 	float blur_sigma;
 
 	struct clipped_region clipped_region;
+};
+
+/** A scene-graph node displaying a crossfaded texture between two buffers */
+struct wlr_scene_buffer_crossfade {
+	struct wlr_scene_node node;
+
+	// TODO: buffer instead of scene_buffer?
+	struct wlr_scene_buffer *scene_buffer_prev; // can be NULL
+	struct wlr_scene_buffer *scene_buffer_next; // can be NULL
+	float progress;
+
+	int corner_radius;
+	enum corner_location corners;
+	float opacity;
+
+	struct wlr_fbox src_box;
+	int dst_width, dst_height;
 };
 
 struct wlr_scene_blur {
@@ -496,6 +514,12 @@ struct wlr_scene_shadow *wlr_scene_shadow_from_node(struct wlr_scene_node *node)
 struct wlr_scene_blur *wlr_scene_blur_from_node(struct wlr_scene_node *node);
 
 /**
+ * If this node represents a wlr_scene_buffer_crossfade, that buffer_crossfade will be
+ * returned. It is not legal to feed a node that does not represent a wlr_scene_buffer_crossfade.
+ */
+struct wlr_scene_buffer_crossfade *wlr_scene_buffer_crossfade_from_node(struct wlr_scene_node *node);
+
+/**
  * If this buffer is backed by a surface, then the struct wlr_scene_surface is
  * returned. If not, NULL will be returned.
  */
@@ -675,6 +699,50 @@ void wlr_scene_optimized_blur_set_size(struct wlr_scene_optimized_blur *blur_nod
  * wallpaper.
  */
 void wlr_scene_optimized_blur_mark_dirty(struct wlr_scene_optimized_blur *blur_node);
+
+/**
+ * Add a node displaying a buffer crossfade to the scene-graph.
+ */
+struct wlr_scene_buffer_crossfade *wlr_scene_buffer_crossfade_create(struct wlr_scene_tree *parent,
+	struct wlr_scene_buffer *from_buffer, struct wlr_scene_buffer *to_buffer);
+
+/**
+ * Set the source rectangle describing the region of the buffer crossfade which will be
+ * sampled to render this node. This allows cropping the buffer crossfade.
+ *
+ * If NULL, the whole buffer crossfade is sampled. By default, the source box is NULL.
+ */
+void wlr_scene_buffer_crossfade_set_source_box(
+	struct wlr_scene_buffer_crossfade *scene_buffer_crossfade, const struct wlr_fbox *box);
+
+/**
+ * Set the destination size describing the region of the scene-graph the buffer crossfade
+ * will be painted onto. This allows scaling the buffer crossfade.
+ *
+ * If zero, the destination size will be the buffer size. By default, the
+ * destination size is zero.
+ */
+void wlr_scene_buffer_crossfade_set_dest_size(
+	struct wlr_scene_buffer_crossfade *scene_buffer_crossfade, int width, int height);
+
+/**
+* Sets the opacity of this buffer crossfade.
+*/
+void wlr_scene_buffer_crossfade_set_opacity(
+	struct wlr_scene_buffer_crossfade *scene_buffer_crossfade, float opacity);
+
+/**
+ * Sets the buffer crossfade's corner radius.
+ */
+void wlr_scene_buffer_crossfade_set_corner_radius(
+	struct wlr_scene_buffer_crossfade *scene_buffer_crossfade,
+	int radii, enum corner_location corners);
+
+/**
+ * Set the progress of the crossfade between the prev and next buffers (0-1)
+ */
+void wlr_scene_buffer_crossfade_set_progress(
+	struct wlr_scene_buffer_crossfade *scene_buffer_crossfade, float progress);
 
 /**
  * Add a node displaying a buffer to the scene-graph.

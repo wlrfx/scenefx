@@ -4,6 +4,7 @@
 #include <wlr/util/log.h>
 
 #include "render/fx_renderer/shaders.h"
+#include "scenefx/render/fx_renderer/fx_blur.h"
 
 // shaders
 #include "GLES2/gl2.h"
@@ -42,6 +43,12 @@ GLuint compile_shader(GLuint type, const GLchar *src) {
 	GLint ok;
 	glGetShaderiv(shader, GL_COMPILE_STATUS, &ok);
 	if (ok == GL_FALSE) {
+		char info[4096];
+		int len = 0;
+		glGetShaderInfoLog(shader, sizeof info, &len, info);
+		if (len > 0) {
+			wlr_log(WLR_ERROR, "GL log: %s", info);
+		}
 		wlr_log(WLR_ERROR, "Failed to compile shader");
 		glDeleteShader(shader);
 		shader = 0;
@@ -389,6 +396,25 @@ bool link_blur_effects_program(struct blur_effects_shader *shader, GLint client_
 	shader->brightness = glGetUniformLocation(prog, "brightness");
 	shader->contrast = glGetUniformLocation(prog, "contrast");
 	shader->saturation = glGetUniformLocation(prog, "saturation");
+
+	return true;
+}
+
+bool fx_link_blur_plugin_base_shader_program(
+	struct fx_blur_plugin_base_shader *shader,
+	char *shader_src,
+	GLint client_version
+) {
+	GLuint prog;
+	shader->program = prog = client_version > 2 ? link_program(shader_src, client_version)
+		: link_program(shader_src, client_version);
+	if (!shader->program) {
+		return false;
+	}
+	shader->proj = glGetUniformLocation(prog, "proj");
+	shader->tex = glGetUniformLocation(prog, "tex");
+	shader->pos_attrib = glGetAttribLocation(prog, "pos");
+	shader->tex_proj = glGetUniformLocation(prog, "tex_proj");
 
 	return true;
 }

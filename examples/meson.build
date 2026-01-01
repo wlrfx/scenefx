@@ -22,3 +22,8 @@ foreach name, info : compositors
 	)
 endforeach
 
+library(
+	'example-blur-plugin',
+	['example-blur-plugin.c'],
+	dependencies: [scenefx]
+)

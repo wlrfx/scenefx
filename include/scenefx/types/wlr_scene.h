@@ -416,6 +416,8 @@ void wlr_scene_set_blur_contrast(struct wlr_scene *scene, float contrast);
 // Sets the global blur saturation parameter
 void wlr_scene_set_blur_saturation(struct wlr_scene *scene, float saturation);
 
+void wlr_scene_set_blur_id(struct wlr_scene *scene, char * id);
+
 /**
  * Handles linux_dmabuf_v1 feedback for all surfaces in the scene.
  *

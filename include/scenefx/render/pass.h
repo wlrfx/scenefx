@@ -100,7 +100,7 @@ struct fx_render_blur_pass_options {
 	bool use_optimized_blur;
 	bool ignore_transparent;
 	float blur_strength;
-	struct fx_corner_radii corners;
+	struct fx_corner_fradii corners;
 	struct clipped_fregion clipped_region;
 };
 

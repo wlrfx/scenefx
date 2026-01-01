@@ -6,7 +6,6 @@
 #include <time.h>
 #include <scenefx/render/fx_renderer/fx_renderer.h>
 #include <scenefx/types/fx/clipped_region.h>
-#include <scenefx/types/fx/corner_location.h>
 #include <scenefx/types/wlr_scene.h>
 #include <unistd.h>
 #include <wayland-server-core.h>
@@ -610,8 +609,7 @@ static void xdg_toplevel_commit(struct wl_listener *listener, void *data) {
 
 	wlr_scene_rect_set_size(toplevel->border, border_width, border_height);
 	wlr_scene_rect_set_clipped_region(toplevel->border, (struct clipped_region) {
-			.corner_radius = toplevel->corner_radius,
-			.corners = CORNER_LOCATION_ALL,
+			.corners = corner_radii_all(toplevel->corner_radius),
 			.area = { BORDER_THICKNESS, BORDER_THICKNESS, geometry->width, geometry->height }
 	});
 
@@ -620,8 +618,7 @@ static void xdg_toplevel_commit(struct wl_listener *listener, void *data) {
 			border_width + (blur_sigma * 2),
 			border_height + (blur_sigma * 2));
 	wlr_scene_shadow_set_clipped_region(toplevel->shadow, (struct clipped_region) {
-			.corner_radius = toplevel->corner_radius + BORDER_THICKNESS,
-			.corners = CORNER_LOCATION_ALL,
+			.corners = corner_radii_all(toplevel->corner_radius + BORDER_THICKNESS),
 			.area = { blur_sigma, blur_sigma, border_width, border_height }
 	});
 }
@@ -655,8 +652,8 @@ static void output_configure_scene(struct wlr_scene_node *node,
 			wlr_scene_buffer_set_opacity(buffer, toplevel->opacity);
 
 			if (!wlr_subsurface_try_from_wlr_surface(xdg_surface->surface)) {
-				wlr_scene_buffer_set_corner_radius(
-						buffer, toplevel->corner_radius, CORNER_LOCATION_BOTTOM);
+				wlr_scene_buffer_set_corner_radii(
+						buffer, corner_radii_bottom(toplevel->corner_radius));
 			}
 		}
 	} else if (node->type == WLR_SCENE_NODE_TREE) {
@@ -805,8 +802,7 @@ static void iter_xdg_scene_buffers(struct wlr_scene_buffer *buffer, int sx,
 		wlr_scene_buffer_set_opacity(buffer, toplevel->opacity);
 
 		if (!wlr_subsurface_try_from_wlr_surface(xdg_surface->surface)) {
-			wlr_scene_buffer_set_corner_radius(buffer, toplevel->corner_radius,
-					CORNER_LOCATION_BOTTOM);
+			wlr_scene_buffer_set_corner_radii(buffer, corner_radii_bottom(toplevel->corner_radius));
 
 			wlr_scene_blur_set_transparency_mask_source(toplevel->blur, buffer);
 		}
@@ -963,8 +959,8 @@ static void server_new_xdg_toplevel(struct wl_listener *listener, void *data) {
 
 	toplevel->border = wlr_scene_rect_create(toplevel->scene_tree, 0, 0,
 			(float[4]){ 1.0f, 0.f, 0.f, 1.0f });
-	wlr_scene_rect_set_corner_radius(toplevel->border,
-			toplevel->corner_radius + BORDER_THICKNESS, CORNER_LOCATION_BOTTOM);
+	wlr_scene_rect_set_corner_radii(toplevel->border,
+			corner_radii_bottom(toplevel->corner_radius + BORDER_THICKNESS));
 	wlr_scene_node_set_position(&toplevel->border->node, -BORDER_THICKNESS, -BORDER_THICKNESS);
 
 	float blur_sigma = 20.0f;
@@ -1147,8 +1143,7 @@ int main(int argc, char *argv[]) {
 	struct wlr_scene_rect *rect = wlr_scene_rect_create(server.layers.toplevel_layer,
 			200, 200, top_rect_color);
 	wlr_scene_rect_set_clipped_region(rect, (struct clipped_region) {
-			.corner_radius = 12,
-			.corners = CORNER_LOCATION_TOP,
+			.corners = {12, 12, 0, 0},
 			.area = {
 				.x = 50,
 				.y = 50,

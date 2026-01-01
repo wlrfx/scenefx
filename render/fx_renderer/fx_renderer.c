@@ -335,7 +335,12 @@ static bool link_shaders(struct fx_renderer *renderer) {
 		goto error;
 	}
 
-	if (!link_quad_round_program(&renderer->shaders.quad_round, (GLint) client_version)) {
+	if (!link_quad_round_program(&renderer->shaders.quad_round, (GLint) client_version, false)) {
+		wlr_log(WLR_ERROR, "Could not link quad round shader");
+		goto error;
+	}
+
+	if (!link_quad_round_program(&renderer->shaders.quad_round_outer_color, (GLint) client_version, true)) {
 		wlr_log(WLR_ERROR, "Could not link quad round shader");
 		goto error;
 	}

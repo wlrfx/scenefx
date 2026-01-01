@@ -308,10 +308,10 @@ static void scene_node_opaque_region(struct wlr_scene_node *node, int x, int y,
 		if (scene_rect->color[3] != 1) {
 			return;
 		}
-		if (!wlr_box_empty(&scene_rect->clipped_region.area)) {
-			pixman_region32_fini(opaque);
-			pixman_region32_init_rect(opaque, x, y, width, height);
 
+		pixman_region32_fini(opaque);
+		pixman_region32_init_rect(opaque, x, y, width, height);
+		if (!wlr_box_empty(&scene_rect->clipped_region.area)) {
 			// Subtract the clipped region from a otherwise fully opaque rect
 			struct wlr_box *clipped = &scene_rect->clipped_region.area;
 			pixman_region32_t clipped_region;
@@ -319,8 +319,12 @@ static void scene_node_opaque_region(struct wlr_scene_node *node, int x, int y,
 					clipped->width, clipped->height);
 			pixman_region32_subtract(opaque, opaque, &clipped_region);
 			pixman_region32_fini(&clipped_region);
-			return;
 		}
+
+		if (pixman_region32_not_empty(&scene_rect->clipped_holes)) {
+			pixman_region32_subtract(opaque, opaque, &scene_rect->clipped_holes);
+		}
+		return;
 	} else if (node->type == WLR_SCENE_NODE_SHADOW) {
 		// TODO: test & handle case of blur sigma = 0 and color[3] = 1?
 		return;
@@ -814,13 +818,17 @@ struct wlr_scene_rect *wlr_scene_rect_create(struct wlr_scene_tree *parent,
 	}
 	scene_node_init(&scene_rect->node, WLR_SCENE_NODE_RECT, parent);
 
+	float transparent[4] = {0.0, 0.0, 0.0, 0.0};
+
 	scene_rect->width = width;
 	scene_rect->height = height;
 	memcpy(scene_rect->color, color, sizeof(scene_rect->color));
+	memcpy(scene_rect->outer_color, transparent, sizeof(scene_rect->outer_color));
 	scene_rect->corner_radius = 0;
 	scene_rect->corners = CORNER_LOCATION_NONE;
 	scene_rect->accepts_input = true;
 	scene_rect->clipped_region = clipped_region_get_default();
+	pixman_region32_init(&scene_rect->clipped_holes);
 
 	scene_node_update(&scene_rect->node, NULL);
 
@@ -836,6 +844,15 @@ void wlr_scene_rect_set_size(struct wlr_scene_rect *rect, int width, int height)
 
 	rect->width = width;
 	rect->height = height;
+	scene_node_update(&rect->node, NULL);
+}
+
+void wlr_scene_rect_set_outer_color(struct wlr_scene_rect *rect, const float color[static 4]) {
+	if (memcmp(rect->outer_color, color, sizeof(rect->outer_color)) == 0) {
+		return;
+	}
+
+	memcpy(rect->outer_color, color, sizeof(rect->outer_color));
 	scene_node_update(&rect->node, NULL);
 }
 
@@ -1814,6 +1831,8 @@ static bool scene_node_at_iterator(struct wlr_scene_node *node,
 				&& wlr_box_contains_point(&rect->clipped_region.area, rx, ry)) {
 			// Inside clipped region
 			return false;
+		} else if (pixman_region32_contains_point(&rect->clipped_holes, rx, ry, NULL)) {
+			return false;
 		}
 	} else if (node->type == WLR_SCENE_NODE_SHADOW
 			|| node->type == WLR_SCENE_NODE_OPTIMIZED_BLUR
@@ -1916,6 +1935,12 @@ static void scene_entry_render(struct render_list_entry *entry, const struct ren
 		transform_output_box(&rect_clipped_region_box, data);
 		corner_location_transform(node_transform, &rect_clipped_corners);
 
+		pixman_region32_t clip;
+		pixman_region32_init(&clip);
+		pixman_region32_copy(&clip, &scene_rect->clipped_holes);
+		pixman_region32_translate(&clip, x, y);
+		pixman_region32_subtract(&clip, &render_region, &clip);
+
 		struct fx_render_rect_options rect_options = {
 			.base = {
 				.box = dst_box,
@@ -1925,7 +1950,7 @@ static void scene_entry_render(struct render_list_entry *entry, const struct ren
 					.b = scene_rect->color[2],
 					.a = scene_rect->color[3],
 				},
-				.clip = &render_region,
+				.clip = &clip,
 			},
 			.clipped_region = {
 				.area = rect_clipped_region_box,
@@ -1940,6 +1965,12 @@ static void scene_entry_render(struct render_list_entry *entry, const struct ren
 				.corner_radius = scene_rect->corner_radius * data->scale,
 				.corners = rect_corners,
 				.clipped_region = rect_options.clipped_region,
+				.outer_color = {
+					.r = scene_rect->outer_color[0],
+					.g = scene_rect->outer_color[1],
+					.b = scene_rect->outer_color[2],
+					.a = scene_rect->outer_color[3],
+				},
 			};
 			fx_render_pass_add_rounded_rect(data->render_pass, &rounded_rect_options);
 		} else {

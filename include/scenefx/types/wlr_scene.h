@@ -154,6 +154,8 @@ struct wlr_scene_rect {
 
 	bool accepts_input;
 	struct clipped_region clipped_region;
+	pixman_region32_t clipped_holes;
+	float outer_color[4];
 };
 
 /** A scene-graph node displaying a shadow */
@@ -531,6 +533,8 @@ void wlr_scene_rect_set_corner_radius(struct wlr_scene_rect *rect, int corner_ra
  */
 void wlr_scene_rect_set_clipped_region(struct wlr_scene_rect *rect,
 		struct clipped_region clipped_region);
+
+void wlr_scene_rect_set_outer_color(struct wlr_scene_rect *rect, const float color[static 4]);
 
 /**
  * Change the color of an existing rectangle node.

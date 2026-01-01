@@ -1,4 +1,5 @@
 #include "scenefx/types/fx/clipped_region.h"
+#include "types/fx/clipped_region.h"
 
 struct fx_corner_radii fx_corner_radii_extend(struct fx_corner_radii corners, int extend) {
 	return (struct fx_corner_radii) {

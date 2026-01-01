@@ -23,6 +23,7 @@
 #include "scenefx/render/pass.h"
 #include "scenefx/types/fx/blur_data.h"
 #include "scenefx/types/fx/clipped_region.h"
+#include "types/fx/clipped_region.h"
 #include "types/wlr_output.h"
 #include "types/wlr_scene.h"
 #include "util/array.h"

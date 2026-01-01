@@ -8,6 +8,7 @@
 
 #include "render/egl.h"
 #include "scenefx/types/fx/clipped_region.h"
+#include "types/fx/clipped_region.h"
 
 struct fx_gles_render_pass {
 	struct wlr_render_pass base;

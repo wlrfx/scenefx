@@ -1,5 +1,5 @@
-#ifndef TYPES_FX_CLIPPED_REGION_H
-#define TYPES_FX_CLIPPED_REGION_H
+#ifndef SCENEFX_TYPES_FX_CLIPPED_REGION_H
+#define SCENEFX_TYPES_FX_CLIPPED_REGION_H
 
 #include <wlr/util/box.h>
 
@@ -11,13 +11,6 @@ struct fx_corner_radii {
 	uint16_t top_right;
 	uint16_t bottom_right;
 	uint16_t bottom_left;
-};
-
-struct fx_corner_fradii {
-	float top_left;
-	float top_right;
-	float bottom_right;
-	float bottom_left;
 };
 
 #define CORNER_RADIUS_MAX (UINT16_MAX)
@@ -51,28 +44,17 @@ static __always_inline struct fx_corner_radii corner_radii_none() {
 	return corner_radii_all(0);
 }
 
-static __always_inline struct fx_corner_radii corner_radii_top(int radius) {
-	return corner_radii_new(radius, radius, 0, 0);
-}
+#define corner_radii_func(name, tl, tr, br, bl) static __always_inline struct fx_corner_radii corner_radii_##name(int radius) { return corner_radii_new(tl, tr, br, bl); }
 
-static __always_inline struct fx_corner_radii corner_radii_bottom(int radius) {
-	return corner_radii_new(0, 0, radius, radius);
-}
-
-static __always_inline struct fx_corner_radii corner_radii_left(int radius) {
-	return corner_radii_new(radius, 0, 0, radius);
-}
-
-static __always_inline struct fx_corner_radii corner_radii_right(int radius) {
-	return corner_radii_new(0, radius, radius, 0);
-}
+corner_radii_func(top, radius, radius, 0, 0);
+corner_radii_func(bottom, 0, 0, radius, radius);
+corner_radii_func(left, radius, 0, 0, radius);
+corner_radii_func(right, 0, radius, radius, 0);
 
 struct fx_corner_radii fx_corner_radii_extend(struct fx_corner_radii corners, int extend);
 
 void fx_corner_radii_transform(enum wl_output_transform transform,
 		struct fx_corner_radii *corners);
-
-struct fx_corner_fradii fx_corner_radii_scale(struct fx_corner_radii, float scale);
 
 bool fx_corner_radii_eq(struct fx_corner_radii lhs, struct fx_corner_radii rhs);
 
@@ -106,18 +88,11 @@ static __always_inline struct fx_corner_radii fx_corner_radii_pick(struct fx_cor
 
 bool fx_corner_radii_is_empty(const struct fx_corner_radii* corners);
 
-bool fx_corner_fradii_is_empty(const struct fx_corner_fradii* corners);
-
 struct clipped_region {
 	struct wlr_box area;
 	struct fx_corner_radii corners;
 };
 
-struct clipped_fregion {
-	struct wlr_box area;
-	struct fx_corner_fradii corners;
-};
-
 struct clipped_region clipped_region_get_default(void);
 
-#endif // !TYPES_FX_CLIPPED_REGION_H
+#endif // !SCENEFX_TYPES_FX_CLIPPED_REGION_H

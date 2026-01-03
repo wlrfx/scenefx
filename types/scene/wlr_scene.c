@@ -294,6 +294,32 @@ static bool scene_nodes_in_box(struct wlr_scene_node *node, struct wlr_box *box,
 	return _scene_nodes_in_box(node, box, iterator, user_data, x, y);
 }
 
+static pixman_region32_t create_corner_location_region(struct fx_corner_radii corners, int x, int y, int width, int height) {
+	pixman_region32_t corner_region;
+	pixman_region32_init(&corner_region);
+	if (corners.top_left) {
+		pixman_region32_union_rect(&corner_region, &corner_region, x, y, corners.top_left, corners.top_left);
+	}
+
+	if (corners.top_right) {
+		pixman_region32_union_rect(&corner_region, &corner_region, x + (width - corners.top_right), y,
+			corners.top_right, corners.top_right);
+	}
+
+	if (corners.bottom_left) {
+		pixman_region32_union_rect(&corner_region, &corner_region, x, y + (height - corners.bottom_left),
+			corners.bottom_left, corners.bottom_left);
+	}
+
+	if (corners.bottom_right) {
+		pixman_region32_union_rect(&corner_region, &corner_region,
+			x + (width - corners.bottom_right), y + (height - corners.bottom_right),
+			corners.bottom_right, corners.bottom_right);
+	}
+
+	return corner_region;
+}
+
 static void scene_node_opaque_region(struct wlr_scene_node *node, int x, int y,
 		pixman_region32_t *opaque) {
 	int width, height;
@@ -301,26 +327,30 @@ static void scene_node_opaque_region(struct wlr_scene_node *node, int x, int y,
 
 	if (node->type == WLR_SCENE_NODE_RECT) {
 		struct wlr_scene_rect *scene_rect = wlr_scene_rect_from_node(node);
-		if (!fx_corner_radii_is_empty(&scene_rect->corners)) {
-			// TODO: this is incorrect
-			return;
-		}
 		if (scene_rect->color[3] != 1) {
 			return;
 		}
-		if (!wlr_box_empty(&scene_rect->clipped_region.area)) {
-			pixman_region32_fini(opaque);
-			pixman_region32_init_rect(opaque, x, y, width, height);
 
-			// Subtract the clipped region from a otherwise fully opaque rect
+		pixman_region32_fini(opaque);
+		pixman_region32_init_rect(opaque, x, y, width, height);
+
+		// subtract corners from opaque region
+		if (!fx_corner_radii_is_empty(&scene_rect->corners)) {
+			pixman_region32_t corners = create_corner_location_region(scene_rect->corners, x, y, width, height);
+			pixman_region32_subtract(opaque, opaque, &corners);
+			pixman_region32_fini(&corners);
+		}
+
+		// subtract clipped area from opaque region
+		if (!wlr_box_empty(&scene_rect->clipped_region.area)) {
 			struct wlr_box *clipped = &scene_rect->clipped_region.area;
 			pixman_region32_t clipped_region;
 			pixman_region32_init_rect(&clipped_region, clipped->x + x, clipped->y + y,
 					clipped->width, clipped->height);
 			pixman_region32_subtract(opaque, opaque, &clipped_region);
 			pixman_region32_fini(&clipped_region);
-			return;
 		}
+		return;
 	} else if (node->type == WLR_SCENE_NODE_SHADOW) {
 		// TODO: test & handle case of blur sigma = 0 and color[3] = 1?
 		return;
@@ -335,24 +365,29 @@ static void scene_node_opaque_region(struct wlr_scene_node *node, int x, int y,
 			return;
 		}
 
-		if (!fx_corner_radii_is_empty(&scene_buffer->corners)) {
-			// TODO: this is incorrect
-			return;
-		}
-
 		if (!scene_buffer->buffer_is_opaque) {
 			pixman_region32_copy(opaque, &scene_buffer->opaque_region);
 			pixman_region32_intersect_rect(opaque, opaque, 0, 0, width, height);
 			pixman_region32_translate(opaque, x, y);
-			return;
+		} else {
+			pixman_region32_fini(opaque);
+			pixman_region32_init_rect(opaque, x, y, width, height);
 		}
+
+		// subtract the colors from the opaque region
+		if (!fx_corner_radii_is_empty(&scene_buffer->corners)) {
+			pixman_region32_t corners = create_corner_location_region(scene_buffer->corners, x, y, width, height);
+			pixman_region32_subtract(opaque, opaque, &corners);
+			pixman_region32_fini(&corners);
+		}
+
+		return;
 	} else if (node->type == WLR_SCENE_NODE_OPTIMIZED_BLUR || node->type == WLR_SCENE_NODE_BLUR) {
 		// Always transparent
 		return;
 	}
 
-	pixman_region32_fini(opaque);
-	pixman_region32_init_rect(opaque, x, y, width, height);
+	unreachable();
 }
 
 struct scene_update_data {

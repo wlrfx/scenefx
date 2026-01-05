@@ -3,6 +3,8 @@
 
 #include <GLES2/gl2.h>
 #include <stdbool.h>
+#include <scenefx/types/fx/clipped_region.h>
+#include "types/fx/clipped_region.h"
 
 struct fx_renderer;
 
@@ -20,6 +22,15 @@ enum fx_tex_shader_source {
 	SHADER_SOURCE_TEXTURE_EXTERNAL = 3,
 };
 
+struct shader_corner_radii {
+	GLint top_left;
+	GLint top_right;
+	GLint bottom_left;
+	GLint bottom_right;
+};
+
+void uniform_corner_radii_set(struct shader_corner_radii *uniform, struct fx_corner_fradii *corners);
+
 struct quad_shader {
 	GLuint program;
 	GLint proj;
@@ -28,10 +39,7 @@ struct quad_shader {
 
 	GLint clip_size;
 	GLint clip_position;
-	GLint clip_radius_top_left;
-	GLint clip_radius_top_right;
-	GLint clip_radius_bottom_left;
-	GLint clip_radius_bottom_right;
+	struct shader_corner_radii clip_radius;
 };
 
 bool link_quad_program(struct quad_shader *shader, GLint client_version);
@@ -62,17 +70,11 @@ struct quad_round_shader {
 	GLint size;
 	GLint position;
 
-	GLint radius_top_left;
-	GLint radius_top_right;
-	GLint radius_bottom_left;
-	GLint radius_bottom_right;
+	struct shader_corner_radii radius;
 
 	GLint clip_size;
 	GLint clip_position;
-	GLint clip_radius_top_left;
-	GLint clip_radius_top_right;
-	GLint clip_radius_bottom_left;
-	GLint clip_radius_bottom_right;
+	struct shader_corner_radii clip_radius;
 };
 
 bool link_quad_round_program(struct quad_round_shader *shader, GLint client_version);
@@ -94,10 +96,7 @@ struct quad_grad_round_shader {
 	GLint count;
 	GLint blend;
 
-	GLint radius_top_left;
-	GLint radius_top_right;
-	GLint radius_bottom_left;
-	GLint radius_bottom_right;
+	struct shader_corner_radii radius;
 
 	int max_len;
 };
@@ -113,19 +112,13 @@ struct tex_shader {
 	GLint pos_attrib;
 	GLint size;
 	GLint position;
-	GLint radius_top_left;
-	GLint radius_top_right;
-	GLint radius_bottom_left;
-	GLint radius_bottom_right;
+	struct shader_corner_radii radius;
 
 	GLint discard_transparent;
 
 	GLint clip_size;
 	GLint clip_position;
-	GLint clip_radius_top_left;
-	GLint clip_radius_top_right;
-	GLint clip_radius_bottom_left;
-	GLint clip_radius_bottom_right;
+	struct shader_corner_radii clip_radius;
 };
 
 bool link_tex_program(struct tex_shader *shader, GLint client_version, enum fx_tex_shader_source source);
@@ -142,10 +135,7 @@ struct box_shadow_shader {
 
 	GLint clip_position;
 	GLint clip_size;
-	GLint clip_radius_top_left;
-	GLint clip_radius_top_right;
-	GLint clip_radius_bottom_left;
-	GLint clip_radius_bottom_right;
+	struct shader_corner_radii clip_radius;
 };
 
 bool link_box_shadow_program(struct box_shadow_shader *shader, GLint client_version);

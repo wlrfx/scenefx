@@ -175,8 +175,7 @@ struct wlr_scene_buffer_crossfade {
 	struct wlr_scene_buffer *scene_buffer_next; // can be NULL
 	float progress;
 
-	int corner_radius;
-	enum corner_location corners;
+	struct fx_corner_radii corners;
 	float opacity;
 
 	struct wlr_fbox src_box;
@@ -736,11 +735,16 @@ void wlr_scene_buffer_crossfade_set_opacity(
 	struct wlr_scene_buffer_crossfade *scene_buffer_crossfade, float opacity);
 
 /**
- * Sets the buffer crossfade's corner radius.
- */
+* Sets the corner radius of all corners to round of this buffer crossfade
+*/
 void wlr_scene_buffer_crossfade_set_corner_radius(
-	struct wlr_scene_buffer_crossfade *scene_buffer_crossfade,
-	int radii, enum corner_location corners);
+		struct wlr_scene_buffer_crossfade *scene_buffer_crossfade, int radii);
+
+/**
+* Sets the corner radii of this buffer crossfade
+*/
+void wlr_scene_buffer_crossfade_set_corner_radii(
+		struct wlr_scene_buffer_crossfade *scene_buffer_crossfade, struct fx_corner_radii corner_radii);
 
 /**
  * Set the progress of the crossfade between the prev and next buffers (0-1)

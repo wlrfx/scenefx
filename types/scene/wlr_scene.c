@@ -1,4 +1,4 @@
-#include <assert.h>wlr_sce
+#include <assert.h>
 #include <pixman.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -409,8 +409,8 @@ static void scene_node_opaque_region(struct wlr_scene_node *node, int x, int y,
 		}
 
 		// subtract the corners from the opaque region
-		if (!fx_corner_radii_is_empty(&scene_buffer->corners)) {
-			pixman_region32_t corners = create_corner_location_region(scene_buffer->corners, x, y, width, height);
+		if (!fx_corner_radii_is_empty(&scene_buffer_crossfade->corners)) {
+			pixman_region32_t corners = create_corner_location_region(scene_buffer_crossfade->corners, x, y, width, height);
 			pixman_region32_subtract(opaque, opaque, &corners);
 			pixman_region32_fini(&corners);
 		}
@@ -1345,8 +1345,7 @@ struct wlr_scene_buffer_crossfade *wlr_scene_buffer_crossfade_create(struct wlr_
 	buffer_crossfade->scene_buffer_prev = from_buffer;
 	buffer_crossfade->scene_buffer_next = to_buffer;
 	buffer_crossfade->opacity = 1.0f;
-	buffer_crossfade->corner_radius = 0;
-	buffer_crossfade->corners = CORNER_LOCATION_NONE;
+	buffer_crossfade->corners = corner_radii_all(0);
 	buffer_crossfade->progress = 0;
 
 	// TODO: render if either buffer?
@@ -1398,16 +1397,18 @@ void wlr_scene_buffer_crossfade_set_opacity(
 	scene_node_update(&scene_buffer_crossfade->node, NULL);
 }
 
-void wlr_scene_buffer_crossfade_set_corner_radius(
-		struct wlr_scene_buffer_crossfade *scene_buffer_crossfade,
-		int radii, enum corner_location corners) {
-	if (scene_buffer_crossfade->corner_radius == radii
-			&& scene_buffer_crossfade->corners == corners) {
+inline void wlr_scene_buffer_crossfade_set_corner_radius(
+		struct wlr_scene_buffer_crossfade *scene_buffer_crossfade, int radii) {
+	wlr_scene_buffer_crossfade_set_corner_radii(scene_buffer_crossfade, corner_radii_all(radii));
+}
+
+void wlr_scene_buffer_crossfade_set_corner_radii(
+		struct wlr_scene_buffer_crossfade *scene_buffer_crossfade, struct fx_corner_radii corner_radii) {
+	if (fx_corner_radii_eq(scene_buffer_crossfade->corners, corner_radii)) {
 		return;
 	}
 
-	scene_buffer_crossfade->corner_radius = radii;
-	scene_buffer_crossfade->corners = corners;
+	scene_buffer_crossfade->corners = corner_radii;
 	scene_node_update(&scene_buffer_crossfade->node, NULL);
 }
 
@@ -1709,7 +1710,7 @@ inline void wlr_scene_buffer_set_corner_radius(struct wlr_scene_buffer *scene_bu
 }
 
 void wlr_scene_buffer_set_corner_radii(struct wlr_scene_buffer *scene_buffer,
-	struct fx_corner_radii corner_radii) {
+		struct fx_corner_radii corner_radii) {
 	if (fx_corner_radii_eq(scene_buffer->corners, corner_radii)) {
 		return;
 	}
@@ -2249,8 +2250,8 @@ static void scene_entry_render(struct render_list_entry *entry, const struct ren
 			break;
 		}
 
-		enum corner_location corner_location = scene_buffer_crossfade->corners;
-		corner_location_transform(node_transform, &corner_location);
+		struct fx_corner_radii buffer_crossfade_corners = scene_buffer_crossfade->corners;
+		fx_corner_radii_transform(node_transform, &buffer_crossfade_corners);
 
 		struct fx_render_texture_crossfade_options tex_crossfade_options = {
 			.texture_prev = texture_prev,
@@ -2266,8 +2267,7 @@ static void scene_entry_render(struct render_list_entry *entry, const struct ren
 				WLR_RENDER_BLEND_MODE_PREMULTIPLIED : WLR_RENDER_BLEND_MODE_NONE,
 			.wait_timeline = scene_buffer_next->wait_timeline,
 			.wait_point = scene_buffer_next->wait_point,
-			.corners = corner_location,
-			.corner_radius = scene_buffer_crossfade->corner_radius * data->scale,
+			.corners = fx_corner_radii_scale(buffer_crossfade_corners, data->scale),
 			.progress = scene_buffer_crossfade->progress,
 		};
 

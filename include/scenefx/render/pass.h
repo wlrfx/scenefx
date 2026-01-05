@@ -72,8 +72,7 @@ struct fx_render_texture_crossfade_options {
 	struct wlr_drm_syncobj_timeline *wait_timeline;
 	uint64_t wait_point;
 	float *alpha;
-	const enum corner_location corners;
-	const int corner_radius;
+	struct fx_corner_fradii corners;
 	const float progress;
 };
 

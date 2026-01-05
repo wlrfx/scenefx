@@ -432,10 +432,10 @@ bool link_tex_crossfade_program(struct tex_crossfade_shader *shader, GLint clien
 	shader->tex_proj = glGetUniformLocation(prog, "tex_proj");
 	shader->size = glGetUniformLocation(prog, "size");
 	shader->position = glGetUniformLocation(prog, "position");
-	shader->radius_top_left = glGetUniformLocation(prog, "radius_top_left");
-	shader->radius_top_right = glGetUniformLocation(prog, "radius_top_right");
-	shader->radius_bottom_left = glGetUniformLocation(prog, "radius_bottom_left");
-	shader->radius_bottom_right = glGetUniformLocation(prog, "radius_bottom_right");
+	shader->radius.top_left = glGetUniformLocation(prog, "radius_top_left");
+	shader->radius.top_right = glGetUniformLocation(prog, "radius_top_right");
+	shader->radius.bottom_left = glGetUniformLocation(prog, "radius_bottom_left");
+	shader->radius.bottom_right = glGetUniformLocation(prog, "radius_bottom_right");
 
 	return true;
 }

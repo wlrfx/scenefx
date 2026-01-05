@@ -177,10 +177,7 @@ struct tex_crossfade_shader {
 	GLint pos_attrib;
 	GLint size;
 	GLint position;
-	GLint radius_top_left;
-	GLint radius_top_right;
-	GLint radius_bottom_left;
-	GLint radius_bottom_right;
+	struct shader_corner_radii radius;
 	GLint progress;
 };
 

@@ -481,7 +481,7 @@ void fx_render_pass_add_texture_crossfade(struct fx_gles_render_pass *pass,
 	bool has_alpha = texture_prev->has_alpha
 		|| texture_next->has_alpha
 		|| alpha < 1.0
-		|| options->corner_radius > 0;
+		|| !fx_corner_fradii_is_empty(&options->corners);
 	setup_blending(!has_alpha ? WLR_RENDER_BLEND_MODE_NONE : options->blend_mode);
 
 
@@ -515,22 +515,14 @@ void fx_render_pass_add_texture_crossfade(struct fx_gles_render_pass *pass,
 		break;
 	}
 
-	enum corner_location corners = options->corners;
-
 	glUniform1i(shader->tex_prev, 0);
 	glUniform1i(shader->tex_next, 1);
 	glUniform1f(shader->alpha, alpha);
 	glUniform2f(shader->size, dst_box.width, dst_box.height);
 	glUniform2f(shader->position, dst_box.x, dst_box.y);
-	glUniform1f(shader->radius_top_left, (CORNER_LOCATION_TOP_LEFT & corners) == CORNER_LOCATION_TOP_LEFT ?
-			options->corner_radius : 0);
-	glUniform1f(shader->radius_top_right, (CORNER_LOCATION_TOP_RIGHT & corners) == CORNER_LOCATION_TOP_RIGHT ?
-			options->corner_radius : 0);
-	glUniform1f(shader->radius_bottom_left, (CORNER_LOCATION_BOTTOM_LEFT & corners) == CORNER_LOCATION_BOTTOM_LEFT ?
-			options->corner_radius : 0);
-	glUniform1f(shader->radius_bottom_right, (CORNER_LOCATION_BOTTOM_RIGHT & corners) == CORNER_LOCATION_BOTTOM_RIGHT ?
-			options->corner_radius : 0);
 	glUniform1f(shader->progress, options->progress);
+	struct fx_corner_fradii corners = options->corners;
+	uniform_corner_radii_set(&shader->radius, &corners);
 
 	set_proj_matrix(shader->proj, pass->projection_matrix, &dst_box);
 	set_tex_matrix(shader->tex_proj, options->transform, &src_fbox);

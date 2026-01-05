@@ -715,7 +715,7 @@ static bool scene_node_update_iterator(struct wlr_scene_node *node,
 	// Expand the damage to compensate for blur artifacts
 	if (node->type == WLR_SCENE_NODE_BLUR) {
 		wlr_region_expand(&node->visible, &node->visible,
-		blur_data_calc_size(data->blur_data));
+			blur_data_calc_size(data->blur_data));
 	}
 
 	if (data->calculate_visibility && !data->optimized_blur_dirty) {
@@ -1071,7 +1071,7 @@ struct wlr_scene_blur *wlr_scene_blur_create(struct wlr_scene_tree *parent,
 	blur->clipped_region = (struct clipped_region){0};
 	blur->corners = corner_radii_all(0);
 	blur->should_only_blur_bottom_layer = false;
-	blur->transparency_mask_source = linked_node_init();;
+	blur->transparency_mask_source = linked_node_init();
 	blur->width = width;
 	blur->height = height;
 
@@ -2133,7 +2133,6 @@ static void scene_entry_render(struct render_list_entry *entry, const struct ren
 				.corners = fx_corner_radii_scale(blur_corners, data->scale),
 				.discard_transparent = false,
 			},
-			.opaque_region = NULL,
 			.use_optimized_blur = blur->should_only_blur_bottom_layer,
 			.blur_data = &scene->blur_data,
 			.ignore_transparent = mask != NULL,

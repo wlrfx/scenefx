@@ -582,6 +582,11 @@ void wlr_scene_shadow_set_reference_buffer(struct wlr_scene_shadow *shadow,
 		struct wlr_scene_buffer *ref_buffer);
 
 /**
+ * Get the reference scene_buffer.
+ */
+struct wlr_scene_buffer *wlr_scene_shadow_get_reference_buffer(struct wlr_scene_shadow *shadow);
+
+/**
  * Gets the sample size of the shadow. Can be used when setting the size of
  * the shadow node. Returns the correct size offset used depending on the
  * shadow-type. A drop-shadow returns a larger integer compared to the

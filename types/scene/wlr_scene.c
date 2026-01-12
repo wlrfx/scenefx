@@ -23,6 +23,7 @@
 #include "scenefx/render/pass.h"
 #include "scenefx/types/fx/blur_data.h"
 #include "scenefx/types/fx/clipped_region.h"
+#include "scenefx/types/linked_node.h"
 #include "types/fx/clipped_region.h"
 #include "types/wlr_output.h"
 #include "types/wlr_scene.h"
@@ -161,6 +162,7 @@ void wlr_scene_node_destroy(struct wlr_scene_node *node) {
 		scene_buffer_set_texture(scene_buffer, NULL);
 		pixman_region32_fini(&scene_buffer->opaque_region);
 		wlr_drm_syncobj_timeline_unref(scene_buffer->wait_timeline);
+		linked_node_destroy(&scene_buffer->drop_shadow_link);
 		linked_node_destroy(&scene_buffer->blur);
 
 		assert(wl_list_empty(&scene_buffer->events.output_leave.listener_list));
@@ -1000,9 +1002,9 @@ struct wlr_scene_shadow *wlr_scene_shadow_create(struct wlr_scene_tree *parent,
 	memcpy(scene_shadow->color, color, sizeof(scene_shadow->color));
 	scene_shadow->clipped_region = clipped_region_get_default();
 
-	scene_node_update(&scene_shadow->node, NULL);
-
 	scene_shadow->buffer_link = linked_node_init();
+
+	scene_node_update(&scene_shadow->node, NULL);
 
 	return scene_shadow;
 }
@@ -1047,22 +1049,31 @@ void wlr_scene_shadow_set_color(struct wlr_scene_shadow *shadow, const float col
 
 void wlr_scene_shadow_set_reference_buffer(struct wlr_scene_shadow *shadow,
 		struct wlr_scene_buffer *ref_buffer) {
-	struct linked_node *buffer_link = linked_node_get_sibling(&shadow->buffer_link);
-	if (buffer_link) {
-		struct wlr_scene_buffer *scene_buffer = wl_container_of(buffer_link, scene_buffer, drop_shadow_link);
-		if (scene_buffer != NULL && scene_buffer == ref_buffer) {
-			// Skip
-			return;
-		}
-		linked_node_unlink(&shadow->buffer_link, buffer_link);
-	}
-
-	if (!ref_buffer) {
+	if (!ref_buffer && !shadow->buffer_link.link) {
 		return;
 	}
-	linked_node_init_link(&shadow->buffer_link, &ref_buffer->drop_shadow_link);
+
+	if (ref_buffer && linked_nodes_are_linked(&shadow->buffer_link, &ref_buffer->drop_shadow_link)) {
+		return;
+	}
+
+	linked_node_destroy(&shadow->buffer_link);
+	if (ref_buffer) {
+		linked_node_destroy(&ref_buffer->drop_shadow_link);
+		linked_node_init_link(&shadow->buffer_link, &ref_buffer->drop_shadow_link);
+	}
 
 	scene_node_update(&shadow->node, NULL);
+}
+
+struct wlr_scene_buffer *wlr_scene_shadow_get_reference_buffer(struct wlr_scene_shadow *shadow) {
+	struct linked_node *node = linked_node_get_sibling(&shadow->buffer_link);
+	if (node == NULL) {
+		return NULL;
+	}
+
+	struct wlr_scene_buffer *scene_buffer = wl_container_of(node, scene_buffer, drop_shadow_link);
+	return scene_buffer;
 }
 
 int wlr_scene_shadow_get_offset(struct wlr_scene_shadow *shadow) {
@@ -2092,12 +2103,7 @@ static void scene_entry_render(struct render_list_entry *entry, const struct ren
 
 		// Drop Shadow
 		if (SCENE_SHADOW_IS_DROP(scene_shadow)) {
-			struct linked_node *buffer_link = linked_node_get_sibling(&scene_shadow->buffer_link);
-			struct wlr_scene_buffer *scene_buffer = NULL;
-			if (buffer_link != NULL) {
-				scene_buffer = wl_container_of(buffer_link, scene_buffer, drop_shadow_link);
-			}
-
+			struct wlr_scene_buffer *scene_buffer = wlr_scene_shadow_get_reference_buffer(scene_shadow);
 			if (!scene_buffer) {
 				wlr_log(WLR_ERROR, "Trying to render drop-shadow with NULL reference_buffer."
 						" Please set the buffer before rendering. Rendering as a box-shadow...");

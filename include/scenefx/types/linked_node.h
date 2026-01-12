@@ -16,6 +16,8 @@ struct linked_node {
 		.link = NULL \
 	})
 
+#define linked_node_initialized(node) ((node)->link != NULL)
+
 bool linked_nodes_are_linked(struct linked_node *node_1,
 		struct linked_node *node_2);
 

@@ -79,7 +79,9 @@ void fx_framebuffer_get_or_create_custom(struct fx_renderer *renderer,
 	int height = output->height;
 	struct wlr_buffer *wlr_buffer = NULL;
 
-	// Try getting a format with alpha. One could use the outputs swapchain
+	// TODO: Configure to use non-alpha to save some GPU memory :)
+	// TODO: Cache this, don't find it at runtime
+	// Try getting a format with alpha. We could use the outputs swapchain
 	// format, but that one doesn't support alpha.
 	const struct fx_pixel_format *pix_fmt =
 		get_fx_format_from_gl(GL_RGBA, GL_UNSIGNED_BYTE, true);

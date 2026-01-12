@@ -58,6 +58,7 @@ enum wlr_scene_node_type {
 	WLR_SCENE_NODE_TREE,
 	WLR_SCENE_NODE_RECT,
 	WLR_SCENE_NODE_SHADOW,
+	WLR_SCENE_NODE_DROP_SHADOW,
 	WLR_SCENE_NODE_BUFFER,
 	WLR_SCENE_NODE_OPTIMIZED_BLUR,
 	WLR_SCENE_NODE_BLUR,
@@ -162,9 +163,20 @@ struct wlr_scene_shadow {
 	float color[4];
 	float blur_sigma;
 
+	struct clipped_region clipped_region;
+};
+
+/** A scene-graph node displaying a dynamic drop-shadow */
+struct wlr_scene_drop_shadow {
+	struct wlr_scene_node node;
+	int width, height;
+	float color[4];
+	float blur_sigma;
+
 	struct {
-		// Used to draw a drop-shadow
-		struct linked_node buffer_link;
+		float blur_sample_size;
+		// Skips drawing if NULL
+		struct linked_node buffer_source;
 	} WLR_PRIVATE;
 
 	struct clipped_region clipped_region;
@@ -182,7 +194,9 @@ struct wlr_scene_blur {
 
 	bool should_only_blur_bottom_layer;
 
-	struct linked_node transparency_mask_source;
+	struct {
+		struct linked_node transparency_mask_source;
+	} WLR_PRIVATE;
 };
 
 /** A scene-graph node telling SceneFX to render the optimized blur */
@@ -261,7 +275,7 @@ struct wlr_scene_buffer {
 
 		struct linked_node blur;
 		// Used to know which shadow's linked to this scene_buffer
-		struct linked_node drop_shadow_link;
+		struct linked_node drop_shadow;
 	} WLR_PRIVATE;
 };
 
@@ -496,6 +510,16 @@ struct wlr_scene_rect *wlr_scene_rect_from_node(struct wlr_scene_node *node);
  */
 struct wlr_scene_shadow *wlr_scene_shadow_from_node(struct wlr_scene_node *node);
 
+/**
+ * If this node represents a wlr_scene_drop_shadow, that shadow will be returned. It
+ * is not legal to feed a node that does not represent a wlr_scene_drop_shadow.
+ */
+struct wlr_scene_drop_shadow *wlr_scene_drop_shadow_from_node(struct wlr_scene_node *node);
+
+/**
+ * If this node represents a wlr_scene_blur node, that blur node will be returned.
+ * It is not legal to feed a node that does not represent a wlr_scene_blur node.
+ */
 struct wlr_scene_blur *wlr_scene_blur_from_node(struct wlr_scene_node *node);
 
 /**
@@ -547,8 +571,7 @@ void wlr_scene_rect_set_clipped_region(struct wlr_scene_rect *rect,
 void wlr_scene_rect_set_color(struct wlr_scene_rect *rect, const float color[static 4]);
 
 /**
- * Add a node displaying a shadow to the scene-graph. The shadow type created is
- * a regular box-shadow.
+ * Add a node displaying a shadow to the scene-graph.
  */
 struct wlr_scene_shadow *wlr_scene_shadow_create(struct wlr_scene_tree *parent,
 		int width, int height, int corner_radius, float blur_sigma,
@@ -575,30 +598,6 @@ void wlr_scene_shadow_set_blur_sigma(struct wlr_scene_shadow *shadow, float blur
 void wlr_scene_shadow_set_color(struct wlr_scene_shadow *shadow, const float color[static 4]);
 
 /**
- * Change the reference scene_buffer.
- * NOTE: Will fallback to a box-shadow if the provided buffer is NULL.
- */
-void wlr_scene_shadow_set_reference_buffer(struct wlr_scene_shadow *shadow,
-		struct wlr_scene_buffer *ref_buffer);
-
-/**
- * Get the reference scene_buffer.
- */
-struct wlr_scene_buffer *wlr_scene_shadow_get_reference_buffer(struct wlr_scene_shadow *shadow);
-
-/**
- * Gets the sample size of the shadow. Can be used when setting the size of
- * the shadow node. Returns the correct size offset used depending on the
- * shadow-type. A drop-shadow returns a larger integer compared to the
- * box-shadow, so this can be used to dynamically adjust the size and position
- * depending on the shadow-type. Eg:
- *
- * Scene Buffer size: 100 x 100px
- * Proper Shadow Node size: 100px + offset x 100px + offset = the correct size
- */
-int wlr_scene_shadow_get_offset(struct wlr_scene_shadow *shadow);
-
-/**
  * Sets the region where to clip the shadow.
  *
  * For there to be corner rounding of the clipped region, the corner radius and
@@ -607,6 +606,88 @@ int wlr_scene_shadow_get_offset(struct wlr_scene_shadow *shadow);
  * NOTE: The positioning is node-relative.
  */
 void wlr_scene_shadow_set_clipped_region(struct wlr_scene_shadow *shadow,
+		struct clipped_region clipped_region);
+
+/**
+ * Add a node displaying a drop shadow to the scene-graph.
+ *
+ * It's recommended to use `wlr_scene_drop_shadow_calculate_offset` when first
+ * setting the size and adjusting the nodes position.
+ *
+ * NOTE: A reference `wlr_scene_buffer` needs to be set using
+ * `wlr_scene_drop_shadow_set_reference_buffer` for the shadow to render.
+ */
+struct wlr_scene_drop_shadow *wlr_scene_drop_shadow_create(struct wlr_scene_tree *parent,
+		int width, int height, float blur_sigma, const float color[static 4]);
+
+/**
+ * Change the width and height of an existing drop shadow node.
+ *
+ * NOTE: The set size of the node doesn't include the blur sample size (offset),
+ * It's recommended to include the offset in the calculations by using
+ * `wlr_scene_drop_shadow_get_offset`.
+ *
+ * Proper Width example: `toplevel_width + offset * 2 = correctly_fitted_width`
+ * Proper X Position example: `toplevel_x - offset = correctly_x_positioned`
+ */
+void wlr_scene_drop_shadow_set_size(struct wlr_scene_drop_shadow *shadow, int width, int height);
+
+/**
+ * Change the blur_sigma of an existing drop shadow node.
+ *
+ * NOTE: This adjusts the drop-shadows offset, so it's recommended to also
+ * adjust the nodes size and position to compensate.
+ */
+void wlr_scene_drop_shadow_set_blur_sigma(struct wlr_scene_drop_shadow *shadow, float blur_sigma);
+
+/**
+ * Change the color of an existing drop shadow node.
+ */
+void wlr_scene_drop_shadow_set_color(struct wlr_scene_drop_shadow *shadow, const float color[static 4]);
+
+/**
+ * Change the reference scene_buffer.
+ * NOTE: Will skip rendering if the provided buffer is NULL.
+ */
+void wlr_scene_drop_shadow_set_reference_buffer(struct wlr_scene_drop_shadow *shadow,
+		struct wlr_scene_buffer *ref_buffer);
+
+/**
+ * Get the reference scene_buffer.
+ */
+struct wlr_scene_buffer *wlr_scene_drop_shadow_get_reference_buffer(struct wlr_scene_drop_shadow *shadow);
+
+/**
+ * Gets the offset of a drop shadow, the recommended way. Can be used as an
+ * offset for setting the correct size and position relative to a toplevel.
+ * Proper Width example: `toplevel_width + offset * 2 = correctly_fitted_width`
+ * Proper X Position example: `toplevel_x - offset = correctly_x_positioned`
+ *
+ * This is the same as `wlr_scene_drop_shadow_calculate_offset`, but uses the
+ * already cached offset instead of recalculating the offset.
+ */
+int wlr_scene_drop_shadow_get_offset(struct wlr_scene_drop_shadow *shadow);
+
+/**
+ * Gets the sample size of a drop shadow.
+ *
+ * Tip: Recalculates the offset, so it's recommended to only use this function
+ * to calculate the initial size and position of the node while using
+ * `wlr_scene_drop_shadow_get_offset` in other cases.
+ */
+__always_inline float wlr_scene_drop_shadow_calculate_offset(int blur_sigma) {
+	return drop_shadow_calc_size(blur_sigma);
+}
+
+/**
+ * Sets the region where to clip the drop shadow.
+ *
+ * For there to be corner rounding of the clipped region, the corner radius and
+ * corners must be non-zero.
+ *
+ * NOTE: The positioning is node-relative.
+ */
+void wlr_scene_drop_shadow_set_clipped_region(struct wlr_scene_drop_shadow *shadow,
 		struct clipped_region clipped_region);
 
 /**

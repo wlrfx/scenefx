@@ -100,10 +100,9 @@ static void surface_handle_commit(struct wl_listener *listener, void *data) {
 	wlr_scene_rect_set_size(surface->border,
 			surface->wlr->current.width + 2 * border_width,
 			surface->wlr->current.height + 2 * border_width);
-	const int blur_offset = wlr_scene_shadow_get_offset(surface->shadow);
 	wlr_scene_shadow_set_size(surface->shadow,
-			surface->wlr->current.width + 2 * (blur_offset + border_width),
-			surface->wlr->current.height + 2 * (blur_offset + border_width));
+			surface->wlr->current.width + 2 * (surface->shadow->blur_sigma + border_width),
+			surface->wlr->current.height + 2 * (surface->shadow->blur_sigma + border_width));
 }
 
 static void surface_handle_destroy(struct wl_listener *listener, void *data) {
@@ -140,9 +139,8 @@ static void server_handle_new_surface(struct wl_listener *listener,
 	float blur_sigma = 20.0f;
 	surface->shadow = wlr_scene_shadow_create(&server->scene->tree,
 			0, 0, corner_radius, blur_sigma, (float[4]){ 1.0f, 0.f, 0.f, 1.0f });
-	const int blur_offset = wlr_scene_shadow_get_offset(surface->shadow);
 	wlr_scene_node_set_position(&surface->shadow->node,
-			pos - blur_offset, pos - blur_offset);
+			pos - blur_sigma, pos - blur_sigma);
 	surface->scene_surface =
 		wlr_scene_surface_create(&server->scene->tree, wlr_surface);
 	wlr_scene_buffer_set_corner_radius(

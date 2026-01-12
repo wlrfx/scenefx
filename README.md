@@ -4,6 +4,13 @@ wlroots is the de-facto library for building wayland compositors, and its scene 
 
 **Please note: while SceneFX is in use by SwayFX version 0.4, it is not yet ready for usage by other compositors. Please refer to the [1.0 milestone](https://github.com/wlrfx/scenefx/milestone/2) to track the remaining tasks for our stable 1.0 release**
 
+## Compositors Using SceneFX
+Plenty of popular wayland compositors are using SceneFX to render eyecandy, including:
+- [SwayFX](https://github.com/WillPower3309/swayfx)
+- [MangoWC](https://github.com/DreamMaoMao/mangowc)
+- [mwc](https://github.com/nikoloc/mwc)
+- dwl [with a patch](https://codeberg.org/dwl/dwl-patches/src/branch/main/stale-patches/scenefx)
+
 ## Installation
 <a href="https://repology.org/project/scenefx/versions"><img src="https://repology.org/badge/vertical-allrepos/scenefx.svg"/></a>
 

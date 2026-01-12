@@ -8,7 +8,7 @@
 
 #include "render/egl.h"
 #include "scenefx/types/fx/clipped_region.h"
-#include "scenefx/types/fx/corner_location.h"
+#include "types/fx/clipped_region.h"
 
 struct fx_gles_render_pass {
 	struct wlr_render_pass base;
@@ -55,14 +55,14 @@ struct fx_gradient {
 struct fx_render_texture_options {
 	struct wlr_render_texture_options base;
 	const struct wlr_box *clip_box; // Used to clip csd. Ignored if NULL
-	enum corner_location corners;
-	int corner_radius;
+	struct fx_corner_fradii corners;
 	bool discard_transparent;
+	struct clipped_fregion clipped_region;
 };
 
 struct fx_render_rect_options {
 	struct wlr_render_rect_options base;
-	struct clipped_region clipped_region;
+	struct clipped_fregion clipped_region;
 };
 
 struct fx_render_rect_grad_options {
@@ -72,21 +72,19 @@ struct fx_render_rect_grad_options {
 
 struct fx_render_rounded_rect_options {
 	struct wlr_render_rect_options base;
-	int corner_radius;
-	enum corner_location corners;
-	struct clipped_region clipped_region;
+	struct fx_corner_fradii corners;
+	struct clipped_fregion clipped_region;
 };
 
 struct fx_render_rounded_rect_grad_options {
 	struct wlr_render_rect_options base;
 	struct fx_gradient gradient;
-	int corner_radius;
-	enum corner_location corners;
+	struct fx_corner_fradii corners;
 };
 
 struct fx_render_box_shadow_options {
 	struct wlr_box box;
-	struct clipped_region clipped_region;
+	struct clipped_fregion clipped_region;
 	/* Clip region, leave NULL to disable clipping */
 	const pixman_region32_t *clip;
 
@@ -102,6 +100,9 @@ struct fx_render_blur_pass_options {
 	struct blur_data *blur_data;
 	bool use_optimized_blur;
 	bool ignore_transparent;
+	float blur_strength;
+	struct fx_corner_fradii corners;
+	struct clipped_fregion clipped_region;
 };
 
 /**

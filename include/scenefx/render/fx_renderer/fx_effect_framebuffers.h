@@ -14,6 +14,9 @@ struct fx_effect_framebuffers {
 
 	// Contains the blurred background for tiled windows
 	struct fx_framebuffer *optimized_blur_buffer;
+	// Contains the non-blurred background for tiled windows. Used for blurring
+	// optimized surfaces with an alpha. Just as inefficient as the regular blur.
+	struct fx_framebuffer *optimized_no_blur_buffer;
 	// Contains the original pixels to draw over the areas where artifact are visible
 	struct fx_framebuffer *blur_saved_pixels_buffer;
 	// Blur swaps between the two effects buffers everytime it scales the image

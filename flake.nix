@@ -65,6 +65,7 @@
         devShells.default = pkgs.mkShell {
           name = "scenefx-shell";
 	      inputsFrom = [ self.packages.${system}.scenefx-git ];
+		  hardeningDisable = [ "fortify" ];
 	    };
 
         formatter = pkgs.nixfmt-rfc-style;

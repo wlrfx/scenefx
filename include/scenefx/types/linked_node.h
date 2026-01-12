@@ -1,5 +1,7 @@
-#ifndef TYPES_LINKED_NODES_H
-#define TYPES_LINKED_NODES_H
+#ifndef TYPES_LINKED_NODE_H
+#define TYPES_LINKED_NODE_H
+
+#include <stdbool.h>
 
 /**
  * A node in a link between two objects. Can be used to safely couple two
@@ -14,10 +16,15 @@ struct linked_node {
 		.link = NULL \
 	})
 
+bool linked_nodes_are_linked(struct linked_node *node_1,
+		struct linked_node *node_2);
+
 void linked_node_init_link(struct linked_node *main_node,
 		struct linked_node *reference_node);
 
-struct linked_node *linked_nodes_get_sibling(struct linked_node *node);
+struct linked_node *linked_node_get_sibling(struct linked_node *node);
+
+void linked_node_orphan(struct linked_node *node);
 
 void linked_node_unlink(struct linked_node *main_node,
 		struct linked_node *reference_node);

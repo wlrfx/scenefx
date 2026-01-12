@@ -3,7 +3,7 @@
 #include <stdlib.h>
 #include <wlr/util/log.h>
 
-#include "types/linked_node.h"
+#include "scenefx/types/linked_node.h"
 
 struct link {
 	struct linked_node *node_1;
@@ -28,7 +28,7 @@ static struct link *link_init(struct linked_node *node_1,
 // Linked Node
 //
 
-static bool linked_nodes_are_linked(struct linked_node *node_1,
+bool linked_nodes_are_linked(struct linked_node *node_1,
 		struct linked_node *node_2) {
 	return node_1->link != NULL && node_2->link != NULL
 		&& node_1->link == node_2->link;
@@ -38,7 +38,7 @@ void linked_node_init_link(struct linked_node *node_1,
 		struct linked_node *node_2) {
 	if (node_1->link || node_2->link) {
 		assert(linked_nodes_are_linked(node_1, node_2));
-		linked_node_unlink(node_1, node_2);
+		return;
 	}
 
 	struct link *link = link_init(node_1, node_2);
@@ -46,7 +46,7 @@ void linked_node_init_link(struct linked_node *node_1,
 	node_2->link = link;
 }
 
-struct linked_node *linked_nodes_get_sibling(struct linked_node *node) {
+struct linked_node *linked_node_get_sibling(struct linked_node *node) {
 	if (node->link == NULL) {
 		return NULL;
 	}

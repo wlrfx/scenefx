@@ -3,7 +3,7 @@
 
 struct fx_corner_radii fx_corner_radii_extend(struct fx_corner_radii corners, int extend) {
 	return (struct fx_corner_radii) {
-		.top_left = corners.top_left == 0 ? 0 : (corners.top_left + extend),
+		.top_left =  corners.top_left == 0 ? 0 : (corners.top_left + extend),
 		.top_right = corners.top_right == 0 ? 0 : (corners.top_right + extend),
 		.bottom_left = corners.bottom_left == 0 ? 0 : (corners.bottom_left + extend),
 		.bottom_right = corners.bottom_right == 0 ? 0 : (corners.bottom_right + extend),

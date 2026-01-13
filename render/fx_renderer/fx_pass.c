@@ -18,6 +18,7 @@
 #include "scenefx/render/fx_renderer/fx_renderer.h"
 #include "scenefx/render/fx_renderer/fx_effect_framebuffers.h"
 #include "scenefx/types/fx/blur_data.h"
+#include "types/wlr_scene.h"
 #include "util/matrix.h"
 
 #define MAX_QUADS 86 // 4kb
@@ -49,17 +50,6 @@ struct fx_render_rect_options fx_render_rect_options_default(
 // Gets a non-transformed wlr_box
 static struct wlr_box get_monitor_box(struct wlr_output *output) {
 	return (struct wlr_box) { 0, 0, output->width, output->height };
-}
-
-static int scale_length(int length, int offset, float scale) {
-	return round((offset + length) * scale) - round(offset * scale);
-}
-
-static void scale_box(struct wlr_box *box, float scale) {
-	box->width = scale_length(box->width, box->x, scale);
-	box->height = scale_length(box->height, box->y, scale);
-	box->x = round(box->x * scale);
-	box->y = round(box->y * scale);
 }
 
 ///

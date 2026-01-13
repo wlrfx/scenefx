@@ -682,7 +682,7 @@ __always_inline float wlr_scene_drop_shadow_calculate_offset(int blur_sigma) {
  * Add a node displaying a blur to the scene-graph.
  */
 struct wlr_scene_blur *wlr_scene_blur_create(struct wlr_scene_tree *parent,
-		int width, int height);
+       int width, int height);
 
 /**
  * Change the width and height of an existing blur node.
@@ -710,7 +710,7 @@ void wlr_scene_blur_set_should_only_blur_bottom_layer(struct wlr_scene_blur *blu
  * Mask source is actually rendering (e.g. skip transparent spaces)
  */
 void wlr_scene_blur_set_transparency_mask_source(struct wlr_scene_blur *blur,
-		struct wlr_scene_buffer *source);
+       struct wlr_scene_buffer *source);
 
 /**
  * get the transparency mask source for the blur

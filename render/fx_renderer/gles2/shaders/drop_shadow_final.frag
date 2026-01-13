@@ -10,7 +10,6 @@ uniform sampler2D tex;
 uniform vec2 size;
 uniform float blur_sigma;
 uniform vec4 color;
-uniform bool is_horizontal;
 
 void main() {
 	vec4 tex_sample = texture2D(tex, v_texcoord);

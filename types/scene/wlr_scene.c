@@ -2653,10 +2653,13 @@ static bool scene_node_invisible(struct wlr_scene_node *node) {
 		return shadow->color[3] == 0.f;
 	} else if (node->type == WLR_SCENE_NODE_DROP_SHADOW) {
 		struct wlr_scene_drop_shadow *drop_shadow = wlr_scene_drop_shadow_from_node(node);
-
-		return drop_shadow->blur_sigma <= 0 || drop_shadow->color[3] == 0
-			|| !linked_node_initialized(&drop_shadow->buffer_source);
-	} else if (node->type == WLR_SCENE_NODE_OPTIMIZED_BLUR) {
+		struct wlr_scene_buffer *scene_buffer
+			= wlr_scene_drop_shadow_get_reference_buffer(drop_shadow);
+		if (!scene_buffer || !scene_buffer->node.enabled) {
+			return true;
+		}
+		return !SCENE_DROP_SHADOW_SHOULD_RENDER(drop_shadow);
+	} else if (node->type == WLR_SCENE_NODE_OPTIMIZED_BLUR || node->type == WLR_SCENE_NODE_BLUR) {
 		return false;
 	} else if (node->type == WLR_SCENE_NODE_BUFFER) {
 		struct wlr_scene_buffer *buffer = wlr_scene_buffer_from_node(node);

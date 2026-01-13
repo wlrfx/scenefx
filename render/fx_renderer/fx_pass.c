@@ -870,22 +870,8 @@ void fx_render_pass_add_blur(struct fx_gles_render_pass *pass,
 	struct fx_render_texture_options *tex_options = &fx_options->tex_options;
 	const struct wlr_render_texture_options *options = &tex_options->base;
 
-	pixman_region32_t translucent_region;
-	pixman_region32_init(&translucent_region);
-
 	struct wlr_box dst_box;
 	wlr_render_texture_options_get_dst_box(options, &dst_box);
-
-	// Gets the translucent region
-	pixman_box32_t surface_box = { 0, 0, dst_box.width, dst_box.height };
-	if (fx_options->opaque_region != NULL) {
-		pixman_region32_copy(&translucent_region, fx_options->opaque_region);
-	}
-
-	pixman_region32_inverse(&translucent_region, &translucent_region, &surface_box);
-	if (!pixman_region32_not_empty(&translucent_region)) {
-		goto damage_finish;
-	}
 
 	const bool has_strength = fx_options->blur_strength < 1.0;
 	struct fx_framebuffer *buffer = pass->fx_effect_framebuffers->optimized_blur_buffer;
@@ -893,12 +879,9 @@ void fx_render_pass_add_blur(struct fx_gles_render_pass *pass,
 		if (!buffer) {
 			wlr_log(WLR_ERROR, "Warning: Failed to use optimized blur");
 		}
-		pixman_region32_translate(&translucent_region, dst_box.x, dst_box.y);
-		pixman_region32_intersect(&translucent_region, &translucent_region, options->clip);
 
 		// Render the blur into its own buffer
 		struct fx_render_blur_pass_options blur_options = *fx_options;
-		blur_options.tex_options.base.clip = &translucent_region;
 		if (fx_options->use_optimized_blur && has_strength
 				// If the optimized blur hasn't been rendered yet
 				&& pass->fx_effect_framebuffers->optimized_no_blur_buffer) {
@@ -910,7 +893,7 @@ void fx_render_pass_add_blur(struct fx_gles_render_pass *pass,
 		}
 		buffer = get_main_buffer_blur(pass, &blur_options);
 		if (!buffer) {
-			goto damage_finish;
+			return;
 		}
 	}
 	struct wlr_texture *wlr_texture =
@@ -950,9 +933,6 @@ void fx_render_pass_add_blur(struct fx_gles_render_pass *pass,
 	if (fx_options->ignore_transparent && fx_options->tex_options.base.texture) {
 		stencil_mask_fini();
 	}
-
-damage_finish:
-	pixman_region32_fini(&translucent_region);
 }
 
 bool fx_render_pass_add_optimized_blur(struct fx_gles_render_pass *pass,

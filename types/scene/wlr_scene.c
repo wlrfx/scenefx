@@ -1084,7 +1084,6 @@ struct wlr_scene_drop_shadow *wlr_scene_drop_shadow_create(struct wlr_scene_tree
 	drop_shadow->blur_sigma = blur_sigma;
 	drop_shadow->blur_sample_size = wlr_scene_drop_shadow_calculate_offset(blur_sigma);
 	memcpy(drop_shadow->color, color, sizeof(drop_shadow->color));
-	drop_shadow->clipped_region = clipped_region_get_default();
 
 	drop_shadow->buffer_source = linked_node_init();
 
@@ -1154,17 +1153,6 @@ struct wlr_scene_buffer *wlr_scene_drop_shadow_get_reference_buffer(struct wlr_s
 
 __always_inline int wlr_scene_drop_shadow_get_offset(struct wlr_scene_drop_shadow *drop_shadow) {
 	return drop_shadow->blur_sample_size;
-}
-
-void wlr_scene_drop_shadow_set_clipped_region(struct wlr_scene_drop_shadow *drop_shadow,
-		struct clipped_region clipped_region) {
-	if (fx_corner_radii_eq(drop_shadow->clipped_region.corners, clipped_region.corners) &&
-			wlr_box_equal(&drop_shadow->clipped_region.area, &clipped_region.area)) {
-		return;
-	}
-
-	drop_shadow->clipped_region = clipped_region;
-	scene_node_update(&drop_shadow->node, NULL);
 }
 
 /*
@@ -2209,11 +2197,6 @@ static void scene_entry_render(struct render_list_entry *entry, const struct ren
 		struct wlr_scene_drop_shadow *drop_shadow = wlr_scene_drop_shadow_from_node(node);
 		// assert(drop_shadow->blur_sigma >= 0 && drop_shadow->color[3] > 0);
 
-		struct wlr_box drop_shadow_clipped_region_box = drop_shadow->clipped_region.area;
-
-		// Node relative -> Root relative
-		drop_shadow_clipped_region_box.x += x;
-		drop_shadow_clipped_region_box.y += y;
 
 		struct wlr_scene_buffer *scene_buffer = wlr_scene_drop_shadow_get_reference_buffer(drop_shadow);
 		if (!scene_buffer || !scene_buffer->node.enabled) {

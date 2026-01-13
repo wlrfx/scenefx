@@ -172,14 +172,13 @@ struct wlr_scene_drop_shadow {
 	int width, height;
 	float color[4];
 	float blur_sigma;
+	// TODO: Clipped region in the future?
 
 	struct {
 		float blur_sample_size;
 		// Skips drawing if NULL
 		struct linked_node buffer_source;
 	} WLR_PRIVATE;
-
-	struct clipped_region clipped_region;
 };
 
 struct wlr_scene_blur {
@@ -678,17 +677,6 @@ int wlr_scene_drop_shadow_get_offset(struct wlr_scene_drop_shadow *shadow);
 __always_inline float wlr_scene_drop_shadow_calculate_offset(int blur_sigma) {
 	return drop_shadow_calc_size(blur_sigma);
 }
-
-/**
- * Sets the region where to clip the drop shadow.
- *
- * For there to be corner rounding of the clipped region, the corner radius and
- * corners must be non-zero.
- *
- * NOTE: The positioning is node-relative.
- */
-void wlr_scene_drop_shadow_set_clipped_region(struct wlr_scene_drop_shadow *shadow,
-		struct clipped_region clipped_region);
 
 /**
  * Add a node displaying a blur to the scene-graph.

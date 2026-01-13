@@ -374,7 +374,7 @@ static void scene_node_opaque_region(struct wlr_scene_node *node, int x, int y,
 			pixman_region32_init_rect(opaque, x, y, width, height);
 		}
 
-		// subtract the colors from the opaque region
+		// subtract the corners from the opaque region
 		if (!fx_corner_radii_is_empty(&scene_buffer->corners)) {
 			pixman_region32_t corners = create_corner_location_region(scene_buffer->corners, x, y, width, height);
 			pixman_region32_subtract(opaque, opaque, &corners);

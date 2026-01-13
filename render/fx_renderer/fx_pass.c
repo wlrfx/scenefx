@@ -1193,6 +1193,7 @@ void fx_render_pass_add_drop_shadow(struct fx_gles_render_pass *pass,
 	tex_options->base.texture = fx_texture_from_buffer(&renderer->wlr_renderer,
 			effects_buffer->buffer);
 	render_drop_shadow_blur_direction(pass, tex_options, blur_sigma, true);
+	wlr_texture_destroy(tex_options->base.texture);
 
 	//
 	// Vertical Pass
@@ -1201,6 +1202,7 @@ void fx_render_pass_add_drop_shadow(struct fx_gles_render_pass *pass,
 	tex_options->base.texture = fx_texture_from_buffer(&renderer->wlr_renderer,
 			effects_buffer_swapped->buffer);
 	render_drop_shadow_blur_direction(pass, tex_options, blur_sigma, false);
+	wlr_texture_destroy(tex_options->base.texture);
 
 	//
 	// Final Render Pass
@@ -1215,6 +1217,7 @@ void fx_render_pass_add_drop_shadow(struct fx_gles_render_pass *pass,
 	tex_options->base.texture = fx_texture_from_buffer(&renderer->wlr_renderer,
 			effects_buffer->buffer);
 	fx_render_pass_add_drop_shadow_final(pass, tex_options, color);
+	wlr_texture_destroy(tex_options->base.texture);
 
 	pixman_region32_fini(&clip_extended);
 	pixman_region32_fini(&clip);

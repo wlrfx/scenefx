@@ -95,7 +95,6 @@ struct fx_render_box_shadow_options {
 
 struct fx_render_blur_pass_options {
 	struct fx_render_texture_options tex_options;
-	pixman_region32_t *opaque_region;
 	struct fx_framebuffer *current_buffer;
 	struct blur_data *blur_data;
 	bool use_optimized_blur;

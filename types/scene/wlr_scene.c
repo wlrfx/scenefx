@@ -41,6 +41,11 @@
 #define DMABUF_FEEDBACK_DEBOUNCE_FRAMES  30
 #define HIGHLIGHT_DAMAGE_FADEOUT_TIME   250
 
+#define SCENE_DROP_SHADOW_SHOULD_RENDER(drop_shadow) \
+	(drop_shadow->blur_sigma > 0.0f \
+	 && drop_shadow->color[3] > 0.0f \
+	 && linked_node_initialized(&drop_shadow->buffer_source))
+
 struct wlr_scene_tree *wlr_scene_tree_from_node(struct wlr_scene_node *node) {
 	assert(node->type == WLR_SCENE_NODE_TREE);
 	struct wlr_scene_tree *tree = wl_container_of(node, tree, node);
@@ -1586,48 +1591,30 @@ void wlr_scene_buffer_set_buffer_with_options(struct wlr_scene_buffer *scene_buf
 		pixman_region32_intersect(&output_damage, &output_damage, &cull_region);
 		pixman_region32_fini(&cull_region);
 
-		// TODO: Investigate
-// <<<<<<< HEAD
-// 		// Also damage the linked drop-shadow
-// 		struct linked_node *shadow_link = linked_nodes_get_sibling(&scene_buffer->drop_shadow_link);
-// 		if (shadow_link != NULL) {
-// 			struct wlr_scene_shadow *scene_shadow = wl_container_of(shadow_link, scene_shadow, buffer_link);
-// 			if (scene_shadow && SCENE_SHADOW_IS_DROP(scene_shadow)) {
-// 				int shadow_lx, shadow_ly;
-// 				if (wlr_scene_node_coords(&scene_shadow->node, &shadow_lx, &shadow_ly)) {
-// 					const int shadow_size = drop_shadow_calc_size(scene_shadow->blur_sigma);
-//
-// 					// Copy the damaged region, translate it to the shadow nodes
-// 					// position, and add it to the original damage
-// 					pixman_region32_t shadow_damage;
-// 					pixman_region32_init(&shadow_damage);
-// 					pixman_region32_copy(&shadow_damage, &output_damage);
-// 					pixman_region32_translate(&shadow_damage,
-// 							((shadow_lx + shadow_size) - lx) * output_scale,
-// 							((shadow_ly + shadow_size) - ly) * output_scale);
-// 					wlr_region_expand(&shadow_damage, &shadow_damage,
-// 							drop_shadow_calc_size(scene_shadow->blur_sigma));
-//
-// 					pixman_region32_union(&output_damage, &output_damage, &shadow_damage);
-// 				}
-// 			}
-// 		}
-//
-// 		// Expand the damage when committed to, fixes blur artifacts
-// 		if (SCENE_BUFFER_SHOULD_BLUR(scene_buffer, &scene->blur_data)) {
-// 			wlr_region_expand(&output_damage, &output_damage,
-// 					blur_data_calc_size(&scene->blur_data));
-// 		}
-//
-// ||||||| 6a0ad0b
-// 		// Expand the damage when committed to, fixes blur artifacts
-// 		if (SCENE_BUFFER_SHOULD_BLUR(scene_buffer, &scene->blur_data)) {
-// 			wlr_region_expand(&output_damage, &output_damage,
-// 					blur_data_calc_size(&scene->blur_data));
-// 		}
-//
-// =======
-// >>>>>>> main
+		// Damage the linked drop-shadow node. Makes sure that the linked
+		// shadow-node gets updated when it's reference buffer get damaged.
+		// Copies the damaged region, translates it to the linked nodes
+		// position, and adds it to the original output damage.
+		struct linked_node *shadow_link = linked_node_get_sibling(&scene_buffer->drop_shadow);
+		if (shadow_link) {
+			struct wlr_scene_drop_shadow *drop_shadow
+				= wl_container_of(shadow_link, drop_shadow, buffer_source);
+			int node_lx, node_ly;
+			if (drop_shadow && SCENE_DROP_SHADOW_SHOULD_RENDER(drop_shadow)
+					&& wlr_scene_node_coords(&drop_shadow->node, &node_lx, &node_ly)) {
+				pixman_region32_t shadow_damage;
+				pixman_region32_init(&shadow_damage);
+				pixman_region32_copy(&shadow_damage, &output_damage);
+				pixman_region32_translate(&shadow_damage,
+						((node_lx + drop_shadow->blur_sample_size) - lx) * output_scale,
+						((node_ly + drop_shadow->blur_sample_size) - ly) * output_scale);
+				wlr_region_expand(&shadow_damage, &shadow_damage,
+						drop_shadow->blur_sample_size);
+				pixman_region32_union(&output_damage, &output_damage, &shadow_damage);
+				pixman_region32_fini(&shadow_damage);
+			}
+		}
+
 		pixman_region32_translate(&output_damage,
 			(int)round((lx - scene_output->x) * output_scale),
 			(int)round((ly - scene_output->y) * output_scale));

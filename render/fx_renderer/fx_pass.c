@@ -446,10 +446,12 @@ void fx_render_pass_add_rect(struct fx_gles_render_pass *pass,
 	} else {
 		pixman_region32_init_rect(&clip_region, box.x, box.y, box.width, box.height);
 	}
+
+	push_fx_debug(renderer);
+
 	const struct wlr_box clipped_region_box = fx_options->clipped_region.area;
 	struct fx_corner_fradii clipped_region_corners = fx_options->clipped_region.corners;
 	if (!apply_clip_region(&clip_region, &clipped_region_box, &clipped_region_corners)) {
-		push_fx_debug(renderer);
 		setup_blending(color->a == 1.0 ? WLR_RENDER_BLEND_MODE_NONE : options->blend_mode);
 	}
 
@@ -1031,9 +1033,7 @@ static void render_drop_shadow_blur_direction(struct fx_gles_render_pass *pass,
 
 	push_fx_debug(renderer);
 
-	// setup_blending(options->blend_mode);
 	setup_blending(WLR_RENDER_BLEND_MODE_NONE);
-	glBlendFunc(GL_ONE, GL_ZERO);
 
 	glUseProgram(shader->program);
 
@@ -1061,8 +1061,6 @@ static void render_drop_shadow_blur_direction(struct fx_gles_render_pass *pass,
 
 	glBindTexture(texture->target, 0);
 
-	glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
-
 	pop_fx_debug(renderer);
 }
 
@@ -1087,7 +1085,6 @@ static void fx_render_pass_add_drop_shadow_final(struct fx_gles_render_pass *pas
 	push_fx_debug(renderer);
 
 	setup_blending(WLR_RENDER_BLEND_MODE_PREMULTIPLIED);
-	glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
 
 	glUseProgram(shader->program);
 
@@ -1114,8 +1111,6 @@ static void fx_render_pass_add_drop_shadow_final(struct fx_gles_render_pass *pas
 	render(&dst_box, options->clip, shader->pos_attrib);
 
 	glBindTexture(texture->target, 0);
-
-	glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
 
 	pop_fx_debug(renderer);
 }
@@ -1154,27 +1149,17 @@ void fx_render_pass_add_drop_shadow(struct fx_gles_render_pass *pass,
 
 	fx_framebuffer_bind(effects_buffer);
 
-	// Clear the pending region, otherwise translucent regions mix with
-	// previously calculated blur.
-	glEnable(GL_SCISSOR_TEST);
-	int n_rects;
-	const pixman_box32_t *rects = pixman_region32_rectangles(&clip_extended, &n_rects);
-	for (int i = 0; i < n_rects; i++) {
-		const pixman_box32_t rect = rects[i];
-		glScissor(rect.x1, rect.y1, rect.x2 - rect.x1, rect.y2 - rect.y1);
-		glClearColor(0, 0, 0, 0);
-		glClear(GL_COLOR_BUFFER_BIT);
-	}
-	glDisable(GL_SCISSOR_TEST);
+	// Clear the extended region, otherwise translucent regions mix with
+	// previously calculated blur due to how `wlr_render_pass_add_texture`
+	// currently almost always forces GL_BLEND
+	fx_render_pass_add_clear_region(pass, &clip_extended);
 
 	// Initially Render to the effects buffer
 	tex_options->base.clip = &clip_extended;
 	tex_options->clip_box = NULL;
-
 	scale_box(&tex_options->base.dst_box, drop_shadow_downscale);
-	tex_options->base.blend_mode = WLR_RENDER_BLEND_MODE_NONE;
 	tex_options->base.filter_mode = WLR_SCALE_FILTER_BILINEAR;
-	fx_render_pass_add_texture(pass, tex_options);
+	wlr_render_pass_add_texture(&pass->base, &tex_options->base);
 
 	//
 	// Prepare for blurring
@@ -1268,6 +1253,35 @@ void fx_renderer_read_to_buffer(struct fx_gles_render_pass *pass,
 	pixman_region32_fini(&region);
 }
 
+void fx_render_pass_add_clear_region(struct fx_gles_render_pass *pass,
+		const pixman_region32_t *region) {
+	struct fx_renderer *renderer = pass->buffer->renderer;
+
+	const struct wlr_box region_box = {
+		.x = region->extents.x1,
+		.y = region->extents.y1,
+		.width = region->extents.x2 - region->extents.x1,
+		.height = region->extents.y2 - region->extents.y1,
+	};
+
+	push_fx_debug(renderer);
+
+	glDisable(GL_BLEND);
+
+	// TODO: Don't use clipping to apparently improve performance:
+	// https://github.com/WillPower3309/swayfx/pull/466
+	struct quad_shader shader = renderer->shaders.quad;
+	glUseProgram(shader.program);
+	set_proj_matrix(shader.proj, pass->projection_matrix, &region_box);
+	glUniform4f(shader.color, 0.0f, 0.0f, 0.0f, 0.0f);
+	glUniform2f(shader.clip_size, 0, 0);
+	glUniform2f(shader.clip_position, 0, 0);
+	uniform_corner_radii_set(&shader.clip_radius, &(struct fx_corner_fradii) {0});
+
+	render(&region_box, region, renderer->shaders.quad.pos_attrib);
+
+	pop_fx_debug(renderer);
+}
 
 static const char *reset_status_str(GLenum status) {
 	switch (status) {

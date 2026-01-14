@@ -411,10 +411,8 @@ static bool egl_init(struct wlr_egl *egl, EGLenum platform,
 	size_t atti = 0;
 	EGLint attribs[7];
 
-	// Try with gles3 first to check if the graphics drivers support it.
-	// If it fails, it will fallback to gles2
 	attribs[atti++] = EGL_CONTEXT_CLIENT_VERSION;
-	attribs[atti++] = 3;
+	attribs[atti++] = 2;
 
 	// Request a high priority context if possible
 	// TODO: only do this if we're running as the DRM master
@@ -435,24 +433,13 @@ static bool egl_init(struct wlr_egl *egl, EGLenum platform,
 	attribs[atti++] = EGL_NONE;
 	assert(atti <= sizeof(attribs)/sizeof(attribs[0]));
 
-	// Attempt to create a context with gles3
 	egl->context = eglCreateContext(egl->display, EGL_NO_CONFIG_KHR,
 		EGL_NO_CONTEXT, attribs);
 	if (egl->context != EGL_NO_CONTEXT) {
-		wlr_log(WLR_DEBUG, "Created EGL context using OpenGL ES 3.0");
+		wlr_log(WLR_DEBUG, "Created EGL context using OpenGL ES 2.0");
 	} else {
-		wlr_log(WLR_INFO, "Failed to create EGL context using OpenGL ES 3.0");
-
-		// Retry with gles2
-		attribs[1] = 2;
-		egl->context = eglCreateContext(egl->display, EGL_NO_CONFIG_KHR,
-			EGL_NO_CONTEXT, attribs);
-		if (egl->context != EGL_NO_CONTEXT) {
-			wlr_log(WLR_DEBUG, "Created EGL context using OpenGL ES 2.0");
-		} else {
-			wlr_log(WLR_ERROR, "Failed to create EGL context using OpenGL ES 2.0");
-			return false;
-		}
+		wlr_log(WLR_ERROR, "Failed to create EGL context using OpenGL ES 2.0");
+		return false;
 	}
 
 	if (request_high_priority) {

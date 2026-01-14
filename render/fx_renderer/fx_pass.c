@@ -463,12 +463,8 @@ void fx_render_pass_add_rect_grad(struct fx_gles_render_pass *pass,
 	struct fx_renderer *renderer = pass->buffer->renderer;
 
 	if (renderer->shaders.quad_grad.max_len <= fx_options->gradient.count) {
-		EGLint client_version;
-		eglQueryContext(renderer->egl->display, renderer->egl->context,
-			EGL_CONTEXT_CLIENT_VERSION, &client_version);
-
 		glDeleteProgram(renderer->shaders.quad_grad.program);
-		if (!link_quad_grad_program(&renderer->shaders.quad_grad, (GLint) client_version, fx_options->gradient.count + 1)) {
+		if (!link_quad_grad_program(&renderer->shaders.quad_grad, fx_options->gradient.count + 1)) {
 			wlr_log(WLR_ERROR, "Could not link quad shader after updating max_len to %d. Aborting renderer", fx_options->gradient.count + 1);
 			abort();
 		}
@@ -552,12 +548,8 @@ void fx_render_pass_add_rounded_rect_grad(struct fx_gles_render_pass *pass,
 	struct fx_renderer *renderer = pass->buffer->renderer;
 
 	if (renderer->shaders.quad_grad_round.max_len <= fx_options->gradient.count) {
-		EGLint client_version;
-		eglQueryContext(renderer->egl->display, renderer->egl->context,
-			EGL_CONTEXT_CLIENT_VERSION, &client_version);
-
 		glDeleteProgram(renderer->shaders.quad_grad_round.program);
-		if (!link_quad_grad_round_program(&renderer->shaders.quad_grad_round, (GLint) client_version, fx_options->gradient.count + 1)) {
+		if (!link_quad_grad_round_program(&renderer->shaders.quad_grad_round, fx_options->gradient.count + 1)) {
 			wlr_log(WLR_ERROR, "Could not link quad shader after updating max_len to %d. Aborting renderer", fx_options->gradient.count + 1);
 			abort();
 		}

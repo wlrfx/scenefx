@@ -40,7 +40,8 @@ if 'gles2' in renderers or 'auto' in renderers
 	if egl.found() and gbm.found() and glesv2.found()
 		scenefx_deps += [egl, gbm, glesv2]
 	endif
-	subdir('gles3')
-	subdir('gles2')
+
+	subdir('shaders')
+
 endif
 

@@ -8,36 +8,20 @@
 
 // shaders
 #include "GLES2/gl2.h"
-// gles3
-#include "common_vert_gles3_src.h"
-#include "gradient_frag_gles3_src.h"
-#include "corner_alpha_frag_gles3_src.h"
-#include "quad_frag_gles3_src.h"
-#include "quad_grad_frag_gles3_src.h"
-#include "quad_round_frag_gles3_src.h"
-#include "quad_grad_round_frag_gles3_src.h"
-#include "tex_frag_gles3_src.h"
-#include "box_shadow_frag_gles3_src.h"
-#include "blur1_frag_gles3_src.h"
-#include "blur2_frag_gles3_src.h"
-#include "blur_effects_frag_gles3_src.h"
-#include "drop_shadow_frag_gles3_src.h"
-#include "drop_shadow_final_frag_gles3_src.h"
-// gles2
-#include "common_vert_gles2_src.h"
-#include "gradient_frag_gles2_src.h"
-#include "corner_alpha_frag_gles2_src.h"
-#include "quad_frag_gles2_src.h"
-#include "quad_grad_frag_gles2_src.h"
-#include "quad_round_frag_gles2_src.h"
-#include "quad_grad_round_frag_gles2_src.h"
-#include "tex_frag_gles2_src.h"
-#include "box_shadow_frag_gles2_src.h"
-#include "blur1_frag_gles2_src.h"
-#include "blur2_frag_gles2_src.h"
-#include "blur_effects_frag_gles2_src.h"
-#include "drop_shadow_frag_gles2_src.h"
-#include "drop_shadow_final_frag_gles2_src.h"
+#include "common_vert_src.h"
+#include "gradient_frag_src.h"
+#include "corner_alpha_frag_src.h"
+#include "quad_frag_src.h"
+#include "quad_grad_frag_src.h"
+#include "quad_round_frag_src.h"
+#include "quad_grad_round_frag_src.h"
+#include "tex_frag_src.h"
+#include "box_shadow_frag_src.h"
+#include "blur1_frag_src.h"
+#include "blur2_frag_src.h"
+#include "blur_effects_frag_src.h"
+#include "drop_shadow_frag_src.h"
+#include "drop_shadow_final_frag_src.h"
 
 GLuint compile_shader(GLuint type, const GLchar *src) {
 	GLuint shader = glCreateShader(type);
@@ -55,9 +39,8 @@ GLuint compile_shader(GLuint type, const GLchar *src) {
 	return shader;
 }
 
-GLuint link_program(const GLchar *frag_src, GLint client_version) {
-	const GLchar *vert_src = client_version > 2 ? common_vert_gles3_src : common_vert_gles2_src;
-	GLuint vert = compile_shader(GL_VERTEX_SHADER, vert_src);
+GLuint link_program(const GLchar *frag_src) {
+	GLuint vert = compile_shader(GL_VERTEX_SHADER, common_vert_src);
 	if (!vert) {
 		goto error;
 	}
@@ -128,18 +111,13 @@ void uniform_corner_radii_set(struct shader_corner_radii *uniform, struct fx_cor
 }
 // Shaders
 
-bool link_quad_program(struct quad_shader *shader, GLint client_version) {
+bool link_quad_program(struct quad_shader *shader) {
 	GLchar quad_src[4096];
-	if (client_version > 2) {
-		snprintf(quad_src, sizeof(quad_src), "%s\n%s", quad_frag_gles3_src,
-			corner_alpha_frag_gles3_src);
-	} else {
-		snprintf(quad_src, sizeof(quad_src), "%s\n%s", quad_frag_gles2_src,
-			corner_alpha_frag_gles2_src);
-	}
+	snprintf(quad_src, sizeof(quad_src), "%s\n%s", quad_frag_src,
+		corner_alpha_frag_src);
 
 	GLuint prog;
-	shader->program = prog = link_program(quad_src, client_version);
+	shader->program = prog = link_program(quad_src);
 	if (!shader->program) {
 		return false;
 	}
@@ -157,23 +135,16 @@ bool link_quad_program(struct quad_shader *shader, GLint client_version) {
 	return true;
 }
 
-bool link_quad_grad_program(struct quad_grad_shader *shader, GLint client_version, int max_len) {
+bool link_quad_grad_program(struct quad_grad_shader *shader, int max_len) {
 	GLchar quad_src_part[2048];
 	GLchar quad_src[4096];
-	if (client_version > 2) {
-		snprintf(quad_src_part, sizeof(quad_src_part),
-			quad_grad_frag_gles3_src, max_len);
-		snprintf(quad_src, sizeof(quad_src),
-			"%s\n%s", quad_src_part, gradient_frag_gles3_src);
-	} else {
-		snprintf(quad_src_part, sizeof(quad_src_part),
-			quad_grad_frag_gles2_src, max_len);
-		snprintf(quad_src, sizeof(quad_src),
-			"%s\n%s", quad_src_part, gradient_frag_gles2_src);
-	}
+	snprintf(quad_src_part, sizeof(quad_src_part),
+		quad_grad_frag_src, max_len);
+	snprintf(quad_src, sizeof(quad_src),
+		"%s\n%s", quad_src_part, gradient_frag_src);
 
 	GLuint prog;
-	shader->program = prog = link_program(quad_src, client_version);
+	shader->program = prog = link_program(quad_src);
 	if (!shader->program) {
 		return false;
 	}
@@ -194,18 +165,13 @@ bool link_quad_grad_program(struct quad_grad_shader *shader, GLint client_versio
 	return true;
 }
 
-bool link_quad_round_program(struct quad_round_shader *shader, GLint client_version) {
+bool link_quad_round_program(struct quad_round_shader *shader) {
 	GLchar quad_src[4096];
-	if (client_version > 2) {
-		snprintf(quad_src, sizeof(quad_src), "%s\n%s", quad_round_frag_gles3_src,
-			corner_alpha_frag_gles3_src);
-	} else {
-		snprintf(quad_src, sizeof(quad_src), "%s\n%s", quad_round_frag_gles2_src,
-			corner_alpha_frag_gles2_src);
-	}
+	snprintf(quad_src, sizeof(quad_src), "%s\n%s", quad_round_frag_src,
+		corner_alpha_frag_src);
 
 	GLuint prog;
-	shader->program = prog = link_program(quad_src, client_version);
+	shader->program = prog = link_program(quad_src);
 	if (!shader->program) {
 		return false;
 	}
@@ -230,23 +196,16 @@ bool link_quad_round_program(struct quad_round_shader *shader, GLint client_vers
 	return true;
 }
 
-bool link_quad_grad_round_program(struct quad_grad_round_shader *shader, GLint client_version, int max_len) {
+bool link_quad_grad_round_program(struct quad_grad_round_shader *shader, int max_len) {
 	GLchar quad_src_part[2048];
 	GLchar quad_src[4096];
-	if (client_version > 2) {
-		snprintf(quad_src_part, sizeof(quad_src_part),
-			quad_grad_round_frag_gles3_src, max_len);
-		snprintf(quad_src, sizeof(quad_src),
-			"%s\n%s\n%s", quad_src_part, gradient_frag_gles3_src, corner_alpha_frag_gles3_src);
-	} else {
-		snprintf(quad_src_part, sizeof(quad_src_part),
-			quad_grad_round_frag_gles2_src, max_len);
-		snprintf(quad_src, sizeof(quad_src),
-			"%s\n%s\n%s", quad_src_part, gradient_frag_gles2_src, corner_alpha_frag_gles2_src);
-	}
+	snprintf(quad_src_part, sizeof(quad_src_part),
+		quad_grad_round_frag_src, max_len);
+	snprintf(quad_src, sizeof(quad_src),
+		"%s\n%s\n%s", quad_src_part, gradient_frag_src, corner_alpha_frag_src);
 
 	GLuint prog;
-	shader->program = prog = link_program(quad_src, client_version);
+	shader->program = prog = link_program(quad_src);
 	if (!shader->program) {
 		return false;
 	}
@@ -275,23 +234,16 @@ bool link_quad_grad_round_program(struct quad_grad_round_shader *shader, GLint c
 	return true;
 }
 
-bool link_tex_program(struct tex_shader *shader, GLint client_version, enum fx_tex_shader_source source) {
+bool link_tex_program(struct tex_shader *shader, enum fx_tex_shader_source source) {
 	GLchar frag_src_part[2048];
 	GLchar frag_src[4096];
-	if (client_version > 2) {
-		snprintf(frag_src_part, sizeof(frag_src_part),
-			tex_frag_gles3_src, source);
-		snprintf(frag_src, sizeof(frag_src),
-			"%s\n%s\n", frag_src_part, corner_alpha_frag_gles3_src);
-	} else {
-		snprintf(frag_src_part, sizeof(frag_src_part),
-			tex_frag_gles2_src, source);
-		snprintf(frag_src, sizeof(frag_src),
-			"%s\n%s\n", frag_src_part, corner_alpha_frag_gles2_src);
-	}
+	snprintf(frag_src_part, sizeof(frag_src_part),
+		tex_frag_src, source);
+	snprintf(frag_src, sizeof(frag_src),
+		"%s\n%s\n", frag_src_part, corner_alpha_frag_src);
 
 	GLuint prog;
-	shader->program = prog = link_program(frag_src, client_version);
+	shader->program = prog = link_program(frag_src);
 	if (!shader->program) {
 		return false;
 	}
@@ -319,18 +271,13 @@ bool link_tex_program(struct tex_shader *shader, GLint client_version, enum fx_t
 	return true;
 }
 
-bool link_box_shadow_program(struct box_shadow_shader *shader, GLint client_version) {
+bool link_box_shadow_program(struct box_shadow_shader *shader) {
 	GLchar shadow_src[8192];
-	if (client_version > 2) {
-		snprintf(shadow_src, sizeof(shadow_src), "%s\n%s", box_shadow_frag_gles3_src,
-			corner_alpha_frag_gles3_src);
-	} else {
-		snprintf(shadow_src, sizeof(shadow_src), "%s\n%s", box_shadow_frag_gles2_src,
-			corner_alpha_frag_gles2_src);
-	}
+	snprintf(shadow_src, sizeof(shadow_src), "%s\n%s", box_shadow_frag_src,
+		corner_alpha_frag_src);
 
 	GLuint prog;
-	shader->program = prog = link_program(shadow_src, client_version);
+	shader->program = prog = link_program(shadow_src);
 	if (!shader->program) {
 		return false;
 	}
@@ -351,10 +298,9 @@ bool link_box_shadow_program(struct box_shadow_shader *shader, GLint client_vers
 	return true;
 }
 
-bool link_blur1_program(struct blur_shader *shader, GLint client_version) {
+bool link_blur1_program(struct blur_shader *shader) {
 	GLuint prog;
-	shader->program = prog = client_version > 2 ? link_program(blur1_frag_gles3_src, client_version)
-		: link_program(blur1_frag_gles2_src, client_version);
+	shader->program = prog = link_program(blur1_frag_src);
 	if (!shader->program) {
 		return false;
 	}
@@ -368,10 +314,9 @@ bool link_blur1_program(struct blur_shader *shader, GLint client_version) {
 	return true;
 }
 
-bool link_blur2_program(struct blur_shader *shader, GLint client_version) {
+bool link_blur2_program(struct blur_shader *shader) {
 	GLuint prog;
-	shader->program = prog = client_version > 2 ? link_program(blur2_frag_gles3_src, client_version)
-		: link_program(blur2_frag_gles2_src, client_version);
+	shader->program = prog = link_program(blur2_frag_src);
 	if (!shader->program) {
 		return false;
 	}
@@ -385,10 +330,9 @@ bool link_blur2_program(struct blur_shader *shader, GLint client_version) {
 	return true;
 }
 
-bool link_blur_effects_program(struct blur_effects_shader *shader, GLint client_version) {
+bool link_blur_effects_program(struct blur_effects_shader *shader) {
 	GLuint prog;
-	shader->program = prog = client_version > 2 ? link_program(blur_effects_frag_gles3_src, client_version)
-		: link_program(blur_effects_frag_gles2_src, client_version);
+	shader->program = prog = link_program(blur_effects_frag_src);
 	if (!shader->program) {
 		return false;
 	}
@@ -404,10 +348,9 @@ bool link_blur_effects_program(struct blur_effects_shader *shader, GLint client_
 	return true;
 }
 
-bool link_drop_shadow_program(struct drop_shadow_shader *shader, GLint client_version) {
+bool link_drop_shadow_program(struct drop_shadow_shader *shader) {
 	GLuint prog;
-	shader->program = prog = client_version > 2 ? link_program(drop_shadow_frag_gles3_src, client_version)
-		: link_program(drop_shadow_frag_gles2_src, client_version);
+	shader->program = prog = link_program(drop_shadow_frag_src);
 	if (!shader->program) {
 		return false;
 	}
@@ -423,10 +366,9 @@ bool link_drop_shadow_program(struct drop_shadow_shader *shader, GLint client_ve
 	return true;
 }
 
-bool link_drop_shadow_final_program(struct drop_shadow_final_shader *shader, GLint client_version) {
+bool link_drop_shadow_final_program(struct drop_shadow_final_shader *shader) {
 	GLuint prog;
-	shader->program = prog = client_version > 2 ? link_program(drop_shadow_final_frag_gles3_src, client_version)
-		: link_program(drop_shadow_final_frag_gles2_src, client_version);
+	shader->program = prog = link_program(drop_shadow_final_frag_src);
 	if (!shader->program) {
 		return false;
 	}

@@ -314,72 +314,68 @@ struct wlr_renderer *fx_renderer_create(struct wlr_backend *backend) {
 }
 
 static bool link_shaders(struct fx_renderer *renderer) {
-	EGLint client_version;
-	eglQueryContext(renderer->egl->display, renderer->egl->context,
-		EGL_CONTEXT_CLIENT_VERSION, &client_version);
-
 	// quad fragment shader
-	if (!link_quad_program(&renderer->shaders.quad, (GLint) client_version)) {
+	if (!link_quad_program(&renderer->shaders.quad)) {
 		wlr_log(WLR_ERROR, "Could not link quad shader");
 		goto error;
 	}
 
 	// quad fragment shader with gradients
-	if (!link_quad_grad_program(&renderer->shaders.quad_grad, (GLint) client_version, 16)) {
+	if (!link_quad_grad_program(&renderer->shaders.quad_grad, 16)) {
 		wlr_log(WLR_ERROR, "Could not link quad grad shader");
 		goto error;
 	}
 
-	if (!link_quad_grad_round_program(&renderer->shaders.quad_grad_round, (GLint) client_version, 16)) {
+	if (!link_quad_grad_round_program(&renderer->shaders.quad_grad_round, 16)) {
 		wlr_log(WLR_ERROR, "Could not link quad grad round shader");
 		goto error;
 	}
 
-	if (!link_quad_round_program(&renderer->shaders.quad_round, (GLint) client_version)) {
+	if (!link_quad_round_program(&renderer->shaders.quad_round)) {
 		wlr_log(WLR_ERROR, "Could not link quad round shader");
 		goto error;
 	}
 
 	// fragment shaders
-	if (!link_tex_program(&renderer->shaders.tex_rgba, (GLint) client_version, SHADER_SOURCE_TEXTURE_RGBA)) {
+	if (!link_tex_program(&renderer->shaders.tex_rgba, SHADER_SOURCE_TEXTURE_RGBA)) {
 		wlr_log(WLR_ERROR, "Could not link tex_RGBA shader");
 		goto error;
 	}
-	if (!link_tex_program(&renderer->shaders.tex_rgbx, (GLint) client_version, SHADER_SOURCE_TEXTURE_RGBX)) {
+	if (!link_tex_program(&renderer->shaders.tex_rgbx, SHADER_SOURCE_TEXTURE_RGBX)) {
 		wlr_log(WLR_ERROR, "Could not link tex_RGBX shader");
 		goto error;
 	}
-	if (!link_tex_program(&renderer->shaders.tex_ext, (GLint) client_version, SHADER_SOURCE_TEXTURE_EXTERNAL)) {
+	if (!link_tex_program(&renderer->shaders.tex_ext, SHADER_SOURCE_TEXTURE_EXTERNAL)) {
 		wlr_log(WLR_ERROR, "Could not link tex_EXTERNAL shader");
 		goto error;
 	}
 
 	// box shadow shader
-	if (!link_box_shadow_program(&renderer->shaders.box_shadow, (GLint) client_version)) {
+	if (!link_box_shadow_program(&renderer->shaders.box_shadow)) {
 		wlr_log(WLR_ERROR, "Could not link box shadow shader");
 		goto error;
 	}
 
 	// Blur shaders
-	if (!link_blur1_program(&renderer->shaders.blur1, (GLint) client_version)) {
+	if (!link_blur1_program(&renderer->shaders.blur1)) {
 		wlr_log(WLR_ERROR, "Could not link blur1 shader");
 		goto error;
 	}
-	if (!link_blur2_program(&renderer->shaders.blur2, (GLint) client_version)) {
+	if (!link_blur2_program(&renderer->shaders.blur2)) {
 		wlr_log(WLR_ERROR, "Could not link blur2 shader");
 		goto error;
 	}
-	if (!link_blur_effects_program(&renderer->shaders.blur_effects, (GLint) client_version)) {
+	if (!link_blur_effects_program(&renderer->shaders.blur_effects)) {
 		wlr_log(WLR_ERROR, "Could not link blur_effects shader");
 		goto error;
 	}
 
 	// Drop Shadow shaders
-	if (!link_drop_shadow_program(&renderer->shaders.drop_shadow, (GLint) client_version)) {
+	if (!link_drop_shadow_program(&renderer->shaders.drop_shadow)) {
 		wlr_log(WLR_ERROR, "Could not link drop_shadow shader");
 		goto error;
 	}
-	if (!link_drop_shadow_final_program(&renderer->shaders.drop_shadow_final, (GLint) client_version)) {
+	if (!link_drop_shadow_final_program(&renderer->shaders.drop_shadow_final)) {
 		wlr_log(WLR_ERROR, "Could not link drop_shadow_final shader");
 		goto error;
 	}

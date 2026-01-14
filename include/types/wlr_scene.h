@@ -7,4 +7,6 @@ struct wlr_scene *scene_node_get_root(struct wlr_scene_node *node);
 
 void scene_surface_set_clip(struct wlr_scene_surface *surface, struct wlr_box *clip);
 
+void scale_box(struct wlr_box *box, float scale);
+
 #endif

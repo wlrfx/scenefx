@@ -197,8 +197,9 @@ struct fx_renderer {
 	// our custom 'fx_renderer_begin_buffer_pass' function
 	bool basic_renderer;
 
-	// NULL when tracy is disabled
+#ifdef TRACY_ENABLE
 	struct tracy_data *tracy_data;
+#endif
 };
 
 #endif

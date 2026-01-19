@@ -516,7 +516,9 @@ struct wlr_renderer *fx_renderer_create_egl(struct wlr_egl *egl) {
 
 	push_fx_debug(renderer);
 
+#ifdef TRACY_ENABLE
 	renderer->tracy_data = TRACY_GPU_CONTEXT_NEW(renderer);
+#endif
 
 	// Link all shaders
 	if (!link_shaders(renderer)) {

@@ -1,6 +1,9 @@
 #ifndef TRACY
 #define TRACY
 
+#ifdef TRACY_ENABLE
+#include <tracy/TracyC.h>
+
 #include "include/render/fx_renderer/fx_renderer.h"
 
 struct tracy_data;
@@ -8,9 +11,6 @@ struct tracy_gpu_zone_context {
 	struct tracy_data *tracy_data;
 	bool is_active;
 };
-
-#ifdef TRACY_ENABLE
-#include <tracy/TracyC.h>
 
 /**
  * Frame

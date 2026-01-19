@@ -17,7 +17,7 @@
 // - https://registry.khronos.org/OpenGL/extensions/EXT/EXT_disjoint_timer_query.txt
 // - https://github.com/wolfpld/tracy/blob/7388a476587c93f4e8e3e50d64c1400fc8c5e47e/public/tracy/TracyOpenGL.hpp
 
-#define QUERY_COUNT (64 * 1024)
+#define QUERY_QUEUE_LEN (64 * 1024)
 
 #define SCREEN_CAPTURE_COPIES 4
 // Has to be % 4 == 0 (tracy compression requirement)
@@ -45,13 +45,14 @@ struct tracy_data {
 
 	uint8_t context_id;
 
-	uint32_t queries[QUERY_COUNT];
-	uint32_t q_head;
-	uint32_t q_tail;
+	struct {
+		uint32_t queries[QUERY_QUEUE_LEN];
+		uint32_t head;
+		uint32_t tail;
+	} queue;
 
 	struct tracy_capture_data *tracy_capture_data;
 };
-
 
 /*
  * Buffer capture
@@ -176,9 +177,9 @@ void tracy_capture_buffer(struct tracy_data *tracy_data, struct fx_framebuffer *
  */
 
 static inline unsigned int get_next_query_index(struct tracy_data *tracy_data) {
-	const unsigned int id = tracy_data->q_head;
-	tracy_data->q_head = (tracy_data->q_head + 1) % QUERY_COUNT;
-	assert(tracy_data->q_head != tracy_data->q_tail);
+	const unsigned int id = tracy_data->queue.head;
+	tracy_data->queue.head = (tracy_data->queue.head + 1) % QUERY_QUEUE_LEN;
+	assert(tracy_data->queue.head != tracy_data->queue.tail);
 	return id;
 }
 
@@ -201,7 +202,7 @@ void tracy_gpu_zone_begin(struct tracy_data *tracy_data, struct tracy_gpu_zone_c
 
 	// Create the query object
 	const unsigned int query = get_next_query_index(tracy_data);
-	tracy_data->renderer->procs.glQueryCounterEXT(tracy_data->queries[query], GL_TIMESTAMP_EXT);
+	tracy_data->renderer->procs.glQueryCounterEXT(tracy_data->queue.queries[query], GL_TIMESTAMP_EXT);
 
 	// Label the zone
 	uint64_t srcloc = ___tracy_alloc_srcloc_name(line,
@@ -227,7 +228,7 @@ void tracy_gpu_zone_end(struct tracy_gpu_zone_context *ctx) {
 
 	// Create the query object
 	const unsigned int query = get_next_query_index(tracy_data);
-	tracy_data->renderer->procs.glQueryCounterEXT(tracy_data->queries[query], GL_TIMESTAMP_EXT);
+	tracy_data->renderer->procs.glQueryCounterEXT(tracy_data->queue.queries[query], GL_TIMESTAMP_EXT);
 
 	// End the Tracy GPU zone
 	const struct ___tracy_gpu_zone_end_data data = {
@@ -246,22 +247,22 @@ void tracy_gpu_context_collect(struct tracy_data *tracy_data) {
 
 	TracyCZoneC(ctx, RED4, true);
 
-	if (tracy_data->q_tail == tracy_data->q_head) {
+	if (tracy_data->queue.tail == tracy_data->queue.head) {
 		goto done;
 	}
 
 #ifdef TRACY_ON_DEMAND
 	if (!TracyCIsConnected) {
-		tracy_data->q_head = 0;
-		tracy_data->q_tail = 0;
+		tracy_data->queue.head = 0;
+		tracy_data->queue.tail = 0;
 		goto done;
 	}
 #endif
 
-	while (tracy_data->q_tail != tracy_data->q_head) {
+	while (tracy_data->queue.tail != tracy_data->queue.head) {
 		GLint available;
 		tracy_data->renderer->procs.glGetQueryObjectivEXT(
-				tracy_data->queries[tracy_data->q_tail],
+				tracy_data->queue.queries[tracy_data->queue.tail],
 				GL_QUERY_RESULT_AVAILABLE_EXT, &available);
 		if (!available) {
 			goto done;
@@ -269,17 +270,17 @@ void tracy_gpu_context_collect(struct tracy_data *tracy_data) {
 
 		GLuint64 time;
 		tracy_data->renderer->procs.glGetQueryObjectui64vEXT(
-				tracy_data->queries[tracy_data->q_tail],
+				tracy_data->queue.queries[tracy_data->queue.tail],
 				GL_QUERY_RESULT_EXT, &time);
 
 		const struct ___tracy_gpu_time_data data = {
 			.context = tracy_data->context_id,
 			.gpuTime = time,
-			.queryId = (uint16_t) tracy_data->q_tail,
+			.queryId = (uint16_t) tracy_data->queue.tail,
 		};
 		___tracy_emit_gpu_time(data);
 
-		tracy_data->q_tail = (tracy_data->q_tail + 1) % QUERY_COUNT;
+		tracy_data->queue.tail = (tracy_data->queue.tail + 1) % QUERY_QUEUE_LEN;
 	}
 
 done:
@@ -295,7 +296,7 @@ void tracy_gpu_context_destroy(struct tracy_data *tracy_data) {
 	tracy_capture_destroy(tracy_data->tracy_capture_data);
 	tracy_data->tracy_capture_data = NULL;
 
-	tracy_data->renderer->procs.glDeleteQueriesEXT(QUERY_COUNT, tracy_data->queries);
+	tracy_data->renderer->procs.glDeleteQueriesEXT(QUERY_QUEUE_LEN, tracy_data->queue.queries);
 	free(tracy_data);
 }
 
@@ -310,13 +311,13 @@ struct tracy_data *tracy_gpu_context_new(struct fx_renderer *renderer) {
 
 	tracy_data->renderer = renderer;
 	tracy_data->context_id = ++id_counter;
-	tracy_data->q_head = 0;
-	tracy_data->q_tail = 0;
+	tracy_data->queue.head = 0;
+	tracy_data->queue.tail = 0;
 
 	tracy_data->tracy_capture_data = tracy_capture_init(tracy_data);
 
 	// Create the query objects
-	renderer->procs.glGenQueriesEXT(QUERY_COUNT, tracy_data->queries);
+	renderer->procs.glGenQueriesEXT(QUERY_QUEUE_LEN, tracy_data->queue.queries);
 
 	// Get the current GL time
 	GLint64 gl_gpu_time;

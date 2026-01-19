@@ -109,12 +109,10 @@ static bool render_pass_submit(struct wlr_render_pass *wlr_pass) {
 	ok = true;
 
 out:
-
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
 	pop_fx_debug(renderer);
 	TRACY_BOTH_ZONES_END;
-
 	TRACY_GPU_ZONE_COLLECT(renderer);
 
 	wlr_egl_restore_context(&pass->prev_ctx);
@@ -729,6 +727,7 @@ void fx_render_pass_add_box_shadow(struct fx_gles_render_pass *pass,
 	glUniform1f(renderer->shaders.box_shadow.blur_sigma, options->blur_sigma);
 	glUniform2f(renderer->shaders.box_shadow.size, box.width, box.height);
 	glUniform2f(renderer->shaders.box_shadow.position, box.x, box.y);
+	glUniform1f(renderer->shaders.box_shadow.corner_radius, options->corner_radius);
 
 	uniform_corner_radii_set(&renderer->shaders.box_shadow.clip_radius, &clipped_region_corners);
 
@@ -1205,7 +1204,7 @@ void fx_renderer_read_to_buffer(struct fx_gles_render_pass *pass,
 	// Bind back to the main WLR buffer
 	fx_framebuffer_bind(pass->buffer);
 
-done:;
+done:
 	TRACY_BOTH_ZONES_END;
 
 	pixman_region32_fini(&region);

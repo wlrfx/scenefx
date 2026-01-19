@@ -38,6 +38,14 @@ Install like so:
 sudo ninja -C build/ install
 ```
 
+## Troubleshooting
+
+### Using scenefx features breaks the compositor
+
+This issue might be caused by compiling scenefx and wlroots with
+Clang compiler and thin LTO(`-flto=thin`) option enabled. Try to
+compile the libraries without LTO optimizations or with GCC compiler instead.
+
 ## Debugging
 
 SceneFX includes the same debugging tools and environment variables as upstream wlroots does, but with some extra goodies.

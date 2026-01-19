@@ -1174,7 +1174,6 @@ void fx_renderer_read_to_buffer(struct fx_gles_render_pass *pass,
 		return;
 	}
 	TRACY_BOTH_ZONES_START(pass->buffer->renderer);
-	TRACY_ZONE_TEXT_f("GLES version: %d", pass->buffer->renderer->client_version);
 
 	pixman_region32_t region;
 	pixman_region32_init(&region);

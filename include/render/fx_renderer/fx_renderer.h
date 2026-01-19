@@ -197,8 +197,6 @@ struct fx_renderer {
 	// our custom 'fx_renderer_begin_buffer_pass' function
 	bool basic_renderer;
 
-	GLint client_version;
-
 	// NULL when tracy is disabled
 	struct tracy_data *tracy_data;
 };

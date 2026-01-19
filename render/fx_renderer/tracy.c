@@ -31,8 +31,6 @@
 static atomic_int id_counter = 0;
 
 struct tracy_capture_data {
-	bool inited;
-
 	GLuint tex[SCREEN_CAPTURE_COPIES];
 	GLuint fbo[SCREEN_CAPTURE_COPIES];
 	GLuint pbo[SCREEN_CAPTURE_COPIES];
@@ -62,12 +60,6 @@ struct tracy_data {
 static struct tracy_capture_data *tracy_capture_init(struct tracy_data *tracy_data) {
 	struct tracy_capture_data *data = calloc(1, sizeof(*data));
 	if (!data) {
-		return NULL;
-	}
-
-	data->inited = tracy_data->renderer->client_version >= 3;
-	if (!data->inited) {
-		free(data);
 		return NULL;
 	}
 
@@ -123,7 +115,7 @@ void tracy_capture_buffer(struct tracy_data *tracy_data, struct fx_framebuffer *
 #endif
 
 	struct tracy_capture_data *data = tracy_data->tracy_capture_data;
-	if (!data || !data->inited) {
+	if (!data) {
 		return;
 	}
 
@@ -344,11 +336,11 @@ struct tracy_data *tracy_gpu_context_new(struct fx_renderer *renderer) {
 	___tracy_emit_gpu_new_context(data);
 
 	// Set the custom name
-	int len = snprintf(NULL, 0, "FX Renderer (GLESV%d): %s",
-		renderer->client_version, glGetString(GL_RENDERER)) + 1; \
+	int len = snprintf(NULL, 0, "FX Renderer (GLESV2): %s",
+		 glGetString(GL_RENDERER)) + 1; \
 	char ctx_name[len]; \
-	snprintf(ctx_name, len, "FX Renderer (GLESV%d): %s",
-		renderer->client_version, glGetString(GL_RENDERER)); \
+	snprintf(ctx_name, len, "FX Renderer (GLESV2): %s",
+		glGetString(GL_RENDERER)); \
 	const struct ___tracy_gpu_context_name_data name_data = {
 		.context = tracy_data->context_id,
 		.name = ctx_name,

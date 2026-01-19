@@ -514,10 +514,6 @@ struct wlr_renderer *fx_renderer_create_egl(struct wlr_egl *egl) {
 			GL_DEBUG_TYPE_PUSH_GROUP_KHR, GL_DONT_CARE, 0, NULL, GL_FALSE);
 	}
 
-	// Get the GLES version
-	eglQueryContext(renderer->egl->display, renderer->egl->context,
-		EGL_CONTEXT_CLIENT_VERSION, &renderer->client_version);
-
 	push_fx_debug(renderer);
 
 	renderer->tracy_data = TRACY_GPU_CONTEXT_NEW(renderer);

@@ -240,8 +240,7 @@ void tracy_gpu_zone_end(struct tracy_gpu_zone_context *ctx) {
 
 void tracy_gpu_context_collect(struct tracy_data *tracy_data) {
 	if (tracy_data == NULL) {
-		// TODO: fix compilation error
-		// TracyCMessageL("tracy_data == NULL");
+		TracyCMessageL("tracy_data == NULL");
 		return;
 	}
 

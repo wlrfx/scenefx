@@ -4,3 +4,4 @@ build/
 result
 
 !subprojects/tracy.wrap
+!subprojects/packagefiles

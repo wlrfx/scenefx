@@ -1,0 +1,22 @@
+diff --git a/public/client/TracyProfiler.cpp b/public/client/TracyProfiler.cpp
+index 0691f78..20a3f02 100644
+--- a/public/client/TracyProfiler.cpp
++++ b/public/client/TracyProfiler.cpp
+@@ -933,7 +933,7 @@ static Thread* s_symbolThread;
+ std::atomic<bool> s_symbolThreadGone { false };
+ #endif
+ #ifdef TRACY_HAS_SYSTEM_TRACING
+-static std::atomic<Thread*> s_sysTraceThread = nullptr;
++static std::atomic<Thread*> s_sysTraceThread(nullptr);
+ #endif
+ 
+ #if defined __linux__ && !defined TRACY_NO_CRASH_HANDLER
+@@ -2154,7 +2154,7 @@ void Profiler::Worker()
+     // takes care of calling StopSystemTracing(). However, a client may decide to
+     // manually RequestShutdown(), in which case ~Profile() may not execute before
+     // this Worker() thread goes through its teardown stages and reaches this point.
+-    // To ensure that system tracing does not keep pushing data to the worker queue 
++    // To ensure that system tracing does not keep pushing data to the worker queue
+     // indefinitely (thus preventing this worker from terminating), we have to call
+     // StopSystemTracing() here as well to be safe:
+     StopSystemTracing();

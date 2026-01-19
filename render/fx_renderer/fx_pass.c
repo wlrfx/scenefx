@@ -462,7 +462,6 @@ void fx_render_pass_add_rect(struct fx_gles_render_pass *pass,
 	const struct wlr_box clipped_region_box = fx_options->clipped_region.area;
 	struct fx_corner_fradii clipped_region_corners = fx_options->clipped_region.corners;
 	if (!apply_clip_region(&clip_region, &clipped_region_box, &clipped_region_corners)) {
-		push_fx_debug(renderer);
 		setup_blending(color->a == 1.0 ? WLR_RENDER_BLEND_MODE_NONE : options->blend_mode);
 	}
 
@@ -782,8 +781,6 @@ static void render_blur_segments(struct fx_gles_render_pass *pass,
 
 	glDisable(GL_BLEND);
 	glDisable(GL_STENCIL_TEST);
-
-	push_fx_debug(renderer);
 
 	glUseProgram(shader->program);
 

@@ -10,7 +10,7 @@ struct fx_renderer;
 
 GLuint compile_shader(GLuint type, const GLchar *src);
 
-GLuint link_program(const GLchar *frag_src, GLint client_version);
+GLuint link_program(const GLchar *frag_src);
 
 bool check_gl_ext(const char *exts, const char *ext);
 
@@ -42,7 +42,7 @@ struct quad_shader {
 	struct shader_corner_radii clip_radius;
 };
 
-bool link_quad_program(struct quad_shader *shader, GLint client_version);
+bool link_quad_program(struct quad_shader *shader);
 
 struct quad_grad_shader {
 	int max_len;
@@ -60,7 +60,7 @@ struct quad_grad_shader {
 	GLint blend;
 };
 
-bool link_quad_grad_program(struct quad_grad_shader *shader, GLint client_version, int max_len);
+bool link_quad_grad_program(struct quad_grad_shader *shader, int max_len);
 
 struct quad_round_shader {
 	GLuint program;
@@ -77,7 +77,7 @@ struct quad_round_shader {
 	struct shader_corner_radii clip_radius;
 };
 
-bool link_quad_round_program(struct quad_round_shader *shader, GLint client_version);
+bool link_quad_round_program(struct quad_round_shader *shader);
 
 struct quad_grad_round_shader {
 	GLuint program;
@@ -101,7 +101,7 @@ struct quad_grad_round_shader {
 	int max_len;
 };
 
-bool link_quad_grad_round_program(struct quad_grad_round_shader *shader, GLint client_version, int max_len);
+bool link_quad_grad_round_program(struct quad_grad_round_shader *shader, int max_len);
 
 struct tex_shader {
 	GLuint program;
@@ -121,7 +121,7 @@ struct tex_shader {
 	struct shader_corner_radii clip_radius;
 };
 
-bool link_tex_program(struct tex_shader *shader, GLint client_version, enum fx_tex_shader_source source);
+bool link_tex_program(struct tex_shader *shader, enum fx_tex_shader_source source);
 
 struct box_shadow_shader {
 	GLuint program;
@@ -138,7 +138,7 @@ struct box_shadow_shader {
 	struct shader_corner_radii clip_radius;
 };
 
-bool link_box_shadow_program(struct box_shadow_shader *shader, GLint client_version);
+bool link_box_shadow_program(struct box_shadow_shader *shader);
 
 struct blur_shader {
 	GLuint program;
@@ -150,8 +150,8 @@ struct blur_shader {
 	GLint halfpixel;
 };
 
-bool link_blur1_program(struct blur_shader *shader, GLint client_version);
-bool link_blur2_program(struct blur_shader *shader, GLint client_version);
+bool link_blur1_program(struct blur_shader *shader);
+bool link_blur2_program(struct blur_shader *shader);
 
 struct blur_effects_shader {
 	GLuint program;
@@ -165,6 +165,6 @@ struct blur_effects_shader {
 	GLfloat saturation;
 };
 
-bool link_blur_effects_program(struct blur_effects_shader *shader, GLint client_version);
+bool link_blur_effects_program(struct blur_effects_shader *shader);
 
 #endif

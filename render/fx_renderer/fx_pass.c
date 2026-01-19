@@ -501,12 +501,8 @@ void fx_render_pass_add_rect_grad(struct fx_gles_render_pass *pass,
 	struct fx_renderer *renderer = pass->buffer->renderer;
 
 	if (renderer->shaders.quad_grad.max_len <= fx_options->gradient.count) {
-		EGLint client_version;
-		eglQueryContext(renderer->egl->display, renderer->egl->context,
-			EGL_CONTEXT_CLIENT_VERSION, &client_version);
-
 		glDeleteProgram(renderer->shaders.quad_grad.program);
-		if (!link_quad_grad_program(&renderer->shaders.quad_grad, (GLint) client_version, fx_options->gradient.count + 1)) {
+		if (!link_quad_grad_program(&renderer->shaders.quad_grad, fx_options->gradient.count + 1)) {
 			wlr_log(WLR_ERROR, "Could not link quad shader after updating max_len to %d. Aborting renderer", fx_options->gradient.count + 1);
 			abort();
 		}
@@ -626,12 +622,8 @@ void fx_render_pass_add_rounded_rect_grad(struct fx_gles_render_pass *pass,
 	struct fx_renderer *renderer = pass->buffer->renderer;
 
 	if (renderer->shaders.quad_grad_round.max_len <= fx_options->gradient.count) {
-		EGLint client_version;
-		eglQueryContext(renderer->egl->display, renderer->egl->context,
-			EGL_CONTEXT_CLIENT_VERSION, &client_version);
-
 		glDeleteProgram(renderer->shaders.quad_grad_round.program);
-		if (!link_quad_grad_round_program(&renderer->shaders.quad_grad_round, (GLint) client_version, fx_options->gradient.count + 1)) {
+		if (!link_quad_grad_round_program(&renderer->shaders.quad_grad_round, fx_options->gradient.count + 1)) {
 			wlr_log(WLR_ERROR, "Could not link quad shader after updating max_len to %d. Aborting renderer", fx_options->gradient.count + 1);
 			abort();
 		}
@@ -1028,22 +1020,8 @@ void fx_render_pass_add_blur(struct fx_gles_render_pass *pass,
 	TRACY_BOTH_ZONES_START(renderer);
 	push_fx_debug(renderer);
 
-	pixman_region32_t translucent_region;
-	pixman_region32_init(&translucent_region);
-
 	struct wlr_box dst_box;
 	wlr_render_texture_options_get_dst_box(options, &dst_box);
-
-	// Gets the translucent region
-	pixman_box32_t surface_box = { 0, 0, dst_box.width, dst_box.height };
-	if (fx_options->opaque_region != NULL) {
-		pixman_region32_copy(&translucent_region, fx_options->opaque_region);
-	}
-
-	pixman_region32_inverse(&translucent_region, &translucent_region, &surface_box);
-	if (!pixman_region32_not_empty(&translucent_region)) {
-		goto damage_finish;
-	}
 
 	const bool has_strength = fx_options->blur_strength < 1.0;
 	struct fx_framebuffer *buffer = pass->fx_effect_framebuffers->optimized_blur_buffer;
@@ -1054,12 +1032,9 @@ void fx_render_pass_add_blur(struct fx_gles_render_pass *pass,
 		if (!buffer) {
 			wlr_log(WLR_ERROR, "Warning: Failed to use optimized blur");
 		}
-		pixman_region32_translate(&translucent_region, dst_box.x, dst_box.y);
-		pixman_region32_intersect(&translucent_region, &translucent_region, options->clip);
 
 		// Render the blur into its own buffer
 		struct fx_render_blur_pass_options blur_options = *fx_options;
-		blur_options.tex_options.base.clip = &translucent_region;
 		if (fx_options->use_optimized_blur && has_strength
 				// If the optimized blur hasn't been rendered yet
 				&& pass->fx_effect_framebuffers->optimized_no_blur_buffer) {
@@ -1071,7 +1046,7 @@ void fx_render_pass_add_blur(struct fx_gles_render_pass *pass,
 		}
 		buffer = get_main_buffer_blur(pass, &blur_options);
 		if (!buffer) {
-			goto damage_finish;
+			goto finish;
 		}
 	}
 	struct wlr_texture *wlr_texture =
@@ -1112,9 +1087,7 @@ void fx_render_pass_add_blur(struct fx_gles_render_pass *pass,
 		stencil_mask_fini();
 	}
 
-damage_finish:
-	pixman_region32_fini(&translucent_region);
-
+finish:
 	pop_fx_debug(renderer);
 	TRACY_BOTH_ZONES_END;
 }

@@ -129,7 +129,7 @@ void tracy_capture_buffer(struct tracy_data *tracy_data, struct fx_framebuffer *
 	//	https://github.com/wolfpld/tracy/releases/latest/download/tracy.pdf
 	while (data->queue.size > 0) {
 		int *queue_data = data->queue.data;
-		const int fence_i = queue_data[0];
+		const int fence_i = *queue_data;
 		if (glClientWaitSync(data->fence[fence_i], 0, 0) == GL_TIMEOUT_EXPIRED) {
 			break;
 		}
@@ -139,11 +139,12 @@ void tracy_capture_buffer(struct tracy_data *tracy_data, struct fx_framebuffer *
 				// NOTE: Assume 4 bytes per pixel
 				SCREEN_CAPTURE_DST_WIDTH * SCREEN_CAPTURE_DST_HEIGHT * 4,
 				GL_MAP_READ_BIT);
-		___tracy_emit_frame_image(ptr, SCREEN_CAPTURE_DST_WIDTH, SCREEN_CAPTURE_DST_HEIGHT, data->queue.size, false);
+		___tracy_emit_frame_image(ptr, SCREEN_CAPTURE_DST_WIDTH, SCREEN_CAPTURE_DST_HEIGHT,
+				data->queue.size / sizeof(int), false);
 		glUnmapBuffer(GL_PIXEL_PACK_BUFFER);
 
 		// Pop the first fence
-		memmove(&queue_data[0], &queue_data[sizeof(int)], data->queue.size - sizeof(int));
+		memmove(queue_data, &queue_data[1], data->queue.size - sizeof(int));
 		data->queue.size -= sizeof(int);
 	}
 	glBindBuffer(GL_PIXEL_PACK_BUFFER, 0);
@@ -169,7 +170,7 @@ void tracy_capture_buffer(struct tracy_data *tracy_data, struct fx_framebuffer *
 	// Append the new fence index
 	int *index = wl_array_add(&data->queue, sizeof(int));
 	*index = data->index;
-	data->index = (data->index + 1) % 4;
+	data->index = (data->index + 1) % SCREEN_CAPTURE_COPIES;
 }
 
 /*

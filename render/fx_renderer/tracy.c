@@ -130,20 +130,19 @@ void tracy_capture_buffer(struct tracy_data *tracy_data, struct fx_framebuffer *
 	while (data->queue.size > 0) {
 		int *queue_data = data->queue.data;
 		const int fence_i = *queue_data;
-		if (glClientWaitSync(data->fence[fence_i], 0, 0) == GL_TIMEOUT_EXPIRED) {
-			break;
+		if (glClientWaitSync(data->fence[fence_i], 0, 0) != GL_TIMEOUT_EXPIRED) {
+			glBindBuffer(GL_PIXEL_PACK_BUFFER, data->pbo[fence_i]);
+			void *ptr = glMapBufferRange(GL_PIXEL_PACK_BUFFER, 0,
+					// NOTE: Assume 4 bytes per pixel
+					SCREEN_CAPTURE_DST_WIDTH * SCREEN_CAPTURE_DST_HEIGHT * 4,
+					GL_MAP_READ_BIT);
+			___tracy_emit_frame_image(ptr, SCREEN_CAPTURE_DST_WIDTH, SCREEN_CAPTURE_DST_HEIGHT,
+					data->queue.size / sizeof(int), false);
+			glUnmapBuffer(GL_PIXEL_PACK_BUFFER);
 		}
-		glDeleteSync(data->fence[fence_i]);
-		glBindBuffer(GL_PIXEL_PACK_BUFFER, data->pbo[fence_i]);
-		void *ptr = glMapBufferRange(GL_PIXEL_PACK_BUFFER, 0,
-				// NOTE: Assume 4 bytes per pixel
-				SCREEN_CAPTURE_DST_WIDTH * SCREEN_CAPTURE_DST_HEIGHT * 4,
-				GL_MAP_READ_BIT);
-		___tracy_emit_frame_image(ptr, SCREEN_CAPTURE_DST_WIDTH, SCREEN_CAPTURE_DST_HEIGHT,
-				data->queue.size / sizeof(int), false);
-		glUnmapBuffer(GL_PIXEL_PACK_BUFFER);
 
 		// Pop the first fence
+		glDeleteSync(data->fence[fence_i]);
 		memmove(queue_data, &queue_data[1], data->queue.size - sizeof(int));
 		data->queue.size -= sizeof(int);
 	}

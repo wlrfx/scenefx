@@ -13,6 +13,7 @@
 #include <wlr/util/box.h>
 
 #include "render/fx_renderer/shaders.h"
+#include "render/tracy.h"
 
 struct fx_framebuffer;
 
@@ -170,9 +171,11 @@ struct fx_renderer {
 		PFNGLDELETEQUERIESEXTPROC glDeleteQueriesEXT;
 		PFNGLQUERYCOUNTEREXTPROC glQueryCounterEXT;
 		PFNGLGETQUERYOBJECTIVEXTPROC glGetQueryObjectivEXT;
-		PFNGLGETQUERYIVEXTPROC glGetQueryivEXT;
 		PFNGLGETQUERYOBJECTUI64VEXTPROC glGetQueryObjectui64vEXT;
 		PFNGLGETINTEGER64VEXTPROC glGetInteger64vEXT;
+		TRACY_FN(
+			PFNGLGETQUERYIVEXTPROC glGetQueryivEXT;
+		)
 	} procs;
 
 	struct {
@@ -197,9 +200,9 @@ struct fx_renderer {
 	// our custom 'fx_renderer_begin_buffer_pass' function
 	bool basic_renderer;
 
-#ifdef TRACY_ENABLE
-	struct tracy_data *tracy_data;
-#endif
+	TRACY_FN(
+		struct tracy_data *tracy_data;
+	)
 };
 
 #endif

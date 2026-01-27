@@ -9,6 +9,7 @@
 #include <wayland-util.h>
 #include <wlr/util/log.h>
 
+#include "render/fx_renderer/fx_renderer.h"
 #include "render/tracy.h"
 
 // Docs used in the implementation:

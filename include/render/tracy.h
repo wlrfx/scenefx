@@ -10,7 +10,7 @@
 #ifdef TRACY_ENABLE
 #include <tracy/TracyC.h>
 
-#include "include/render/fx_renderer/fx_renderer.h"
+struct fx_renderer;
 
 struct tracy_data;
 struct tracy_gpu_zone_context {
@@ -19,8 +19,6 @@ struct tracy_gpu_zone_context {
 };
 
 // Private functions: Don't use these outside of this file!
-
-void tracy_capture_buffer(struct tracy_data *tracy_data, struct fx_framebuffer *src_buffer);
 
 void tracy_gpu_zone_begin(struct tracy_data *tracy_data, struct tracy_gpu_zone_context *out_ctx,
 		const int line, const char *source, const char *func, const char *name);

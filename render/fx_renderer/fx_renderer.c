@@ -21,6 +21,7 @@
 #include "render/fx_renderer/shaders.h"
 #include "render/fx_renderer/fx_renderer.h"
 #include "render/fx_renderer/util.h"
+#include "render/tracy.h"
 #include "scenefx/render/fx_renderer/fx_effect_framebuffers.h"
 #include "scenefx/render/fx_renderer/fx_renderer.h"
 #include "scenefx/render/pass.h"
@@ -81,6 +82,8 @@ static int fx_get_drm_fd(struct wlr_renderer *wlr_renderer) {
 
 static void fx_renderer_destroy(struct wlr_renderer *wlr_renderer) {
 	struct fx_renderer *renderer = fx_get_renderer(wlr_renderer);
+
+	TRACY_GPU_CONTEXT_DESTROY(renderer->tracy_data);
 
 	wlr_egl_make_current(renderer->egl, NULL);
 
@@ -496,6 +499,9 @@ struct wlr_renderer *fx_renderer_create_egl(struct wlr_egl *egl) {
 		} else {
 			load_gl_proc(&renderer->procs.glGetInteger64vEXT, "glGetInteger64v");
 		}
+		TRACY_FN(
+			load_gl_proc(&renderer->procs.glGetQueryivEXT, "glGetQueryivEXT");
+		)
 	}
 
 	if (renderer->exts.KHR_debug) {
@@ -511,6 +517,10 @@ struct wlr_renderer *fx_renderer_create_egl(struct wlr_egl *egl) {
 	}
 
 	push_fx_debug(renderer);
+
+	TRACY_FN(
+		renderer->tracy_data = TRACY_GPU_CONTEXT_NEW(renderer);
+	)
 
 	// Link all shaders
 	if (!link_shaders(renderer)) {

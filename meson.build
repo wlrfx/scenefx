@@ -123,6 +123,32 @@ scenefx_deps = [
 	rt,
 ]
 
+# Tracy
+if get_option('tracy_enable')
+	if get_option('buildtype') != 'debugoptimized'
+		warning('Profiling builds should set --buildtype=debugoptimized')
+	endif
+
+	tracy_options = [
+		'default_library=static',
+		'werror=false',
+		'warning_level=0',
+	]
+	tracy_proj = subproject(
+		'tracy',
+		required: true,
+		default_options: tracy_options
+	)
+	scenefx_deps += tracy_proj.get_variable('tracy_dep')
+	add_project_arguments(
+		[
+			'-DTRACY_ENABLE',
+			'-DTRACY_ON_DEMAND',
+		],
+		language: 'c',
+	)
+endif
+
 subdir('protocol')
 subdir('render')
 
@@ -162,3 +188,7 @@ pkgconfig.generate(
 	description: 'Wlroots effects library',
 	subdirs: versioned_name,
 )
+
+summary({
+	'tracy': get_option('tracy_enable'),
+}, bool_yn: true)

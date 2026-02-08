@@ -18,6 +18,7 @@
 #include <wlr/util/region.h>
 #include <wlr/util/transform.h>
 
+#include "render/tracy.h"
 #include "scenefx/render/fx_renderer/fx_effect_framebuffers.h"
 #include "scenefx/render/fx_renderer/fx_renderer.h"
 #include "scenefx/render/pass.h"
@@ -3127,6 +3128,7 @@ bool wlr_scene_output_build_state(struct wlr_scene_output *scene_output,
 	pixman_region32_fini(&render_data.damage);
 
 	if (!wlr_render_pass_submit(&render_pass->base)) {
+		TRACY_MARK_FRAME;
 		wlr_buffer_unlock(buffer);
 
 		// if we failed to render the buffer, it will have undefined contents
@@ -3134,6 +3136,7 @@ bool wlr_scene_output_build_state(struct wlr_scene_output *scene_output,
 		wlr_damage_ring_add_whole(&scene_output->damage_ring);
 		return false;
 	}
+	TRACY_MARK_FRAME;
 
 	wlr_output_state_set_buffer(state, buffer);
 	wlr_buffer_unlock(buffer);

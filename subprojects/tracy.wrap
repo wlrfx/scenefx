@@ -1,0 +1,8 @@
+[wrap-git]
+url=https://github.com/wolfpld/tracy.git
+revision=v0.13.1
+depth=1
+
+# Fixes build errors for v0.13.1.
+# Should be removed when the next version gets released!
+diff_files=tracy_v0_13_1_build_fix.patch

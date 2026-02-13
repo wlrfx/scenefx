@@ -52,27 +52,29 @@ vec4 sample_texture() {
 #endif
 }
 
-float corner_alpha(vec2 size, vec2 position, float round_tl, float round_tr, float round_bl, float round_br);
+float corner_alpha(vec2 size, vec2 position, float radius_tl, float radius_tr, float radius_bl, float radius_br, bool inverse);
 
 void main() {
-    float quad_corner_alpha = corner_alpha(
-        size - 0.5,
-        position + 0.25,
-        radius_top_left,
-        radius_top_right,
-        radius_bottom_left,
-        radius_bottom_right
-    );
+	float quad_corner_alpha = corner_alpha(
+		size,
+		position,
+		radius_top_left,
+		radius_top_right,
+		radius_bottom_left,
+		radius_bottom_right,
+		false
+	);
 
-    // Clipping
-    float clip_corner_alpha = corner_alpha(
-        clip_size - 1.0,
-        clip_position + 0.5,
-        clip_radius_top_left,
-        clip_radius_top_right,
-        clip_radius_bottom_left,
-        clip_radius_bottom_right
-    );
+	// Clipping
+	float clip_corner_alpha = corner_alpha(
+		clip_size,
+		clip_position,
+		clip_radius_top_left,
+		clip_radius_top_right,
+		clip_radius_bottom_left,
+		clip_radius_bottom_right,
+		true
+	);
 
 	gl_FragColor = mix(sample_texture() * alpha, vec4(0.0), quad_corner_alpha) * clip_corner_alpha;
 

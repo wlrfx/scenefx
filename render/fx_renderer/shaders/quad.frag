@@ -14,18 +14,19 @@ uniform float clip_radius_top_right;
 uniform float clip_radius_bottom_left;
 uniform float clip_radius_bottom_right;
 
-float corner_alpha(vec2 size, vec2 position, float radius_tl, float radius_tr, float radius_bl, float radius_br);
+float corner_alpha(vec2 size, vec2 position, float radius_tl, float radius_tr, float radius_bl, float radius_br, bool inverse);
 
 void main() {
-    // Clipping
-    float clip_corner_alpha = corner_alpha(
-        clip_size - 1.0,
-        clip_position + 0.5,
-        clip_radius_top_left,
-        clip_radius_top_right,
-        clip_radius_bottom_left,
-        clip_radius_bottom_right
-    );
+	// Clipping
+	float clip_corner_alpha = corner_alpha(
+		clip_size,
+		clip_position,
+		clip_radius_top_left,
+		clip_radius_top_right,
+		clip_radius_bottom_left,
+		clip_radius_bottom_right,
+		true
+	);
 
-    gl_FragColor = v_color * clip_corner_alpha;
+	gl_FragColor = v_color * clip_corner_alpha;
 }

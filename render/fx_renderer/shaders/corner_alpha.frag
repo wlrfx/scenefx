@@ -21,38 +21,31 @@ float corner_alpha(vec2 size, vec2 position, float radius_tl, float radius_tr, f
 		discard;
 	}
 
-	bool is_tl = radius_tl > 0.0
+	bool is_top_left = radius_tl > 0.0
 		&& relative_pos.x <= radius_tl
 		&& relative_pos.y <= radius_tl;
-	bool is_tr = radius_tr > 0.0
+	bool is_top_right = radius_tr > 0.0
 		&& relative_pos.x >= size.x - radius_tr
 		&& relative_pos.y <= radius_tr;
-	bool is_bl = radius_bl > 0.0
+	bool is_bottom_left = radius_bl > 0.0
 		&& relative_pos.x <= radius_bl
 		&& relative_pos.y >= size.y - radius_bl;
-	bool is_br = radius_br > 0.0
+	bool is_bottom_right = radius_br > 0.0
 		&& relative_pos.x >= size.x - radius_br
 		&& relative_pos.y >= size.y - radius_br;
-	if (!(is_tl || is_tr || is_bl || is_br)) {
+	if (!(is_top_left || is_top_right || is_bottom_left || is_bottom_right)) {
 		return 0.0;
 	}
 
-	float dist = 0.0;
-	if (is_tl) {
-		vec2 top_left = abs(relative_pos - size) - size + radius_tl;
-		dist = max(dist, get_dist(top_left, radius_tl));
-	}
-	if (is_tr) {
-		vec2 top_right = abs(relative_pos - vec2(0, size.y)) - size + radius_tr;
-		dist = max(dist, get_dist(top_right, radius_tr));
-	}
-	if (is_bl) {
-		vec2 bottom_left = abs(relative_pos - vec2(size.x, 0)) - size + radius_bl;
-		dist = max(dist, get_dist(bottom_left, radius_bl));
-	}
-	if (is_br) {
-		vec2 bottom_right = abs(relative_pos) - size + radius_br;
-		dist = max(dist, get_dist(bottom_right, radius_br));
-	}
+	vec2 top_left = abs(relative_pos - size) - size + radius_tl;
+	vec2 top_right = abs(relative_pos - vec2(0, size.y)) - size + radius_tr;
+	vec2 bottom_left = abs(relative_pos - vec2(size.x, 0)) - size + radius_bl;
+	vec2 bottom_right = abs(relative_pos) - size + radius_br;
+
+	float dist = max(
+		max(get_dist(top_left, radius_tl), get_dist(top_right, radius_tr)),
+		max(get_dist(bottom_left, radius_bl), get_dist(bottom_right, radius_br))
+	);
+
 	return smoothstep(0.0, 1.0, dist);
 }

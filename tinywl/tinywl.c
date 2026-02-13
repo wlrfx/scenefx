@@ -973,6 +973,8 @@ static void server_new_xdg_toplevel(struct wl_listener *listener, void *data) {
 	wlr_scene_node_lower_to_bottom(&toplevel->border->node);
 	// Lower the shadow below the border
 	wlr_scene_node_lower_to_bottom(&toplevel->shadow->node);
+	// Lower the blur below the shadow
+	wlr_scene_node_lower_to_bottom(&toplevel->blur->node);
 
 	/* Listen to the various events it can emit */
 	toplevel->map.notify = xdg_toplevel_map;

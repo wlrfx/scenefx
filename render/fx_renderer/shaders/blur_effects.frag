@@ -47,7 +47,7 @@ float noiseAmount(vec2 p) {
 	p3 += dot(p3, p3.yzx + 33.33);
 	float hash = fract((p3.x + p3.y) * p3.z);
 	return (mod(hash, 1.0) - 0.5) * noise;
-};
+}
 
 void main() {
 	vec4 color = texture2D(tex, v_texcoord);

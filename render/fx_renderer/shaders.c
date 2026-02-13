@@ -196,7 +196,7 @@ bool link_quad_round_program(struct quad_round_shader *shader) {
 
 bool link_quad_grad_round_program(struct quad_grad_round_shader *shader, int max_len) {
 	GLchar quad_src_part[2048];
-	GLchar quad_src[4096];
+	GLchar quad_src[8192];
 	snprintf(quad_src_part, sizeof(quad_src_part),
 		quad_grad_round_frag_src, max_len);
 	snprintf(quad_src, sizeof(quad_src),
@@ -233,8 +233,8 @@ bool link_quad_grad_round_program(struct quad_grad_round_shader *shader, int max
 }
 
 bool link_tex_program(struct tex_shader *shader, enum fx_tex_shader_source source) {
-	GLchar frag_src_part[2048];
-	GLchar frag_src[4096];
+	GLchar frag_src_part[4096];
+	GLchar frag_src[8192];
 	snprintf(frag_src_part, sizeof(frag_src_part),
 		tex_frag_src, source);
 	snprintf(frag_src, sizeof(frag_src),

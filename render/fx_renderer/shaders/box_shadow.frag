@@ -77,8 +77,8 @@ void main() {
 
     // Clipping
     float clip_corner_alpha = corner_alpha(
-        clip_size,
-        clip_position,
+        clip_size - 1.5,
+        clip_position + 0.75,
         clip_radius_top_left,
         clip_radius_top_right,
         clip_radius_bottom_left,

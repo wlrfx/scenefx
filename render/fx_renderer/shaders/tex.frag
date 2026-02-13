@@ -56,8 +56,8 @@ float corner_alpha(vec2 size, vec2 position, float radius_tl, float radius_tr, f
 
 void main() {
 	float quad_corner_alpha = corner_alpha(
-		size,
-		position,
+		size - 0.5,
+		position + 0.25,
 		radius_top_left,
 		radius_top_right,
 		radius_bottom_left,
@@ -67,8 +67,8 @@ void main() {
 
 	// Clipping
 	float clip_corner_alpha = corner_alpha(
-		clip_size,
-		clip_position,
+		clip_size - 1.0,
+		clip_position + 0.5,
 		clip_radius_top_left,
 		clip_radius_top_right,
 		clip_radius_bottom_left,

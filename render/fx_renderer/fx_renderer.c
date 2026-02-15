@@ -373,6 +373,16 @@ static bool link_shaders(struct fx_renderer *renderer) {
 		goto error;
 	}
 
+	// Drop Shadow shaders
+	if (!link_drop_shadow_program(&renderer->shaders.drop_shadow)) {
+		wlr_log(WLR_ERROR, "Could not link drop_shadow shader");
+		goto error;
+	}
+	if (!link_drop_shadow_final_program(&renderer->shaders.drop_shadow_final)) {
+		wlr_log(WLR_ERROR, "Could not link drop_shadow_final shader");
+		goto error;
+	}
+
 	return true;
 
 error:
@@ -387,6 +397,8 @@ error:
 	glDeleteProgram(renderer->shaders.blur1.program);
 	glDeleteProgram(renderer->shaders.blur2.program);
 	glDeleteProgram(renderer->shaders.blur_effects.program);
+	glDeleteProgram(renderer->shaders.drop_shadow.program);
+	glDeleteProgram(renderer->shaders.drop_shadow_final.program);
 
 	return false;
 }

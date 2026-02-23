@@ -81,6 +81,22 @@ static int fx_get_drm_fd(struct wlr_renderer *wlr_renderer) {
 	return renderer->drm_fd;
 }
 
+static inline void free_shaders(struct fx_renderer *renderer) {
+	push_fx_debug(renderer);
+	glDeleteProgram(renderer->shaders.quad.program);
+	glDeleteProgram(renderer->shaders.quad_round.program);
+	glDeleteProgram(renderer->shaders.quad_grad.program);
+	glDeleteProgram(renderer->shaders.quad_grad_round.program);
+	glDeleteProgram(renderer->shaders.tex_rgba.program);
+	glDeleteProgram(renderer->shaders.tex_rgbx.program);
+	glDeleteProgram(renderer->shaders.tex_ext.program);
+	glDeleteProgram(renderer->shaders.box_shadow.program);
+	glDeleteProgram(renderer->shaders.blur1.program);
+	glDeleteProgram(renderer->shaders.blur2.program);
+	glDeleteProgram(renderer->shaders.blur_effects.program);
+	pop_fx_debug(renderer);
+}
+
 static void fx_renderer_destroy(struct wlr_renderer *wlr_renderer) {
 	struct fx_renderer *renderer = fx_get_renderer(wlr_renderer);
 
@@ -103,12 +119,7 @@ static void fx_renderer_destroy(struct wlr_renderer *wlr_renderer) {
 		fx_framebuffer_destroy(buffer);
 	}
 
-	push_fx_debug(renderer);
-	glDeleteProgram(renderer->shaders.quad.program);
-	glDeleteProgram(renderer->shaders.tex_rgba.program);
-	glDeleteProgram(renderer->shaders.tex_rgbx.program);
-	glDeleteProgram(renderer->shaders.tex_ext.program);
-	pop_fx_debug(renderer);
+	free_shaders(renderer);
 
 	if (renderer->exts.KHR_debug) {
 		glDisable(GL_DEBUG_OUTPUT_KHR);
@@ -399,18 +410,7 @@ static bool link_shaders(struct fx_renderer *renderer) {
 	return true;
 
 error:
-	glDeleteProgram(renderer->shaders.quad.program);
-	glDeleteProgram(renderer->shaders.quad_round.program);
-	glDeleteProgram(renderer->shaders.quad_grad.program);
-	glDeleteProgram(renderer->shaders.quad_grad_round.program);
-	glDeleteProgram(renderer->shaders.tex_rgba.program);
-	glDeleteProgram(renderer->shaders.tex_rgbx.program);
-	glDeleteProgram(renderer->shaders.tex_ext.program);
-	glDeleteProgram(renderer->shaders.box_shadow.program);
-	glDeleteProgram(renderer->shaders.blur1.program);
-	glDeleteProgram(renderer->shaders.blur2.program);
-	glDeleteProgram(renderer->shaders.blur_effects.program);
-
+	free_shaders(renderer);
 	return false;
 }
 

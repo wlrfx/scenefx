@@ -141,6 +141,15 @@ void fx_render_pass_add_box_shadow(struct fx_gles_render_pass *pass,
 		const struct fx_render_box_shadow_options *options);
 
 /**
+ * Render a drop shadow. Blurs a reference texture, turning it into a dynamic
+ * shadow which includes transparent regions such as any transparent hole in a
+ * surface.
+ */
+void fx_render_pass_add_drop_shadow(struct fx_gles_render_pass *pass,
+		struct fx_render_texture_options *tex_options, float blur_sigma,
+		struct wlr_render_color *color);
+
+/**
  * Render blur.
  */
 void fx_render_pass_add_blur(struct fx_gles_render_pass *pass,
@@ -158,5 +167,10 @@ bool fx_render_pass_add_optimized_blur(struct fx_gles_render_pass *pass,
 void fx_renderer_read_to_buffer(struct fx_gles_render_pass *pass,
 		pixman_region32_t *region, struct fx_framebuffer *dst_buffer,
 		struct fx_framebuffer *src_buffer);
+/**
+ * Clear a framebuffer region.
+ */
+void fx_render_pass_add_clear_region(struct fx_gles_render_pass *pass,
+		const pixman_region32_t *region);
 
 #endif

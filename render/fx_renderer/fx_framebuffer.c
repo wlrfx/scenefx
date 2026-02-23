@@ -1,3 +1,4 @@
+#include <assert.h>
 #include <stdlib.h>
 #include <wlr/interfaces/wlr_buffer.h>
 #include <wlr/render/allocator.h>
@@ -68,28 +69,33 @@ GLuint fx_framebuffer_get_fbo(struct fx_framebuffer *buffer) {
 }
 
 void fx_framebuffer_get_or_create_custom(struct fx_renderer *renderer,
-		struct wlr_output *output, struct wlr_swapchain *swapchain,
-		struct fx_framebuffer **fx_framebuffer, bool *failed) {
+		struct wlr_output *output, struct fx_framebuffer **fx_framebuffer, bool *failed) {
 	if (*failed) {
 		return;
 	}
 
 	struct wlr_allocator *allocator = output->allocator;
-	if (!swapchain) {
-		if (!output->swapchain) {
-			wlr_log(WLR_ERROR, "Failed to allocate buffer, no swapchain");
-			*failed = true;
-			return;
-		}
-		swapchain = output->swapchain;
-	}
 	int width = output->width;
 	int height = output->height;
 	struct wlr_buffer *wlr_buffer = NULL;
 
+	// TODO: Configure to use non-alpha to save some GPU memory :)
+	// TODO: Cache this, don't find it at runtime
+	// Try getting a format with alpha. We could use the outputs swapchain
+	// format, but that one doesn't support alpha.
+	const struct fx_pixel_format *pix_fmt =
+		get_fx_format_from_gl(GL_RGBA, GL_UNSIGNED_BYTE, true);
+	if (!pix_fmt) {
+		wlr_log(WLR_ERROR, "Could not get pixel format for custom fx framebuffer!");
+		*failed = true;
+		return;
+	}
+	const struct wlr_drm_format *format = wlr_drm_format_set_get(&renderer->shm_texture_formats, pix_fmt->drm_format);
+	// Should exist when found with get_fx_format_from_gl
+	assert(format);
+
 	if (*fx_framebuffer == NULL) {
-		wlr_buffer = wlr_allocator_create_buffer(allocator, width, height,
-				&swapchain->format);
+		wlr_buffer = wlr_allocator_create_buffer(allocator, width, height, format);
 		if (wlr_buffer == NULL) {
 			wlr_log(WLR_ERROR, "Failed to allocate buffer");
 			*failed = true;
@@ -107,8 +113,7 @@ void fx_framebuffer_get_or_create_custom(struct fx_renderer *renderer,
 			fx_framebuffer_destroy(*fx_framebuffer);
 		}
 
-		wlr_buffer = wlr_allocator_create_buffer(allocator,
-				width, height, &swapchain->format);
+		wlr_buffer = wlr_allocator_create_buffer(allocator, width, height, format);
 	}
 	*fx_framebuffer = fx_framebuffer_get_or_create(renderer, wlr_buffer);
 	fx_framebuffer_get_fbo(*fx_framebuffer);

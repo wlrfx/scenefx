@@ -30,13 +30,13 @@ static struct link *link_init(struct linked_node *node_1,
 
 bool linked_nodes_are_linked(struct linked_node *node_1,
         struct linked_node *node_2) {
-    return node_1->link != NULL && node_2->link != NULL
+    return linked_node_initialized(node_1) && linked_node_initialized(node_2)
         && node_1->link == node_2->link;
 }
 
 void linked_node_init_link(struct linked_node *node_1,
         struct linked_node *node_2) {
-    if (node_1->link || node_2->link) {
+    if (linked_node_initialized(node_1) || linked_node_initialized(node_2)) {
         assert(linked_nodes_are_linked(node_1, node_2));
         return;
     }
@@ -47,7 +47,7 @@ void linked_node_init_link(struct linked_node *node_1,
 }
 
 struct linked_node *linked_nodes_get_sibling(struct linked_node *node) {
-    if (node->link == NULL) {
+    if (!linked_node_initialized(node)) {
         return NULL;
     }
     assert(node == node->link->node_1 || node == node->link->node_2);
@@ -70,7 +70,7 @@ void linked_node_unlink(struct linked_node *node_1,
 }
 
 void linked_node_destroy(struct linked_node *node) {
-    if (node->link == NULL) {
+    if (!linked_node_initialized(node)) {
         return;
     }
     assert(node == node->link->node_1 || node == node->link->node_2);

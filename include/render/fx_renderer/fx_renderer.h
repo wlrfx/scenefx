@@ -52,8 +52,7 @@ struct fx_framebuffer {
 
 /** Should only be used with custom fbs */
 void fx_framebuffer_get_or_create_custom(struct fx_renderer *fx_renderer,
-		struct wlr_output *output, struct wlr_swapchain *swapchain,
-		struct fx_framebuffer **fx_buffer, bool *failed);
+		struct wlr_output *output, struct fx_framebuffer **fx_buffer, bool *failed);
 
 struct fx_framebuffer *fx_framebuffer_get_or_create(struct fx_renderer *renderer,
 		struct wlr_buffer *wlr_buffer);
@@ -190,6 +189,8 @@ struct fx_renderer {
 		struct blur_shader blur1;
 		struct blur_shader blur2;
 		struct blur_effects_shader blur_effects;
+		struct drop_shadow_shader drop_shadow;
+		struct drop_shadow_final_shader drop_shadow_final;
 	} shaders;
 
 	struct wl_list buffers; // fx_framebuffer.link

@@ -20,6 +20,8 @@
 #include "blur1_frag_src.h"
 #include "blur2_frag_src.h"
 #include "blur_effects_frag_src.h"
+#include "drop_shadow_frag_src.h"
+#include "drop_shadow_final_frag_src.h"
 
 GLuint compile_shader(GLuint type, const GLchar *src) {
 	GLuint shader = glCreateShader(type);
@@ -342,6 +344,40 @@ bool link_blur_effects_program(struct blur_effects_shader *shader) {
 	shader->brightness = glGetUniformLocation(prog, "brightness");
 	shader->contrast = glGetUniformLocation(prog, "contrast");
 	shader->saturation = glGetUniformLocation(prog, "saturation");
+
+	return true;
+}
+
+bool link_drop_shadow_program(struct drop_shadow_shader *shader) {
+	GLuint prog;
+	shader->program = prog = link_program(drop_shadow_frag_src);
+	if (!shader->program) {
+		return false;
+	}
+
+	shader->proj = glGetUniformLocation(prog, "proj");
+	shader->tex = glGetUniformLocation(prog, "tex");
+	shader->blur_sigma = glGetUniformLocation(prog, "blur_sigma");
+	shader->direction = glGetUniformLocation(prog, "direction");
+	shader->pos_attrib = glGetAttribLocation(prog, "pos");
+	shader->tex_proj = glGetUniformLocation(prog, "tex_proj");
+	shader->size = glGetUniformLocation(prog, "size");
+
+	return true;
+}
+
+bool link_drop_shadow_final_program(struct drop_shadow_final_shader *shader) {
+	GLuint prog;
+	shader->program = prog = link_program(drop_shadow_final_frag_src);
+	if (!shader->program) {
+		return false;
+	}
+
+	shader->proj = glGetUniformLocation(prog, "proj");
+	shader->tex = glGetUniformLocation(prog, "tex");
+	shader->color = glGetUniformLocation(prog, "color");
+	shader->pos_attrib = glGetAttribLocation(prog, "pos");
+	shader->tex_proj = glGetUniformLocation(prog, "tex_proj");
 
 	return true;
 }

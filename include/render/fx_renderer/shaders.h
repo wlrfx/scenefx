@@ -167,4 +167,28 @@ struct blur_effects_shader {
 
 bool link_blur_effects_program(struct blur_effects_shader *shader);
 
+struct drop_shadow_shader {
+	GLuint program;
+	GLint proj;
+	GLint tex_proj;
+	GLint tex;
+	GLint blur_sigma;
+	GLint direction;
+	GLint pos_attrib;
+	GLint size;
+};
+
+bool link_drop_shadow_program(struct drop_shadow_shader *shader);
+
+struct drop_shadow_final_shader {
+	GLuint program;
+	GLint proj;
+	GLint tex_proj;
+	GLint tex;
+	GLint color;
+	GLint pos_attrib;
+};
+
+bool link_drop_shadow_final_program(struct drop_shadow_final_shader *shader);
+
 #endif

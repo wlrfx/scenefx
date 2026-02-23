@@ -2461,7 +2461,18 @@ static bool scene_buffer_is_black_opaque(struct wlr_scene_buffer *scene_buffer) 
 		scene_buffer->single_pixel_buffer_color[1] == 0 &&
 		scene_buffer->single_pixel_buffer_color[2] == 0 &&
 		scene_buffer->single_pixel_buffer_color[3] == UINT32_MAX &&
-		scene_buffer->opacity == 1.0;
+		scene_buffer->opacity == 1.0 &&
+		fx_corner_radii_is_empty(&scene_buffer->corners);
+}
+
+static bool scene_rect_is_black_opaque(struct wlr_scene_rect *scene_rect) {
+	return scene_rect->color[0] == 0.f &&
+		scene_rect->color[1] == 0.f &&
+		scene_rect->color[2] == 0.f &&
+		scene_rect->color[3] == 1.f &&
+		fx_corner_radii_is_empty(&scene_rect->corners) &&
+		fx_corner_radii_is_empty(&scene_rect->clipped_region.corners) &&
+		wlr_box_empty(&scene_rect->clipped_region.area);
 }
 
 static bool construct_render_list_iterator(struct wlr_scene_node *node,
@@ -2479,9 +2490,8 @@ static bool construct_render_list_iterator(struct wlr_scene_node *node,
 	if (node->type == WLR_SCENE_NODE_RECT && data->calculate_visibility &&
 			(!data->fractional_scale || data->render_list->size == 0)) {
 		struct wlr_scene_rect *rect = wlr_scene_rect_from_node(node);
-		float *black = (float[4]){ 0.f, 0.f, 0.f, 1.f };
 
-		if (memcmp(rect->color, black, sizeof(float) * 4) == 0) {
+		if (scene_rect_is_black_opaque(rect)) {
 			return false;
 		}
 	}

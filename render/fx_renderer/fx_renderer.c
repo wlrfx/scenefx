@@ -104,6 +104,7 @@ static void fx_renderer_destroy(struct wlr_renderer *wlr_renderer) {
 
 	push_fx_debug(renderer);
 	glDeleteProgram(renderer->shaders.quad.program);
+	glDeleteProgram(renderer->shaders.quad_clip.program);
 	glDeleteProgram(renderer->shaders.tex_rgba.program);
 	glDeleteProgram(renderer->shaders.tex_rgbx.program);
 	glDeleteProgram(renderer->shaders.tex_ext.program);
@@ -321,8 +322,14 @@ struct wlr_renderer *fx_renderer_create(struct wlr_backend *backend) {
 
 static bool link_shaders(struct fx_renderer *renderer) {
 	// quad fragment shader
-	if (!link_quad_program(&renderer->shaders.quad)) {
+	if (!link_quad_program(&renderer->shaders.quad, false)) {
 		wlr_log(WLR_ERROR, "Could not link quad shader");
+		goto error;
+	}
+
+	// quad clip fragment shader
+	if (!link_quad_program(&renderer->shaders.quad_clip, true)) {
+		wlr_log(WLR_ERROR, "Could not link quad clip shader");
 		goto error;
 	}
 
@@ -400,6 +407,7 @@ static bool link_shaders(struct fx_renderer *renderer) {
 
 error:
 	glDeleteProgram(renderer->shaders.quad.program);
+	glDeleteProgram(renderer->shaders.quad_clip.program);
 	glDeleteProgram(renderer->shaders.quad_round.program);
 	glDeleteProgram(renderer->shaders.quad_grad.program);
 	glDeleteProgram(renderer->shaders.quad_grad_round.program);

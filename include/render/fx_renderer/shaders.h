@@ -37,12 +37,15 @@ struct quad_shader {
 	GLint color;
 	GLint pos_attrib;
 
-	GLint clip_size;
-	GLint clip_position;
-	struct shader_corner_radii clip_radius;
+	// Only used for the effects shader
+	struct {
+		GLint clip_size;
+		GLint clip_position;
+		struct shader_corner_radii clip_radius;
+	} effects;
 };
 
-bool link_quad_program(struct quad_shader *shader);
+bool link_quad_program(struct quad_shader *shader, bool clip);
 
 struct quad_grad_shader {
 	int max_len;

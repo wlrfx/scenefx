@@ -473,9 +473,11 @@ void fx_render_pass_add_rect(struct fx_gles_render_pass *pass,
 	} else {
 		pixman_region32_init_rect(&clip_region, box.x, box.y, box.width, box.height);
 	}
+
+	bool use_clip = clipped_fregion_is_valid(&fx_options->clipped_region);
 	const struct wlr_box clipped_region_box = fx_options->clipped_region.area;
 	struct fx_corner_fradii clipped_region_corners = fx_options->clipped_region.corners;
-	if (!apply_clip_region(&clip_region, &clipped_region_box, &clipped_region_corners)) {
+	if (!use_clip || !apply_clip_region(&clip_region, &clipped_region_box, &clipped_region_corners)) {
 		setup_blending(color->a == 1.0 ? WLR_RENDER_BLEND_MODE_NONE : options->blend_mode);
 	}
 
@@ -492,15 +494,18 @@ void fx_render_pass_add_rect(struct fx_gles_render_pass *pass,
 	TRACY_ZONE_TEXT_f("Color RGBA: %f, %f, %f, %f", color->r, color->g, color->b, color->a);
 	push_fx_debug(renderer);
 
-	struct quad_shader shader = renderer->shaders.quad;
+	struct quad_shader shader = use_clip ? renderer->shaders.quad_clip : renderer->shaders.quad;
 	glUseProgram(shader.program);
 	set_proj_matrix(shader.proj, pass->projection_matrix, &box);
 	glUniform4f(shader.color, color->r, color->g, color->b, color->a);
-	glUniform2f(shader.clip_size, clipped_region_box.width, clipped_region_box.height);
-	glUniform2f(shader.clip_position, clipped_region_box.x, clipped_region_box.y);
-	uniform_corner_radii_set(&shader.clip_radius, &clipped_region_corners);
 
-	render(&box, &clip_region, renderer->shaders.quad.pos_attrib);
+	if (use_clip) {
+		glUniform2f(shader.effects.clip_size, clipped_region_box.width, clipped_region_box.height);
+		glUniform2f(shader.effects.clip_position, clipped_region_box.x, clipped_region_box.y);
+		uniform_corner_radii_set(&shader.effects.clip_radius, &clipped_region_corners);
+	}
+
+	render(&box, &clip_region, shader.pos_attrib);
 	pixman_region32_fini(&clip_region);
 
 	pop_fx_debug(renderer);

@@ -109,10 +109,13 @@ void uniform_corner_radii_set(struct shader_corner_radii *uniform, struct fx_cor
 }
 // Shaders
 
-bool link_quad_program(struct quad_shader *shader) {
+bool link_quad_program(struct quad_shader *shader, bool clip) {
+	GLchar quad_src_part[2048];
 	GLchar quad_src[4096];
-	snprintf(quad_src, sizeof(quad_src), "%s\n%s", quad_frag_src,
-		corner_alpha_frag_src);
+	snprintf(quad_src_part, sizeof(quad_src_part),
+		quad_frag_src, clip);
+	snprintf(quad_src, sizeof(quad_src),
+		"%s\n%s\n", quad_src_part, clip ? corner_alpha_frag_src : "");
 
 	GLuint prog;
 	shader->program = prog = link_program(quad_src);
@@ -123,12 +126,16 @@ bool link_quad_program(struct quad_shader *shader) {
 	shader->proj = glGetUniformLocation(prog, "proj");
 	shader->color = glGetUniformLocation(prog, "color");
 	shader->pos_attrib = glGetAttribLocation(prog, "pos");
-	shader->clip_size = glGetUniformLocation(prog, "clip_size");
-	shader->clip_position = glGetUniformLocation(prog, "clip_position");
-	shader->clip_radius.top_left = glGetUniformLocation(prog, "clip_radius_top_left");
-	shader->clip_radius.top_right = glGetUniformLocation(prog, "clip_radius_top_right");
-	shader->clip_radius.bottom_left = glGetUniformLocation(prog, "clip_radius_bottom_left");
-	shader->clip_radius.bottom_right = glGetUniformLocation(prog, "clip_radius_bottom_right");
+
+	if (!clip) {
+		return true;
+	}
+	shader->effects.clip_size = glGetUniformLocation(prog, "clip_size");
+	shader->effects.clip_position = glGetUniformLocation(prog, "clip_position");
+	shader->effects.clip_radius.top_left = glGetUniformLocation(prog, "clip_radius_top_left");
+	shader->effects.clip_radius.top_right = glGetUniformLocation(prog, "clip_radius_top_right");
+	shader->effects.clip_radius.bottom_left = glGetUniformLocation(prog, "clip_radius_bottom_left");
+	shader->effects.clip_radius.bottom_right = glGetUniformLocation(prog, "clip_radius_bottom_right");
 
 	return true;
 }

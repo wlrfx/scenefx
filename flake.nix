@@ -47,8 +47,8 @@
               wayland-protocols
               wlroots_0_19
               libgbm
-              xorg.libxcb
-              xorg.xcbutilwm
+              libxcb
+              libxcb-wm
             ];
 
             meta = with pkgs.lib; {
@@ -68,7 +68,7 @@
 		  hardeningDisable = [ "fortify" ];
 	    };
 
-        formatter = pkgs.nixfmt-rfc-style;
+        formatter = pkgs.nixfmt;
       }
     );
 }

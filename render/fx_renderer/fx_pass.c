@@ -311,19 +311,27 @@ void fx_render_pass_add_texture(struct fx_gles_render_pass *pass,
 
 	struct tex_shader *shader = NULL;
 
+	bool use_effects = !fx_corner_fradii_is_empty(&fx_options->corners)
+		|| clipped_fregion_is_valid(&fx_options->clipped_region);
 	switch (texture->target) {
 	case GL_TEXTURE_2D:
 		if (texture->has_alpha) {
-			shader = &renderer->shaders.tex_rgba;
+			shader = use_effects
+				? &renderer->shaders.tex_effects_rgba
+				: &renderer->shaders.tex_rgba;
 		} else {
-			shader = &renderer->shaders.tex_rgbx;
+			shader = use_effects
+				? &renderer->shaders.tex_effects_rgbx
+				: &renderer->shaders.tex_rgbx;
 		}
 		break;
 	case GL_TEXTURE_EXTERNAL_OES:
 		// EGL_EXT_image_dma_buf_import_modifiers requires
 		// GL_OES_EGL_image_external
 		assert(renderer->exts.OES_egl_image_external);
-		shader = &renderer->shaders.tex_ext;
+		shader = use_effects
+			? &renderer->shaders.tex_effects_ext
+			: &renderer->shaders.tex_ext;
 		break;
 	default:
 		abort();
@@ -353,9 +361,16 @@ void fx_render_pass_add_texture(struct fx_gles_render_pass *pass,
 	TRACY_ZONE_TEXT_f("src_box (WxH, X, Y): %lfx%lf, %lf, %lf",
 			src_fbox.width, src_fbox.height, src_fbox.x, src_fbox.y);
 	TRACY_ZONE_TEXT_f("Shader Type: %s",
-			shader == &renderer->shaders.tex_rgba ? "RGBA"
-			: shader == &renderer->shaders.tex_rgbx ? "RGBX"
-			: "EXT");
+			use_effects ? (
+			 shader == &renderer->shaders.tex_effects_rgba ? "Effects RGBA"
+			 : shader == &renderer->shaders.tex_effects_rgbx ? "Effects RGBX"
+			 : "Effects EXT"
+			) : (
+				shader == &renderer->shaders.tex_rgba ? "RGBA"
+				: shader == &renderer->shaders.tex_rgbx ? "RGBX"
+				: "EXT"
+			)
+		);
 	push_fx_debug(renderer);
 
 	if (options->wait_timeline != NULL) {
@@ -381,10 +396,7 @@ void fx_render_pass_add_texture(struct fx_gles_render_pass *pass,
 		}
 	}
 
-	bool has_alpha = texture->has_alpha
-		|| alpha < 1.0
-		|| !fx_corner_fradii_is_empty(&fx_options->corners)
-		|| fx_options->discard_transparent;
+	bool has_alpha = texture->has_alpha || alpha < 1.0 || use_effects;
 	TRACY_ZONE_TEXT_f("Has Alpha: %d", has_alpha);
 	setup_blending(!has_alpha ? WLR_RENDER_BLEND_MODE_NONE : options->blend_mode);
 
@@ -415,18 +427,22 @@ void fx_render_pass_add_texture(struct fx_gles_render_pass *pass,
 		break;
 	}
 
-	struct fx_corner_fradii corners = fx_options->corners;
-
 	glUniform1i(shader->tex, 0);
 	glUniform1f(shader->alpha, alpha);
-	glUniform2f(shader->size, clip_box->width, clip_box->height);
-	glUniform2f(shader->position, clip_box->x, clip_box->y);
-	glUniform1f(shader->discard_transparent, fx_options->discard_transparent);
-	uniform_corner_radii_set(&shader->radius, &corners);
 
-	glUniform2f(shader->clip_size, clipped_region_box.width, clipped_region_box.height);
-	glUniform2f(shader->clip_position, clipped_region_box.x, clipped_region_box.y);
-	uniform_corner_radii_set(&shader->clip_radius, &clipped_region_corners);
+	glUniform1f(shader->discard_transparent, fx_options->discard_transparent);
+
+	if (use_effects) {
+		struct fx_corner_fradii corners = fx_options->corners;
+
+		glUniform2f(shader->effects.size, clip_box->width, clip_box->height);
+		glUniform2f(shader->effects.position, clip_box->x, clip_box->y);
+		uniform_corner_radii_set(&shader->effects.radius, &corners);
+
+		glUniform2f(shader->effects.clip_size, clipped_region_box.width, clipped_region_box.height);
+		glUniform2f(shader->effects.clip_position, clipped_region_box.x, clipped_region_box.y);
+		uniform_corner_radii_set(&shader->effects.clip_radius, &clipped_region_corners);
+	}
 
 	set_proj_matrix(shader->proj, pass->projection_matrix, &dst_box);
 	set_tex_matrix(shader->tex_proj, options->transform, &src_fbox);

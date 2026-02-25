@@ -107,6 +107,9 @@ static void fx_renderer_destroy(struct wlr_renderer *wlr_renderer) {
 	glDeleteProgram(renderer->shaders.tex_rgba.program);
 	glDeleteProgram(renderer->shaders.tex_rgbx.program);
 	glDeleteProgram(renderer->shaders.tex_ext.program);
+	glDeleteProgram(renderer->shaders.tex_effects_rgba.program);
+	glDeleteProgram(renderer->shaders.tex_effects_rgbx.program);
+	glDeleteProgram(renderer->shaders.tex_effects_ext.program);
 	pop_fx_debug(renderer);
 
 	if (renderer->exts.KHR_debug) {
@@ -339,17 +342,37 @@ static bool link_shaders(struct fx_renderer *renderer) {
 		goto error;
 	}
 
-	// fragment shaders
-	if (!link_tex_program(&renderer->shaders.tex_rgba, SHADER_SOURCE_TEXTURE_RGBA)) {
+	// Basic fragment shaders
+	if (!link_tex_program(&renderer->shaders.tex_rgba,
+				SHADER_SOURCE_TEXTURE_RGBA, false)) {
 		wlr_log(WLR_ERROR, "Could not link tex_RGBA shader");
 		goto error;
 	}
-	if (!link_tex_program(&renderer->shaders.tex_rgbx, SHADER_SOURCE_TEXTURE_RGBX)) {
+	if (!link_tex_program(&renderer->shaders.tex_rgbx,
+				SHADER_SOURCE_TEXTURE_RGBX, false)) {
 		wlr_log(WLR_ERROR, "Could not link tex_RGBX shader");
 		goto error;
 	}
-	if (!link_tex_program(&renderer->shaders.tex_ext, SHADER_SOURCE_TEXTURE_EXTERNAL)) {
+	if (!link_tex_program(&renderer->shaders.tex_ext,
+				SHADER_SOURCE_TEXTURE_EXTERNAL, false)) {
 		wlr_log(WLR_ERROR, "Could not link tex_EXTERNAL shader");
+		goto error;
+	}
+
+	// Effects fragment shaders
+	if (!link_tex_program(&renderer->shaders.tex_effects_rgba,
+				SHADER_SOURCE_TEXTURE_RGBA, true)) {
+		wlr_log(WLR_ERROR, "Could not link tex_effects_RGBA shader");
+		goto error;
+	}
+	if (!link_tex_program(&renderer->shaders.tex_effects_rgbx,
+				SHADER_SOURCE_TEXTURE_RGBX, true)) {
+		wlr_log(WLR_ERROR, "Could not link tex_effects_RGBX shader");
+		goto error;
+	}
+	if (!link_tex_program(&renderer->shaders.tex_effects_ext,
+				SHADER_SOURCE_TEXTURE_EXTERNAL, true)) {
+		wlr_log(WLR_ERROR, "Could not link tex_effects_EXTERNAL shader");
 		goto error;
 	}
 
@@ -383,6 +406,9 @@ error:
 	glDeleteProgram(renderer->shaders.tex_rgba.program);
 	glDeleteProgram(renderer->shaders.tex_rgbx.program);
 	glDeleteProgram(renderer->shaders.tex_ext.program);
+	glDeleteProgram(renderer->shaders.tex_effects_rgba.program);
+	glDeleteProgram(renderer->shaders.tex_effects_rgbx.program);
+	glDeleteProgram(renderer->shaders.tex_effects_ext.program);
 	glDeleteProgram(renderer->shaders.box_shadow.program);
 	glDeleteProgram(renderer->shaders.blur1.program);
 	glDeleteProgram(renderer->shaders.blur2.program);

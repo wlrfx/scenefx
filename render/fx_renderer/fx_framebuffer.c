@@ -88,8 +88,6 @@ void fx_framebuffer_get_or_create_custom(struct fx_renderer *renderer,
 		*fx_framebuffer = NULL;
 	}
 
-	// Create a new buffer
-
 	// Get the best supported DRM format (DMABUF if supported)
 	const struct wlr_drm_format_set *texture_formats = wlr_renderer_get_texture_formats(
 			&renderer->wlr_renderer, renderer->wlr_renderer.render_buffer_caps);

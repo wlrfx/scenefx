@@ -1248,31 +1248,6 @@ done:
 	pixman_region32_fini(&region);
 }
 
-void fx_render_pass_add_clear_region(struct fx_gles_render_pass *pass,
-		const pixman_region32_t *region) {
-	struct fx_renderer *renderer = pass->buffer->renderer;
-
-	push_fx_debug(renderer);
-
-	glClearColor(0, 0, 0, 1);
-
-	if (region) {
-		glEnable(GL_SCISSOR_TEST);
-		int n_rects;
-		const pixman_box32_t *rects = pixman_region32_rectangles(region, &n_rects);
-		for (int i = 0; i < n_rects; i++) {
-			const pixman_box32_t rect = rects[i];
-			glScissor(rect.x1, rect.y1, rect.x2 - rect.x1, rect.y2 - rect.y1);
-			glClear(GL_COLOR_BUFFER_BIT);
-		}
-		glDisable(GL_SCISSOR_TEST);
-	} else {
-		glClear(GL_COLOR_BUFFER_BIT);
-	}
-
-	pop_fx_debug(renderer);
-}
-
 static const char *reset_status_str(GLenum status) {
 	switch (status) {
 	case GL_GUILTY_CONTEXT_RESET_KHR:

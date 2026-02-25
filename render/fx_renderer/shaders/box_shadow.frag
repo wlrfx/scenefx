@@ -66,7 +66,8 @@ float roundedBoxShadow(vec2 lower, vec2 upper, vec2 point, float sigma, float co
     return value;
 }
 
-float corner_alpha(vec2 size, vec2 position, float radius_tl, float radius_tr, float radius_bl, float radius_br, bool inverse);
+float corner_alpha(vec2 size, vec2 position, bool is_cutout,
+        float radius_tl, float radius_tr, float radius_bl, float radius_br);
 
 void main() {
     float shadow_alpha = v_color.a * roundedBoxShadow(
@@ -79,11 +80,11 @@ void main() {
     float clip_corner_alpha = corner_alpha(
         clip_size - 1.5,
         clip_position + 0.75,
+        true,
         clip_radius_top_left,
         clip_radius_top_right,
         clip_radius_bottom_left,
-        clip_radius_bottom_right,
-        true
+        clip_radius_bottom_right
     );
 
     gl_FragColor = vec4(v_color.rgb, shadow_alpha) * clip_corner_alpha;

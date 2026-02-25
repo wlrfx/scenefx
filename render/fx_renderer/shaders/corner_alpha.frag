@@ -2,20 +2,22 @@ float get_dist(vec2 q, float radius) {
 	return min(max(q.x, q.y), 0.0) + length(max(q, 0.0)) - radius;
 }
 
-// Note: Returns 1.0 if outside, 0.0 if inside the bounds.
-float corner_alpha(vec2 size, vec2 position, float radius_tl, float radius_tr, float radius_bl, float radius_br, bool inverse) {
+// Note: Returns 0.0 if outside, 1.0 if inside the bounds. The is_cutout parameter
+// reverses this, 0.0 inside cutout and 1.0 for outside cutout.
+float corner_alpha(vec2 size, vec2 position, bool is_cutout,
+		float radius_tl, float radius_tr, float radius_bl, float radius_br) {
 	if (radius_tl <= 0.0
 			&& radius_tr <= 0.0
 			&& radius_bl <= 0.0
 			&& radius_br <= 0.0) {
-		return inverse ? 1.0 : 0.0;
+		return 1.0;
 	}
 
 	vec2 relative_pos = (gl_FragCoord.xy - position);
 
 	if (relative_pos.x < 0.0 || relative_pos.y < 0.0
 			|| relative_pos.x > size.x || relative_pos.y > size.y) {
-		if (inverse) {
+		if (is_cutout) {
 			return 1.0;
 		}
 		discard;
@@ -33,8 +35,11 @@ float corner_alpha(vec2 size, vec2 position, float radius_tl, float radius_tr, f
 	bool is_bottom_right = radius_br > 0.0
 		&& relative_pos.x >= size.x - radius_br
 		&& relative_pos.y >= size.y - radius_br;
-	if (!(is_top_left || is_top_right || is_bottom_left || is_bottom_right)) {
-		return 0.0;
+	if (!is_top_left && !is_top_right && !is_bottom_left && !is_bottom_right) {
+		if (is_cutout) {
+			discard;
+		}
+		return 1.0;
 	}
 
 	vec2 top_left = abs(relative_pos - size) - size + radius_tl;
@@ -47,5 +52,6 @@ float corner_alpha(vec2 size, vec2 position, float radius_tl, float radius_tr, f
 		max(get_dist(bottom_left, radius_bl), get_dist(bottom_right, radius_br))
 	);
 
-	return smoothstep(0.0, 1.0, dist);
+	float result = smoothstep(0.0, 1.0, dist);
+	return is_cutout ? result : 1.0 - result;
 }

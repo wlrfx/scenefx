@@ -1,10 +1,7 @@
-#include <assert.h>
-#include <drm_fourcc.h>
 #include <stdlib.h>
 #include <wlr/interfaces/wlr_buffer.h>
 #include <wlr/render/allocator.h>
 #include <wlr/render/interface.h>
-#include <wlr/render/swapchain.h>
 #include <wlr/util/log.h>
 
 #include "render/egl.h"

@@ -95,6 +95,10 @@ struct fx_render_blur_pass_options {
 
 struct fx_gles_render_pass *fx_get_render_pass(struct wlr_render_pass *render_pass);
 
+/**
+ * Initializes the render pass offscreen buffers required for advanced effects
+ * like blur.
+ */
 bool fx_render_pass_init_offscreen_buffers(struct wlr_render_pass *render_pass,
 		struct wlr_output *output);
 

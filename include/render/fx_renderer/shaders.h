@@ -37,12 +37,15 @@ struct quad_shader {
 	GLint color;
 	GLint pos_attrib;
 
-	GLint clip_size;
-	GLint clip_position;
-	struct shader_corner_radii clip_radius;
+	// Only used for the effects shader
+	struct {
+		GLint clip_size;
+		GLint clip_position;
+		struct shader_corner_radii clip_radius;
+	} effects;
 };
 
-bool link_quad_program(struct quad_shader *shader);
+bool link_quad_program(struct quad_shader *shader, bool clip);
 
 struct quad_grad_shader {
 	int max_len;
@@ -110,18 +113,23 @@ struct tex_shader {
 	GLint tex;
 	GLint alpha;
 	GLint pos_attrib;
-	GLint size;
-	GLint position;
-	struct shader_corner_radii radius;
 
 	GLint discard_transparent;
 
-	GLint clip_size;
-	GLint clip_position;
-	struct shader_corner_radii clip_radius;
+	// Only used for the effects shader
+	struct {
+		GLint size;
+		GLint position;
+		struct shader_corner_radii radius;
+
+		GLint clip_size;
+		GLint clip_position;
+		struct shader_corner_radii clip_radius;
+	} effects;
 };
 
-bool link_tex_program(struct tex_shader *shader, enum fx_tex_shader_source source);
+bool link_tex_program(struct tex_shader *shader, enum fx_tex_shader_source source,
+		bool effects);
 
 struct box_shadow_shader {
 	GLuint program;

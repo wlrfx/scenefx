@@ -1,10 +1,11 @@
 #define SOURCE %d
+#define EFFECTS %d
 
 #define SOURCE_TEXTURE_RGBA 1
 #define SOURCE_TEXTURE_RGBX 2
 #define SOURCE_TEXTURE_EXTERNAL 3
 
-#if !defined(SOURCE)
+#if !defined(SOURCE) || !defined(EFFECTS)
 #error "Missing shader preamble"
 #endif
 
@@ -28,6 +29,7 @@ uniform sampler2D tex;
 
 uniform float alpha;
 
+#if EFFECTS
 uniform vec2 size;
 uniform vec2 position;
 uniform float radius_top_left;
@@ -41,6 +43,7 @@ uniform float clip_radius_top_left;
 uniform float clip_radius_top_right;
 uniform float clip_radius_bottom_left;
 uniform float clip_radius_bottom_right;
+#endif
 
 uniform bool discard_transparent;
 
@@ -52,32 +55,40 @@ vec4 sample_texture() {
 #endif
 }
 
-float corner_alpha(vec2 size, vec2 position, float round_tl, float round_tr, float round_bl, float round_br);
+#if EFFECTS
+float corner_alpha(vec2 size, vec2 position, bool is_cutout,
+		float radius_tl, float radius_tr, float radius_bl, float radius_br);
+#endif
 
 void main() {
-    float quad_corner_alpha = corner_alpha(
-        size - 0.5,
-        position + 0.25,
-        radius_top_left,
-        radius_top_right,
-        radius_bottom_left,
-        radius_bottom_right
-    );
+#if EFFECTS
+	float quad_corner_alpha = corner_alpha(
+		size - 0.5,
+		position + 0.25,
+		false,
+		radius_top_left,
+		radius_top_right,
+		radius_bottom_left,
+		radius_bottom_right
+	);
 
-    // Clipping
-    float clip_corner_alpha = corner_alpha(
-        clip_size - 1.0,
-        clip_position + 0.5,
-        clip_radius_top_left,
-        clip_radius_top_right,
-        clip_radius_bottom_left,
-        clip_radius_bottom_right
-    );
+	// Clipping
+	float clip_corner_alpha = corner_alpha(
+		clip_size - 1.0,
+		clip_position + 0.5,
+		true,
+		clip_radius_top_left,
+		clip_radius_top_right,
+		clip_radius_bottom_left,
+		clip_radius_bottom_right
+	);
 
-	gl_FragColor = mix(sample_texture() * alpha, vec4(0.0), quad_corner_alpha) * clip_corner_alpha;
+	gl_FragColor = sample_texture() * alpha * quad_corner_alpha * clip_corner_alpha;
+#else
+	gl_FragColor = sample_texture() * alpha;
+#endif
 
 	if (discard_transparent && gl_FragColor.a == 0.0) {
 		discard;
-		return;
 	}
 }

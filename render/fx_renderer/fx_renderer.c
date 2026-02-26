@@ -104,9 +104,13 @@ static void fx_renderer_destroy(struct wlr_renderer *wlr_renderer) {
 
 	push_fx_debug(renderer);
 	glDeleteProgram(renderer->shaders.quad.program);
+	glDeleteProgram(renderer->shaders.quad_clip.program);
 	glDeleteProgram(renderer->shaders.tex_rgba.program);
 	glDeleteProgram(renderer->shaders.tex_rgbx.program);
 	glDeleteProgram(renderer->shaders.tex_ext.program);
+	glDeleteProgram(renderer->shaders.tex_effects_rgba.program);
+	glDeleteProgram(renderer->shaders.tex_effects_rgbx.program);
+	glDeleteProgram(renderer->shaders.tex_effects_ext.program);
 	pop_fx_debug(renderer);
 
 	if (renderer->exts.KHR_debug) {
@@ -318,8 +322,14 @@ struct wlr_renderer *fx_renderer_create(struct wlr_backend *backend) {
 
 static bool link_shaders(struct fx_renderer *renderer) {
 	// quad fragment shader
-	if (!link_quad_program(&renderer->shaders.quad)) {
+	if (!link_quad_program(&renderer->shaders.quad, false)) {
 		wlr_log(WLR_ERROR, "Could not link quad shader");
+		goto error;
+	}
+
+	// quad clip fragment shader
+	if (!link_quad_program(&renderer->shaders.quad_clip, true)) {
+		wlr_log(WLR_ERROR, "Could not link quad clip shader");
 		goto error;
 	}
 
@@ -339,17 +349,37 @@ static bool link_shaders(struct fx_renderer *renderer) {
 		goto error;
 	}
 
-	// fragment shaders
-	if (!link_tex_program(&renderer->shaders.tex_rgba, SHADER_SOURCE_TEXTURE_RGBA)) {
+	// Basic fragment shaders
+	if (!link_tex_program(&renderer->shaders.tex_rgba,
+				SHADER_SOURCE_TEXTURE_RGBA, false)) {
 		wlr_log(WLR_ERROR, "Could not link tex_RGBA shader");
 		goto error;
 	}
-	if (!link_tex_program(&renderer->shaders.tex_rgbx, SHADER_SOURCE_TEXTURE_RGBX)) {
+	if (!link_tex_program(&renderer->shaders.tex_rgbx,
+				SHADER_SOURCE_TEXTURE_RGBX, false)) {
 		wlr_log(WLR_ERROR, "Could not link tex_RGBX shader");
 		goto error;
 	}
-	if (!link_tex_program(&renderer->shaders.tex_ext, SHADER_SOURCE_TEXTURE_EXTERNAL)) {
+	if (!link_tex_program(&renderer->shaders.tex_ext,
+				SHADER_SOURCE_TEXTURE_EXTERNAL, false)) {
 		wlr_log(WLR_ERROR, "Could not link tex_EXTERNAL shader");
+		goto error;
+	}
+
+	// Effects fragment shaders
+	if (!link_tex_program(&renderer->shaders.tex_effects_rgba,
+				SHADER_SOURCE_TEXTURE_RGBA, true)) {
+		wlr_log(WLR_ERROR, "Could not link tex_effects_RGBA shader");
+		goto error;
+	}
+	if (!link_tex_program(&renderer->shaders.tex_effects_rgbx,
+				SHADER_SOURCE_TEXTURE_RGBX, true)) {
+		wlr_log(WLR_ERROR, "Could not link tex_effects_RGBX shader");
+		goto error;
+	}
+	if (!link_tex_program(&renderer->shaders.tex_effects_ext,
+				SHADER_SOURCE_TEXTURE_EXTERNAL, true)) {
+		wlr_log(WLR_ERROR, "Could not link tex_effects_EXTERNAL shader");
 		goto error;
 	}
 
@@ -377,12 +407,16 @@ static bool link_shaders(struct fx_renderer *renderer) {
 
 error:
 	glDeleteProgram(renderer->shaders.quad.program);
+	glDeleteProgram(renderer->shaders.quad_clip.program);
 	glDeleteProgram(renderer->shaders.quad_round.program);
 	glDeleteProgram(renderer->shaders.quad_grad.program);
 	glDeleteProgram(renderer->shaders.quad_grad_round.program);
 	glDeleteProgram(renderer->shaders.tex_rgba.program);
 	glDeleteProgram(renderer->shaders.tex_rgbx.program);
 	glDeleteProgram(renderer->shaders.tex_ext.program);
+	glDeleteProgram(renderer->shaders.tex_effects_rgba.program);
+	glDeleteProgram(renderer->shaders.tex_effects_rgbx.program);
+	glDeleteProgram(renderer->shaders.tex_effects_ext.program);
 	glDeleteProgram(renderer->shaders.box_shadow.program);
 	glDeleteProgram(renderer->shaders.blur1.program);
 	glDeleteProgram(renderer->shaders.blur2.program);

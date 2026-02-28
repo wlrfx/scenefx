@@ -3165,9 +3165,12 @@ bool wlr_scene_output_build_state(struct wlr_scene_output *scene_output,
 		wlr_damage_ring_add_whole(&scene_output->damage_ring);
 
 		TRACY_MARK_FRAME;
+		TRACY_WHEN_CONNECTED({
+			// Queue a new frame as soon as possible when profiling
+			wlr_output_schedule_frame(scene_output->output);
+		})
 		return false;
 	}
-	TRACY_MARK_FRAME;
 
 	wlr_output_state_set_buffer(state, buffer);
 	wlr_buffer_unlock(buffer);
@@ -3179,6 +3182,12 @@ bool wlr_scene_output_build_state(struct wlr_scene_output *scene_output,
 
 	scene_output_state_attempt_gamma(scene_output, state);
 
+	TRACY_MARK_FRAME;
+	TRACY_WHEN_CONNECTED({
+		// Queue a new frame as soon as possible when profiling
+		wlr_damage_ring_add_whole(&scene_output->damage_ring);
+		wlr_output_schedule_frame(scene_output->output);
+	})
 	return true;
 }
 

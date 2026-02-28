@@ -7,36 +7,25 @@
 #include <wlr/render/swapchain.h>
 
 #include "render/egl.h"
-#include "scenefx/types/fx/clipped_region.h"
 #include "types/fx/clipped_region.h"
 
 struct fx_gles_render_pass {
 	struct wlr_render_pass base;
 	struct fx_framebuffer *buffer;
-	struct fx_effect_framebuffers *fx_effect_framebuffers;
-	struct wlr_output *output;
 	float projection_matrix[9];
 	struct wlr_egl_context prev_ctx;
 	struct fx_render_timer *timer;
 	struct wlr_drm_syncobj_timeline *signal_timeline;
 	uint64_t signal_point;
+
+	// The region where there's blur
+	pixman_region32_t blur_padding_region;
+	bool has_blur;
+	// Contains output-specific framebuffers.
+	// NULL when no advanced effects like blur is being used in the current pass.
+	// Call `fx_render_pass_init_offscreen_buffers` to use advanced effects.
+	struct fx_offscreen_buffers *fx_offscreen_buffers;
 };
-
-struct fx_buffer_pass_options {
-	const struct wlr_buffer_pass_options *base;
-
-	struct wlr_swapchain *swapchain;
-};
-
-/**
- * Begin a new render pass with the supplied destination buffer.
- *
- * Callers must call wlr_render_pass_submit() once they are done with the
- * render pass.
- */
-struct fx_gles_render_pass *fx_renderer_begin_buffer_pass(struct wlr_renderer *wlr_renderer,
-		struct wlr_buffer *wlr_buffer, struct wlr_output *output,
-		const struct fx_buffer_pass_options *options);
 
 struct fx_gradient {
 	float degree;
@@ -104,6 +93,15 @@ struct fx_render_blur_pass_options {
 	struct clipped_fregion clipped_region;
 };
 
+struct fx_gles_render_pass *fx_get_render_pass(struct wlr_render_pass *render_pass);
+
+/**
+ * Initializes the render pass offscreen buffers required for advanced effects
+ * like blur.
+ */
+bool fx_render_pass_init_offscreen_buffers(struct wlr_render_pass *render_pass,
+		struct wlr_output *output);
+
 /**
  * Render a fx texture.
  */
@@ -155,7 +153,7 @@ bool fx_render_pass_add_optimized_blur(struct fx_gles_render_pass *pass,
 /**
  * Render from one buffer to another
  */
-void fx_renderer_read_to_buffer(struct fx_gles_render_pass *pass,
+void fx_render_pass_read_to_buffer(struct fx_gles_render_pass *pass,
 		pixman_region32_t *region, struct fx_framebuffer *dst_buffer,
 		struct fx_framebuffer *src_buffer);
 

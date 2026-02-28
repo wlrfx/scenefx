@@ -21,8 +21,9 @@
 #include "render/fx_renderer/shaders.h"
 #include "render/fx_renderer/fx_renderer.h"
 #include "render/fx_renderer/util.h"
+#include "render/pass.h"
 #include "render/tracy.h"
-#include "scenefx/render/fx_renderer/fx_effect_framebuffers.h"
+#include "scenefx/render/fx_renderer/fx_offscreen_buffers.h"
 #include "scenefx/render/fx_renderer/fx_renderer.h"
 #include "scenefx/render/pass.h"
 #include "util/time.h"
@@ -80,6 +81,22 @@ static int fx_get_drm_fd(struct wlr_renderer *wlr_renderer) {
 	return renderer->drm_fd;
 }
 
+static inline void free_shaders(struct fx_renderer *renderer) {
+	push_fx_debug(renderer);
+	glDeleteProgram(renderer->shaders.quad.program);
+	glDeleteProgram(renderer->shaders.quad_round.program);
+	glDeleteProgram(renderer->shaders.quad_grad.program);
+	glDeleteProgram(renderer->shaders.quad_grad_round.program);
+	glDeleteProgram(renderer->shaders.tex_rgba.program);
+	glDeleteProgram(renderer->shaders.tex_rgbx.program);
+	glDeleteProgram(renderer->shaders.tex_ext.program);
+	glDeleteProgram(renderer->shaders.box_shadow.program);
+	glDeleteProgram(renderer->shaders.blur1.program);
+	glDeleteProgram(renderer->shaders.blur2.program);
+	glDeleteProgram(renderer->shaders.blur_effects.program);
+	pop_fx_debug(renderer);
+}
+
 static void fx_renderer_destroy(struct wlr_renderer *wlr_renderer) {
 	struct fx_renderer *renderer = fx_get_renderer(wlr_renderer);
 
@@ -92,22 +109,17 @@ static void fx_renderer_destroy(struct wlr_renderer *wlr_renderer) {
 		fx_texture_destroy(tex);
 	}
 
+	struct fx_offscreen_buffers *fbos, *fbos_tmp;
+	wl_list_for_each_safe(fbos, fbos_tmp, &renderer->offscreen_buffers, link) {
+		fx_offscreen_buffers_destroy(fbos);
+	}
+
 	struct fx_framebuffer *buffer, *buffer_tmp;
 	wl_list_for_each_safe(buffer, buffer_tmp, &renderer->buffers, link) {
 		fx_framebuffer_destroy(buffer);
 	}
 
-	struct fx_effect_framebuffers *fbos, *fbos_tmp;
-	wl_list_for_each_safe(fbos, fbos_tmp, &renderer->effect_fbos, link) {
-		fx_effect_framebuffers_destroy(fbos);
-	}
-
-	push_fx_debug(renderer);
-	glDeleteProgram(renderer->shaders.quad.program);
-	glDeleteProgram(renderer->shaders.tex_rgba.program);
-	glDeleteProgram(renderer->shaders.tex_rgbx.program);
-	glDeleteProgram(renderer->shaders.tex_ext.program);
-	pop_fx_debug(renderer);
+	free_shaders(renderer);
 
 	if (renderer->exts.KHR_debug) {
 		glDisable(GL_DEBUG_OUTPUT_KHR);
@@ -128,14 +140,36 @@ static void fx_renderer_destroy(struct wlr_renderer *wlr_renderer) {
 
 static struct wlr_render_pass *begin_buffer_pass(struct wlr_renderer *wlr_renderer,
 		struct wlr_buffer *wlr_buffer, const struct wlr_buffer_pass_options *options) {
-	struct fx_gles_render_pass *pass =
-		fx_renderer_begin_buffer_pass(wlr_renderer, wlr_buffer, NULL, &(struct fx_buffer_pass_options) {
-					.base = options,
-					.swapchain = NULL,
-				});
-	if (!pass) {
+	struct fx_renderer *renderer = fx_get_renderer(wlr_renderer);
+
+	struct wlr_egl_context prev_ctx = {0};
+	if (!wlr_egl_make_current(renderer->egl, &prev_ctx)) {
 		return NULL;
 	}
+
+	TRACY_BOTH_ZONES_START(renderer);
+
+	struct fx_render_timer *timer = NULL;
+	if (options->timer) {
+		timer = fx_get_render_timer(options->timer);
+		clock_gettime(CLOCK_MONOTONIC, &timer->cpu_start);
+	}
+
+	struct fx_framebuffer *buffer = fx_framebuffer_get_or_create(renderer, wlr_buffer);
+	if (!buffer) {
+		TRACY_BOTH_ZONES_END_FAIL;
+		return NULL;
+	}
+
+	struct fx_gles_render_pass *pass = fx_begin_buffer_pass(buffer,
+			&prev_ctx, timer, options->signal_timeline, options->signal_point);
+	if (!pass) {
+		TRACY_BOTH_ZONES_END_FAIL;
+		return NULL;
+	}
+
+	TRACY_BOTH_ZONES_END;
+
 	return &pass->base;
 }
 
@@ -376,18 +410,7 @@ static bool link_shaders(struct fx_renderer *renderer) {
 	return true;
 
 error:
-	glDeleteProgram(renderer->shaders.quad.program);
-	glDeleteProgram(renderer->shaders.quad_round.program);
-	glDeleteProgram(renderer->shaders.quad_grad.program);
-	glDeleteProgram(renderer->shaders.quad_grad_round.program);
-	glDeleteProgram(renderer->shaders.tex_rgba.program);
-	glDeleteProgram(renderer->shaders.tex_rgbx.program);
-	glDeleteProgram(renderer->shaders.tex_ext.program);
-	glDeleteProgram(renderer->shaders.box_shadow.program);
-	glDeleteProgram(renderer->shaders.blur1.program);
-	glDeleteProgram(renderer->shaders.blur2.program);
-	glDeleteProgram(renderer->shaders.blur_effects.program);
-
+	free_shaders(renderer);
 	return false;
 }
 
@@ -411,7 +434,7 @@ struct wlr_renderer *fx_renderer_create_egl(struct wlr_egl *egl) {
 
 	wl_list_init(&renderer->buffers);
 	wl_list_init(&renderer->textures);
-	wl_list_init(&renderer->effect_fbos);
+	wl_list_init(&renderer->offscreen_buffers);
 
 	renderer->egl = egl;
 	renderer->exts_str = exts_str;

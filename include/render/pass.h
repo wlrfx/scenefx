@@ -13,4 +13,8 @@ struct fx_render_texture_options fx_render_texture_options_default(
 struct fx_render_rect_options fx_render_rect_options_default(
 		const struct wlr_render_rect_options *base);
 
+struct fx_gles_render_pass *fx_begin_buffer_pass(struct fx_framebuffer *buffer,
+	struct wlr_egl_context *prev_ctx, struct fx_render_timer *timer,
+	struct wlr_drm_syncobj_timeline *signal_timeline, uint64_t signal_point);
+
 #endif

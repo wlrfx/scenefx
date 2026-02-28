@@ -50,9 +50,12 @@ struct fx_framebuffer {
 	struct wlr_addon addon;
 };
 
-/** Should only be used with custom fbs */
+/**
+ * Should only be used with custom fbs.
+ * Note: Does not bind back to the default Framebuffer!
+ */
 void fx_framebuffer_get_or_create_custom(struct fx_renderer *fx_renderer,
-		struct wlr_output *output, struct wlr_swapchain *swapchain,
+		struct wlr_allocator *allocator, int width, int height, bool has_alpha,
 		struct fx_framebuffer **fx_buffer, bool *failed);
 
 struct fx_framebuffer *fx_framebuffer_get_or_create(struct fx_renderer *renderer,
@@ -194,11 +197,7 @@ struct fx_renderer {
 
 	struct wl_list buffers; // fx_framebuffer.link
 	struct wl_list textures; // fx_texture.link
-	struct wl_list effect_fbos; // fx_effect_framebuffers.link
-
-	// Set to true when 'wlr_renderer_begin_buffer_pass' is called instead of
-	// our custom 'fx_renderer_begin_buffer_pass' function
-	bool basic_renderer;
+	struct wl_list offscreen_buffers; // fx_offscreen_buffers.link
 
 	TRACY_FN(
 		struct tracy_data *tracy_data;

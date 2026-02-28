@@ -2,7 +2,6 @@
 #include <wlr/interfaces/wlr_buffer.h>
 #include <wlr/render/allocator.h>
 #include <wlr/render/interface.h>
-#include <wlr/render/swapchain.h>
 #include <wlr/util/log.h>
 
 #include "render/egl.h"
@@ -68,35 +67,15 @@ GLuint fx_framebuffer_get_fbo(struct fx_framebuffer *buffer) {
 }
 
 void fx_framebuffer_get_or_create_custom(struct fx_renderer *renderer,
-		struct wlr_output *output, struct wlr_swapchain *swapchain,
+		struct wlr_allocator *allocator, int width, int height, bool has_alpha,
 		struct fx_framebuffer **fx_framebuffer, bool *failed) {
 	if (*failed) {
 		return;
 	}
 
-	struct wlr_allocator *allocator = output->allocator;
-	if (!swapchain) {
-		if (!output->swapchain) {
-			wlr_log(WLR_ERROR, "Failed to allocate buffer, no swapchain");
-			*failed = true;
-			return;
-		}
-		swapchain = output->swapchain;
-	}
-	int width = output->width;
-	int height = output->height;
-	struct wlr_buffer *wlr_buffer = NULL;
-
-	if (*fx_framebuffer == NULL) {
-		wlr_buffer = wlr_allocator_create_buffer(allocator, width, height,
-				&swapchain->format);
-		if (wlr_buffer == NULL) {
-			wlr_log(WLR_ERROR, "Failed to allocate buffer");
-			*failed = true;
-			return;
-		}
-	} else {
-		if ((wlr_buffer = (*fx_framebuffer)->buffer)) {
+	if (*fx_framebuffer != NULL) {
+		struct wlr_buffer *wlr_buffer = (*fx_framebuffer)->buffer;
+		if (wlr_buffer != NULL) {
 			if (wlr_buffer->width == width && wlr_buffer->height == height) {
 				return;
 			}
@@ -106,11 +85,35 @@ void fx_framebuffer_get_or_create_custom(struct fx_renderer *renderer,
 		} else {
 			fx_framebuffer_destroy(*fx_framebuffer);
 		}
-
-		wlr_buffer = wlr_allocator_create_buffer(allocator,
-				width, height, &swapchain->format);
+		*fx_framebuffer = NULL;
 	}
+
+	// Get the best supported DRM format (DMABUF if supported)
+	const struct wlr_drm_format_set *texture_formats = wlr_renderer_get_texture_formats(
+			&renderer->wlr_renderer, renderer->wlr_renderer.render_buffer_caps);
+	const struct fx_pixel_format *pix_format =
+		get_fx_format_from_gl(GL_RGBA, GL_UNSIGNED_BYTE, has_alpha);
+	const struct wlr_drm_format *format = wlr_drm_format_set_get(texture_formats, pix_format->drm_format);
+	if (format == NULL) {
+		wlr_log(WLR_ERROR, "Failed to get a supported texture format while allocating buffer");
+		*failed = true;
+		return;
+	}
+
+	struct wlr_buffer *wlr_buffer = wlr_allocator_create_buffer(allocator, width, height, format);
+	if (wlr_buffer == NULL) {
+		wlr_log(WLR_ERROR, "Failed to allocate wlr_buffer");
+		*failed = true;
+		return;
+	}
+
 	*fx_framebuffer = fx_framebuffer_get_or_create(renderer, wlr_buffer);
+	if (*fx_framebuffer == NULL) {
+		wlr_log(WLR_ERROR, "Failed to allocate fx_buffer");
+		wlr_buffer_drop(wlr_buffer);
+		*failed = true;
+		return;
+	}
 	fx_framebuffer_get_fbo(*fx_framebuffer);
 }
 
@@ -158,7 +161,7 @@ error_buffer:
 }
 
 void fx_framebuffer_bind(struct fx_framebuffer *fx_buffer) {
-	glBindFramebuffer(GL_FRAMEBUFFER, fx_buffer->fbo);
+	glBindFramebuffer(GL_FRAMEBUFFER, fx_framebuffer_get_fbo(fx_buffer));
 }
 
 void fx_framebuffer_destroy(struct fx_framebuffer *fx_buffer) {

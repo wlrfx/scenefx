@@ -2670,6 +2670,78 @@ bool wlr_scene_output_needs_frame(struct wlr_scene_output *scene_output) {
 		scene_output->gamma_lut_changed;
 }
 
+static bool should_blur_node_extend_damage(struct wlr_scene_node *node,
+		struct fx_gles_render_pass *fx_pass, struct blur_data *blur_data) {
+	switch (node->type) {
+	case WLR_SCENE_NODE_BLUR:;
+		struct wlr_scene_blur *blur_node = wlr_scene_blur_from_node(node);
+		// No artifact prevention needed when the whole blur is already
+		// rendered
+		if (blur_node->should_only_blur_bottom_layer && blur_node->strength == 1.0) {
+			fx_pass->has_blur = true;
+			return false;
+		}
+		// Apply the blur strength to avoid rendering more blur than
+		// what's needed
+		if (blur_node->strength < 1.0f) {
+			*blur_data = blur_data_apply_strength(blur_data, blur_node->strength);
+		}
+		break;
+	case WLR_SCENE_NODE_OPTIMIZED_BLUR:;
+		struct wlr_scene_optimized_blur *optimized_node =
+			wlr_scene_optimized_blur_from_node(node);
+		if (!optimized_node->dirty) {
+			return false;
+		}
+		break;
+	default:
+		return false;
+	}
+
+	return is_scene_blur_enabled(blur_data);
+}
+
+static bool apply_blur_region(struct wlr_scene_node *node, struct blur_data *blur_data,
+		struct render_data *render_data, struct wlr_output_state *output_state,
+		const pixman_region32_t *original_damage, pixman_region32_t *blur_padding_region) {
+	bool should_compensate_blur = false;
+	const int sample_size = blur_data_calc_size(blur_data);
+
+	pixman_region32_t node_visible_region;
+	pixman_region32_init(&node_visible_region);
+	pixman_region32_copy(&node_visible_region, &node->visible);
+	pixman_region32_translate(&node_visible_region, -render_data->output->x, -render_data->output->y);
+	logical_to_buffer_coords(&node_visible_region, render_data, false);
+
+	pixman_region32_t expanded_damage;
+	pixman_region32_init(&expanded_damage);
+	wlr_region_expand(&expanded_damage, original_damage, sample_size);
+
+	pixman_region32_t intersection;
+	pixman_region32_init(&intersection);
+	if (pixman_region32_intersect(&intersection, &expanded_damage, &node_visible_region)) {
+		should_compensate_blur = true;
+
+		// Expand the render damage to re-render surrounding blur nodes
+		pixman_region32_union(&render_data->damage, &render_data->damage, &intersection);
+		// Also make sure that the backend also knows about the new
+		// damage. Very important
+		pixman_region32_union(&output_state->damage, &output_state->damage, &intersection);
+
+		// Expand it once more to get the blur padding region
+		// which is key for artifact removal :)
+		wlr_region_expand(&intersection, &intersection, sample_size);
+		// Don't re-add already added rectangles
+		pixman_region32_subtract(&intersection, &intersection, blur_padding_region);
+		pixman_region32_union(blur_padding_region, blur_padding_region, &intersection);
+	}
+
+	pixman_region32_fini(&intersection);
+	pixman_region32_fini(&expanded_damage);
+	pixman_region32_fini(&node_visible_region);
+	return should_compensate_blur;
+}
+
 bool wlr_scene_output_commit(struct wlr_scene_output *scene_output,
 		const struct wlr_scene_output_state_options *options) {
 	if (!wlr_scene_output_needs_frame(scene_output)) {
@@ -2935,7 +3007,6 @@ bool wlr_scene_output_build_state(struct wlr_scene_output *scene_output,
 			&& pixman_region32_not_empty(&render_data.damage)) {
 		// Blur artifact prevention
 		// Note: Supports individual blur node blur_data
-
 		pixman_region32_t original_damage;
 		pixman_region32_init(&original_damage);
 		pixman_region32_copy(&original_damage, &render_data.damage);
@@ -2962,31 +3033,8 @@ bool wlr_scene_output_build_state(struct wlr_scene_output *scene_output,
 		for (int i = list_len - 1; i >= 0; i--) {
 			struct render_list_entry *entry = &list_data[i];
 			struct wlr_scene_node *node = entry->node;
-
 			struct blur_data blur_data = scene_output->scene->blur_data;
-			if (node->type == WLR_SCENE_NODE_BLUR) {
-				struct wlr_scene_blur *blur_node = wlr_scene_blur_from_node(node);
-				// No artifact prevention needed when the whole blur is already
-				// rendered
-				if (blur_node->should_only_blur_bottom_layer) {
-					continue;
-				}
-				// Apply the blur strength to avoid rendering more blur than
-				// what's needed
-				if (blur_node->strength < 1.0f) {
-					blur_data = blur_data_apply_strength(&blur_data, blur_node->strength);
-				}
-			} else if (node->type == WLR_SCENE_NODE_OPTIMIZED_BLUR) {
-				struct wlr_scene_optimized_blur *optimized_node =
-					wlr_scene_optimized_blur_from_node(node);
-				if (!optimized_node->dirty) {
-					continue;
-				}
-			} else {
-				continue;
-			}
-
-			if (!is_scene_blur_enabled(&blur_data)) {
+			if (!should_blur_node_extend_damage(node, fx_pass, &blur_data)) {
 				continue;
 			}
 
@@ -2999,41 +3047,11 @@ bool wlr_scene_output_build_state(struct wlr_scene_output *scene_output,
 				break;
 			}
 
-			const int sample_size = blur_data_calc_size(&blur_data);
-
-			pixman_region32_t node_visible_region;
-			pixman_region32_init(&node_visible_region);
-			pixman_region32_copy(&node_visible_region, &entry->node->visible);
-			pixman_region32_translate(&node_visible_region, -scene_output->x, -scene_output->y);
-			logical_to_buffer_coords(&node_visible_region, &render_data, false);
-
-			pixman_region32_t expanded_damage;
-			pixman_region32_init(&expanded_damage);
-			wlr_region_expand(&expanded_damage, &original_damage, sample_size);
-
-			pixman_region32_t intersection;
-			pixman_region32_init(&intersection);
-			if (pixman_region32_intersect(&intersection, &expanded_damage, &node_visible_region)) {
+			if (apply_blur_region(node, &blur_data, &render_data, state,
+						&original_damage, &blur_padding_region)) {
 				should_compensate_blur = true;
 				fx_pass->has_blur = true;
-
-				// Expand the render damage to re-render surrounding blur nodes
-				pixman_region32_union(&render_data.damage, &render_data.damage, &intersection);
-				// Also make sure that the backend also knows about the new
-				// damage. Very important
-				pixman_region32_union(&state->damage, &state->damage, &intersection);
-
-				// Expand it once more to get the blur padding region
-				// which is key for artifact removal :)
-				wlr_region_expand(&intersection, &intersection, sample_size);
-				// Don't re-add already added rectangles
-				pixman_region32_subtract(&intersection, &intersection, &blur_padding_region);
-				pixman_region32_union(&blur_padding_region, &blur_padding_region, &intersection);
 			}
-
-			pixman_region32_fini(&intersection);
-			pixman_region32_fini(&expanded_damage);
-			pixman_region32_fini(&node_visible_region);
 		}
 
 		// Expand the damage to compensate for blur
@@ -3048,8 +3066,6 @@ bool wlr_scene_output_build_state(struct wlr_scene_output *scene_output,
 			// Combine with the render damage (we need to redraw the padding area as well)
 			pixman_region32_union(&render_data.damage,
 					&render_data.damage, &fx_pass->blur_padding_region);
-			// pixman_region32_union(&state->damage,
-			// 		&state->damage, &fx_pass->blur_padding_region);
 			pixman_region32_intersect_rect(&render_data.damage, &render_data.damage,
 					0, 0, output->width, output->height);
 

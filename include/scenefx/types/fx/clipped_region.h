@@ -40,7 +40,7 @@ static __always_inline struct fx_corner_radii corner_radii_all(int radius) {
 	return corner_radii_new(radius, radius, radius, radius);
 }
 
-static __always_inline struct fx_corner_radii corner_radii_none() {
+static __always_inline struct fx_corner_radii corner_radii_none(void) {
 	return corner_radii_all(0);
 }
 

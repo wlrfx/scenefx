@@ -2,18 +2,16 @@
 #include <pixman.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <scenefx/types/wlr_scene.h>
 #include <string.h>
 #include <wlr/backend.h>
-#include <wlr/render/gles2.h>
-#include <wlr/render/drm_syncobj.h>
 #include <wlr/render/swapchain.h>
+#include <wlr/render/drm_syncobj.h>
+#include <wlr/render/wlr_renderer.h>
 #include <wlr/types/wlr_compositor.h>
 #include <wlr/types/wlr_damage_ring.h>
 #include <wlr/types/wlr_gamma_control_v1.h>
+#include <wlr/types/wlr_linux_dmabuf_v1.h>
 #include <wlr/types/wlr_presentation_time.h>
-#include <wlr/types/wlr_subcompositor.h>
-#include <wlr/types/wlr_xdg_shell.h>
 #include <wlr/util/log.h>
 #include <wlr/util/region.h>
 #include <wlr/util/transform.h>
@@ -23,13 +21,13 @@
 #include "scenefx/render/pass.h"
 #include "scenefx/types/fx/blur_data.h"
 #include "scenefx/types/fx/clipped_region.h"
+#include "scenefx/types/wlr_scene.h"
 #include "types/fx/clipped_region.h"
 #include "types/wlr_output.h"
 #include "types/wlr_scene.h"
 #include "util/array.h"
 #include "util/env.h"
 #include "util/time.h"
-#include "wlr/util/box.h"
 
 #include <wlr/config.h>
 
@@ -387,7 +385,8 @@ static void scene_node_opaque_region(struct wlr_scene_node *node, int x, int y,
 		return;
 	}
 
-	unreachable();
+	pixman_region32_fini(opaque);
+	pixman_region32_init_rect(opaque, x, y, width, height);
 }
 
 struct scene_update_data {
@@ -2078,6 +2077,7 @@ static void scene_entry_render(struct render_list_entry *entry, const struct ren
 			.direct_scanout = false,
 		};
 		wl_signal_emit_mutable(&scene_buffer->events.output_sample, &sample_event);
+
 		if (entry->highlight_transparent_region) {
 			wlr_render_pass_add_rect(data->render_pass, &(struct wlr_render_rect_options){
 					.box = dst_box,
@@ -2127,6 +2127,7 @@ static void scene_entry_render(struct render_list_entry *entry, const struct ren
 			.blur_strength = blur->strength,
 		};
 		fx_render_pass_add_blur(fx_pass, &blur_options);
+		break;
 	}
 
 	pixman_region32_fini(&opaque);
@@ -2184,7 +2185,7 @@ static void scene_handle_gamma_control_manager_v1_destroy(struct wl_listener *li
 }
 
 void wlr_scene_set_gamma_control_manager_v1(struct wlr_scene *scene,
-		struct wlr_gamma_control_manager_v1 *gamma_control) {
+	    struct wlr_gamma_control_manager_v1 *gamma_control) {
 	assert(scene->gamma_control_manager_v1 == NULL);
 	scene->gamma_control_manager_v1 = gamma_control;
 
@@ -2242,7 +2243,7 @@ static void scene_output_handle_commit(struct wl_listener *listener, void *data)
 	if (state->committed & WLR_OUTPUT_STATE_BUFFER) {
 		if (state->committed & WLR_OUTPUT_STATE_DAMAGE) {
 			pixman_region32_subtract(&scene_output->pending_commit_damage,
-					&scene_output->pending_commit_damage, &state->damage);
+				&scene_output->pending_commit_damage, &state->damage);
 		} else {
 			pixman_region32_fini(&scene_output->pending_commit_damage);
 			pixman_region32_init(&scene_output->pending_commit_damage);
@@ -2423,8 +2424,6 @@ static bool scene_node_invisible(struct wlr_scene_node *node) {
 		struct wlr_scene_shadow *shadow = wlr_scene_shadow_from_node(node);
 
 		return shadow->color[3] == 0.f;
-	} else if (node->type == WLR_SCENE_NODE_OPTIMIZED_BLUR) {
-		return false;
 	} else if (node->type == WLR_SCENE_NODE_BUFFER) {
 		struct wlr_scene_buffer *buffer = wlr_scene_buffer_from_node(node);
 
@@ -2997,6 +2996,7 @@ bool wlr_scene_output_build_state(struct wlr_scene_output *scene_output,
 	}
 
 	render_data.render_pass = render_pass;
+
 	pixman_region32_init(&render_data.damage);
 	wlr_damage_ring_rotate_buffer(&scene_output->damage_ring, buffer,
 		&render_data.damage);

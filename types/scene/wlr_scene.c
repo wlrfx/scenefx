@@ -2725,6 +2725,7 @@ static bool apply_blur_region(struct wlr_scene_node *node, struct blur_data *blu
 		pixman_region32_union(&render_data->damage, &render_data->damage, &intersection);
 		// Also make sure that the backend also knows about the new
 		// damage. Very important
+		output_state->committed |= WLR_OUTPUT_STATE_DAMAGE;
 		pixman_region32_union(&output_state->damage, &output_state->damage, &intersection);
 
 		// Expand it once more to get the blur padding region

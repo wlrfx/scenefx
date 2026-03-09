@@ -97,7 +97,7 @@ static inline void free_shaders(struct fx_renderer *renderer) {
 	glDeleteProgram(renderer->shaders.box_shadow.program);
 	glDeleteProgram(renderer->shaders.blur1.program);
 	glDeleteProgram(renderer->shaders.blur2.program);
-	glDeleteProgram(renderer->shaders.blur_effects.program);  
+	glDeleteProgram(renderer->shaders.blur_effects.program);
 	pop_fx_debug(renderer);
 }
 
@@ -123,9 +123,7 @@ static void fx_renderer_destroy(struct wlr_renderer *wlr_renderer) {
 		fx_framebuffer_destroy(buffer);
 	}
 
-	
-  
-  aders(renderer);
+	free_shaders(renderer);
 
 	if (renderer->exts.KHR_debug) {
 		glDisable(GL_DEBUG_OUTPUT_KHR);

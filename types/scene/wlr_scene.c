@@ -2265,6 +2265,11 @@ static void scene_output_handle_commit(struct wl_listener *listener, void *data)
 		wlr_output_schedule_frame(scene_output->output);
 	}
 
+	TRACY_WHEN_CONNECTED({
+		// Queue a new frame as soon as possible when profiling
+		wlr_output_schedule_frame(scene_output->output);
+	})
+
 	// Next time the output is enabled, try to re-apply the gamma LUT
 	if (scene_output->scene->gamma_control_manager_v1 &&
 			(state->committed & WLR_OUTPUT_STATE_ENABLED) &&
@@ -3182,10 +3187,6 @@ bool wlr_scene_output_build_state(struct wlr_scene_output *scene_output,
 		wlr_damage_ring_add_whole(&scene_output->damage_ring);
 
 		TRACY_MARK_FRAME;
-		TRACY_WHEN_CONNECTED({
-			// Queue a new frame as soon as possible when profiling
-			wlr_output_schedule_frame(scene_output->output);
-		})
 		return false;
 	}
 
@@ -3200,11 +3201,6 @@ bool wlr_scene_output_build_state(struct wlr_scene_output *scene_output,
 	scene_output_state_attempt_gamma(scene_output, state);
 
 	TRACY_MARK_FRAME;
-	TRACY_WHEN_CONNECTED({
-		// Queue a new frame as soon as possible when profiling
-		wlr_damage_ring_add_whole(&scene_output->damage_ring);
-		wlr_output_schedule_frame(scene_output->output);
-	})
 	return true;
 }
 

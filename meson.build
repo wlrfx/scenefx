@@ -149,6 +149,10 @@ if get_option('tracy_enable')
 	)
 endif
 
+if get_option('force_fragment_shader_precision_high')
+  add_project_arguments('-DFORCE_GL_FRAGMENT_PRECISION_HIGH=1', language: 'c')
+endif
+
 subdir('protocol')
 subdir('render')
 

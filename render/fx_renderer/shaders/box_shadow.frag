@@ -66,7 +66,7 @@ float roundedBoxShadow(vec2 lower, vec2 upper, vec2 point, float sigma, float co
     return value;
 }
 
-float corner_alpha(vec2 size, vec2 position, bool is_cutout,
+float corner_alpha(vec2 size, vec2 position,
         float radius_tl, float radius_tr, float radius_bl, float radius_br);
 
 void main() {
@@ -80,7 +80,6 @@ void main() {
     float clip_corner_alpha = corner_alpha(
         clip_size - 1.5,
         clip_position + 0.75,
-        true,
         clip_radius_top_left,
         clip_radius_top_right,
         clip_radius_bottom_left,

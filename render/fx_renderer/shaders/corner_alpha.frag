@@ -1,57 +1,22 @@
-float get_dist(vec2 q, float radius) {
-	return min(max(q.x, q.y), 0.0) + length(max(q, 0.0)) - radius;
-}
-
-// Note: Returns 0.0 if outside, 1.0 if inside the bounds. The is_cutout parameter
-// reverses this, 0.0 inside cutout and 1.0 for outside cutout.
-float corner_alpha(vec2 size, vec2 position, bool is_cutout,
+float corner_alpha(vec2 size, vec2 position,
 		float radius_tl, float radius_tr, float radius_bl, float radius_br) {
-	if (radius_tl <= 0.0
-			&& radius_tr <= 0.0
-			&& radius_bl <= 0.0
-			&& radius_br <= 0.0) {
-		return 1.0;
-	}
+	// TODO: precompute these: function args should be float corner_alpha(position, center_x, center_y, radii)
+	vec4 radii = vec4(radius_tr, radius_br, radius_tl, radius_bl);
+	vec4 center_x = (size.x - radii) * vec4(1.0, 1.0, -1.0, -1.0);
+	vec4 center_y = (size.y - radii) * vec4(1.0, -1.0, 1.0, -1.0);
 
 	vec2 relative_pos = (gl_FragCoord.xy - position);
 
-	if (relative_pos.x < 0.0 || relative_pos.y < 0.0
-			|| relative_pos.x > size.x || relative_pos.y > size.y) {
-		if (is_cutout) {
-			return 1.0;
-		}
-		discard;
-	}
+	// calculate 'v' (local distance from each corner center)
+	vec4 vx = (relative_pos.x - center_x) * vec4(1.0, 1.0, -1.0, -1.0);
+	vec4 vy = (relative_pos.y - center_y) * vec4(1.0, -1.0, 1.0, -1.0);
 
-	bool is_top_left = radius_tl > 0.0
-		&& relative_pos.x <= radius_tl
-		&& relative_pos.y <= radius_tl;
-	bool is_top_right = radius_tr > 0.0
-		&& relative_pos.x >= size.x - radius_tr
-		&& relative_pos.y <= radius_tr;
-	bool is_bottom_left = radius_bl > 0.0
-		&& relative_pos.x <= radius_bl
-		&& relative_pos.y >= size.y - radius_bl;
-	bool is_bottom_right = radius_br > 0.0
-		&& relative_pos.x >= size.x - radius_br
-		&& relative_pos.y >= size.y - radius_br;
-	if (!is_top_left && !is_top_right && !is_bottom_left && !is_bottom_right) {
-		if (is_cutout) {
-			discard;
-		}
-		return 1.0;
-	}
+	// Vectorized SDF logic: Processes all 4 corners at once
+	vec4 x_max = max(vx, 0.0);
+	vec4 y_max = max(vy, 0.0);
+	vec4 dists = sqrt(x_max * x_max + y_max * y_max) + min(max(vx, vy), 0.0) - radii;
+	float dist = max(max(dists.x, dists.y), max(dists.z, dists.w));
 
-	vec2 top_left = abs(relative_pos - size) - size + radius_tl;
-	vec2 top_right = abs(relative_pos - vec2(0, size.y)) - size + radius_tr;
-	vec2 bottom_left = abs(relative_pos - vec2(size.x, 0)) - size + radius_bl;
-	vec2 bottom_right = abs(relative_pos) - size + radius_br;
-
-	float dist = max(
-		max(get_dist(top_left, radius_tl), get_dist(top_right, radius_tr)),
-		max(get_dist(bottom_left, radius_bl), get_dist(bottom_right, radius_br))
-	);
-
-	float result = smoothstep(0.0, 1.0, dist);
-	return is_cutout ? result : 1.0 - result;
+	return smoothstep(0.0, 1.0, dist);
 }
+

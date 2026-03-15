@@ -44,5 +44,5 @@ void main() {
 		clip_radius_bottom_right
 	);
 
-	gl_FragColor = v_color * quad_corner_alpha * clip_corner_alpha;
+	gl_FragColor = mix(v_color, vec4(0.0), quad_corner_alpha) * clip_corner_alpha;
 }

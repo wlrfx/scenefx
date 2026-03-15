@@ -81,7 +81,7 @@ void main() {
 		clip_radius_bottom_right
 	);
 
-	gl_FragColor = sample_texture() * alpha * quad_corner_alpha * clip_corner_alpha;
+	gl_FragColor = mix(sample_texture() * alpha, vec4(0.0), quad_corner_alpha) * clip_corner_alpha;
 #else
 	gl_FragColor = sample_texture() * alpha;
 #endif

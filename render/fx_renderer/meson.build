@@ -12,7 +12,7 @@ scenefx_files += files(
 	'pixel_format.c',
 	'fx_pass.c',
 	'fx_framebuffer.c',
-	'fx_effect_framebuffers.c',
+	'fx_offscreen_buffers.c',
 	'fx_texture.c',
 	'fx_renderer.c',
 )

@@ -29,11 +29,16 @@ void tracy_gpu_context_destroy(struct tracy_data *tracy_data);
 struct tracy_data *tracy_gpu_context_new(struct fx_renderer *renderer);
 #endif  // TRACY_ENABLE
 
+#define TRACY_WHEN_CONNECTED(fn) \
+	TRACY_FN(if (TracyCIsConnected) { fn })
+
 /**
  * Frame
  */
 
 #define TRACY_MARK_FRAME TRACY_FN(TracyCFrameMark)
+
+#define TRACY_RESCHEDULE TRACY_FN(TracyCFrameMark)
 
 /**
  * Messaging

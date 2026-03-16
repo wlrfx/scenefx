@@ -11,13 +11,11 @@ float corner_alpha(vec4 radii, vec2 center_pos, vec4 corner_center_x, vec4 corne
 	// Vectorized SDF logic: Process all 4 corners at once
 	vec4 x_max = max(vx, 0.0);
 	vec4 y_max = max(vy, 0.0);
-	vec4 dists = vec4(
-		length(vec2(x_max.x, y_max.x)),
-		length(vec2(x_max.y, y_max.y)),
-		length(vec2(x_max.z, y_max.z)),
-		length(vec2(x_max.w, y_max.w))
-	) + min(max(vx, vy), 0.0) - radii;
-	float dist = max(max(dists.x, dists.y), max(dists.z, dists.w));
+
+	vec4 dists = sqrt(x_max*x_max + y_max*y_max) + min(max(vx, vy), 0.0) - radii;
+
+	vec2 max_half = max(dists.xy, dists.zw);
+	float dist = max(max_half.x, max_half.y);
 
 	return smoothstep(0.0, 1.0, dist);
 }

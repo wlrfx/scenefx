@@ -13,12 +13,11 @@ uniform vec2 position;
 uniform vec2 size;
 uniform float blur_sigma;
 uniform float corner_radius;
-uniform vec2 clip_position;
-uniform vec2 clip_size;
-uniform float clip_radius_top_left;
-uniform float clip_radius_top_right;
-uniform float clip_radius_bottom_left;
-uniform float clip_radius_bottom_right;
+
+uniform vec2 clip_center_pos;
+uniform vec4 clip_corner_center_x;
+uniform vec4 clip_corner_center_y;
+uniform vec4 clip_radii;
 
 float gaussian(float x, float sigma) {
     const float pi = 3.141592653589793;
@@ -66,8 +65,7 @@ float roundedBoxShadow(vec2 lower, vec2 upper, vec2 point, float sigma, float co
     return value;
 }
 
-float corner_alpha(vec2 size, vec2 position,
-        float radius_tl, float radius_tr, float radius_bl, float radius_br);
+float corner_alpha(vec4 radii, vec2 center_pos, vec4 corner_center_x, vec4 corner_center_y);
 
 void main() {
     float shadow_alpha = v_color.a * roundedBoxShadow(
@@ -77,14 +75,12 @@ void main() {
             corner_radius);
 
     // Clipping
-    float clip_corner_alpha = corner_alpha(
-        clip_size - 1.5,
-        clip_position + 0.75,
-        clip_radius_top_left,
-        clip_radius_top_right,
-        clip_radius_bottom_left,
-        clip_radius_bottom_right
-    );
+	float clip_corner_alpha = corner_alpha(
+		clip_radii,
+		clip_center_pos,
+		clip_corner_center_x,
+		clip_corner_center_y
+	);
 
     gl_FragColor = vec4(v_color.rgb, shadow_alpha) * clip_corner_alpha;
 }

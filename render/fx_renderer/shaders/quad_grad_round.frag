@@ -9,14 +9,12 @@ precision mediump float;
 varying vec4 v_color;
 varying vec2 v_texcoord;
 
+uniform vec2 center_pos;
+uniform vec4 corner_center_x;
+uniform vec4 corner_center_y;
+uniform vec4 radii;
+
 uniform vec2 size;
-uniform vec2 position;
-
-uniform float radius_top_left;
-uniform float radius_top_right;
-uniform float radius_bottom_left;
-uniform float radius_bottom_right;
-
 uniform vec4 colors[LEN];
 uniform vec2 grad_size;
 uniform float degree;
@@ -28,18 +26,15 @@ uniform int count;
 
 vec4 gradient(vec4 colors[LEN], int count, vec2 size, vec2 grad_box, vec2 origin, float degree, bool linear, bool blend);
 
-float corner_alpha(vec2 size, vec2 position,
-		float radius_tl, float radius_tr, float radius_bl, float radius_br);
+float corner_alpha(vec4 radii, vec2 center_pos, vec4 corner_center_x, vec4 corner_center_y);
 
 // TODO:
 void main() {
 	float quad_corner_alpha = corner_alpha(
-		size - 1.0,
-		position + 0.5,
-		radius_top_left,
-		radius_top_right,
-		radius_bottom_left,
-		radius_bottom_right
+		radii,
+		center_pos,
+		corner_center_x,
+		corner_center_y
 	);
 	float rect_alpha = v_color.a * quad_corner_alpha;
 

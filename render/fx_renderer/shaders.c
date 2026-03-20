@@ -101,12 +101,33 @@ void load_gl_proc(void *proc_ptr, const char *name) {
 	*(void **)proc_ptr = proc;
 }
 
-void uniform_corner_radii_set(struct shader_corner_radii *uniform, struct fx_corner_fradii *corners) {
-	glUniform1f(uniform->top_left, corners->top_left);
-	glUniform1f(uniform->top_right, corners->top_right);
-	glUniform1f(uniform->bottom_left, corners->bottom_left);
-	glUniform1f(uniform->bottom_right, corners->bottom_right);
+bool check_egl_ext(const char *exts, const char *ext) {
+	size_t extlen = strlen(ext);
+	const char *end = exts + strlen(exts);
+
+	while (exts < end) {
+		if (*exts == ' ') {
+			exts++;
+			continue;
+		}
+		size_t n = strcspn(exts, " ");
+		if (n == extlen && strncmp(ext, exts, n) == 0) {
+			return true;
+		}
+		exts += n;
+	}
+	return false;
 }
+
+void load_egl_proc(void *proc_ptr, const char *name) {
+	void *proc = (void *)eglGetProcAddress(name);
+	if (proc == NULL) {
+		wlr_log(WLR_ERROR, "eglGetProcAddress(%s) failed", name);
+		abort();
+	}
+	*(void **)proc_ptr = proc;
+}
+
 // Shaders
 
 bool link_quad_program(struct quad_shader *shader, bool clip) {

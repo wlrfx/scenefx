@@ -1,7 +1,7 @@
 #include <stdlib.h>
 #include <wlr/interfaces/wlr_buffer.h>
 #include <wlr/render/allocator.h>
-#include <wlr/render/interface.h>
+#include <wlr/render/gles2.h>
 #include <wlr/util/log.h>
 
 #include "render/egl.h"
@@ -18,55 +18,61 @@ static const struct wlr_addon_interface buffer_addon_impl = {
 	.destroy = handle_buffer_destroy,
 };
 
-GLuint fx_framebuffer_get_fbo(struct fx_framebuffer *buffer) {
-	if (buffer->external_only) {
-		wlr_log(WLR_ERROR, "DMA-BUF format is external-only");
-		return 0;
+struct fx_framebuffer *fx_framebuffer_get_or_create(struct fx_renderer *fx_renderer,
+		struct wlr_buffer *wlr_buffer) {
+	struct wlr_addon *addon =
+		wlr_addon_find(&wlr_buffer->addons, fx_renderer->wlr_renderer, &buffer_addon_impl);
+	if (addon) {
+		struct fx_framebuffer *buffer = wl_container_of(addon, buffer, addon);
+		return buffer;
 	}
 
-	if (buffer->fbo) {
-		return buffer->fbo;
+	struct fx_framebuffer *buffer = calloc(1, sizeof(*buffer));
+	if (buffer == NULL) {
+		wlr_log_errno(WLR_ERROR, "Allocation failed");
+		return NULL;
 	}
+	buffer->wlr_buffer = wlr_buffer;
+	buffer->fx_renderer = fx_renderer;
 
-	push_fx_debug(buffer->renderer);
-
-	if (!buffer->rbo) {
-		glGenRenderbuffers(1, &buffer->rbo);
-		glBindRenderbuffer(GL_RENDERBUFFER, buffer->rbo);
-		buffer->renderer->procs.glEGLImageTargetRenderbufferStorageOES(GL_RENDERBUFFER,
-				buffer->image);
-		glBindRenderbuffer(GL_RENDERBUFFER, 0);
+	// Init the base wlr_gles2_buffer
+	GLuint fbo = wlr_gles2_renderer_get_buffer_fbo(fx_renderer->wlr_renderer, wlr_buffer);
+	if (!fbo) {
+		free(buffer);
+		wlr_log_errno(WLR_ERROR, "Could not get wlr_buffer fbo");
+		return NULL;
 	}
-
-	glGenFramebuffers(1, &buffer->fbo);
-	glBindFramebuffer(GL_FRAMEBUFFER, buffer->fbo);
-	glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0,
-			GL_RENDERBUFFER, buffer->rbo);
-	GLenum fb_status = glCheckFramebufferStatus(GL_FRAMEBUFFER);
+	buffer->fbo = fbo;
 
 	// Init stencil buffer
+	glBindFramebuffer(GL_FRAMEBUFFER, buffer->fbo);
 	glGenRenderbuffers(1, &buffer->sb);
 	glBindRenderbuffer(GL_RENDERBUFFER, buffer->sb);
 	glRenderbufferStorage(GL_RENDERBUFFER, GL_STENCIL_INDEX8,
-			buffer->buffer->width, buffer->buffer->height);
+			wlr_buffer->width, wlr_buffer->height);
 	glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_STENCIL_ATTACHMENT,
 			GL_RENDERBUFFER, buffer->sb);
-	fb_status = glCheckFramebufferStatus(GL_FRAMEBUFFER);
-
+	GLenum fb_status = glCheckFramebufferStatus(GL_FRAMEBUFFER);
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
 	if (fb_status != GL_FRAMEBUFFER_COMPLETE) {
 		wlr_log(WLR_ERROR, "Failed to create FBO");
-		glDeleteFramebuffers(1, &buffer->fbo);
-		buffer->fbo = 0;
+		free(buffer);
+		return NULL;
 	}
 
-	pop_fx_debug(buffer->renderer);
+	wlr_addon_init(&buffer->addon, &wlr_buffer->addons, fx_renderer->wlr_renderer,
+		&buffer_addon_impl);
 
-	return buffer->fbo;
+	wl_list_insert(&fx_renderer->buffers, &buffer->link);
+
+	wlr_log(WLR_DEBUG, "Created GL FBO for buffer %dx%d",
+		wlr_buffer->width, wlr_buffer->height);
+
+	return buffer;
 }
 
-void fx_framebuffer_get_or_create_custom(struct fx_renderer *renderer,
+void fx_framebuffer_get_or_create_custom(struct fx_renderer *fx_renderer,
 		struct wlr_allocator *allocator, int width, int height, bool has_alpha,
 		struct fx_framebuffer **fx_framebuffer, bool *failed) {
 	if (*failed) {
@@ -74,7 +80,7 @@ void fx_framebuffer_get_or_create_custom(struct fx_renderer *renderer,
 	}
 
 	if (*fx_framebuffer != NULL) {
-		struct wlr_buffer *wlr_buffer = (*fx_framebuffer)->buffer;
+		struct wlr_buffer *wlr_buffer = (*fx_framebuffer)->wlr_buffer;
 		if (wlr_buffer != NULL) {
 			if (wlr_buffer->width == width && wlr_buffer->height == height) {
 				return;
@@ -88,9 +94,11 @@ void fx_framebuffer_get_or_create_custom(struct fx_renderer *renderer,
 		*fx_framebuffer = NULL;
 	}
 
+	struct wlr_renderer *wlr_renderer = fx_renderer->wlr_renderer;
+
 	// Get the best supported DRM format (DMABUF if supported)
 	const struct wlr_drm_format_set *texture_formats = wlr_renderer_get_texture_formats(
-			&renderer->wlr_renderer, renderer->wlr_renderer.render_buffer_caps);
+			wlr_renderer, wlr_renderer->render_buffer_caps);
 	const struct fx_pixel_format *pix_format =
 		get_fx_format_from_gl(GL_RGBA, GL_UNSIGNED_BYTE, has_alpha);
 	const struct wlr_drm_format *format = wlr_drm_format_set_get(texture_formats, pix_format->drm_format);
@@ -107,61 +115,17 @@ void fx_framebuffer_get_or_create_custom(struct fx_renderer *renderer,
 		return;
 	}
 
-	*fx_framebuffer = fx_framebuffer_get_or_create(renderer, wlr_buffer);
+	*fx_framebuffer = fx_framebuffer_get_or_create(fx_renderer, wlr_buffer);
 	if (*fx_framebuffer == NULL) {
 		wlr_log(WLR_ERROR, "Failed to allocate fx_buffer");
 		wlr_buffer_drop(wlr_buffer);
 		*failed = true;
 		return;
 	}
-	fx_framebuffer_get_fbo(*fx_framebuffer);
-}
-
-struct fx_framebuffer *fx_framebuffer_get_or_create(struct fx_renderer *renderer,
-		struct wlr_buffer *wlr_buffer) {
-	struct wlr_addon *addon =
-		wlr_addon_find(&wlr_buffer->addons, renderer, &buffer_addon_impl);
-	if (addon) {
-		struct fx_framebuffer *buffer = wl_container_of(addon, buffer, addon);
-		return buffer;
-	}
-
-	struct fx_framebuffer *buffer = calloc(1, sizeof(*buffer));
-	if (buffer == NULL) {
-		wlr_log_errno(WLR_ERROR, "Allocation failed");
-		return NULL;
-	}
-	buffer->buffer = wlr_buffer;
-	buffer->renderer = renderer;
-
-	struct wlr_dmabuf_attributes dmabuf = {0};
-	if (!wlr_buffer_get_dmabuf(wlr_buffer, &dmabuf)) {
-		goto error_buffer;
-	}
-
-	buffer->image = wlr_egl_create_image_from_dmabuf(renderer->egl,
-		&dmabuf, &buffer->external_only);
-	if (buffer->image == EGL_NO_IMAGE_KHR) {
-		goto error_buffer;
-	}
-
-	wlr_addon_init(&buffer->addon, &wlr_buffer->addons, renderer,
-		&buffer_addon_impl);
-
-	wl_list_insert(&renderer->buffers, &buffer->link);
-
-	wlr_log(WLR_DEBUG, "Created GL FBO for buffer %dx%d",
-		wlr_buffer->width, wlr_buffer->height);
-
-	return buffer;
-
-error_buffer:
-	free(buffer);
-	return NULL;
 }
 
 void fx_framebuffer_bind(struct fx_framebuffer *fx_buffer) {
-	glBindFramebuffer(GL_FRAMEBUFFER, fx_framebuffer_get_fbo(fx_buffer));
+	glBindFramebuffer(GL_FRAMEBUFFER, fx_buffer->fbo);
 }
 
 void fx_framebuffer_destroy(struct fx_framebuffer *fx_buffer) {
@@ -174,21 +138,9 @@ void fx_framebuffer_destroy(struct fx_framebuffer *fx_buffer) {
 	wl_list_remove(&fx_buffer->link);
 	wlr_addon_finish(&fx_buffer->addon);
 
-	struct wlr_egl_context prev_ctx;
-	wlr_egl_make_current(fx_buffer->renderer->egl, &prev_ctx);
-
-	glDeleteFramebuffers(1, &fx_buffer->fbo);
-	fx_buffer->fbo = -1;
-	glDeleteRenderbuffers(1, &fx_buffer->rbo);
-	fx_buffer->rbo = -1;
-	glDeleteTextures(1, &fx_buffer->tex);
-	fx_buffer->tex = -1;
+	egl_ensure_current(fx_buffer->fx_renderer);
 	glDeleteRenderbuffers(1, &fx_buffer->sb);
-	fx_buffer->sb = -1;
-
-	wlr_egl_destroy_image(fx_buffer->renderer->egl, fx_buffer->image);
-
-	wlr_egl_restore_context(&prev_ctx);
+	fx_buffer->sb = 0;
 
 	free(fx_buffer);
 }

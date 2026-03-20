@@ -120,6 +120,7 @@ struct wlr_scene {
 		bool highlight_transparent_region;
 
 		struct blur_data blur_data;
+		struct fx_renderer *fx_renderer;
 	} WLR_PRIVATE;
 };
 

@@ -4,6 +4,8 @@
 #include <wlr/types/wlr_output.h>
 #include <wlr/util/addon.h>
 
+#include "render/fx_renderer/fx_renderer.h"
+
 /**
  * Used to add effect framebuffers per output instead of every output sharing
  * them.
@@ -27,6 +29,7 @@ struct fx_offscreen_buffers {
 };
 
 void fx_offscreen_buffers_destroy(struct fx_offscreen_buffers *fbos);
-struct fx_offscreen_buffers *fx_offscreen_buffers_try_get(struct wlr_output *output);
+struct fx_offscreen_buffers *fx_offscreen_buffers_try_get(struct fx_renderer *fx_renderer,
+		struct wlr_output *output);
 
 #endif

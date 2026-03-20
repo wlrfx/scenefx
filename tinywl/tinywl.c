@@ -4,7 +4,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <time.h>
-#include <scenefx/render/fx_renderer/fx_renderer.h>
+#include <scenefx/scenefx.h>
 #include <scenefx/types/fx/clipped_region.h>
 #include <scenefx/types/wlr_scene.h>
 #include <unistd.h>
@@ -1079,11 +1079,13 @@ int main(int argc, char *argv[]) {
 		return 1;
 	}
 
+	server.scene = wlr_scene_create();
+
 	/* Autocreates a renderer, either Pixman, GLES2 or Vulkan for us. The user
 	 * can also specify a renderer using the WLR_RENDERER env var.
 	 * The renderer is responsible for defining the various pixel formats it
 	 * supports for shared memory, this configures that for clients. */
-	server.renderer = fx_renderer_create(server.backend);
+	server.renderer = scenefx_init(server.scene, server.backend);
 	if (server.renderer == NULL) {
 		wlr_log(WLR_ERROR, "failed to create wlr_renderer");
 		return 1;
@@ -1129,7 +1131,6 @@ int main(int argc, char *argv[]) {
 	 * positions and then call wlr_scene_output_commit() to render a frame if
 	 * necessary.
 	 */
-	server.scene = wlr_scene_create();
 	server.scene_layout = wlr_scene_attach_output_layout(server.scene, server.output_layout);
 
 	/* Create all of the basic scene layers */

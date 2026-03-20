@@ -26,7 +26,7 @@ void tracy_gpu_zone_end(struct tracy_gpu_zone_context *ctx);
 
 void tracy_gpu_context_collect(struct tracy_data *tracy_data);
 void tracy_gpu_context_destroy(struct tracy_data *tracy_data);
-struct tracy_data *tracy_gpu_context_new(struct fx_renderer *renderer);
+struct tracy_data *tracy_gpu_context_new(struct fx_renderer *fx_renderer);
 #endif  // TRACY_ENABLE
 
 #define TRACY_WHEN_CONNECTED(fn) \

@@ -1,22 +1,16 @@
 #ifndef SCENE_FX_RENDER_PASS_H
 #define SCENE_FX_RENDER_PASS_H
 
-#include <stdbool.h>
 #include <wlr/render/pass.h>
-#include <wlr/render/interface.h>
-#include <wlr/render/swapchain.h>
+#include <wlr/types/wlr_output.h>
 
-#include "render/egl.h"
 #include "types/fx/clipped_region.h"
 
 struct fx_gles_render_pass {
-	struct wlr_render_pass base;
-	struct fx_framebuffer *buffer;
+	struct wlr_render_pass *base;
+	struct fx_renderer *fx_renderer;
+	struct fx_framebuffer *fx_buffer;
 	float projection_matrix[9];
-	struct wlr_egl_context prev_ctx;
-	struct fx_render_timer *timer;
-	struct wlr_drm_syncobj_timeline *signal_timeline;
-	uint64_t signal_point;
 
 	// The region where there's blur
 	pixman_region32_t blur_padding_region;
@@ -93,14 +87,15 @@ struct fx_render_blur_pass_options {
 	struct clipped_fregion clipped_region;
 };
 
-struct fx_gles_render_pass *fx_get_render_pass(struct wlr_render_pass *render_pass);
-
 /**
  * Initializes the render pass offscreen buffers required for advanced effects
  * like blur.
  */
-bool fx_render_pass_init_offscreen_buffers(struct wlr_render_pass *render_pass,
+struct fx_gles_render_pass *fx_render_pass_init(struct fx_renderer *fx_renderer,
+		struct wlr_render_pass *render_pass, struct wlr_buffer *wlr_buffer,
 		struct wlr_output *output);
+
+void fx_render_pass_destroy(struct fx_gles_render_pass *fx_pass);
 
 /**
  * Render a fx texture.

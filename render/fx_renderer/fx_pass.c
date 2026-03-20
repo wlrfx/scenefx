@@ -1,205 +1,114 @@
+#include <assert.h>
 #include <math.h>
+#include <pixman.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <assert.h>
-#include <pixman.h>
-#include <time.h>
 #include <unistd.h>
 #include <wlr/render/allocator.h>
 #include <wlr/render/drm_syncobj.h>
-#include <wlr/util/transform.h>
+#include <wlr/render/gles2.h>
+#include <wlr/render/interface.h>
 #include <wlr/util/log.h>
 #include <wlr/util/region.h>
+#include <wlr/util/transform.h>
 
 #include "render/egl.h"
 #include "render/fx_renderer/fx_renderer.h"
 #include "render/fx_renderer/shaders.h"
-#include "render/pass.h"
 #include "render/tracy.h"
 #include "scenefx/render/fx_renderer/fx_offscreen_buffers.h"
-#include "scenefx/render/fx_renderer/fx_renderer.h"
+#include "scenefx/render/pass.h"
 #include "scenefx/types/fx/blur_data.h"
 #include "util/matrix.h"
 
 #define MAX_QUADS 86 // 4kb
 
-struct fx_render_texture_options fx_render_texture_options_default(
-		const struct wlr_render_texture_options *base) {
-	struct fx_render_texture_options options = {
-		.corners = {0},
-		.discard_transparent = false,
-		.clip_box = NULL,
-		.clipped_region = {0},
-	};
-	memcpy(&options.base, base, sizeof(*base));
-	return options;
-}
-
-struct fx_render_rect_options fx_render_rect_options_default(
-		const struct wlr_render_rect_options *base) {
-	struct fx_render_rect_options options = {
-		.base = *base,
-		.clipped_region = {
-			.area = { .0, .0, .0, .0 },
-			.corners = {0},
-		},
-	};
-	return options;
-}
-
-bool fx_render_pass_init_offscreen_buffers(struct wlr_render_pass *render_pass,
+struct fx_gles_render_pass *fx_render_pass_init(struct fx_renderer *fx_renderer,
+		struct wlr_render_pass *render_pass, struct wlr_buffer *wlr_buffer,
 		struct wlr_output *output) {
-	struct fx_gles_render_pass *pass = fx_get_render_pass(render_pass);
-	if (output == NULL) {
-		pass->fx_offscreen_buffers = NULL;
-		return false;
+	if (fx_renderer == NULL || render_pass == NULL || wlr_buffer == NULL
+			|| output == NULL) {
+		wlr_log(WLR_DEBUG, "Could not create fx_render_pass, NULL parameters");
+		return NULL;
 	}
-	if (pass->fx_offscreen_buffers != NULL) {
-		wlr_log(WLR_ERROR, "Extra buffers called twice. Ignoring...");
-		return true;
+
+	struct fx_gles_render_pass *pass = calloc(1, sizeof(*pass));
+	if (pass == NULL) {
+		wlr_log(WLR_ERROR, "Failed to create fx_gles_render_pass");
+		return NULL;
 	}
+
+	struct fx_framebuffer *fx_buffer = fx_framebuffer_get_or_create(fx_renderer, wlr_buffer);
+	if (fx_buffer == NULL) {
+		free(pass);
+		return NULL;
+	}
+
+	pass->fx_renderer = fx_renderer;
+	pass->fx_buffer = fx_buffer;
+	pass->base = render_pass;
+
+	pixman_region32_init(&pass->blur_padding_region);
+	pass->has_blur = false;
+
+	// Save the same matrix projection that wlr_gles2_render_pass uses
+	matrix_projection(pass->projection_matrix, wlr_buffer->width, wlr_buffer->height,
+		WL_OUTPUT_TRANSFORM_FLIPPED_180);
 
 	// For per output framebuffers
-	pass->fx_offscreen_buffers = fx_offscreen_buffers_try_get(output);
+	pass->fx_offscreen_buffers = fx_offscreen_buffers_try_get(fx_renderer, output);
 	if (pass->fx_offscreen_buffers == NULL) {
 		wlr_log(WLR_ERROR, "Failed to get/create effect framebuffers for output: %s",
 				output->name);
-		return false;
+		fx_framebuffer_destroy(fx_buffer);
+		free(pass);
+		return NULL;
 	}
 
 	// Update the buffers if needed
-	struct fx_renderer *renderer = pass->buffer->renderer;
-	const int width = pass->buffer->buffer->width;
-	const int height = pass->buffer->buffer->height;
+	const int width = pass->fx_buffer->wlr_buffer->width;
+	const int height = pass->fx_buffer->wlr_buffer->height;
 	bool failed = false;
-	fx_framebuffer_get_or_create_custom(renderer, output->allocator, width, height, false,
+	fx_framebuffer_get_or_create_custom(fx_renderer, output->allocator, width, height, false,
 			&pass->fx_offscreen_buffers->blur_saved_pixels_buffer, &failed);
-	fx_framebuffer_get_or_create_custom(renderer, output->allocator, width, height, true,
+	fx_framebuffer_get_or_create_custom(fx_renderer, output->allocator, width, height, true,
 			&pass->fx_offscreen_buffers->effects_buffer, &failed);
-	fx_framebuffer_get_or_create_custom(renderer, output->allocator, width, height, true,
+	fx_framebuffer_get_or_create_custom(fx_renderer, output->allocator, width, height, true,
 			&pass->fx_offscreen_buffers->effects_buffer_swapped, &failed);
-	fx_framebuffer_get_or_create_custom(renderer, output->allocator, width, height, false,
+	fx_framebuffer_get_or_create_custom(fx_renderer, output->allocator, width, height, false,
 			&pass->fx_offscreen_buffers->optimized_blur_buffer, &failed);
-	fx_framebuffer_get_or_create_custom(renderer, output->allocator, width, height, false,
+	fx_framebuffer_get_or_create_custom(fx_renderer, output->allocator, width, height, false,
 			&pass->fx_offscreen_buffers->optimized_no_blur_buffer, &failed);
 
 	// Bind back to the default buffer
-	fx_framebuffer_bind(pass->buffer);
+	fx_framebuffer_bind(pass->fx_buffer);
 
 	if (failed) {
 		fx_offscreen_buffers_destroy(pass->fx_offscreen_buffers);
-		pass->fx_offscreen_buffers = NULL;
+		fx_framebuffer_destroy(fx_buffer);
+		free(pass);
 		wlr_log(WLR_ERROR, "Failed to create effect framebuffers");
-		return false;
+		return NULL;
 	}
-	return true;
-}
-
-///
-/// Base Wlroots pass functions
-///
-
-static const struct wlr_render_pass_impl render_pass_impl;
-
-struct fx_gles_render_pass *fx_get_render_pass(struct wlr_render_pass *render_pass) {
-	assert(render_pass->impl == &render_pass_impl);
-	struct fx_gles_render_pass *pass = wl_container_of(render_pass, pass, base);
 	return pass;
 }
 
-static bool render_pass_submit(struct wlr_render_pass *wlr_pass) {
-	struct fx_gles_render_pass *pass = fx_get_render_pass(wlr_pass);
-	struct fx_renderer *renderer = pass->buffer->renderer;
-	struct fx_render_timer *timer = pass->timer;
-	bool ok = false;
-
-	TRACY_BOTH_ZONES_START(pass->buffer->renderer);
-	push_fx_debug(renderer);
-
-	if (timer) {
-		// clear disjoint flag
-		GLint64 disjoint;
-		renderer->procs.glGetInteger64vEXT(GL_GPU_DISJOINT_EXT, &disjoint);
-		// set up the query
-		renderer->procs.glQueryCounterEXT(timer->id, GL_TIMESTAMP_EXT);
-		// get end-of-CPU-work time in GL time domain
-		renderer->procs.glGetInteger64vEXT(GL_TIMESTAMP_EXT, &timer->gl_cpu_end);
-		// get end-of-CPU-work time in CPU time domain
-		clock_gettime(CLOCK_MONOTONIC, &timer->cpu_end);
-	}
-
-	if (pass->signal_timeline != NULL) {
-		EGLSyncKHR sync = wlr_egl_create_sync(renderer->egl, -1);
-		if (sync == EGL_NO_SYNC_KHR) {
-			goto out;
-		}
-
-		int sync_file_fd = wlr_egl_dup_fence_fd(renderer->egl, sync);
-		wlr_egl_destroy_sync(renderer->egl, sync);
-		if (sync_file_fd < 0) {
-			goto out;
-		}
-
-		ok = wlr_drm_syncobj_timeline_import_sync_file(pass->signal_timeline, pass->signal_point, sync_file_fd);
-		close(sync_file_fd);
-		if (!ok) {
-			goto out;
-		}
-	} else {
-		glFlush();
-	}
-
-	ok = true;
-
-out:
-	glBindFramebuffer(GL_FRAMEBUFFER, 0);
-
-	pop_fx_debug(renderer);
-	TRACY_BOTH_ZONES_END;
-	TRACY_GPU_ZONE_COLLECT(renderer);
-
-	wlr_egl_restore_context(&pass->prev_ctx);
-
-	wlr_drm_syncobj_timeline_unref(pass->signal_timeline);
-	wlr_buffer_unlock(pass->buffer->buffer);
-
-	pass->fx_offscreen_buffers = NULL;
-	pixman_region32_fini(&pass->blur_padding_region);
-
-	free(pass);
-
-	return ok;
+void fx_render_pass_destroy(struct fx_gles_render_pass *fx_pass) {
+	pixman_region32_fini(&fx_pass->blur_padding_region);
+	fx_pass->has_blur = false;
+	free(fx_pass);
 }
-
-static void render_pass_add_texture(struct wlr_render_pass *wlr_pass,
-		const struct wlr_render_texture_options *options) {
-	struct fx_gles_render_pass *pass = fx_get_render_pass(wlr_pass);
-	const struct fx_render_texture_options fx_options =
-		fx_render_texture_options_default(options);
-	// Re-use fx function but with default options
-	// TODO: Simplified version?
-	fx_render_pass_add_texture(pass, &fx_options);
-}
-
-static void render_pass_add_rect(struct wlr_render_pass *wlr_pass,
-		const struct wlr_render_rect_options *options) {
-	struct fx_gles_render_pass *pass = fx_get_render_pass(wlr_pass);
-	const struct fx_render_rect_options fx_options =
-		fx_render_rect_options_default(options);
-	// Re-use fx function but with default options
-	// TODO: Simplified version?
-	fx_render_pass_add_rect(pass, &fx_options);
-}
-
-static const struct wlr_render_pass_impl render_pass_impl = {
-	.submit = render_pass_submit,
-	.add_texture = render_pass_add_texture,
-	.add_rect = render_pass_add_rect,
-};
 
 ///
 /// FX pass functions
 ///
+
+static void uniform_corner_radii_set(struct shader_corner_radii *uniform, struct fx_corner_fradii *corners) {
+	glUniform1f(uniform->top_left, corners->top_left);
+	glUniform1f(uniform->top_right, corners->top_right);
+	glUniform1f(uniform->bottom_left, corners->bottom_left);
+	glUniform1f(uniform->bottom_right, corners->bottom_right);
+}
 
 // TODO: REMOVE STENCILING
 
@@ -351,32 +260,35 @@ static bool apply_clip_region(pixman_region32_t *clip_region,
 void fx_render_pass_add_texture(struct fx_gles_render_pass *pass,
 		const struct fx_render_texture_options *fx_options) {
 	const struct wlr_render_texture_options *options = &fx_options->base;
-	struct fx_renderer *renderer = pass->buffer->renderer;
-	struct fx_texture *texture = fx_get_texture(options->texture);
+	struct fx_renderer *fx_renderer = pass->fx_renderer;
+
+	struct wlr_gles2_texture_attribs attribs;
+	wlr_gles2_texture_get_attribs(options->texture, &attribs);
 
 	struct tex_shader *shader = NULL;
 
 	bool use_effects = !fx_corner_fradii_is_empty(&fx_options->corners)
-		|| clipped_fregion_is_valid(&fx_options->clipped_region);
-	switch (texture->target) {
+		|| clipped_fregion_is_valid(&fx_options->clipped_region)
+		|| fx_options->discard_transparent;
+	switch (attribs.target) {
 	case GL_TEXTURE_2D:
-		if (texture->has_alpha) {
+		if (attribs.has_alpha) {
 			shader = use_effects
-				? &renderer->shaders.tex_effects_rgba
-				: &renderer->shaders.tex_rgba;
+				? &fx_renderer->shaders.tex_effects_rgba
+				: &fx_renderer->shaders.tex_rgba;
 		} else {
 			shader = use_effects
-				? &renderer->shaders.tex_effects_rgbx
-				: &renderer->shaders.tex_rgbx;
+				? &fx_renderer->shaders.tex_effects_rgbx
+				: &fx_renderer->shaders.tex_rgbx;
 		}
 		break;
 	case GL_TEXTURE_EXTERNAL_OES:
 		// EGL_EXT_image_dma_buf_import_modifiers requires
 		// GL_OES_EGL_image_external
-		assert(renderer->exts.OES_egl_image_external);
+		assert(fx_renderer->exts.OES_egl_image_external);
 		shader = use_effects
-			? &renderer->shaders.tex_effects_ext
-			: &renderer->shaders.tex_ext;
+			? &fx_renderer->shaders.tex_effects_ext
+			: &fx_renderer->shaders.tex_ext;
 		break;
 	default:
 		abort();
@@ -398,7 +310,7 @@ void fx_render_pass_add_texture(struct fx_gles_render_pass *pass,
 	src_fbox.width /= options->texture->width;
 	src_fbox.height /= options->texture->height;
 
-	TRACY_BOTH_ZONES_START(renderer);
+	TRACY_BOTH_ZONES_START(fx_renderer);
 	TRACY_ZONE_TEXT_f("dst_box (WxH, X, Y): %dx%d, %d, %d",
 			dst_box.width, dst_box.height, dst_box.x, dst_box.y);
 	TRACY_ZONE_TEXT_f("clip_box (WxH, X, Y): %dx%d, %d, %d",
@@ -407,16 +319,16 @@ void fx_render_pass_add_texture(struct fx_gles_render_pass *pass,
 			src_fbox.width, src_fbox.height, src_fbox.x, src_fbox.y);
 	TRACY_ZONE_TEXT_f("Shader Type: %s",
 			use_effects ? (
-			 shader == &renderer->shaders.tex_effects_rgba ? "Effects RGBA"
-			 : shader == &renderer->shaders.tex_effects_rgbx ? "Effects RGBX"
+			 shader == &fx_renderer->shaders.tex_effects_rgba ? "Effects RGBA"
+			 : shader == &fx_renderer->shaders.tex_effects_rgbx ? "Effects RGBX"
 			 : "Effects EXT"
 			) : (
-				shader == &renderer->shaders.tex_rgba ? "RGBA"
-				: shader == &renderer->shaders.tex_rgbx ? "RGBX"
+				shader == &fx_renderer->shaders.tex_rgba ? "RGBA"
+				: shader == &fx_renderer->shaders.tex_rgbx ? "RGBX"
 				: "EXT"
 			)
 		);
-	push_fx_debug(renderer);
+	push_fx_debug(fx_renderer);
 
 	if (options->wait_timeline != NULL) {
 		int sync_file_fd =
@@ -426,22 +338,22 @@ void fx_render_pass_add_texture(struct fx_gles_render_pass *pass,
 			return;
 		}
 
-		EGLSyncKHR sync = wlr_egl_create_sync(renderer->egl, sync_file_fd);
+		EGLSyncKHR sync = egl_create_sync(fx_renderer, sync_file_fd);
 		close(sync_file_fd);
 		if (sync == EGL_NO_SYNC_KHR) {
 			TRACY_BOTH_ZONES_END_FAIL;
 			return;
 		}
 
-		bool ok = wlr_egl_wait_sync(renderer->egl, sync);
-		wlr_egl_destroy_sync(renderer->egl, sync);
+		bool ok = egl_wait_sync(fx_renderer, sync);
+		egl_destroy_sync(fx_renderer, sync);
 		if (!ok) {
 			TRACY_BOTH_ZONES_END_FAIL;
 			return;
 		}
 	}
 
-	bool has_alpha = texture->has_alpha || alpha < 1.0 || use_effects;
+	bool has_alpha = attribs.has_alpha || alpha < 1.0 || use_effects;
 	TRACY_ZONE_TEXT_f("Has Alpha: %d", has_alpha);
 	setup_blending(!has_alpha ? WLR_RENDER_BLEND_MODE_NONE : options->blend_mode);
 
@@ -459,16 +371,16 @@ void fx_render_pass_add_texture(struct fx_gles_render_pass *pass,
 	glUseProgram(shader->program);
 
 	glActiveTexture(GL_TEXTURE0);
-	glBindTexture(texture->target, texture->tex);
+	glBindTexture(attribs.target, attribs.tex);
 
 	switch (options->filter_mode) {
 	case WLR_SCALE_FILTER_BILINEAR:
-		glTexParameteri(texture->target, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-		glTexParameteri(texture->target, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+		glTexParameteri(attribs.target, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+		glTexParameteri(attribs.target, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 		break;
 	case WLR_SCALE_FILTER_NEAREST:
-		glTexParameteri(texture->target, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-		glTexParameteri(texture->target, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+		glTexParameteri(attribs.target, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+		glTexParameteri(attribs.target, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 		break;
 	}
 
@@ -495,9 +407,9 @@ void fx_render_pass_add_texture(struct fx_gles_render_pass *pass,
 	render(&dst_box, &clip_region, shader->pos_attrib);
 	pixman_region32_fini(&clip_region);
 
-	glBindTexture(texture->target, 0);
+	glBindTexture(attribs.target, 0);
 
-	pop_fx_debug(renderer);
+	pop_fx_debug(fx_renderer);
 	TRACY_BOTH_ZONES_END;
 }
 
@@ -505,11 +417,11 @@ void fx_render_pass_add_rect(struct fx_gles_render_pass *pass,
 		const struct fx_render_rect_options *fx_options) {
 	const struct wlr_render_rect_options *options = &fx_options->base;
 
-	struct fx_renderer *renderer = pass->buffer->renderer;
+	struct fx_renderer *fx_renderer = pass->fx_renderer;
 
 	const struct wlr_render_color *color = &options->color;
 	struct wlr_box box;
-	wlr_render_rect_options_get_box(options, pass->buffer->buffer, &box);
+	wlr_render_rect_options_get_box(options, pass->fx_buffer->wlr_buffer, &box);
 
 	pixman_region32_t clip_region;
 	if (options->clip) {
@@ -526,7 +438,7 @@ void fx_render_pass_add_rect(struct fx_gles_render_pass *pass,
 		setup_blending(color->a == 1.0 ? WLR_RENDER_BLEND_MODE_NONE : options->blend_mode);
 	}
 
-	TRACY_BOTH_ZONES_START(renderer);
+	TRACY_BOTH_ZONES_START(fx_renderer);
 	TRACY_ZONE_TEXT_f("Box (WxH, X, Y): %dx%d, %d, %d", box.width, box.height, box.x, box.y);
 	TRACY_ZONE_TEXT_f("Clip Box (WxH, X, Y): %dx%d, %d, %d",
 			clipped_region_box.width, clipped_region_box.height,
@@ -537,9 +449,9 @@ void fx_render_pass_add_rect(struct fx_gles_render_pass *pass,
 			clipped_region_corners.bottom_left,
 			clipped_region_corners.bottom_right);
 	TRACY_ZONE_TEXT_f("Color RGBA: %f, %f, %f, %f", color->r, color->g, color->b, color->a);
-	push_fx_debug(renderer);
+	push_fx_debug(fx_renderer);
 
-	struct quad_shader shader = use_clip ? renderer->shaders.quad_clip : renderer->shaders.quad;
+	struct quad_shader shader = use_clip ? fx_renderer->shaders.quad_clip : fx_renderer->shaders.quad;
 	glUseProgram(shader.program);
 	set_proj_matrix(shader.proj, pass->projection_matrix, &box);
 	glUniform4f(shader.color, color->r, color->g, color->b, color->a);
@@ -549,11 +461,10 @@ void fx_render_pass_add_rect(struct fx_gles_render_pass *pass,
 		glUniform2f(shader.effects.clip_position, clipped_region_box.x, clipped_region_box.y);
 		uniform_corner_radii_set(&shader.effects.clip_radius, &clipped_region_corners);
 	}
-
 	render(&box, &clip_region, shader.pos_attrib);
 	pixman_region32_fini(&clip_region);
 
-	pop_fx_debug(renderer);
+	pop_fx_debug(fx_renderer);
 	TRACY_BOTH_ZONES_END;
 }
 
@@ -561,20 +472,20 @@ void fx_render_pass_add_rect_grad(struct fx_gles_render_pass *pass,
 		const struct fx_render_rect_grad_options *fx_options) {
 	const struct wlr_render_rect_options *options = &fx_options->base;
 
-	struct fx_renderer *renderer = pass->buffer->renderer;
+	struct fx_renderer *fx_renderer = pass->fx_renderer;
 
-	if (renderer->shaders.quad_grad.max_len <= fx_options->gradient.count) {
-		glDeleteProgram(renderer->shaders.quad_grad.program);
-		if (!link_quad_grad_program(&renderer->shaders.quad_grad, fx_options->gradient.count + 1)) {
-			wlr_log(WLR_ERROR, "Could not link quad shader after updating max_len to %d. Aborting renderer", fx_options->gradient.count + 1);
+	if (fx_renderer->shaders.quad_grad.max_len <= fx_options->gradient.count) {
+		glDeleteProgram(fx_renderer->shaders.quad_grad.program);
+		if (!link_quad_grad_program(&fx_renderer->shaders.quad_grad, fx_options->gradient.count + 1)) {
+			wlr_log(WLR_ERROR, "Could not link quad shader after updating max_len to %d. Aborting fx_renderer", fx_options->gradient.count + 1);
 			abort();
 		}
 	}
 
 	struct wlr_box box;
-	wlr_render_rect_options_get_box(options, pass->buffer->buffer, &box);
+	wlr_render_rect_options_get_box(options, pass->fx_buffer->wlr_buffer, &box);
 
-	TRACY_BOTH_ZONES_START(renderer);
+	TRACY_BOTH_ZONES_START(fx_renderer);
 	TRACY_ZONE_TEXT_f("Box (WxH, X, Y): %dx%d, %d, %d", box.width, box.height, box.x, box.y);
 	TRACY_ZONE_TEXT_f("Gradient:");
 	TRACY_ZONE_TEXT_f("\tNum Colors: %d", fx_options->gradient.count);
@@ -590,25 +501,26 @@ void fx_render_pass_add_rect_grad(struct fx_gles_render_pass *pass,
 			fx_options->gradient.range.width, fx_options->gradient.range.height,
 			fx_options->gradient.range.x, fx_options->gradient.range.y);
 	// TODO: Display Colors (not really sure how it works without a scene example...)
-	push_fx_debug(renderer);
+	push_fx_debug(fx_renderer);
 
 	setup_blending(options->blend_mode);
 
-	glUseProgram(renderer->shaders.quad_grad.program);
+	struct quad_grad_shader shader = fx_renderer->shaders.quad_grad;
+	glUseProgram(shader.program);
 
-	set_proj_matrix(renderer->shaders.quad_grad.proj, pass->projection_matrix, &box);
-	glUniform4fv(renderer->shaders.quad_grad.colors, fx_options->gradient.count, (GLfloat*)fx_options->gradient.colors);
-	glUniform1i(renderer->shaders.quad_grad.count, fx_options->gradient.count);
-	glUniform2f(renderer->shaders.quad_grad.size, fx_options->gradient.range.width, fx_options->gradient.range.height);
-	glUniform1f(renderer->shaders.quad_grad.degree, fx_options->gradient.degree);
-	glUniform1f(renderer->shaders.quad_grad.linear, fx_options->gradient.linear);
-	glUniform1f(renderer->shaders.quad_grad.blend, fx_options->gradient.blend);
-	glUniform2f(renderer->shaders.quad_grad.grad_box, fx_options->gradient.range.x, fx_options->gradient.range.y);
-	glUniform2f(renderer->shaders.quad_grad.origin, fx_options->gradient.origin[0], fx_options->gradient.origin[1]);
+	set_proj_matrix(shader.proj, pass->projection_matrix, &box);
+	glUniform4fv(shader.colors, fx_options->gradient.count, (GLfloat*)fx_options->gradient.colors);
+	glUniform1i(shader.count, fx_options->gradient.count);
+	glUniform2f(shader.size, fx_options->gradient.range.width, fx_options->gradient.range.height);
+	glUniform1f(shader.degree, fx_options->gradient.degree);
+	glUniform1f(shader.linear, fx_options->gradient.linear);
+	glUniform1f(shader.blend, fx_options->gradient.blend);
+	glUniform2f(shader.grad_box, fx_options->gradient.range.x, fx_options->gradient.range.y);
+	glUniform2f(shader.origin, fx_options->gradient.origin[0], fx_options->gradient.origin[1]);
 
-	render(&box, options->clip, renderer->shaders.quad_grad.pos_attrib);
+	render(&box, options->clip, shader.pos_attrib);
 
-	pop_fx_debug(renderer);
+	pop_fx_debug(fx_renderer);
 	TRACY_BOTH_ZONES_END;
 }
 
@@ -617,10 +529,10 @@ void fx_render_pass_add_rounded_rect(struct fx_gles_render_pass *pass,
 	const struct wlr_render_rect_options *options = &fx_options->base;
 
 	struct wlr_box box;
-	wlr_render_rect_options_get_box(options, pass->buffer->buffer, &box);
+	wlr_render_rect_options_get_box(options, pass->fx_buffer->wlr_buffer, &box);
 	assert(box.width > 0 && box.height > 0);
 
-	struct fx_renderer *renderer = pass->buffer->renderer;
+	struct fx_renderer *fx_renderer = pass->fx_renderer;
 
 	const struct wlr_render_color *color = &options->color;
 
@@ -635,7 +547,7 @@ void fx_render_pass_add_rounded_rect(struct fx_gles_render_pass *pass,
 	struct fx_corner_fradii clipped_region_corners = fx_options->clipped_region.corners;
 	apply_clip_region(&clip_region, &clipped_region_box, &clipped_region_corners);
 
-	TRACY_BOTH_ZONES_START(renderer);
+	TRACY_BOTH_ZONES_START(fx_renderer);
 	TRACY_ZONE_TEXT_f("Box (WxH, X, Y): %dx%d, %d, %d", box.width, box.height, box.x, box.y);
 	TRACY_ZONE_TEXT_f("Clip Box (WxH, X, Y): %dx%d, %d, %d",
 			clipped_region_box.width, clipped_region_box.height,
@@ -651,12 +563,11 @@ void fx_render_pass_add_rounded_rect(struct fx_gles_render_pass *pass,
 			clipped_region_corners.top_right,
 			clipped_region_corners.bottom_left,
 			clipped_region_corners.bottom_right);
-	push_fx_debug(renderer);
+	push_fx_debug(fx_renderer);
 
 	setup_blending(WLR_RENDER_BLEND_MODE_PREMULTIPLIED);
 
-	struct quad_round_shader shader = renderer->shaders.quad_round;
-
+	struct quad_round_shader shader = fx_renderer->shaders.quad_round;
 	glUseProgram(shader.program);
 
 	set_proj_matrix(shader.proj, pass->projection_matrix, &box);
@@ -671,10 +582,10 @@ void fx_render_pass_add_rounded_rect(struct fx_gles_render_pass *pass,
 	struct fx_corner_fradii corners = fx_options->corners;
 	uniform_corner_radii_set(&shader.radius, &corners);
 
-	render(&box, &clip_region, renderer->shaders.quad_round.pos_attrib);
+	render(&box, &clip_region, shader.pos_attrib);
 	pixman_region32_fini(&clip_region);
 
-	pop_fx_debug(renderer);
+	pop_fx_debug(fx_renderer);
 	TRACY_BOTH_ZONES_END;
 }
 
@@ -682,20 +593,20 @@ void fx_render_pass_add_rounded_rect_grad(struct fx_gles_render_pass *pass,
 		const struct fx_render_rounded_rect_grad_options *fx_options) {
 	const struct wlr_render_rect_options *options = &fx_options->base;
 
-	struct fx_renderer *renderer = pass->buffer->renderer;
+	struct fx_renderer *fx_renderer = pass->fx_renderer;
 
-	if (renderer->shaders.quad_grad_round.max_len <= fx_options->gradient.count) {
-		glDeleteProgram(renderer->shaders.quad_grad_round.program);
-		if (!link_quad_grad_round_program(&renderer->shaders.quad_grad_round, fx_options->gradient.count + 1)) {
-			wlr_log(WLR_ERROR, "Could not link quad shader after updating max_len to %d. Aborting renderer", fx_options->gradient.count + 1);
+	if (fx_renderer->shaders.quad_grad_round.max_len <= fx_options->gradient.count) {
+		glDeleteProgram(fx_renderer->shaders.quad_grad_round.program);
+		if (!link_quad_grad_round_program(&fx_renderer->shaders.quad_grad_round, fx_options->gradient.count + 1)) {
+			wlr_log(WLR_ERROR, "Could not link quad shader after updating max_len to %d. Aborting fx_renderer", fx_options->gradient.count + 1);
 			abort();
 		}
 	}
 
 	struct wlr_box box;
-	wlr_render_rect_options_get_box(options, pass->buffer->buffer, &box);
+	wlr_render_rect_options_get_box(options, pass->fx_buffer->wlr_buffer, &box);
 
-	TRACY_BOTH_ZONES_START(renderer);
+	TRACY_BOTH_ZONES_START(fx_renderer);
 	TRACY_ZONE_TEXT_f("Box (WxH, X, Y): %dx%d, %d, %d", box.width, box.height, box.x, box.y);
 	TRACY_ZONE_TEXT_f("Corners (TL, TR, BL, BR): %f, %f, %f, %f",
 			fx_options->corners.top_left,
@@ -716,11 +627,11 @@ void fx_render_pass_add_rounded_rect_grad(struct fx_gles_render_pass *pass,
 			fx_options->gradient.range.width, fx_options->gradient.range.height,
 			fx_options->gradient.range.x, fx_options->gradient.range.y);
 	// TODO: Display Colors (not really sure how it works without a scene example...)
-	push_fx_debug(renderer);
+	push_fx_debug(fx_renderer);
 
 	setup_blending(WLR_RENDER_BLEND_MODE_PREMULTIPLIED);
 
-	struct quad_grad_round_shader shader = renderer->shaders.quad_grad_round;
+	struct quad_grad_round_shader shader = fx_renderer->shaders.quad_grad_round;
 	glUseProgram(shader.program);
 
 	set_proj_matrix(shader.proj, pass->projection_matrix, &box);
@@ -742,13 +653,13 @@ void fx_render_pass_add_rounded_rect_grad(struct fx_gles_render_pass *pass,
 
 	render(&box, options->clip, shader.pos_attrib);
 
-	pop_fx_debug(renderer);
+	pop_fx_debug(fx_renderer);
 	TRACY_BOTH_ZONES_END;
 }
 
 void fx_render_pass_add_box_shadow(struct fx_gles_render_pass *pass,
 		const struct fx_render_box_shadow_options *options) {
-	struct fx_renderer *renderer = pass->buffer->renderer;
+	struct fx_renderer *fx_renderer = pass->fx_renderer;
 
 	struct wlr_box box = options->box;
 	assert(box.width > 0 && box.height > 0);
@@ -764,7 +675,7 @@ void fx_render_pass_add_box_shadow(struct fx_gles_render_pass *pass,
 	struct fx_corner_fradii clipped_region_corners = options->clipped_region.corners;
 	apply_clip_region(&clip_region, &clipped_region_box, &clipped_region_corners);
 
-	TRACY_BOTH_ZONES_START(renderer);
+	TRACY_BOTH_ZONES_START(fx_renderer);
 	TRACY_ZONE_TEXT_f("Box (WxH, X, Y): %dx%d, %d, %d", box.width, box.height, box.x, box.y);
 	TRACY_ZONE_TEXT_f("Clip Box (WxH, X, Y): %dx%d, %d, %d",
 			clipped_region_box.width, clipped_region_box.height,
@@ -778,34 +689,35 @@ void fx_render_pass_add_box_shadow(struct fx_gles_render_pass *pass,
 	TRACY_ZONE_TEXT_f("\tColor RGBA: %f, %f, %f, %f",
 			options->color.r, options->color.g, options->color.b, options->color.a);
 	TRACY_ZONE_TEXT_f("\tBlur Sigma: %f", options->blur_sigma);
-	push_fx_debug(renderer);
+	push_fx_debug(fx_renderer);
 
 	// blending will practically always be needed (unless we have a madman
 	// who uses opaque shadows with zero sigma), so just enable it
 	setup_blending(WLR_RENDER_BLEND_MODE_PREMULTIPLIED);
 	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
-	glUseProgram(renderer->shaders.box_shadow.program);
+	struct box_shadow_shader shader = fx_renderer->shaders.box_shadow;
+	glUseProgram(shader.program);
 
 	const struct wlr_render_color *color = &options->color;
-	set_proj_matrix(renderer->shaders.box_shadow.proj, pass->projection_matrix, &box);
-	glUniform4f(renderer->shaders.box_shadow.color, color->r, color->g, color->b, color->a);
-	glUniform1f(renderer->shaders.box_shadow.blur_sigma, options->blur_sigma);
-	glUniform2f(renderer->shaders.box_shadow.size, box.width, box.height);
-	glUniform2f(renderer->shaders.box_shadow.position, box.x, box.y);
-	glUniform1f(renderer->shaders.box_shadow.corner_radius, options->corner_radius);
+	set_proj_matrix(shader.proj, pass->projection_matrix, &box);
+	glUniform4f(shader.color, color->r, color->g, color->b, color->a);
+	glUniform1f(shader.blur_sigma, options->blur_sigma);
+	glUniform2f(shader.size, box.width, box.height);
+	glUniform2f(shader.position, box.x, box.y);
+	glUniform1f(shader.corner_radius, options->corner_radius);
 
-	uniform_corner_radii_set(&renderer->shaders.box_shadow.clip_radius, &clipped_region_corners);
+	uniform_corner_radii_set(&shader.clip_radius, &clipped_region_corners);
 
-	glUniform2f(renderer->shaders.box_shadow.clip_position, clipped_region_box.x, clipped_region_box.y);
-	glUniform2f(renderer->shaders.box_shadow.clip_size, clipped_region_box.width, clipped_region_box.height);
+	glUniform2f(shader.clip_position, clipped_region_box.x, clipped_region_box.y);
+	glUniform2f(shader.clip_size, clipped_region_box.width, clipped_region_box.height);
 
-	render(&box, &clip_region, renderer->shaders.box_shadow.pos_attrib);
+	render(&box, &clip_region, shader.pos_attrib);
 	pixman_region32_fini(&clip_region);
 
 	glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
 
-	pop_fx_debug(renderer);
+	pop_fx_debug(fx_renderer);
 	TRACY_BOTH_ZONES_END;
 }
 
@@ -814,22 +726,24 @@ static void render_blur_segments(struct fx_gles_render_pass *pass,
 		struct fx_render_blur_pass_options *fx_options, struct blur_shader* shader) {
 	struct fx_render_texture_options *tex_options = &fx_options->tex_options;
 	struct wlr_render_texture_options *options = &tex_options->base;
-	struct fx_renderer *renderer = pass->buffer->renderer;
+	struct fx_renderer *fx_renderer = pass->fx_renderer;
 	struct blur_data *blur_data = fx_options->blur_data;
 
-	TRACY_BOTH_ZONES_START(renderer);
-	push_fx_debug(renderer);
+	TRACY_BOTH_ZONES_START(fx_renderer);
+	push_fx_debug(fx_renderer);
 
 	// Swap fbo
 	if (fx_options->current_buffer == pass->fx_offscreen_buffers->effects_buffer) {
-		fx_framebuffer_bind(pass->fx_offscreen_buffers->effects_buffer_swapped);
+		glBindFramebuffer(GL_FRAMEBUFFER, pass->fx_offscreen_buffers->effects_buffer_swapped->fbo);
 	} else {
-		fx_framebuffer_bind(pass->fx_offscreen_buffers->effects_buffer);
+		glBindFramebuffer(GL_FRAMEBUFFER, pass->fx_offscreen_buffers->effects_buffer->fbo);
 	}
 
-	options->texture = fx_texture_from_buffer(&renderer->wlr_renderer,
-			fx_options->current_buffer->buffer);
-	struct fx_texture *texture = fx_get_texture(options->texture);
+	options->texture = wlr_texture_from_buffer(fx_renderer->wlr_renderer,
+			fx_options->current_buffer->wlr_buffer);
+
+	struct wlr_gles2_texture_attribs attribs;
+	wlr_gles2_texture_get_attribs(options->texture, &attribs);
 
 	/*
 	 * Render
@@ -850,12 +764,12 @@ static void render_blur_segments(struct fx_gles_render_pass *pass,
 	glUseProgram(shader->program);
 
 	glActiveTexture(GL_TEXTURE0);
-	glBindTexture(texture->target, texture->tex);
+	glBindTexture(attribs.target, attribs.tex);
 
 	switch (options->filter_mode) {
 	case WLR_SCALE_FILTER_BILINEAR:
-		glTexParameteri(texture->target, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-		glTexParameteri(texture->target, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+		glTexParameteri(attribs.target, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+		glTexParameteri(attribs.target, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 		break;
 	case WLR_SCALE_FILTER_NEAREST:
 		abort();
@@ -864,7 +778,7 @@ static void render_blur_segments(struct fx_gles_render_pass *pass,
 	glUniform1i(shader->tex, 0);
 	glUniform1f(shader->radius, blur_data->radius);
 
-	if (shader == &renderer->shaders.blur1) {
+	if (shader == &fx_renderer->shaders.blur1) {
 		glUniform2f(shader->halfpixel,
 				0.5f / (options->texture->width / 2.0f),
 				0.5f / (options->texture->height / 2.0f));
@@ -879,8 +793,8 @@ static void render_blur_segments(struct fx_gles_render_pass *pass,
 
 	render(&dst_box, options->clip, shader->pos_attrib);
 
-	glBindTexture(texture->target, 0);
-	pop_fx_debug(renderer);
+	glBindTexture(attribs.target, 0);
+	pop_fx_debug(fx_renderer);
 	TRACY_BOTH_ZONES_END;
 
 	wlr_texture_destroy(options->texture);
@@ -897,11 +811,13 @@ static void render_blur_effects(struct fx_gles_render_pass *pass,
 		struct fx_render_blur_pass_options *fx_options) {
 	struct fx_render_texture_options *tex_options = &fx_options->tex_options;
 	struct wlr_render_texture_options *options = &tex_options->base;
-	struct fx_renderer *renderer = pass->buffer->renderer;
+	struct fx_renderer *fx_renderer = pass->fx_renderer;
 	struct blur_data *blur_data = fx_options->blur_data;
-	struct fx_texture *texture = fx_get_texture(options->texture);
 
-	struct blur_effects_shader shader = renderer->shaders.blur_effects;
+	struct wlr_gles2_texture_attribs attribs;
+	wlr_gles2_texture_get_attribs(options->texture, &attribs);
+
+	struct blur_effects_shader shader = fx_renderer->shaders.blur_effects;
 
 	struct wlr_box dst_box;
 	struct wlr_fbox src_fbox;
@@ -916,18 +832,18 @@ static void render_blur_effects(struct fx_gles_render_pass *pass,
 	glDisable(GL_BLEND);
 	glDisable(GL_STENCIL_TEST);
 
-	TRACY_BOTH_ZONES_START(renderer);
-	push_fx_debug(renderer);
+	TRACY_BOTH_ZONES_START(fx_renderer);
+	push_fx_debug(fx_renderer);
 
 	glUseProgram(shader.program);
 
 	glActiveTexture(GL_TEXTURE0);
-	glBindTexture(texture->target, texture->tex);
+	glBindTexture(attribs.target, attribs.tex);
 
 	switch (options->filter_mode) {
 	case WLR_SCALE_FILTER_BILINEAR:
-		glTexParameteri(texture->target, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-		glTexParameteri(texture->target, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+		glTexParameteri(attribs.target, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+		glTexParameteri(attribs.target, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 		break;
 	case WLR_SCALE_FILTER_NEAREST:
 		abort();
@@ -944,9 +860,9 @@ static void render_blur_effects(struct fx_gles_render_pass *pass,
 
 	render(&dst_box, options->clip, shader.pos_attrib);
 
-	glBindTexture(texture->target, 0);
+	glBindTexture(attribs.target, 0);
 
-	pop_fx_debug(renderer);
+	pop_fx_debug(fx_renderer);
 	TRACY_BOTH_ZONES_END;
 
 	wlr_texture_destroy(options->texture);
@@ -961,10 +877,10 @@ static struct fx_framebuffer *get_main_buffer_blur(struct fx_gles_render_pass *p
 		return NULL;
 	}
 
-	struct fx_renderer *renderer = pass->buffer->renderer;
+	struct fx_renderer *fx_renderer = pass->fx_renderer;
 	struct wlr_box buffer_bounds = {
 		0, 0,
-		fx_options->current_buffer->buffer->width, fx_options->current_buffer->buffer->height
+		fx_options->current_buffer->wlr_buffer->width, fx_options->current_buffer->wlr_buffer->height
 	};
 
 	// We don't want to affect the reference blur_data
@@ -999,7 +915,7 @@ static struct fx_framebuffer *get_main_buffer_blur(struct fx_gles_render_pass *p
 	// Artifacts with NEAREST filter
 	fx_options->tex_options.base.filter_mode = WLR_SCALE_FILTER_BILINEAR;
 
-	TRACY_BOTH_ZONES_START(renderer);
+	TRACY_BOTH_ZONES_START(fx_renderer);
 	TRACY_ZONE_TEXT_f("dst_box (WxH, X, Y): %dx%d, %d, %d",
 			fx_options->tex_options.base.dst_box.width,
 			fx_options->tex_options.base.dst_box.height,
@@ -1030,19 +946,19 @@ static struct fx_framebuffer *get_main_buffer_blur(struct fx_gles_render_pass *p
 	TRACY_ZONE_TEXT_f("\tContrast: %f", fx_options->blur_data->contrast);
 	TRACY_ZONE_TEXT_f("\tNoise: %f", fx_options->blur_data->noise);
 	TRACY_ZONE_TEXT_f("\tSaturation: %f", fx_options->blur_data->saturation);
-	push_fx_debug(renderer);
+	push_fx_debug(fx_renderer);
 
 	// Downscale
 	for (int i = 0; i < blur_data.num_passes; ++i) {
 		wlr_region_scale(&scaled_damage, &damage, 1.0f / (1 << (i + 1)));
-		render_blur_segments(pass, fx_options, &renderer->shaders.blur1);
+		render_blur_segments(pass, fx_options, &fx_renderer->shaders.blur1);
 	}
 
 	// Upscale
 	for (int i = blur_data.num_passes - 1; i >= 0; --i) {
 		// when upsampling we make the region twice as big
 		wlr_region_scale(&scaled_damage, &damage, 1.0f / (1 << i));
-		render_blur_segments(pass, fx_options, &renderer->shaders.blur2);
+		render_blur_segments(pass, fx_options, &fx_renderer->shaders.blur2);
 	}
 
 	pixman_region32_fini(&scaled_damage);
@@ -1051,13 +967,13 @@ static struct fx_framebuffer *get_main_buffer_blur(struct fx_gles_render_pass *p
 	if (blur_data_should_parameters_blur_effects(&blur_data)
 			&& pixman_region32_not_empty(&damage)) {
 		if (fx_options->current_buffer == pass->fx_offscreen_buffers->effects_buffer) {
-			fx_framebuffer_bind(pass->fx_offscreen_buffers->effects_buffer_swapped);
+			glBindFramebuffer(GL_FRAMEBUFFER, pass->fx_offscreen_buffers->effects_buffer_swapped->fbo);
 		} else {
-			fx_framebuffer_bind(pass->fx_offscreen_buffers->effects_buffer);
+			glBindFramebuffer(GL_FRAMEBUFFER, pass->fx_offscreen_buffers->effects_buffer->fbo);
 		}
 		fx_options->tex_options.base.clip = &damage;
-		fx_options->tex_options.base.texture = fx_texture_from_buffer(
-				&renderer->wlr_renderer, fx_options->current_buffer->buffer);
+		fx_options->tex_options.base.texture = wlr_texture_from_buffer(
+				fx_renderer->wlr_renderer, fx_options->current_buffer->wlr_buffer);
 		render_blur_effects(pass, fx_options);
 		if (fx_options->current_buffer != pass->fx_offscreen_buffers->effects_buffer) {
 			fx_options->current_buffer = pass->fx_offscreen_buffers->effects_buffer;
@@ -1069,9 +985,9 @@ static struct fx_framebuffer *get_main_buffer_blur(struct fx_gles_render_pass *p
 	pixman_region32_fini(&damage);
 
 	// Bind back to the default buffer
-	fx_framebuffer_bind(pass->buffer);
+	fx_framebuffer_bind(pass->fx_buffer);
 
-	pop_fx_debug(renderer);
+	pop_fx_debug(fx_renderer);
 	TRACY_BOTH_ZONES_END;
 
 	return fx_options->current_buffer;
@@ -1084,11 +1000,11 @@ void fx_render_pass_add_blur(struct fx_gles_render_pass *pass,
 		return;
 	}
 
-	struct fx_renderer *renderer = pass->buffer->renderer;
+	struct fx_renderer *fx_renderer = pass->fx_renderer;
 	struct fx_render_texture_options *tex_options = &fx_options->tex_options;
 
-	TRACY_BOTH_ZONES_START(renderer);
-	push_fx_debug(renderer);
+	TRACY_BOTH_ZONES_START(fx_renderer);
+	push_fx_debug(fx_renderer);
 
 	const bool has_strength = fx_options->blur_strength < 1.0;
 	struct fx_framebuffer *buffer = pass->fx_offscreen_buffers->optimized_blur_buffer;
@@ -1103,16 +1019,17 @@ void fx_render_pass_add_blur(struct fx_gles_render_pass *pass,
 			// Isn't as efficient as just using the optimized blur buffer
 			blur_options.current_buffer = pass->fx_offscreen_buffers->optimized_no_blur_buffer;
 		} else {
-			blur_options.current_buffer = pass->buffer;
+			blur_options.current_buffer = pass->fx_buffer;
 		}
 		buffer = get_main_buffer_blur(pass, &blur_options);
 	}
 	if (!buffer) {
 		goto finish;
 	}
-	struct wlr_texture *wlr_texture =
-		fx_texture_from_buffer(&renderer->wlr_renderer, buffer->buffer);
-	struct fx_texture *blur_texture = fx_get_texture(wlr_texture);
+	struct wlr_texture *blur_texture =
+		wlr_texture_from_buffer(fx_renderer->wlr_renderer, buffer->wlr_buffer);
+	struct wlr_gles2_texture_attribs attribs;
+	wlr_gles2_texture_get_attribs(blur_texture, &attribs);
 
 	// Get a stencil of the window ignoring transparent regions
 	if (fx_options->ignore_transparent && fx_options->tex_options.base.texture) {
@@ -1130,22 +1047,22 @@ void fx_render_pass_add_blur(struct fx_gles_render_pass *pass,
 	tex_options->base.dst_box = (struct wlr_box) {
 		.x = 0,
 		.y = 0,
-		.width = buffer->buffer->width,
-		.height = buffer->buffer->height,
+		.width = buffer->wlr_buffer->width,
+		.height = buffer->wlr_buffer->height,
 	};
 	tex_options->base.src_box = (struct wlr_fbox) {
 		.x = 0,
 		.y = 0,
-		.width = buffer->buffer->width,
-		.height = buffer->buffer->height,
+		.width = buffer->wlr_buffer->width,
+		.height = buffer->wlr_buffer->height,
 	};
-	tex_options->base.texture = &blur_texture->wlr_texture;
+	tex_options->base.texture = blur_texture;
 	// since we're capturing from the fbo, transform will always be normal
 	tex_options->base.transform = WL_OUTPUT_TRANSFORM_NORMAL;
 	tex_options->clipped_region = fx_options->clipped_region;
 	fx_render_pass_add_texture(pass, tex_options);
 
-	wlr_texture_destroy(&blur_texture->wlr_texture);
+	wlr_texture_destroy(blur_texture);
 
 	// Finish stenciling
 	if (fx_options->ignore_transparent && fx_options->tex_options.base.texture) {
@@ -1153,7 +1070,7 @@ void fx_render_pass_add_blur(struct fx_gles_render_pass *pass,
 	}
 
 finish:
-	pop_fx_debug(renderer);
+	pop_fx_debug(fx_renderer);
 	TRACY_BOTH_ZONES_END;
 }
 
@@ -1163,10 +1080,10 @@ bool fx_render_pass_add_optimized_blur(struct fx_gles_render_pass *pass,
 		wlr_log(WLR_ERROR, "FX Pass offscreen buffers not initialized. Skipping optimized blur...");
 		return false;
 	}
-	struct fx_renderer *renderer = pass->buffer->renderer;
+	struct fx_renderer *fx_renderer = pass->fx_renderer;
 	struct wlr_box dst_box = fx_options->tex_options.base.dst_box;
 
-	TRACY_BOTH_ZONES_START(renderer);
+	TRACY_BOTH_ZONES_START(fx_renderer);
 	TRACY_ZONE_TEXT_f("dst_box (WxH, X, Y): %dx%d, %d, %d",
 			fx_options->tex_options.base.dst_box.width,
 			fx_options->tex_options.base.dst_box.height,
@@ -1192,7 +1109,7 @@ bool fx_render_pass_add_optimized_blur(struct fx_gles_render_pass *pass,
 	TRACY_ZONE_TEXT_f("\tContrast: %f", fx_options->blur_data->contrast);
 	TRACY_ZONE_TEXT_f("\tNoise: %f", fx_options->blur_data->noise);
 	TRACY_ZONE_TEXT_f("\tSaturation: %f", fx_options->blur_data->saturation);
-	push_fx_debug(renderer);
+	push_fx_debug(fx_renderer);
 
 	pixman_region32_t clip;
 	pixman_region32_init_rect(&clip,
@@ -1200,7 +1117,7 @@ bool fx_render_pass_add_optimized_blur(struct fx_gles_render_pass *pass,
 
 	// Render the blur into its own buffer
 	struct fx_render_blur_pass_options blur_options = *fx_options;
-	blur_options.current_buffer = pass->buffer;
+	blur_options.current_buffer = pass->fx_buffer;
 	blur_options.tex_options.base.clip = &clip;
 	struct fx_framebuffer *fx_buffer = get_main_buffer_blur(pass, &blur_options);
 	if (fx_buffer != NULL) {
@@ -1210,12 +1127,12 @@ bool fx_render_pass_add_optimized_blur(struct fx_gles_render_pass *pass,
 
 		// Save the current scene pass state
 		fx_render_pass_read_to_buffer(pass, &clip,
-				pass->fx_offscreen_buffers->optimized_no_blur_buffer, pass->buffer);
+				pass->fx_offscreen_buffers->optimized_no_blur_buffer, pass->fx_buffer);
 	}
 
 	pixman_region32_fini(&clip);
 
-	pop_fx_debug(renderer);
+	pop_fx_debug(fx_renderer);
 	TRACY_BOTH_ZONES_END;
 	return fx_buffer != NULL;
 }
@@ -1226,21 +1143,21 @@ void fx_render_pass_read_to_buffer(struct fx_gles_render_pass *pass,
 	if (!_region || !pixman_region32_not_empty(_region)) {
 		return;
 	}
-	TRACY_BOTH_ZONES_START(pass->buffer->renderer);
+	TRACY_BOTH_ZONES_START(pass->fx_renderer);
 
 	pixman_region32_t region;
 	pixman_region32_init(&region);
 	pixman_region32_copy(&region, _region);
 
 	struct wlr_texture *src_tex =
-		fx_texture_from_buffer(&pass->buffer->renderer->wlr_renderer, src_buffer->buffer);
+		wlr_texture_from_buffer(pass->fx_renderer->wlr_renderer, src_buffer->wlr_buffer);
 	if (src_tex == NULL) {
 		goto done;
 	}
 
 	// Draw onto the dst_buffer
-	fx_framebuffer_bind(dst_buffer);
-	wlr_render_pass_add_texture(&pass->base, &(struct wlr_render_texture_options) {
+	glBindFramebuffer(GL_FRAMEBUFFER, dst_buffer->fbo);
+	wlr_render_pass_add_texture(pass->base, &(struct wlr_render_texture_options) {
 		.texture = src_tex,
 		.clip = &region,
 		.transform = WL_OUTPUT_TRANSFORM_NORMAL,
@@ -1248,89 +1165,23 @@ void fx_render_pass_read_to_buffer(struct fx_gles_render_pass *pass,
 		.dst_box = (struct wlr_box){
 			.x = 0,
 			.y = 0,
-			.width = dst_buffer->buffer->width,
-			.height = dst_buffer->buffer->height,
+			.width = dst_buffer->wlr_buffer->width,
+			.height = dst_buffer->wlr_buffer->height,
 		},
 		.src_box = (struct wlr_fbox){
 			.x = 0,
 			.y = 0,
-			.width = src_buffer->buffer->width,
-			.height = src_buffer->buffer->height,
+			.width = src_buffer->wlr_buffer->width,
+			.height = src_buffer->wlr_buffer->height,
 		},
 	});
 	wlr_texture_destroy(src_tex);
 
 	// Bind back to the main WLR buffer
-	fx_framebuffer_bind(pass->buffer);
+	fx_framebuffer_bind(pass->fx_buffer);
 
 done:
 	TRACY_BOTH_ZONES_END;
 
 	pixman_region32_fini(&region);
-}
-
-static const char *reset_status_str(GLenum status) {
-	switch (status) {
-	case GL_GUILTY_CONTEXT_RESET_KHR:
-		return "guilty";
-	case GL_INNOCENT_CONTEXT_RESET_KHR:
-		return "innocent";
-	case GL_UNKNOWN_CONTEXT_RESET_KHR:
-		return "unknown";
-	default:
-		return "<invalid>";
-	}
-}
-
-struct fx_gles_render_pass *fx_begin_buffer_pass(struct fx_framebuffer *buffer,
-		struct wlr_egl_context *prev_ctx, struct fx_render_timer *timer,
-		struct wlr_drm_syncobj_timeline *signal_timeline, uint64_t signal_point) {
-	struct fx_renderer *renderer = buffer->renderer;
-	struct wlr_buffer *wlr_buffer = buffer->buffer;
-
-	if (renderer->procs.glGetGraphicsResetStatusKHR) {
-		GLenum status = renderer->procs.glGetGraphicsResetStatusKHR();
-		if (status != GL_NO_ERROR) {
-			wlr_log(WLR_ERROR, "GPU reset (%s)", reset_status_str(status));
-			wl_signal_emit_mutable(&renderer->wlr_renderer.events.lost, NULL);
-			return NULL;
-		}
-	}
-
-	GLint fbo = fx_framebuffer_get_fbo(buffer);
-	if (!fbo) {
-		return NULL;
-	}
-
-	struct fx_gles_render_pass *pass = calloc(1, sizeof(*pass));
-	if (pass == NULL) {
-		return NULL;
-	}
-
-	wlr_render_pass_init(&pass->base, &render_pass_impl);
-	wlr_buffer_lock(wlr_buffer);
-	pass->buffer = buffer;
-	pass->timer = timer;
-	pass->prev_ctx = *prev_ctx;
-	if (signal_timeline != NULL) {
-		pass->signal_timeline = wlr_drm_syncobj_timeline_ref(signal_timeline);
-		pass->signal_point = signal_point;
-	}
-
-	pass->fx_offscreen_buffers = NULL;
-	pixman_region32_init(&pass->blur_padding_region);
-	pass->has_blur = false;
-
-	matrix_projection(pass->projection_matrix, wlr_buffer->width, wlr_buffer->height,
-		WL_OUTPUT_TRANSFORM_FLIPPED_180);
-
-	push_fx_debug(renderer);
-	glBindFramebuffer(GL_FRAMEBUFFER, fbo);
-
-	glViewport(0, 0, wlr_buffer->width, wlr_buffer->height);
-	glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
-	glDisable(GL_SCISSOR_TEST);
-
-	pop_fx_debug(renderer);
-	return pass;
 }

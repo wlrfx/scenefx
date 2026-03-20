@@ -6,14 +6,12 @@ elif 'auto' in renderers and get_option('auto_features').disabled()
 endif
 
 scenefx_files += files(
-	'util.c',
 	'tracy.c',
 	'shaders.c',
 	'pixel_format.c',
 	'fx_pass.c',
 	'fx_framebuffer.c',
 	'fx_offscreen_buffers.c',
-	'fx_texture.c',
 	'fx_renderer.c',
 )
 

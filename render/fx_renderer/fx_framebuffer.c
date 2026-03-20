@@ -96,12 +96,7 @@ void fx_framebuffer_get_or_create_custom(struct fx_renderer *fx_renderer,
 
 	struct wlr_renderer *wlr_renderer = fx_renderer->wlr_renderer;
 
-	// Get the best supported DRM format (DMABUF if supported)
-	const struct wlr_drm_format_set *texture_formats = wlr_renderer_get_texture_formats(
-			wlr_renderer, wlr_renderer->render_buffer_caps);
-	const struct fx_pixel_format *pix_format =
-		get_fx_format_from_gl(GL_RGBA, GL_UNSIGNED_BYTE, has_alpha);
-	const struct wlr_drm_format *format = wlr_drm_format_set_get(texture_formats, pix_format->drm_format);
+	const struct wlr_drm_format *format = find_wlr_drm_format(wlr_renderer, has_alpha);
 	if (format == NULL) {
 		wlr_log(WLR_ERROR, "Failed to get a supported texture format while allocating buffer");
 		*failed = true;

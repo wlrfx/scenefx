@@ -12,16 +12,8 @@
 
 struct fx_framebuffer;
 
-struct fx_pixel_format {
-	uint32_t drm_format;
-	// optional field, if empty then internalformat = format
-	GLint gl_internalformat;
-	GLint gl_format, gl_type;
-	bool has_alpha;
-};
-
-const struct fx_pixel_format *get_fx_format_from_drm(uint32_t fmt);
-const struct fx_pixel_format *get_fx_format_from_gl(GLint gl_format, GLint gl_type, bool alpha);
+/** Find the best supported DRM format */
+const struct wlr_drm_format *find_wlr_drm_format(struct wlr_renderer *wlr_renderer, bool alpha);
 
 ///
 /// fx_framebuffer

@@ -4,7 +4,7 @@
 #include <wlr/util/log.h>
 #include <scenefx/types/fx/clipped_region.h>
 
-#include "render/fx_renderer/shaders.h"
+#include "render/gles2/shaders.h"
 
 // shaders
 #include "GLES2/gl2.h"

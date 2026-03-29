@@ -8,17 +8,31 @@
 #endif  // TRACY_ENABLE
 
 #ifdef TRACY_ENABLE
+#include <assert.h>
 #include <tracy/TracyC.h>
 
 struct fx_renderer;
 
-struct tracy_data;
+#define QUERY_QUEUE_LEN (64 * 1024)
+struct tracy_data {
+	struct fx_renderer *fx_renderer;
+
+	uint8_t context_id;
+
+	struct {
+		uint32_t queries[QUERY_QUEUE_LEN];
+		uint32_t head;
+		uint32_t tail;
+	} queue;
+};
 struct tracy_gpu_zone_context {
 	struct tracy_data *tracy_data;
 	bool is_active;
 };
 
 // Private functions: Don't use these outside of this file!
+
+unsigned int tracy_get_next_query_index(struct tracy_data *tracy_data);
 
 void tracy_gpu_zone_begin(struct tracy_data *tracy_data, struct tracy_gpu_zone_context *out_ctx,
 		const int line, const char *source, const char *func, const char *name);

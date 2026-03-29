@@ -16,8 +16,8 @@
 #include <wlr/util/region.h>
 #include <wlr/util/transform.h>
 
+#include "render/fx_renderer.h"
 #include "render/tracy.h"
-#include "scenefx/render/fx_renderer/fx_offscreen_buffers.h"
 #include "scenefx/render/pass.h"
 #include "scenefx/types/fx/blur_data.h"
 #include "scenefx/types/fx/clipped_region.h"
@@ -433,7 +433,7 @@ struct render_data {
 	struct wlr_render_pass *render_pass;
 	pixman_region32_t damage;
 
-	struct fx_gles_render_pass *fx_pass;
+	struct fx_render_pass *fx_pass;
 };
 
 static void logical_to_buffer_coords(pixman_region32_t *region, const struct render_data *data,
@@ -2701,7 +2701,7 @@ bool wlr_scene_output_needs_frame(struct wlr_scene_output *scene_output) {
 }
 
 static bool should_blur_node_extend_damage(struct wlr_scene_node *node,
-		struct fx_gles_render_pass *fx_pass, struct blur_data *blur_data) {
+		struct fx_render_pass *fx_pass, struct blur_data *blur_data) {
 	switch (node->type) {
 	case WLR_SCENE_NODE_BLUR:;
 		struct wlr_scene_blur *blur_node = wlr_scene_blur_from_node(node);
@@ -3033,8 +3033,8 @@ bool wlr_scene_output_build_state(struct wlr_scene_output *scene_output,
 	wlr_damage_ring_rotate_buffer(&scene_output->damage_ring, buffer,
 		&render_data.damage);
 
-	struct fx_gles_render_pass *fx_pass =
-		fx_render_pass_init(scene_output->scene->fx_renderer, render_pass, buffer, output);
+	struct fx_render_pass *fx_pass =
+		fx_renderer_init_render_pass(scene_output->scene->fx_renderer, render_pass, buffer, output);
 	render_data.fx_pass = fx_pass;
 
 	bool should_compensate_blur = false;
@@ -3108,8 +3108,7 @@ bool wlr_scene_output_build_state(struct wlr_scene_output *scene_output,
 			// content would be included into the new blur. This means that
 			// content like a high z-index toplevel would be included into the
 			// blur of a toplevel with a low z-index.
-			fx_render_pass_read_to_buffer(fx_pass, &fx_pass->blur_padding_region,
-					fx_pass->fx_offscreen_buffers->blur_saved_pixels_buffer, fx_pass->fx_buffer);
+			fx_render_pass_save_blur_region(fx_pass, &fx_pass->blur_padding_region);
 		}
 
 		pixman_region32_fini(&blur_padding_region);
@@ -3201,8 +3200,7 @@ bool wlr_scene_output_build_state(struct wlr_scene_output *scene_output,
 
 	if (fx_pass && should_compensate_blur) {
 		// Render the saved pixels over the blur artifacts
-		fx_render_pass_read_to_buffer(fx_pass, &fx_pass->blur_padding_region,
-				fx_pass->fx_buffer, fx_pass->fx_offscreen_buffers->blur_saved_pixels_buffer);
+		fx_render_pass_apply_saved_blur_region(fx_pass, &fx_pass->blur_padding_region);
 	}
 
 	pixman_region32_fini(&render_data.damage);

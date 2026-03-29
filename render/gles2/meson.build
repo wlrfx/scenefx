@@ -6,13 +6,12 @@ elif 'auto' in renderers and get_option('auto_features').disabled()
 endif
 
 scenefx_files += files(
-	'tracy.c',
+	'buffer.c',
+	'egl.c',
+	'pass.c',
+	'renderer.c',
 	'shaders.c',
-	'pixel_format.c',
-	'fx_pass.c',
-	'fx_framebuffer.c',
-	'fx_offscreen_buffers.c',
-	'fx_renderer.c',
+	'tracy.c',
 )
 
 if 'gles2' in renderers or 'auto' in renderers
@@ -43,4 +42,3 @@ if 'gles2' in renderers or 'auto' in renderers
 	subdir('shaders')
 
 endif
-

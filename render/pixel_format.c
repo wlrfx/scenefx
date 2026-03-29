@@ -1,7 +1,8 @@
 #include <drm_fourcc.h>
+#include <wlr/render/drm_format_set.h>
 #include <wlr/render/wlr_renderer.h>
 
-#include "render/fx_renderer/fx_renderer.h"
+#include "render/fx_renderer.h"
 
 static const uint32_t formats_alpha[] = {
 	DRM_FORMAT_ARGB8888,

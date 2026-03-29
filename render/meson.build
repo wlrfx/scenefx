@@ -1,5 +1,9 @@
 scenefx_files += files(
-	'egl.c',
+	'fx_offscreen_buffers.c',
+	'fx_pass.c',
+	'fx_renderer.c',
+	'pixel_format.c',
+	'tracy.c',
 )
 
-subdir('fx_renderer')
+subdir('gles2')

@@ -12,23 +12,23 @@ static void addon_handle_destroy(struct wlr_addon *addon) {
 
 	// Make sure to free the buffers
 	if (fbos->optimized_blur_buffer != NULL) {
-		fx_framebuffer_destroy(fbos->optimized_blur_buffer);
+		wlr_buffer_drop(fbos->optimized_blur_buffer->buffer);
 		fbos->optimized_blur_buffer = NULL;
 	}
 	if (fbos->optimized_no_blur_buffer != NULL) {
-		fx_framebuffer_destroy(fbos->optimized_no_blur_buffer);
+		wlr_buffer_drop(fbos->optimized_no_blur_buffer->buffer);
 		fbos->optimized_no_blur_buffer = NULL;
 	}
 	if (fbos->blur_saved_pixels_buffer != NULL) {
-		fx_framebuffer_destroy(fbos->blur_saved_pixels_buffer);
+		wlr_buffer_drop(fbos->blur_saved_pixels_buffer->buffer);
 		fbos->blur_saved_pixels_buffer = NULL;
 	}
 	if (fbos->effects_buffer != NULL) {
-		fx_framebuffer_destroy(fbos->effects_buffer);
+		wlr_buffer_drop(fbos->effects_buffer->buffer);
 		fbos->effects_buffer = NULL;
 	}
 	if (fbos->effects_buffer_swapped != NULL) {
-		fx_framebuffer_destroy(fbos->effects_buffer_swapped);
+		wlr_buffer_drop(fbos->effects_buffer_swapped->buffer);
 		fbos->effects_buffer_swapped = NULL;
 	}
 

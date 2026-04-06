@@ -13,8 +13,7 @@ struct fx_render_pass *fx_renderer_init_render_pass(struct fx_renderer *fx_rende
 
 void fx_render_pass_init(struct fx_render_pass *render_pass,
 		const struct fx_render_pass_impl *impl, struct fx_renderer *fx_renderer,
-		struct wlr_render_pass *wlr_render_pass, struct wlr_buffer *wlr_buffer,
-		struct wlr_output *output) {
+		struct wlr_render_pass *wlr_render_pass) {
 	assert(impl->destroy);
 	*render_pass = (struct fx_render_pass) {
 		.fx_renderer = fx_renderer,

@@ -1190,7 +1190,7 @@ struct fx_render_pass *gles2_render_pass_init(struct fx_renderer *fx_renderer,
 		return NULL;
 	}
 
-	fx_render_pass_init(&pass->fx_render_pass, &render_pass_impl, fx_renderer, render_pass, wlr_buffer, output);
+	fx_render_pass_init(&pass->fx_render_pass, &render_pass_impl, fx_renderer, render_pass);
 
 	pass->gles2_renderer = gles2_get_renderer(fx_renderer);
 	pass->gles2_buffer = gles2_buffer_get_or_create(fx_renderer, wlr_buffer, true);

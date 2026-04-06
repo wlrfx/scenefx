@@ -118,6 +118,7 @@ struct fx_renderer_impl {
 struct fx_renderer {
 	struct wlr_renderer *wlr_renderer;
 
+	struct wlr_addon scene_addon;
 	const struct fx_renderer_impl *impl;
 
 #ifdef TRACY_ENABLE

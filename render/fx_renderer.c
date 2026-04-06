@@ -1,5 +1,4 @@
 #include <assert.h>
-#include <stdlib.h>
 #include <wlr/config.h>
 #if WLR_HAS_GLES2_RENDERER
 #include <wlr/render/gles2.h>
@@ -14,6 +13,16 @@
 #include "render/tracy.h"
 #include "scenefx/scenefx.h"
 
+static void scene_addon_handle_destroy(struct wlr_addon *addon) {
+	struct fx_renderer *fx_renderer = wl_container_of(addon, fx_renderer, scene_addon);
+	wlr_addon_finish(&fx_renderer->scene_addon);
+}
+
+static const struct wlr_addon_interface fx_renderer_scene_addon_impl = {
+	.name = "fx_renderer",
+	.destroy = scene_addon_handle_destroy,
+};
+
 static void handle_renderer_destroy(struct wl_listener *listener, void *data) {
 	struct fx_renderer *fx_renderer = wl_container_of(listener, fx_renderer, renderer_destroy);
 
@@ -22,6 +31,7 @@ static void handle_renderer_destroy(struct wl_listener *listener, void *data) {
 	TRACY_GPU_CONTEXT_DESTROY(fx_renderer->tracy_data);
 
 	wl_list_remove(&fx_renderer->renderer_destroy.link);
+	wlr_addon_finish(&fx_renderer->scene_addon);
 
 	struct fx_offscreen_buffers *offscreen_buffers, *offscreen_buffers_tmp;
 	wl_list_for_each_safe(offscreen_buffers, offscreen_buffers_tmp,
@@ -30,9 +40,6 @@ static void handle_renderer_destroy(struct wl_listener *listener, void *data) {
 	}
 
 	fx_renderer->impl->renderer_destroy(fx_renderer);
-
-	fx_renderer->wlr_renderer = NULL;
-	free(fx_renderer);
 }
 
 void fx_renderer_init(struct fx_renderer *fx_renderer,
@@ -72,8 +79,27 @@ struct wlr_renderer *fx_renderer_get_wlr_renderer(struct fx_renderer *fx_rendere
 	return fx_renderer->wlr_renderer;
 }
 
+struct fx_renderer *scenefx_find_fx_renderer(struct wlr_scene *scene,
+		struct wlr_renderer *wlr_renderer) {
+	if (scene == NULL) {
+		return NULL;
+	}
+
+	struct wlr_addon *addon = wlr_addon_find(&scene->tree.node.addons, wlr_renderer,
+			&fx_renderer_scene_addon_impl);
+	if (!addon) {
+		return NULL;
+	}
+
+	struct fx_renderer *fx_renderer = wl_container_of(addon, fx_renderer, scene_addon);
+	return fx_renderer;
+}
+
 struct fx_renderer *scenefx_init_complete(struct wlr_scene *wlr_scene, struct wlr_backend *backend) {
-	wlr_scene->fx_renderer = NULL;
+	if (wlr_scene == NULL) {
+		wlr_log(WLR_ERROR, "Could not initialize scenefx: wlr_scene is NULL");
+		return NULL;
+	}
 
 	struct wlr_renderer *wlr_renderer = wlr_renderer_autocreate(backend);
 	if (wlr_renderer == NULL) {
@@ -97,7 +123,10 @@ renderer_created:
 		return NULL;
 	}
 
-	wlr_scene->fx_renderer = fx_renderer;
+	// Add the fx_renderer to the wlr_scene addon set, but ensure that the
+	// wlr_renderer is the owner as there could be multiple fx_renderers.
+	wlr_addon_init(&fx_renderer->scene_addon, &wlr_scene->tree.node.addons,
+			wlr_renderer, &fx_renderer_scene_addon_impl);
 	return fx_renderer;
 }
 

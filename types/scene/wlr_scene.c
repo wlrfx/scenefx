@@ -19,6 +19,7 @@
 #include "render/fx_renderer.h"
 #include "render/tracy.h"
 #include "scenefx/render/pass.h"
+#include "scenefx/scenefx.h"
 #include "scenefx/types/fx/blur_data.h"
 #include "scenefx/types/fx/clipped_region.h"
 #include "scenefx/types/wlr_scene.h"
@@ -229,7 +230,6 @@ struct wlr_scene *wlr_scene_create(void) {
 	scene->highlight_transparent_region = env_parse_bool("WLR_SCENE_HIGHLIGHT_TRANSPARENT_REGION");
 
 	scene->blur_data = blur_data_get_default();
-	scene->fx_renderer = NULL;
 
 	return scene;
 }
@@ -3033,8 +3033,12 @@ bool wlr_scene_output_build_state(struct wlr_scene_output *scene_output,
 	wlr_damage_ring_rotate_buffer(&scene_output->damage_ring, buffer,
 		&render_data.damage);
 
-	struct fx_render_pass *fx_pass =
-		fx_renderer_init_render_pass(scene_output->scene->fx_renderer, render_pass, buffer, output);
+	struct fx_render_pass *fx_pass = NULL;
+	struct fx_renderer *fx_renderer = scenefx_find_fx_renderer(
+			scene_output->scene, output->renderer);
+	if (fx_renderer != NULL) {
+		fx_pass = fx_renderer_init_render_pass(fx_renderer, render_pass, buffer, output);
+	}
 	render_data.fx_pass = fx_pass;
 
 	bool should_compensate_blur = false;

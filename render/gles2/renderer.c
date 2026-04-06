@@ -174,6 +174,8 @@ static void renderer_destroy(struct fx_renderer *fx_renderer) {
 	free_shaders(gles2_renderer);
 
 	gles2_renderer->wlr_egl = NULL;
+
+	free(gles2_renderer);
 }
 
 static const struct fx_renderer_impl renderer_impl = {

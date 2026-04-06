@@ -5,7 +5,7 @@
 struct fx_render_pass *fx_renderer_init_render_pass(struct fx_renderer *fx_renderer,
 		struct wlr_render_pass *wlr_render_pass, struct wlr_buffer *wlr_buffer,
 		struct wlr_output *output) {
-	if (fx_renderer == NULL) {
+	if (fx_renderer == NULL || fx_renderer->wlr_renderer != output->renderer) {
 		return NULL;
 	}
 	return fx_renderer->impl->render_pass_allocate(fx_renderer, wlr_render_pass, wlr_buffer, output);

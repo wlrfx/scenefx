@@ -195,7 +195,7 @@ static void gles2_render_pass_read_to_buffer(struct fx_render_pass *fx_pass,
 	struct fx_renderer *fx_renderer = &pass->gles2_renderer->fx_renderer;
 	TRACY_BOTH_ZONES_START(fx_renderer);
 
-	struct gles2_buffer *dst_gles2_buffer = gles2_buffer_get_or_create(fx_renderer, dst_buffer);
+	struct gles2_buffer *dst_gles2_buffer = gles2_buffer_get_or_create(fx_renderer, dst_buffer, false);
 
 	pixman_region32_t region;
 	pixman_region32_init(&region);
@@ -1007,7 +1007,7 @@ static struct gles2_buffer *get_main_buffer_blur(struct gles2_render_pass *pass,
 	pop_fx_debug(gles2_renderer);
 	TRACY_BOTH_ZONES_END;
 
-	return gles2_buffer_get_or_create(fx_renderer, fx_options->current_buffer);
+	return gles2_buffer_get_or_create(fx_renderer, fx_options->current_buffer, false);
 }
 
 static void gles2_render_pass_add_blur(struct fx_render_pass *fx_pass,
@@ -1194,7 +1194,7 @@ struct fx_render_pass *gles2_render_pass_init(struct fx_renderer *fx_renderer,
 	fx_render_pass_init(&pass->fx_render_pass, &render_pass_impl, fx_renderer, render_pass, wlr_buffer, output);
 
 	pass->gles2_renderer = gles2_get_renderer(fx_renderer);
-	pass->gles2_buffer = gles2_buffer_get_or_create(fx_renderer, wlr_buffer);
+	pass->gles2_buffer = gles2_buffer_get_or_create(fx_renderer, wlr_buffer, true);
 	if (pass->gles2_buffer == NULL) {
 		free(pass);
 		return NULL;

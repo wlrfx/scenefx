@@ -27,7 +27,7 @@ struct gles2_buffer {
 };
 
 struct gles2_buffer *gles2_buffer_get_or_create(struct fx_renderer *fx_renderer,
-		struct wlr_buffer *wlr_buffer);
+		struct wlr_buffer *wlr_buffer, bool needs_stencil);
 void gles2_buffer_get_or_allocate(struct fx_renderer *fx_renderer,
 		struct wlr_allocator *allocator, int width, int height, bool has_alpha,
 		struct gles2_buffer **gles2_buffer, bool *failed);

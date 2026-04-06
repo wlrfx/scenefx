@@ -16,9 +16,11 @@ void gles2_buffer_destroy(struct gles2_buffer *buffer) {
 	wl_list_remove(&buffer->link);
 	wlr_addon_finish(&buffer->addon);
 
-	egl_ensure_current(buffer->gles2_renderer);
-	glDeleteRenderbuffers(1, &buffer->sb);
-	buffer->sb = 0;
+	if (buffer->sb != 0) {
+		egl_ensure_current(buffer->gles2_renderer);
+		glDeleteRenderbuffers(1, &buffer->sb);
+		buffer->sb = 0;
+	}
 
 	free(buffer);
 }
@@ -34,7 +36,7 @@ static const struct wlr_addon_interface buffer_addon_impl = {
 };
 
 static struct gles2_buffer *gles2_buffer_init(struct fx_renderer *fx_renderer,
-		struct wlr_buffer *wlr_buffer) {
+		struct wlr_buffer *wlr_buffer, bool needs_stencil) {
 	struct gles2_renderer *gles2_renderer = gles2_get_renderer(fx_renderer);
 
 	struct gles2_buffer *buffer = calloc(1, sizeof(*buffer));
@@ -52,21 +54,26 @@ static struct gles2_buffer *gles2_buffer_init(struct fx_renderer *fx_renderer,
 		return NULL;
 	}
 
-	// Init stencil buffer
-	glBindFramebuffer(GL_FRAMEBUFFER, buffer->fbo);
-	glGenRenderbuffers(1, &buffer->sb);
-	glBindRenderbuffer(GL_RENDERBUFFER, buffer->sb);
-	glRenderbufferStorage(GL_RENDERBUFFER, GL_STENCIL_INDEX8,
-			wlr_buffer->width, wlr_buffer->height);
-	glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_STENCIL_ATTACHMENT,
-			GL_RENDERBUFFER, buffer->sb);
-	GLenum fb_status = glCheckFramebufferStatus(GL_FRAMEBUFFER);
-	glBindFramebuffer(GL_FRAMEBUFFER, 0);
+	// Init stencil buffer if needed
+	buffer->sb = 0;
+	if (needs_stencil) {
+		glBindFramebuffer(GL_FRAMEBUFFER, buffer->fbo);
+		glGenRenderbuffers(1, &buffer->sb);
+		glBindRenderbuffer(GL_RENDERBUFFER, buffer->sb);
+		glRenderbufferStorage(GL_RENDERBUFFER, GL_STENCIL_INDEX8,
+				wlr_buffer->width, wlr_buffer->height);
+		glBindRenderbuffer(GL_RENDERBUFFER, 0);
+		glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_STENCIL_ATTACHMENT,
+				GL_RENDERBUFFER, buffer->sb);
+		GLenum fb_status = glCheckFramebufferStatus(GL_FRAMEBUFFER);
+		glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
-	if (fb_status != GL_FRAMEBUFFER_COMPLETE) {
-		wlr_log(WLR_ERROR, "Failed to create gles2_buffer stencil");
-		free(buffer);
-		return NULL;
+		if (fb_status != GL_FRAMEBUFFER_COMPLETE) {
+			wlr_log(WLR_ERROR, "Failed to create gles2_buffer stencil");
+			glDeleteRenderbuffers(1, &buffer->sb);
+			free(buffer);
+			return NULL;
+		}
 	}
 
 	wl_list_insert(&gles2_renderer->buffers, &buffer->link);
@@ -77,7 +84,7 @@ static struct gles2_buffer *gles2_buffer_init(struct fx_renderer *fx_renderer,
 }
 
 struct gles2_buffer *gles2_buffer_get_or_create(struct fx_renderer *fx_renderer,
-		struct wlr_buffer *wlr_buffer) {
+		struct wlr_buffer *wlr_buffer, bool needs_stencil) {
 	struct wlr_addon *addon =
 		wlr_addon_find(&wlr_buffer->addons, fx_renderer, &buffer_addon_impl);
 	if (addon) {
@@ -85,7 +92,7 @@ struct gles2_buffer *gles2_buffer_get_or_create(struct fx_renderer *fx_renderer,
 		return buffer;
 	}
 
-	struct gles2_buffer *buffer = gles2_buffer_init(fx_renderer, wlr_buffer);
+	struct gles2_buffer *buffer = gles2_buffer_init(fx_renderer, wlr_buffer, needs_stencil);
 	if (buffer == NULL) {
 		wlr_log_errno(WLR_ERROR, "Failed to create fx_framebuffer from impl");
 		return NULL;
@@ -135,7 +142,7 @@ void gles2_buffer_get_or_allocate(struct fx_renderer *fx_renderer,
 		return;
 	}
 
-	*gles2_buffer = gles2_buffer_get_or_create(fx_renderer, wlr_buffer);
+	*gles2_buffer = gles2_buffer_get_or_create(fx_renderer, wlr_buffer, false);
 	if (*gles2_buffer == NULL) {
 		wlr_log(WLR_ERROR, "Failed to allocate fx_buffer");
 		wlr_buffer_drop(wlr_buffer);

@@ -255,9 +255,8 @@ static void gles2_render_pass_apply_saved_blur_region(struct fx_render_pass *fx_
 }
 
 static void gles2_render_pass_destroy(struct fx_render_pass *fx_pass) {
-	pixman_region32_fini(&fx_pass->blur_padding_region);
-	fx_pass->has_blur = false;
-	free(fx_pass);
+	struct gles2_render_pass *gles2_render_pass = gles2_get_render_pass(fx_pass);
+	free(gles2_render_pass);
 }
 
 static void gles2_render_pass_add_texture(struct fx_render_pass *fx_pass,

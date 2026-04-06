@@ -143,6 +143,8 @@ static void offscreen_buffers_destroy(struct fx_offscreen_buffers *fx_offscreen_
 		wlr_buffer_drop(gles2_offscreen_buffers->effects_buffer_swapped->wlr_buffer);
 		gles2_offscreen_buffers->effects_buffer_swapped = NULL;
 	}
+
+	free(gles2_offscreen_buffers);
 }
 
 static const struct fx_offscreen_buffers_impl offscreen_buffers_impl = {

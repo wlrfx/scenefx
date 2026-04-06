@@ -1,5 +1,4 @@
 #include <assert.h>
-#include <stdlib.h>
 #include <wlr/types/wlr_output.h>
 #include <wlr/util/addon.h>
 #include <wlr/util/log.h>
@@ -9,11 +8,10 @@
 static void addon_handle_destroy(struct wlr_addon *addon) {
 	struct fx_offscreen_buffers *offscreen_buffers = wl_container_of(addon, offscreen_buffers, addon);
 
-	offscreen_buffers->impl->destroy(offscreen_buffers);
-
 	wl_list_remove(&offscreen_buffers->link);
 	wlr_addon_finish(&offscreen_buffers->addon);
-	free(offscreen_buffers);
+
+	offscreen_buffers->impl->destroy(offscreen_buffers);
 }
 
 static const struct wlr_addon_interface offscreen_buffers_addon_impl = {

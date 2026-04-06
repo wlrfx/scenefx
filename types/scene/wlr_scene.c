@@ -9,6 +9,7 @@
 #include <wlr/render/wlr_renderer.h>
 #include <wlr/types/wlr_compositor.h>
 #include <wlr/types/wlr_damage_ring.h>
+#include <wlr/types/wlr_color_management_v1.h>
 #include <wlr/types/wlr_gamma_control_v1.h>
 #include <wlr/types/wlr_linux_dmabuf_v1.h>
 #include <wlr/types/wlr_presentation_time.h>
@@ -1540,9 +1541,9 @@ void wlr_scene_buffer_set_transform(struct wlr_scene_buffer *scene_buffer,
 }
 
 void wlr_scene_buffer_send_frame_done(struct wlr_scene_buffer *scene_buffer,
-		struct timespec *now) {
+		struct wlr_scene_frame_done_event *event) {
 	if (!pixman_region32_empty(&scene_buffer->node.visible)) {
-		wl_signal_emit_mutable(&scene_buffer->events.frame_done, now);
+		wl_signal_emit_mutable(&scene_buffer->events.frame_done, event);
 	}
 }
 
@@ -1554,6 +1555,42 @@ void wlr_scene_buffer_set_opacity(struct wlr_scene_buffer *scene_buffer,
 
 	assert(opacity >= 0 && opacity <= 1);
 	scene_buffer->opacity = opacity;
+	scene_node_update(&scene_buffer->node, NULL);
+}
+
+void wlr_scene_buffer_set_transfer_function(struct wlr_scene_buffer *scene_buffer,
+		enum wlr_color_transfer_function transfer_function) {
+	if (scene_buffer->transfer_function == transfer_function) {
+		return;
+	}
+	scene_buffer->transfer_function = transfer_function;
+	scene_node_update(&scene_buffer->node, NULL);
+}
+
+void wlr_scene_buffer_set_primaries(struct wlr_scene_buffer *scene_buffer,
+		enum wlr_color_named_primaries primaries) {
+	if (scene_buffer->primaries == primaries) {
+		return;
+	}
+	scene_buffer->primaries = primaries;
+	scene_node_update(&scene_buffer->node, NULL);
+}
+
+void wlr_scene_buffer_set_color_encoding(struct wlr_scene_buffer *scene_buffer,
+		enum wlr_color_encoding encoding) {
+	if (scene_buffer->color_encoding == encoding) {
+		return;
+	}
+	scene_buffer->color_encoding = encoding;
+	scene_node_update(&scene_buffer->node, NULL);
+}
+
+void wlr_scene_buffer_set_color_range(struct wlr_scene_buffer *scene_buffer,
+		enum wlr_color_range range) {
+	if (scene_buffer->color_range == range) {
+		return;
+	}
+	scene_buffer->color_range = range;
 	scene_node_update(&scene_buffer->node, NULL);
 }
 
@@ -2195,6 +2232,22 @@ void wlr_scene_set_gamma_control_manager_v1(struct wlr_scene *scene,
 	scene->gamma_control_manager_v1_set_gamma.notify =
 		scene_handle_gamma_control_manager_v1_set_gamma;
 	wl_signal_add(&gamma_control->events.set_gamma, &scene->gamma_control_manager_v1_set_gamma);
+}
+
+static void scene_handle_color_manager_v1_destroy(struct wl_listener *listener, void *data) {
+	struct wlr_scene *scene = wl_container_of(listener, scene, color_manager_v1_destroy);
+	wl_list_remove(&scene->color_manager_v1_destroy.link);
+	scene->color_manager_v1 = NULL;
+}
+
+void wlr_scene_set_color_manager_v1(struct wlr_scene *scene,
+		struct wlr_color_manager_v1 *manager) {
+	assert(scene->color_manager_v1 == NULL);
+	scene->color_manager_v1 = manager;
+
+	scene->color_manager_v1_destroy.notify =
+		scene_handle_color_manager_v1_destroy;
+	wl_signal_add(&manager->events.destroy, &scene->color_manager_v1_destroy);
 }
 
 static void scene_output_handle_destroy(struct wlr_addon *addon) {
@@ -3230,7 +3283,11 @@ static void scene_node_send_frame_done(struct wlr_scene_node *node,
 			wlr_scene_buffer_from_node(node);
 
 		if (scene_buffer->primary_output == scene_output) {
-			wlr_scene_buffer_send_frame_done(scene_buffer, now);
+			struct wlr_scene_frame_done_event event = {
+				.output = scene_output,
+				.when = *now,
+			};
+			wlr_scene_buffer_send_frame_done(scene_buffer, &event);
 		}
 	} else if (node->type == WLR_SCENE_NODE_TREE) {
 		struct wlr_scene_tree *scene_tree = wlr_scene_tree_from_node(node);

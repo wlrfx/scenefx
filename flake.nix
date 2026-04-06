@@ -45,7 +45,7 @@
               mesa # gbm
               wayland # wayland-server
               wayland-protocols
-              wlroots_0_19
+              wlroots
               libgbm
               libxcb
               libxcb-wm

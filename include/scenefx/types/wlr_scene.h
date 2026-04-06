@@ -22,6 +22,7 @@
 #include <pixman.h>
 #include <time.h>
 #include <wayland-server-core.h>
+#include <wlr/render/color.h>
 #include <wlr/render/wlr_renderer.h>
 #include <wlr/types/wlr_damage_ring.h>
 #include <wlr/types/wlr_linux_dmabuf_v1.h>
@@ -39,6 +40,8 @@ struct wlr_xdg_surface;
 struct wlr_layer_surface_v1;
 struct wlr_drag_icon;
 struct wlr_surface;
+struct wlr_color_manager_v1;
+struct wlr_drm_syncobj_timeline;
 
 struct wlr_scene_node;
 struct wlr_scene_buffer;
@@ -108,11 +111,15 @@ struct wlr_scene {
 	// May be NULL
 	struct wlr_linux_dmabuf_v1 *linux_dmabuf_v1;
 	struct wlr_gamma_control_manager_v1 *gamma_control_manager_v1;
+	struct wlr_color_manager_v1 *color_manager_v1;
+
+	bool restack_xwayland_surfaces;
 
 	struct {
 		struct wl_listener linux_dmabuf_v1_destroy;
 		struct wl_listener gamma_control_manager_v1_destroy;
 		struct wl_listener gamma_control_manager_v1_set_gamma;
+		struct wl_listener color_manager_v1_destroy;
 
 		enum wlr_scene_debug_damage_option debug_damage_option;
 		bool direct_scanout;
@@ -134,8 +141,6 @@ struct wlr_scene_surface {
 		struct wlr_addon addon;
 
 		struct wl_listener outputs_update;
-		struct wl_listener output_enter;
-		struct wl_listener output_leave;
 		struct wl_listener output_sample;
 		struct wl_listener frame_done;
 		struct wl_listener surface_destroy;
@@ -196,6 +201,13 @@ struct wlr_scene_outputs_update_event {
 struct wlr_scene_output_sample_event {
 	struct wlr_scene_output *output;
 	bool direct_scanout;
+	struct wlr_drm_syncobj_timeline *release_timeline;
+	uint64_t release_point;
+};
+
+struct wlr_scene_frame_done_event {
+	struct wlr_scene_output *output;
+	struct timespec when;
 };
 
 /** A scene-graph node displaying a buffer */
@@ -210,7 +222,7 @@ struct wlr_scene_buffer {
 		struct wl_signal output_enter; // struct wlr_scene_output
 		struct wl_signal output_leave; // struct wlr_scene_output
 		struct wl_signal output_sample; // struct wlr_scene_output_sample_event
-		struct wl_signal frame_done; // struct timespec
+		struct wl_signal frame_done; // struct wlr_scene_frame_done_event
 	} events;
 
 	// May be NULL
@@ -219,8 +231,7 @@ struct wlr_scene_buffer {
 	/**
 	 * The output that the largest area of this buffer is displayed on.
 	 * This may be NULL if the buffer is not currently displayed on any
-	 * outputs. This is the output that should be used for frame callbacks,
-	 * presentation feedback, etc.
+	 * outputs.
 	 */
 	struct wlr_scene_output *primary_output;
 
@@ -232,6 +243,10 @@ struct wlr_scene_buffer {
 	int dst_width, dst_height;
 	enum wl_output_transform transform;
 	pixman_region32_t opaque_region;
+	enum wlr_color_transfer_function transfer_function;
+	enum wlr_color_named_primaries primaries;
+	enum wlr_color_encoding color_encoding;
+	enum wlr_color_range color_range;
 
 	struct linked_node blur;
 
@@ -782,11 +797,23 @@ void wlr_scene_buffer_set_corner_radius(struct wlr_scene_buffer *scene_buffer,
 */
 void wlr_scene_buffer_set_corner_radii(struct wlr_scene_buffer *scene_buffer,
 	struct fx_corner_radii corner_radii);
+void wlr_scene_buffer_set_transfer_function(struct wlr_scene_buffer *scene_buffer,
+	enum wlr_color_transfer_function transfer_function);
+
+void wlr_scene_buffer_set_primaries(struct wlr_scene_buffer *scene_buffer,
+	enum wlr_color_named_primaries primaries);
+
+void wlr_scene_buffer_set_color_encoding(struct wlr_scene_buffer *scene_buffer,
+	enum wlr_color_encoding encoding);
+
+void wlr_scene_buffer_set_color_range(struct wlr_scene_buffer *scene_buffer,
+	enum wlr_color_range range);
+
 /**
  * Calls the buffer's frame_done signal.
  */
 void wlr_scene_buffer_send_frame_done(struct wlr_scene_buffer *scene_buffer,
-	struct timespec *now);
+	struct wlr_scene_frame_done_event *event);
 
 /**
  * Add a viewport for the specified output to the scene-graph.
@@ -851,6 +878,11 @@ void wlr_scene_timer_finish(struct wlr_scene_timer *timer);
  */
 void wlr_scene_output_send_frame_done(struct wlr_scene_output *scene_output,
 	struct timespec *now);
+
+/**
+ * Asserts that a struct wlr_color_manager_v1 hasn't already been set for the scene.
+ */
+void wlr_scene_set_color_manager_v1(struct wlr_scene *scene, struct wlr_color_manager_v1 *manager);
 /**
  * Call `iterator` on each buffer in the scene-graph visible on the output,
  * with the buffer's position in layout coordinates. The function is called

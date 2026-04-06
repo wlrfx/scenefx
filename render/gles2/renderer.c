@@ -124,23 +124,23 @@ static void offscreen_buffers_destroy(struct fx_offscreen_buffers *fx_offscreen_
 	struct gles2_offscreen_buffers *gles2_offscreen_buffers = gles2_get_offscreen_buffers(fx_offscreen_buffers);
 	// Make sure to free the buffers
 	if (gles2_offscreen_buffers->optimized_blur_buffer != NULL) {
-		gles2_buffer_destroy(gles2_offscreen_buffers->optimized_blur_buffer);
+		wlr_buffer_drop(gles2_offscreen_buffers->optimized_blur_buffer->wlr_buffer);
 		gles2_offscreen_buffers->optimized_blur_buffer = NULL;
 	}
 	if (gles2_offscreen_buffers->optimized_no_blur_buffer != NULL) {
-		gles2_buffer_destroy(gles2_offscreen_buffers->optimized_no_blur_buffer);
+		wlr_buffer_drop(gles2_offscreen_buffers->optimized_no_blur_buffer->wlr_buffer);
 		gles2_offscreen_buffers->optimized_no_blur_buffer = NULL;
 	}
 	if (gles2_offscreen_buffers->blur_saved_pixels_buffer != NULL) {
-		gles2_buffer_destroy(gles2_offscreen_buffers->blur_saved_pixels_buffer);
+		wlr_buffer_drop(gles2_offscreen_buffers->blur_saved_pixels_buffer->wlr_buffer);
 		gles2_offscreen_buffers->blur_saved_pixels_buffer = NULL;
 	}
 	if (gles2_offscreen_buffers->effects_buffer != NULL) {
-		gles2_buffer_destroy(gles2_offscreen_buffers->effects_buffer);
+		wlr_buffer_drop(gles2_offscreen_buffers->effects_buffer->wlr_buffer);
 		gles2_offscreen_buffers->effects_buffer = NULL;
 	}
 	if (gles2_offscreen_buffers->effects_buffer_swapped != NULL) {
-		gles2_buffer_destroy(gles2_offscreen_buffers->effects_buffer_swapped);
+		wlr_buffer_drop(gles2_offscreen_buffers->effects_buffer_swapped->wlr_buffer);
 		gles2_offscreen_buffers->effects_buffer_swapped = NULL;
 	}
 }

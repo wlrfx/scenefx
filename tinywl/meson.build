@@ -1,5 +1,7 @@
 executable(
 	'tinywl',
-	['tinywl.c', protocols_client_header['xdg-shell']],
+	['tinywl.c',
+        protocols_client_header['xdg-shell'],
+        protocols_server_header['xdg-shell']],
 	dependencies: scenefx,
 )

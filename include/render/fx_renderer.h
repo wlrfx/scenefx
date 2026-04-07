@@ -60,9 +60,9 @@ struct fx_render_pass_impl {
 	void (*add_box_shadow)(struct fx_render_pass *pass,
 			const struct fx_render_box_shadow_options *options);
 	void (*add_blur)(struct fx_render_pass *pass,
-			struct fx_render_blur_pass_options *fx_options);
+			const struct fx_render_blur_pass_options *fx_options);
 	bool (*add_optimized_blur)(struct fx_render_pass *pass,
-			struct fx_render_blur_pass_options *fx_options);
+			const struct fx_render_blur_pass_options *fx_options);
 	void (*read_to_buffer)(struct fx_render_pass *pass,
 			pixman_region32_t *region, struct wlr_buffer *dst_buffer,
 			struct wlr_buffer *src_buffer);

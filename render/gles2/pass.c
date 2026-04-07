@@ -737,6 +737,7 @@ static void gles2_render_pass_add_box_shadow(struct fx_render_pass *fx_pass,
 
 // Renders the blur for each damaged rect and swaps the buffer
 static void render_blur_segments(struct gles2_render_pass *pass,
+		// TODO: make fx_options immutable in the future
 		struct fx_render_blur_pass_options *fx_options, struct blur_shader* shader) {
 	struct fx_render_texture_options *tex_options = &fx_options->tex_options;
 	struct wlr_render_texture_options *options = &tex_options->base;
@@ -822,6 +823,7 @@ static void render_blur_segments(struct gles2_render_pass *pass,
 }
 
 static void render_blur_effects(struct gles2_render_pass *pass,
+		// TODO: make fx_options immutable in the future
 		struct fx_render_blur_pass_options *fx_options) {
 	struct fx_render_texture_options *tex_options = &fx_options->tex_options;
 	struct wlr_render_texture_options *options = &tex_options->base;
@@ -886,6 +888,7 @@ static void render_blur_effects(struct gles2_render_pass *pass,
 // Blurs the fx_options current_buffer content and returns the blurred framebuffer.
 // Returns NULL when the blur parameters reach 0.
 static struct gles2_buffer *get_main_buffer_blur(struct gles2_render_pass *pass,
+		// TODO: make fx_options immutable in the future
 		struct fx_render_blur_pass_options *fx_options) {
 	if (pass->gles2_offscreen_buffers == NULL) {
 		wlr_log(WLR_ERROR, "FX Pass offscreen buffers not initialized. Skipping getting blur...");
@@ -1010,7 +1013,7 @@ static struct gles2_buffer *get_main_buffer_blur(struct gles2_render_pass *pass,
 }
 
 static void gles2_render_pass_add_blur(struct fx_render_pass *fx_pass,
-		struct fx_render_blur_pass_options *fx_options) {
+		const struct fx_render_blur_pass_options *fx_options) {
 	struct gles2_render_pass *pass = gles2_get_render_pass(fx_pass);
 	if (pass->gles2_offscreen_buffers == NULL) {
 		wlr_log(WLR_ERROR, "FX Pass offscreen buffers not initialized. Skipping blur...");
@@ -1019,7 +1022,6 @@ static void gles2_render_pass_add_blur(struct fx_render_pass *fx_pass,
 
 	struct gles2_renderer *gles2_renderer = pass->gles2_renderer;
 	struct fx_renderer *fx_renderer = &gles2_renderer->fx_renderer;
-	struct fx_render_texture_options *tex_options = &fx_options->tex_options;
 
 	TRACY_BOTH_ZONES_START(fx_renderer);
 	push_fx_debug(gles2_renderer);
@@ -1062,23 +1064,24 @@ static void gles2_render_pass_add_blur(struct fx_render_pass *fx_pass,
 	}
 
 	// Draw the blurred texture
-	tex_options->base.dst_box = (struct wlr_box) {
+	struct fx_render_texture_options tex_options = fx_options->tex_options;
+	tex_options.base.dst_box = (struct wlr_box) {
 		.x = 0,
 		.y = 0,
 		.width = buffer->wlr_buffer->width,
 		.height = buffer->wlr_buffer->height,
 	};
-	tex_options->base.src_box = (struct wlr_fbox) {
+	tex_options.base.src_box = (struct wlr_fbox) {
 		.x = 0,
 		.y = 0,
 		.width = buffer->wlr_buffer->width,
 		.height = buffer->wlr_buffer->height,
 	};
-	tex_options->base.texture = blur_texture;
+	tex_options.base.texture = blur_texture;
 	// since we're capturing from the fbo, transform will always be normal
-	tex_options->base.transform = WL_OUTPUT_TRANSFORM_NORMAL;
-	tex_options->clipped_region = fx_options->clipped_region;
-	gles2_render_pass_add_texture(fx_pass, tex_options);
+	tex_options.base.transform = WL_OUTPUT_TRANSFORM_NORMAL;
+	tex_options.clipped_region = fx_options->clipped_region;
+	gles2_render_pass_add_texture(fx_pass, &tex_options);
 
 	wlr_texture_destroy(blur_texture);
 
@@ -1093,7 +1096,7 @@ finish:
 }
 
 static bool gles2_render_pass_add_optimized_blur(struct fx_render_pass *fx_pass,
-		struct fx_render_blur_pass_options *fx_options) {
+		const struct fx_render_blur_pass_options *fx_options) {
 	struct gles2_render_pass *pass = gles2_get_render_pass(fx_pass);
 	if (pass->gles2_offscreen_buffers == NULL) {
 		wlr_log(WLR_ERROR, "FX Pass offscreen buffers not initialized. Skipping optimized blur...");

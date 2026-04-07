@@ -75,14 +75,14 @@ void fx_render_pass_add_box_shadow(struct fx_render_pass *render_pass,
 }
 
 void fx_render_pass_add_blur(struct fx_render_pass *render_pass,
-		struct fx_render_blur_pass_options *fx_options) {
+		const struct fx_render_blur_pass_options *fx_options) {
 	if (render_pass->impl->add_blur != NULL) {
 		render_pass->impl->add_blur(render_pass, fx_options);
 	}
 }
 
 bool fx_render_pass_add_optimized_blur(struct fx_render_pass *render_pass,
-		struct fx_render_blur_pass_options *fx_options) {
+		const struct fx_render_blur_pass_options *fx_options) {
 	if (render_pass->impl->add_optimized_blur != NULL) {
 		return render_pass->impl->add_optimized_blur(render_pass, fx_options);
 	}

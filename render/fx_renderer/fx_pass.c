@@ -348,6 +348,35 @@ static bool apply_clip_region(pixman_region32_t *clip_region,
 	return false;
 }
 
+static float *get_corner_radii(struct fx_corner_fradii corners) {
+	static float radii[4];
+	radii[0] = corners.top_right;
+	radii[1] = corners.bottom_right;
+	radii[2] = corners.top_left;
+	radii[3] = corners.bottom_left;
+	return radii;
+}
+
+static float *get_corner_center_x(struct fx_corner_fradii corners,
+		float half_width) {
+	static float corner_center_x[4];
+	corner_center_x[0] = half_width - corners.top_right;
+	corner_center_x[1] = half_width - corners.bottom_right;
+	corner_center_x[2] = -1.0 * (half_width - corners.top_left);
+	corner_center_x[3] = -1.0 * (half_width - corners.bottom_left);
+	return corner_center_x;
+}
+
+static float *get_corner_center_y(struct fx_corner_fradii corners,
+		float half_height) {
+	static float corner_center_y[4];
+	corner_center_y[0] = -1.0 * (half_height - corners.top_right);
+	corner_center_y[1] = half_height - corners.bottom_right;
+	corner_center_y[2] = -1.0 * (half_height - corners.top_left);
+	corner_center_y[3] = half_height - corners.bottom_left;
+	return corner_center_y;
+}
+
 void fx_render_pass_add_texture(struct fx_gles_render_pass *pass,
 		const struct fx_render_texture_options *fx_options) {
 	const struct wlr_render_texture_options *options = &fx_options->base;
@@ -452,6 +481,7 @@ void fx_render_pass_add_texture(struct fx_gles_render_pass *pass,
 	} else {
 		pixman_region32_init_rect(&clip_region, dst_box.x, dst_box.y, dst_box.width, dst_box.height);
 	}
+	// TODO: differentiate clipped_region_box vs clip_box
 	const struct wlr_box clipped_region_box = fx_options->clipped_region.area;
 	struct fx_corner_fradii clipped_region_corners = fx_options->clipped_region.corners;
 	apply_clip_region(&clip_region, &clipped_region_box, &clipped_region_corners);
@@ -480,13 +510,24 @@ void fx_render_pass_add_texture(struct fx_gles_render_pass *pass,
 	if (use_effects) {
 		struct fx_corner_fradii corners = fx_options->corners;
 
-		glUniform2f(shader->effects.size, clip_box->width, clip_box->height);
-		glUniform2f(shader->effects.position, clip_box->x, clip_box->y);
-		uniform_corner_radii_set(&shader->effects.radius, &corners);
+		float half_width = clip_box->width / 2.0;
+		float half_height = clip_box->height / 2.0;
+		glUniform4fv(shader->effects.radii, 1, get_corner_radii(corners));
+		glUniform2f(shader->effects.center_pos, clip_box->x + half_width, clip_box->y + half_height);
+		glUniform4fv(shader->effects.corner_center_x, 1, get_corner_center_x(corners, half_width));
+		glUniform4fv(shader->effects.corner_center_y, 1, get_corner_center_y(corners, half_height));
 
-		glUniform2f(shader->effects.clip_size, clipped_region_box.width, clipped_region_box.height);
-		glUniform2f(shader->effects.clip_position, clipped_region_box.x, clipped_region_box.y);
-		uniform_corner_radii_set(&shader->effects.clip_radius, &clipped_region_corners);
+		float clipped_half_width = clipped_region_box.width / 2.0;
+		float clipped_half_height = clipped_region_box.height / 2.0;
+		glUniform4fv(shader->effects.clip_radii, 1, get_corner_radii(clipped_region_corners));
+		glUniform2f(shader->effects.clip_center_pos,
+			clipped_region_box.x + clipped_half_width,
+			clipped_region_box.y + clipped_half_height
+		);
+		glUniform4fv(shader->effects.clip_corner_center_x, 1,
+			get_corner_center_x(clipped_region_corners, clipped_half_width));
+		glUniform4fv(shader->effects.clip_corner_center_y, 1,
+			get_corner_center_y(clipped_region_corners, clipped_half_height));
 	}
 
 	set_proj_matrix(shader->proj, pass->projection_matrix, &dst_box);
@@ -545,9 +586,12 @@ void fx_render_pass_add_rect(struct fx_gles_render_pass *pass,
 	glUniform4f(shader.color, color->r, color->g, color->b, color->a);
 
 	if (use_clip) {
-		glUniform2f(shader.effects.clip_size, clipped_region_box.width, clipped_region_box.height);
-		glUniform2f(shader.effects.clip_position, clipped_region_box.x, clipped_region_box.y);
-		uniform_corner_radii_set(&shader.effects.clip_radius, &clipped_region_corners);
+		float half_width = clipped_region_box.width / 2.0;
+		float half_height = clipped_region_box.height / 2.0;
+		glUniform4fv(shader.effects.clip_radii, 1, get_corner_radii(clipped_region_corners));
+		glUniform2f(shader.effects.clip_center_pos, clipped_region_box.x + half_width, clipped_region_box.y + half_height);
+		glUniform4fv(shader.effects.clip_corner_center_x, 1, get_corner_center_x(clipped_region_corners, half_width));
+		glUniform4fv(shader.effects.clip_corner_center_y, 1, get_corner_center_y(clipped_region_corners, half_height));
 	}
 
 	render(&box, &clip_region, shader.pos_attrib);
@@ -662,14 +706,20 @@ void fx_render_pass_add_rounded_rect(struct fx_gles_render_pass *pass,
 	set_proj_matrix(shader.proj, pass->projection_matrix, &box);
 	glUniform4f(shader.color, color->r, color->g, color->b, color->a);
 
-	glUniform2f(shader.size, box.width, box.height);
-	glUniform2f(shader.position, box.x, box.y);
-	glUniform2f(shader.clip_size, clipped_region_box.width, clipped_region_box.height);
-	glUniform2f(shader.clip_position, clipped_region_box.x, clipped_region_box.y);
-	uniform_corner_radii_set(&shader.clip_radius, &clipped_region_corners);
-
 	struct fx_corner_fradii corners = fx_options->corners;
-	uniform_corner_radii_set(&shader.radius, &corners);
+	float half_width = box.width / 2.0;
+	float half_height = box.height / 2.0;
+	glUniform4fv(shader.radii, 1, get_corner_radii(corners));
+	glUniform2f(shader.center_pos, box.x + half_width, box.y + half_height);
+	glUniform4fv(shader.corner_center_x, 1, get_corner_center_x(corners, half_width));
+	glUniform4fv(shader.corner_center_y, 1, get_corner_center_y(corners, half_height));
+
+	float clip_half_width = clipped_region_box.width / 2.0;
+	float clip_half_height = clipped_region_box.height / 2.0;
+	glUniform4fv(shader.clip_radii, 1, get_corner_radii(clipped_region_corners));
+	glUniform2f(shader.clip_center_pos, clipped_region_box.x + clip_half_width, clipped_region_box.y + clip_half_height);
+	glUniform4fv(shader.clip_corner_center_x, 1, get_corner_center_x(clipped_region_corners, clip_half_width));
+	glUniform4fv(shader.clip_corner_center_y, 1, get_corner_center_y(clipped_region_corners, clip_half_height));
 
 	render(&box, &clip_region, renderer->shaders.quad_round.pos_attrib);
 	pixman_region32_fini(&clip_region);
@@ -726,8 +776,6 @@ void fx_render_pass_add_rounded_rect_grad(struct fx_gles_render_pass *pass,
 	set_proj_matrix(shader.proj, pass->projection_matrix, &box);
 
 	glUniform2f(shader.size, box.width, box.height);
-	glUniform2f(shader.position, box.x, box.y);
-
 	glUniform4fv(shader.colors, fx_options->gradient.count, (GLfloat*)fx_options->gradient.colors);
 	glUniform1i(shader.count, fx_options->gradient.count);
 	glUniform2f(shader.grad_size, fx_options->gradient.range.width, fx_options->gradient.range.height);
@@ -738,7 +786,12 @@ void fx_render_pass_add_rounded_rect_grad(struct fx_gles_render_pass *pass,
 	glUniform2f(shader.origin, fx_options->gradient.origin[0], fx_options->gradient.origin[1]);
 
 	struct fx_corner_fradii corners = fx_options->corners;
-	uniform_corner_radii_set(&shader.radius, &corners);
+	float half_width = box.width / 2.0;
+	float half_height = box.height / 2.0;
+	glUniform4fv(shader.radii, 1, get_corner_radii(corners));
+	glUniform2f(shader.center_pos, box.x + half_width, box.y + half_height);
+	glUniform4fv(shader.corner_center_x, 1, get_corner_center_x(corners, half_width));
+	glUniform4fv(shader.corner_center_y, 1, get_corner_center_y(corners, half_height));
 
 	render(&box, options->clip, shader.pos_attrib);
 
@@ -785,22 +838,26 @@ void fx_render_pass_add_box_shadow(struct fx_gles_render_pass *pass,
 	setup_blending(WLR_RENDER_BLEND_MODE_PREMULTIPLIED);
 	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
-	glUseProgram(renderer->shaders.box_shadow.program);
+	struct box_shadow_shader shader = renderer->shaders.box_shadow;
+
+	glUseProgram(shader.program);
 
 	const struct wlr_render_color *color = &options->color;
-	set_proj_matrix(renderer->shaders.box_shadow.proj, pass->projection_matrix, &box);
-	glUniform4f(renderer->shaders.box_shadow.color, color->r, color->g, color->b, color->a);
-	glUniform1f(renderer->shaders.box_shadow.blur_sigma, options->blur_sigma);
-	glUniform2f(renderer->shaders.box_shadow.size, box.width, box.height);
-	glUniform2f(renderer->shaders.box_shadow.position, box.x, box.y);
-	glUniform1f(renderer->shaders.box_shadow.corner_radius, options->corner_radius);
+	set_proj_matrix(shader.proj, pass->projection_matrix, &box);
+	glUniform4f(shader.color, color->r, color->g, color->b, color->a);
+	glUniform1f(shader.blur_sigma, options->blur_sigma);
+	glUniform2f(shader.size, box.width, box.height);
+	glUniform2f(shader.position, box.x, box.y);
+	glUniform1f(shader.corner_radius, options->corner_radius);
 
-	uniform_corner_radii_set(&renderer->shaders.box_shadow.clip_radius, &clipped_region_corners);
+	float clip_half_width = clipped_region_box.width / 2.0;
+	float clip_half_height = clipped_region_box.height / 2.0;
+	glUniform4fv(shader.clip_radii, 1, get_corner_radii(clipped_region_corners));
+	glUniform2f(shader.clip_center_pos, clipped_region_box.x + clip_half_width, clipped_region_box.y + clip_half_height);
+	glUniform4fv(shader.clip_corner_center_x, 1, get_corner_center_x(clipped_region_corners, clip_half_width));
+	glUniform4fv(shader.clip_corner_center_y, 1, get_corner_center_y(clipped_region_corners, clip_half_height));
 
-	glUniform2f(renderer->shaders.box_shadow.clip_position, clipped_region_box.x, clipped_region_box.y);
-	glUniform2f(renderer->shaders.box_shadow.clip_size, clipped_region_box.width, clipped_region_box.height);
-
-	render(&box, &clip_region, renderer->shaders.box_shadow.pos_attrib);
+	render(&box, &clip_region, shader.pos_attrib);
 	pixman_region32_fini(&clip_region);
 
 	glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
@@ -855,7 +912,7 @@ static void render_blur_segments(struct fx_gles_render_pass *pass,
 	switch (options->filter_mode) {
 	case WLR_SCALE_FILTER_BILINEAR:
 		glTexParameteri(texture->target, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-		glTexParameteri(texture->target, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+				glTexParameteri(texture->target, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 		break;
 	case WLR_SCALE_FILTER_NEAREST:
 		abort();

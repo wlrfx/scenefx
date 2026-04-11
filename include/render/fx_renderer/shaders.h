@@ -3,8 +3,6 @@
 
 #include <GLES2/gl2.h>
 #include <stdbool.h>
-#include <scenefx/types/fx/clipped_region.h>
-#include "types/fx/clipped_region.h"
 
 struct fx_renderer;
 
@@ -22,15 +20,6 @@ enum fx_tex_shader_source {
 	SHADER_SOURCE_TEXTURE_EXTERNAL = 3,
 };
 
-struct shader_corner_radii {
-	GLint top_left;
-	GLint top_right;
-	GLint bottom_left;
-	GLint bottom_right;
-};
-
-void uniform_corner_radii_set(struct shader_corner_radii *uniform, struct fx_corner_fradii *corners);
-
 struct quad_shader {
 	GLuint program;
 	GLint proj;
@@ -39,9 +28,10 @@ struct quad_shader {
 
 	// Only used for the effects shader
 	struct {
-		GLint clip_size;
-		GLint clip_position;
-		struct shader_corner_radii clip_radius;
+		GLint clip_center_pos;
+		GLint clip_corner_center_x;
+		GLint clip_corner_center_y;
+		GLint clip_radii;
 	} effects;
 };
 
@@ -70,14 +60,16 @@ struct quad_round_shader {
 	GLint proj;
 	GLint color;
 	GLint pos_attrib;
-	GLint size;
-	GLint position;
 
-	struct shader_corner_radii radius;
+	GLint center_pos;
+	GLint corner_center_x;
+	GLint corner_center_y;
+	GLint radii;
 
-	GLint clip_size;
-	GLint clip_position;
-	struct shader_corner_radii clip_radius;
+	GLint clip_center_pos;
+	GLint clip_corner_center_x;
+	GLint clip_corner_center_y;
+	GLint clip_radii;
 };
 
 bool link_quad_round_program(struct quad_round_shader *shader);
@@ -87,9 +79,8 @@ struct quad_grad_round_shader {
 	GLint proj;
 	GLint color;
 	GLint pos_attrib;
-	GLint size;
-	GLint position;
 
+	GLint size;
 	GLint colors;
 	GLint grad_size;
 	GLint degree;
@@ -99,7 +90,10 @@ struct quad_grad_round_shader {
 	GLint count;
 	GLint blend;
 
-	struct shader_corner_radii radius;
+	GLint center_pos;
+	GLint corner_center_x;
+	GLint corner_center_y;
+	GLint radii;
 
 	int max_len;
 };
@@ -118,13 +112,15 @@ struct tex_shader {
 
 	// Only used for the effects shader
 	struct {
-		GLint size;
-		GLint position;
-		struct shader_corner_radii radius;
+		GLint center_pos;
+		GLint corner_center_x;
+		GLint corner_center_y;
+		GLint radii;
 
-		GLint clip_size;
-		GLint clip_position;
-		struct shader_corner_radii clip_radius;
+		GLint clip_center_pos;
+		GLint clip_corner_center_x;
+		GLint clip_corner_center_y;
+		GLint clip_radii;
 	} effects;
 };
 
@@ -141,9 +137,10 @@ struct box_shadow_shader {
 	GLint blur_sigma;
 	GLint corner_radius;
 
-	GLint clip_position;
-	GLint clip_size;
-	struct shader_corner_radii clip_radius;
+	GLint clip_center_pos;
+	GLint clip_corner_center_x;
+	GLint clip_corner_center_y;
+	GLint clip_radii;
 };
 
 bool link_box_shadow_program(struct box_shadow_shader *shader);

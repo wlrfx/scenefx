@@ -63,6 +63,10 @@ struct fx_framebuffer *fx_framebuffer_get_or_create(struct fx_renderer *renderer
 
 void fx_framebuffer_bind(struct fx_framebuffer *buffer);
 
+/**
+ * Destroy the fx_framebuffer.
+ * Note: Doesn't drop the wlr_buffer, so should only be used internally.
+ */
 void fx_framebuffer_destroy(struct fx_framebuffer *buffer);
 
 ///

@@ -1,7 +1,7 @@
 project(
 	'scenefx',
 	'c',
-	version: '0.4.1',
+	version: '0.5.0',
 	license: 'MIT',
 	meson_version: '>=1.3',
 	default_options: [
@@ -79,8 +79,8 @@ wayland_server = dependency('wayland-server',
 )
 
 wlroots_options = [ 'examples=false' ]
-wlroots_version = ['>=0.19.0', '<0.20.0']
-wlroots = dependency('wlroots-0.19',
+wlroots_version = ['>=0.20.0']
+wlroots = dependency('wlroots-0.20',
 	version: wlroots_version,
 	default_options: wlroots_options,
 	required: false,

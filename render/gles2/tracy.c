@@ -10,10 +10,11 @@
 #include <wlr/util/log.h>
 
 #include "render/gles2/gles2.h"
+#include "render/tracy.h"
 
 static atomic_int id_counter = 0;
 
-void gles2_tracy_gpu_zone_begin(struct fx_renderer *fx_renderer, struct tracy_data *tracy_data,
+static void gles2_tracy_gpu_zone_begin(struct fx_renderer *fx_renderer, struct tracy_data *tracy_data,
 		struct tracy_gpu_zone_context *out_ctx, const int line,
 		const char *source, const char *func, const char *name) {
 	struct gles2_renderer *gles2_renderer = gles2_get_renderer(fx_renderer);
@@ -49,7 +50,7 @@ void gles2_tracy_gpu_zone_begin(struct fx_renderer *fx_renderer, struct tracy_da
 	___tracy_emit_gpu_zone_begin_alloc(data);
 }
 
-void gles2_tracy_gpu_zone_end(struct fx_renderer *fx_renderer, struct tracy_gpu_zone_context *ctx) {
+static void gles2_tracy_gpu_zone_end(struct fx_renderer *fx_renderer, struct tracy_gpu_zone_context *ctx) {
 	struct gles2_renderer *gles2_renderer = gles2_get_renderer(fx_renderer);
 	struct tracy_data *tracy_data = ctx->tracy_data;
 
@@ -65,7 +66,7 @@ void gles2_tracy_gpu_zone_end(struct fx_renderer *fx_renderer, struct tracy_gpu_
 	___tracy_emit_gpu_zone_end(data);
 }
 
-void gles2_tracy_gpu_context_collect(struct fx_renderer *fx_renderer, struct tracy_data *tracy_data) {
+static void gles2_tracy_gpu_context_collect(struct fx_renderer *fx_renderer, struct tracy_data *tracy_data) {
 	struct gles2_renderer *gles2_renderer = gles2_get_renderer(fx_renderer);
 
 	if (tracy_data->queue.tail == tracy_data->queue.head) {
@@ -105,13 +106,13 @@ void gles2_tracy_gpu_context_collect(struct fx_renderer *fx_renderer, struct tra
 	}
 }
 
-void gles2_tracy_gpu_context_destroy(struct fx_renderer *fx_renderer, struct tracy_data *tracy_data) {
+static void gles2_tracy_gpu_context_destroy(struct fx_renderer *fx_renderer, struct tracy_data *tracy_data) {
 	struct gles2_renderer *gles2_renderer = gles2_get_renderer(fx_renderer);
 
 	gles2_renderer->gl_procs.glDeleteQueriesEXT(QUERY_QUEUE_LEN, tracy_data->queue.queries);
 }
 
-struct tracy_data *gles2_tracy_gpu_context_new(struct fx_renderer *fx_renderer) {
+static struct tracy_data *gles2_tracy_gpu_context_new(struct fx_renderer *fx_renderer) {
 	struct gles2_renderer *gles2_renderer = gles2_get_renderer(fx_renderer);
 
 	struct tracy_data *tracy_data = calloc(1, sizeof(*tracy_data));
@@ -160,5 +161,13 @@ struct tracy_data *gles2_tracy_gpu_context_new(struct fx_renderer *fx_renderer) 
 
 	return tracy_data;
 }
+
+const struct fx_renderer_tracy_impl gles2_renderer_tracy_impl = {
+	.gpu_zone_begin = gles2_tracy_gpu_zone_begin,
+	.gpu_zone_end = gles2_tracy_gpu_zone_end,
+	.gpu_context_collect = gles2_tracy_gpu_context_collect,
+	.gpu_context_destroy = gles2_tracy_gpu_context_destroy,
+	.gpu_context_new = gles2_tracy_gpu_context_new,
+};
 
 #endif

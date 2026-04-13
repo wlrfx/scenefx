@@ -264,7 +264,6 @@ static void gles2_render_pass_add_texture(struct fx_render_pass *fx_pass,
 	const struct wlr_render_texture_options *options = &fx_options->base;
 	struct gles2_render_pass *pass = gles2_get_render_pass(fx_pass);
 	struct gles2_renderer *gles2_renderer = pass->gles2_renderer;
-	struct fx_renderer *fx_renderer = &gles2_renderer->fx_renderer;
 
 	struct wlr_gles2_texture_attribs attribs;
 	wlr_gles2_texture_get_attribs(options->texture, &attribs);
@@ -314,7 +313,7 @@ static void gles2_render_pass_add_texture(struct fx_render_pass *fx_pass,
 	src_fbox.width /= options->texture->width;
 	src_fbox.height /= options->texture->height;
 
-	TRACY_BOTH_ZONES_START(fx_renderer);
+	TRACY_BOTH_ZONES_START(&gles2_renderer->fx_renderer);
 	TRACY_ZONE_TEXT_f("dst_box (WxH, X, Y): %dx%d, %d, %d",
 			dst_box.width, dst_box.height, dst_box.x, dst_box.y);
 	TRACY_ZONE_TEXT_f("clip_box (WxH, X, Y): %dx%d, %d, %d",
@@ -423,7 +422,6 @@ static void gles2_render_pass_add_rect(struct fx_render_pass *fx_pass,
 
 	struct gles2_render_pass *pass = gles2_get_render_pass(fx_pass);
 	struct gles2_renderer *gles2_renderer = pass->gles2_renderer;
-	struct fx_renderer *fx_renderer = &gles2_renderer->fx_renderer;
 
 	const struct wlr_render_color *color = &options->color;
 	struct wlr_box box;
@@ -444,7 +442,7 @@ static void gles2_render_pass_add_rect(struct fx_render_pass *fx_pass,
 		setup_blending(color->a == 1.0 ? WLR_RENDER_BLEND_MODE_NONE : options->blend_mode);
 	}
 
-	TRACY_BOTH_ZONES_START(fx_renderer);
+	TRACY_BOTH_ZONES_START(&gles2_renderer->fx_renderer);
 	TRACY_ZONE_TEXT_f("Box (WxH, X, Y): %dx%d, %d, %d", box.width, box.height, box.x, box.y);
 	TRACY_ZONE_TEXT_f("Clip Box (WxH, X, Y): %dx%d, %d, %d",
 			clipped_region_box.width, clipped_region_box.height,
@@ -480,7 +478,6 @@ static void gles2_render_pass_add_rect_grad(struct fx_render_pass *fx_pass,
 
 	struct gles2_render_pass *pass = gles2_get_render_pass(fx_pass);
 	struct gles2_renderer *gles2_renderer = pass->gles2_renderer;
-	struct fx_renderer *fx_renderer = &gles2_renderer->fx_renderer;
 
 	if (gles2_renderer->shaders.quad_grad.max_len <= fx_options->gradient.count) {
 		glDeleteProgram(gles2_renderer->shaders.quad_grad.program);
@@ -493,7 +490,7 @@ static void gles2_render_pass_add_rect_grad(struct fx_render_pass *fx_pass,
 	struct wlr_box box;
 	wlr_render_rect_options_get_box(options, pass->gles2_buffer->wlr_buffer, &box);
 
-	TRACY_BOTH_ZONES_START(fx_renderer);
+	TRACY_BOTH_ZONES_START(&gles2_renderer->fx_renderer);
 	TRACY_ZONE_TEXT_f("Box (WxH, X, Y): %dx%d, %d, %d", box.width, box.height, box.x, box.y);
 	TRACY_ZONE_TEXT_f("Gradient:");
 	TRACY_ZONE_TEXT_f("\tNum Colors: %d", fx_options->gradient.count);
@@ -542,7 +539,6 @@ static void gles2_render_pass_add_rounded_rect(struct fx_render_pass *fx_pass,
 	assert(box.width > 0 && box.height > 0);
 
 	struct gles2_renderer *gles2_renderer = pass->gles2_renderer;
-	struct fx_renderer *fx_renderer = &gles2_renderer->fx_renderer;
 
 	const struct wlr_render_color *color = &options->color;
 
@@ -557,7 +553,7 @@ static void gles2_render_pass_add_rounded_rect(struct fx_render_pass *fx_pass,
 	struct fx_corner_fradii clipped_region_corners = fx_options->clipped_region.corners;
 	apply_clip_region(&clip_region, &clipped_region_box, &clipped_region_corners);
 
-	TRACY_BOTH_ZONES_START(fx_renderer);
+	TRACY_BOTH_ZONES_START(&gles2_renderer->fx_renderer);
 	TRACY_ZONE_TEXT_f("Box (WxH, X, Y): %dx%d, %d, %d", box.width, box.height, box.x, box.y);
 	TRACY_ZONE_TEXT_f("Clip Box (WxH, X, Y): %dx%d, %d, %d",
 			clipped_region_box.width, clipped_region_box.height,
@@ -605,7 +601,6 @@ static void gles2_render_pass_add_rounded_rect_grad(struct fx_render_pass *fx_pa
 
 	struct gles2_render_pass *pass = gles2_get_render_pass(fx_pass);
 	struct gles2_renderer *gles2_renderer = pass->gles2_renderer;
-	struct fx_renderer *fx_renderer = &gles2_renderer->fx_renderer;
 
 	if (gles2_renderer->shaders.quad_grad_round.max_len <= fx_options->gradient.count) {
 		glDeleteProgram(gles2_renderer->shaders.quad_grad_round.program);
@@ -618,7 +613,7 @@ static void gles2_render_pass_add_rounded_rect_grad(struct fx_render_pass *fx_pa
 	struct wlr_box box;
 	wlr_render_rect_options_get_box(options, pass->gles2_buffer->wlr_buffer, &box);
 
-	TRACY_BOTH_ZONES_START(fx_renderer);
+	TRACY_BOTH_ZONES_START(&gles2_renderer->fx_renderer);
 	TRACY_ZONE_TEXT_f("Box (WxH, X, Y): %dx%d, %d, %d", box.width, box.height, box.x, box.y);
 	TRACY_ZONE_TEXT_f("Corners (TL, TR, BL, BR): %f, %f, %f, %f",
 			fx_options->corners.top_left,
@@ -673,7 +668,6 @@ static void gles2_render_pass_add_box_shadow(struct fx_render_pass *fx_pass,
 		const struct fx_render_box_shadow_options *options) {
 	struct gles2_render_pass *pass = gles2_get_render_pass(fx_pass);
 	struct gles2_renderer *gles2_renderer = pass->gles2_renderer;
-	struct fx_renderer *fx_renderer = &gles2_renderer->fx_renderer;
 
 	struct wlr_box box = options->box;
 	assert(box.width > 0 && box.height > 0);
@@ -689,7 +683,7 @@ static void gles2_render_pass_add_box_shadow(struct fx_render_pass *fx_pass,
 	struct fx_corner_fradii clipped_region_corners = options->clipped_region.corners;
 	apply_clip_region(&clip_region, &clipped_region_box, &clipped_region_corners);
 
-	TRACY_BOTH_ZONES_START(fx_renderer);
+	TRACY_BOTH_ZONES_START(&gles2_renderer->fx_renderer);
 	TRACY_ZONE_TEXT_f("Box (WxH, X, Y): %dx%d, %d, %d", box.width, box.height, box.x, box.y);
 	TRACY_ZONE_TEXT_f("Clip Box (WxH, X, Y): %dx%d, %d, %d",
 			clipped_region_box.width, clipped_region_box.height,
@@ -828,7 +822,6 @@ static void render_blur_effects(struct gles2_render_pass *pass,
 	struct fx_render_texture_options *tex_options = &fx_options->tex_options;
 	struct wlr_render_texture_options *options = &tex_options->base;
 	struct gles2_renderer *gles2_renderer = pass->gles2_renderer;
-	struct fx_renderer *fx_renderer = &gles2_renderer->fx_renderer;
 	struct blur_data *blur_data = fx_options->blur_data;
 
 	struct wlr_gles2_texture_attribs attribs;
@@ -849,7 +842,7 @@ static void render_blur_effects(struct gles2_render_pass *pass,
 	glDisable(GL_BLEND);
 	glDisable(GL_STENCIL_TEST);
 
-	TRACY_BOTH_ZONES_START(fx_renderer);
+	TRACY_BOTH_ZONES_START(&gles2_renderer->fx_renderer);
 	push_fx_debug(gles2_renderer);
 
 	glUseProgram(shader.program);
@@ -1104,10 +1097,9 @@ static bool gles2_render_pass_add_optimized_blur(struct fx_render_pass *fx_pass,
 	}
 	struct gles2_renderer *gles2_renderer = pass->gles2_renderer;
 	struct gles2_offscreen_buffers *offscreen_buffers = pass->gles2_offscreen_buffers;
-	struct fx_renderer *fx_renderer = &gles2_renderer->fx_renderer;
 	struct wlr_box dst_box = fx_options->tex_options.base.dst_box;
 
-	TRACY_BOTH_ZONES_START(fx_renderer);
+	TRACY_BOTH_ZONES_START(&gles2_renderer->fx_renderer);
 	TRACY_ZONE_TEXT_f("dst_box (WxH, X, Y): %dx%d, %d, %d",
 			fx_options->tex_options.base.dst_box.width,
 			fx_options->tex_options.base.dst_box.height,

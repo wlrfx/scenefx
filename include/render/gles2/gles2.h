@@ -12,6 +12,8 @@
 
 struct gles2_renderer;
 
+extern const struct fx_renderer_tracy_impl gles2_renderer_tracy_impl;
+
 struct gles2_buffer {
 	struct wlr_buffer *wlr_buffer;
 
@@ -132,15 +134,5 @@ struct gles2_renderer *gles2_get_renderer(struct fx_renderer *fx_renderer);
 void push_fx_debug_(struct gles2_renderer *gles2_renderer, const char *file, const char *func);
 #define push_fx_debug(renderer) push_fx_debug_(renderer, _WLR_FILENAME, __func__)
 void pop_fx_debug(struct gles2_renderer *gles2_renderer);
-
-#ifdef TRACY_ENABLE
-void gles2_tracy_gpu_zone_begin(struct fx_renderer *fx_renderer, struct tracy_data *tracy_data,
-		struct tracy_gpu_zone_context *out_ctx, const int line,
-		const char *source, const char *func, const char *name);
-void gles2_tracy_gpu_zone_end(struct fx_renderer *fx_renderer, struct tracy_gpu_zone_context *ctx);
-void gles2_tracy_gpu_context_collect(struct fx_renderer *fx_renderer, struct tracy_data *tracy_data);
-void gles2_tracy_gpu_context_destroy(struct fx_renderer *fx_renderer, struct tracy_data *tracy_data);
-struct tracy_data *gles2_tracy_gpu_context_new(struct fx_renderer *fx_renderer);
-#endif
 
 #endif

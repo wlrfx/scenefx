@@ -92,6 +92,16 @@ void fx_render_pass_destroy(struct fx_render_pass *render_pass);
 /// fx_renderer
 ///
 
+struct fx_renderer_tracy_impl {
+	void (*gpu_zone_begin)(struct fx_renderer *fx_renderer, struct tracy_data *tracy_data,
+			struct tracy_gpu_zone_context *out_ctx, const int line,
+			const char *source, const char *func, const char *name);
+	void (*gpu_zone_end)(struct fx_renderer *fx_renderer, struct tracy_gpu_zone_context *ctx);
+	void (*gpu_context_collect)(struct fx_renderer *fx_renderer, struct tracy_data *tracy_data);
+	void (*gpu_context_destroy)(struct fx_renderer *fx_renderer, struct tracy_data *tracy_data);
+	struct tracy_data *(*gpu_context_new)(struct fx_renderer *fx_renderer);
+};
+
 struct fx_renderer_impl {
 	struct fx_offscreen_buffers *(*offscreen_buffers_allocate)(
 			struct fx_renderer *fx_renderer, struct wlr_output *output);
@@ -99,15 +109,9 @@ struct fx_renderer_impl {
 			struct wlr_render_pass *render_pass, struct wlr_buffer *wlr_buffer,
 			struct wlr_output *output);
 	void (*renderer_destroy)(struct fx_renderer *fx_renderer);
-#ifdef TRACY_ENABLE
-	void (*tracy_gpu_zone_begin)(struct fx_renderer *fx_renderer, struct tracy_data *tracy_data,
-			struct tracy_gpu_zone_context *out_ctx, const int line,
-			const char *source, const char *func, const char *name);
-	void (*tracy_gpu_zone_end)(struct fx_renderer *fx_renderer, struct tracy_gpu_zone_context *ctx);
-	void (*tracy_gpu_context_collect)(struct fx_renderer *fx_renderer, struct tracy_data *tracy_data);
-	void (*tracy_gpu_context_destroy)(struct fx_renderer *fx_renderer, struct tracy_data *tracy_data);
-	struct tracy_data *(*tracy_gpu_context_new)(struct fx_renderer *fx_renderer);
-#endif
+
+	// NULL if not supported or disabled
+	const struct fx_renderer_tracy_impl *tracy;
 };
 
 /**
@@ -120,10 +124,8 @@ struct fx_renderer {
 	struct wlr_addon scene_addon;
 	const struct fx_renderer_impl *impl;
 
-#ifdef TRACY_ENABLE
+	// NULL if not supported or disabled
 	struct tracy_data *tracy_data;
-	bool tracy_capable;
-#endif
 
 	struct wl_list offscreen_buffers; // fx_offscreen_buffers.link
 

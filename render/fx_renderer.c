@@ -28,7 +28,7 @@ static void handle_renderer_destroy(struct wl_listener *listener, void *data) {
 
 	wlr_log(WLR_INFO, "wlr_renderer being destroyed, destroying fx_renderer");
 
-	TRACY_GPU_CONTEXT_DESTROY(fx_renderer->tracy_data);
+	TRACY_GPU_CONTEXT_DESTROY(fx_renderer);
 
 	wl_list_remove(&fx_renderer->renderer_destroy.link);
 	wlr_addon_finish(&fx_renderer->scene_addon);
@@ -52,18 +52,13 @@ void fx_renderer_init(struct fx_renderer *fx_renderer,
 	*fx_renderer = (struct fx_renderer) {
 		.impl = impl,
 		.wlr_renderer = wlr_renderer,
-#ifdef TRACY_ENABLE
 		.tracy_data = NULL,
-#endif
 	};
 
 #ifdef TRACY_ENABLE
-	fx_renderer->tracy_capable = impl->tracy_gpu_zone_begin
-		&& impl->tracy_gpu_zone_end
-		&& impl->tracy_gpu_context_collect
-		&& impl->tracy_gpu_context_destroy
-		&& impl->tracy_gpu_context_new;
-	fx_renderer->tracy_data = TRACY_GPU_CONTEXT_NEW(fx_renderer);
+	if (impl->tracy) {
+		fx_renderer->tracy_data = TRACY_GPU_CONTEXT_NEW(fx_renderer);
+	}
 #endif
 
 	fx_renderer->renderer_destroy.notify = handle_renderer_destroy;

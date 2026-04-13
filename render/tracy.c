@@ -1,4 +1,3 @@
-#include <stdio.h>
 #ifdef TRACY_ENABLE
 #include <assert.h>
 #include <stdatomic.h>
@@ -19,6 +18,9 @@
 //	From https://github.com/wolfpld/tracy/blob/7388a476587c93f4e8e3e50d64c1400fc8c5e47e/public/common/TracyColor.hpp
 #define RED4 0x8b0000
 
+#define TRACY_AVAILABLE(fx_renderer) \
+	((fx_renderer)->impl->tracy != NULL && (fx_renderer)->tracy_data != NULL)
+
 /*
  * GPU Zone
  */
@@ -30,70 +32,53 @@ unsigned int tracy_get_next_query_index(struct tracy_data *tracy_data) {
 	return id;
 }
 
-void tracy_gpu_zone_begin(struct tracy_data *tracy_data, struct tracy_gpu_zone_context *out_ctx,
-		const int line, const char *source, const char *func, const char *name) {
+void tracy_gpu_zone_begin(struct fx_renderer *fx_renderer,
+		struct tracy_gpu_zone_context *out_ctx, const int line, const char *source,
+		const char *func, const char *name) {
 	*out_ctx = (struct tracy_gpu_zone_context) { 0 };
-	if (out_ctx == NULL || tracy_data == NULL) {
-		return;
+	if (TRACY_AVAILABLE(fx_renderer)) {
+		fx_renderer->impl->tracy->gpu_zone_begin(fx_renderer, fx_renderer->tracy_data,
+				out_ctx, line, source, func, name);
 	}
-	if (!tracy_data->fx_renderer || !tracy_data->fx_renderer->tracy_capable) {
-		return;
-	}
-	struct fx_renderer *fx_renderer = tracy_data->fx_renderer;
-	fx_renderer->impl->tracy_gpu_zone_begin(fx_renderer, tracy_data, out_ctx, line, source, func, name);
 }
 
 void tracy_gpu_zone_end(struct tracy_gpu_zone_context *ctx) {
-	if (ctx == NULL || ctx->tracy_data == NULL || !ctx->is_active) {
-		return;
+	if (ctx->is_active && ctx->tracy_data != NULL
+			&& TRACY_AVAILABLE(ctx->tracy_data->fx_renderer)) {
+		ctx->tracy_data->fx_renderer->impl->tracy->gpu_zone_end(
+				ctx->tracy_data->fx_renderer, ctx);
 	}
-	struct tracy_data *tracy_data = ctx->tracy_data;
-	if (tracy_data == NULL || tracy_data->fx_renderer == NULL
-			|| !tracy_data->fx_renderer->tracy_capable) {
-		return;
-	}
-	struct fx_renderer *fx_renderer = tracy_data->fx_renderer;
-	fx_renderer->impl->tracy_gpu_zone_end(fx_renderer, ctx);
 }
 
-void tracy_gpu_context_collect(struct tracy_data *tracy_data) {
-	if (tracy_data == NULL) {
+void tracy_gpu_context_collect(struct fx_renderer *fx_renderer) {
+	if (!TRACY_AVAILABLE(fx_renderer)) {
 		TracyCMessageL("tracy_data == NULL");
-		return;
-	}
-	if (!tracy_data->fx_renderer || !tracy_data->fx_renderer->tracy_capable) {
 		return;
 	}
 
 	TracyCZoneC(ctx, RED4, true);
 
-	struct fx_renderer *fx_renderer = tracy_data->fx_renderer;
-	fx_renderer->impl->tracy_gpu_context_collect(fx_renderer, tracy_data);
+	fx_renderer->impl->tracy->gpu_context_collect(fx_renderer, fx_renderer->tracy_data);
 
 	TracyCZoneEnd(ctx);
 }
 
-void tracy_gpu_context_destroy(struct tracy_data *tracy_data) {
-	if (tracy_data == NULL) {
-		return;
-	}
-	if (!tracy_data->fx_renderer || !tracy_data->fx_renderer->tracy_capable) {
-		return;
-	}
+void tracy_gpu_context_destroy(struct fx_renderer *fx_renderer) {
+	if (TRACY_AVAILABLE(fx_renderer)) {
+		fx_renderer->impl->tracy->gpu_context_destroy(fx_renderer, fx_renderer->tracy_data);
 
-	struct fx_renderer *fx_renderer = tracy_data->fx_renderer;
-	fx_renderer->impl->tracy_gpu_context_destroy(fx_renderer, tracy_data);
-
-	free(tracy_data);
+		free(fx_renderer->tracy_data);
+		fx_renderer->tracy_data = NULL;
+	}
 }
 
 struct tracy_data *tracy_gpu_context_new(struct fx_renderer *fx_renderer) {
 	assert(fx_renderer);
-	if (!fx_renderer->tracy_capable) {
+	if (fx_renderer->impl->tracy == NULL) {
 		wlr_log(WLR_ERROR, "FX Renderer not Tracy capable");
 		return NULL;
 	}
-
-	return fx_renderer->impl->tracy_gpu_context_new(fx_renderer);
+	return fx_renderer->impl->tracy->gpu_context_new(fx_renderer);
 }
+
 #endif /* ifdef TRACY_ENABLE */

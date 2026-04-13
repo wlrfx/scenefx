@@ -7,6 +7,9 @@
 #define TRACY_FN(...) // noop
 #endif  // TRACY_ENABLE
 
+struct tracy_data;
+struct tracy_gpu_zone_context;
+
 #ifdef TRACY_ENABLE
 #include <assert.h>
 #include <tracy/TracyC.h>
@@ -34,12 +37,13 @@ struct tracy_gpu_zone_context {
 
 unsigned int tracy_get_next_query_index(struct tracy_data *tracy_data);
 
-void tracy_gpu_zone_begin(struct tracy_data *tracy_data, struct tracy_gpu_zone_context *out_ctx,
-		const int line, const char *source, const char *func, const char *name);
+void tracy_gpu_zone_begin(struct fx_renderer *fx_renderer,
+		struct tracy_gpu_zone_context *out_ctx, const int line, const char *source,
+		const char *func, const char *name);
 void tracy_gpu_zone_end(struct tracy_gpu_zone_context *ctx);
 
-void tracy_gpu_context_collect(struct tracy_data *tracy_data);
-void tracy_gpu_context_destroy(struct tracy_data *tracy_data);
+void tracy_gpu_context_collect(struct fx_renderer *fx_renderer);
+void tracy_gpu_context_destroy(struct fx_renderer *fx_renderer);
 struct tracy_data *tracy_gpu_context_new(struct fx_renderer *fx_renderer);
 #endif  // TRACY_ENABLE
 
@@ -139,21 +143,18 @@ struct tracy_data *tracy_gpu_context_new(struct fx_renderer *fx_renderer);
 
 #define TRACY_GPU_ZONE_START_NAME(renderer, name) \
 	TRACY_FN( \
-		struct tracy_gpu_zone_context gpu_ctx; \
-		tracy_gpu_zone_begin(renderer->tracy_data, &gpu_ctx, __LINE__, __FILE__, __func__, name) \
+		struct tracy_gpu_zone_context gpu_ctx = {0}; \
+		tracy_gpu_zone_begin(renderer, &gpu_ctx, __LINE__, __FILE__, __func__, name) \
 	)
 #define TRACY_GPU_ZONE_START(renderer) \
-	TRACY_FN( \
-		struct tracy_gpu_zone_context gpu_ctx; \
-		tracy_gpu_zone_begin(renderer->tracy_data, &gpu_ctx, __LINE__, __FILE__, __func__, __func__) \
-	)
+	TRACY_GPU_ZONE_START_NAME(renderer, __func__)
 #define TRACY_GPU_ZONE_END \
 	TRACY_FN( \
 		tracy_gpu_zone_end(&gpu_ctx) \
 	)
 #define TRACY_GPU_ZONE_COLLECT(renderer) \
 	TRACY_FN( \
-		tracy_gpu_context_collect(renderer->tracy_data) \
+		tracy_gpu_context_collect((renderer)->tracy_data) \
 	)
 
 /**
@@ -164,9 +165,9 @@ struct tracy_data *tracy_gpu_context_new(struct fx_renderer *fx_renderer);
 	TRACY_FN( \
 		tracy_gpu_context_new(renderer) \
 	)
-#define TRACY_GPU_CONTEXT_DESTROY(tracy_data) \
+#define TRACY_GPU_CONTEXT_DESTROY(renderer) \
 	TRACY_FN( \
-		tracy_gpu_context_destroy(tracy_data); \
+		tracy_gpu_context_destroy(renderer); \
 	)
 
 /**

@@ -187,11 +187,7 @@ static const struct fx_renderer_impl renderer_impl = {
 	.renderer_destroy = renderer_destroy,
 
 #ifdef TRACY_ENABLE
-	.tracy_gpu_zone_begin = gles2_tracy_gpu_zone_begin,
-	.tracy_gpu_zone_end = gles2_tracy_gpu_zone_end,
-	.tracy_gpu_context_collect = gles2_tracy_gpu_context_collect,
-	.tracy_gpu_context_destroy = gles2_tracy_gpu_context_destroy,
-	.tracy_gpu_context_new = gles2_tracy_gpu_context_new,
+	.tracy = &gles2_renderer_tracy_impl,
 #endif
 };
 

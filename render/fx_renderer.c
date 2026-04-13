@@ -16,6 +16,7 @@
 static void scene_addon_handle_destroy(struct wlr_addon *addon) {
 	struct fx_renderer *fx_renderer = wl_container_of(addon, fx_renderer, scene_addon);
 	wlr_addon_finish(&fx_renderer->scene_addon);
+	fx_renderer->scene_addon_attached = false;
 }
 
 static const struct wlr_addon_interface fx_renderer_scene_addon_impl = {
@@ -31,7 +32,10 @@ static void handle_renderer_destroy(struct wl_listener *listener, void *data) {
 	TRACY_GPU_CONTEXT_DESTROY(fx_renderer);
 
 	wl_list_remove(&fx_renderer->renderer_destroy.link);
-	wlr_addon_finish(&fx_renderer->scene_addon);
+
+	if (fx_renderer->scene_addon_attached) {
+		scene_addon_handle_destroy(&fx_renderer->scene_addon);
+	}
 
 	struct fx_offscreen_buffers *offscreen_buffers, *offscreen_buffers_tmp;
 	wl_list_for_each_safe(offscreen_buffers, offscreen_buffers_tmp,
@@ -50,6 +54,7 @@ void fx_renderer_init(struct fx_renderer *fx_renderer,
 	assert(impl->renderer_destroy);
 
 	*fx_renderer = (struct fx_renderer) {
+		.scene_addon_attached = false,
 		.impl = impl,
 		.wlr_renderer = wlr_renderer,
 		.tracy_data = NULL,
@@ -122,6 +127,8 @@ renderer_created:
 	// wlr_renderer is the owner as there could be multiple fx_renderers.
 	wlr_addon_init(&fx_renderer->scene_addon, &wlr_scene->tree.node.addons,
 			wlr_renderer, &fx_renderer_scene_addon_impl);
+	fx_renderer->scene_addon_attached = true;
+
 	return fx_renderer;
 }
 

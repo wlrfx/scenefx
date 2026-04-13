@@ -122,6 +122,8 @@ struct fx_renderer {
 	struct wlr_renderer *wlr_renderer;
 
 	struct wlr_addon scene_addon;
+	bool scene_addon_attached;
+
 	const struct fx_renderer_impl *impl;
 
 	// NULL if not supported or disabled

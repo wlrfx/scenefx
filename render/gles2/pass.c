@@ -230,7 +230,7 @@ static void gles2_render_pass_read_to_buffer(struct fx_render_pass *fx_pass,
 	wlr_texture_destroy(src_tex);
 
 	// Bind back to the main WLR buffer
-	gles2_framebuffer_bind(pass->gles2_buffer);
+	glBindFramebuffer(GL_FRAMEBUFFER, pass->gles2_buffer->fbo);
 
 done:
 	TRACY_BOTH_ZONES_END;
@@ -997,7 +997,7 @@ static struct gles2_buffer *get_main_buffer_blur(struct gles2_render_pass *pass,
 	pixman_region32_fini(&damage);
 
 	// Bind back to the default buffer
-	gles2_framebuffer_bind(pass->gles2_buffer);
+	glBindFramebuffer(GL_FRAMEBUFFER, pass->gles2_buffer->fbo);
 
 	pop_fx_debug(gles2_renderer);
 	TRACY_BOTH_ZONES_END;
@@ -1223,7 +1223,7 @@ struct fx_render_pass *gles2_render_pass_init(struct fx_renderer *fx_renderer,
 			&pass->gles2_offscreen_buffers->optimized_no_blur_buffer, &failed);
 
 	// Bind back to the default buffer
-	gles2_framebuffer_bind(pass->gles2_buffer);
+	glBindFramebuffer(GL_FRAMEBUFFER, pass->gles2_buffer->fbo);
 
 	if (failed) {
 		wlr_log(WLR_ERROR, "Failed to create effect framebuffers");

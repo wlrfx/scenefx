@@ -2,15 +2,6 @@
 
 #include "render/fx_renderer.h"
 
-struct fx_render_pass *fx_renderer_init_render_pass(struct fx_renderer *fx_renderer,
-		struct wlr_render_pass *wlr_render_pass, struct wlr_buffer *wlr_buffer,
-		struct wlr_output *output) {
-	if (fx_renderer == NULL || fx_renderer->wlr_renderer != output->renderer) {
-		return NULL;
-	}
-	return fx_renderer->impl->render_pass_allocate(fx_renderer, wlr_render_pass, wlr_buffer, output);
-}
-
 void fx_render_pass_init(struct fx_render_pass *render_pass,
 		const struct fx_render_pass_impl *impl, struct fx_renderer *fx_renderer,
 		struct wlr_render_pass *wlr_render_pass) {
@@ -26,10 +17,10 @@ void fx_render_pass_init(struct fx_render_pass *render_pass,
 }
 
 void fx_render_pass_destroy(struct fx_render_pass *render_pass) {
+	render_pass->impl->destroy(render_pass);
+
 	pixman_region32_fini(&render_pass->blur_padding_region);
 	render_pass->has_blur = false;
-
-	render_pass->impl->destroy(render_pass);
 }
 
 void fx_render_pass_add_texture(struct fx_render_pass *render_pass,

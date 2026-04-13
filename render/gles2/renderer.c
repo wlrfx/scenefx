@@ -181,7 +181,6 @@ static void renderer_destroy(struct fx_renderer *fx_renderer) {
 }
 
 static const struct fx_renderer_impl renderer_impl = {
-	// .name = "gles2_renderer",
 	.offscreen_buffers_allocate = offscreen_buffers_allocate,
 	.render_pass_allocate = gles2_render_pass_init,
 	.renderer_destroy = renderer_destroy,
@@ -202,7 +201,7 @@ struct fx_renderer *gles2_renderer_create(struct wlr_renderer *wlr_renderer) {
 	gles2_renderer->wlr_egl = wlr_gles2_renderer_get_egl(wlr_renderer);
 	assert(gles2_renderer->wlr_egl);
 	if (!egl_ensure_current(gles2_renderer)) {
-		goto error;
+		goto egl_error;
 	}
 
 	// EGL extensions
@@ -260,19 +259,14 @@ struct fx_renderer *gles2_renderer_create(struct wlr_renderer *wlr_renderer) {
 	pop_fx_debug(gles2_renderer);
 
 	fx_renderer_init(&gles2_renderer->fx_renderer, &renderer_impl, wlr_renderer);
-
 	wlr_log(WLR_INFO, "GLES2 FX RENDERER: Shaders Initialized Successfully");
-
 	return &gles2_renderer->fx_renderer;
+
 gl_error:
 	pop_fx_debug(gles2_renderer);
-error:
+egl_error:
 	free(gles2_renderer);
 	return NULL;
-}
-
-void gles2_framebuffer_bind(struct gles2_buffer *gles2_buffer) {
-	glBindFramebuffer(GL_FRAMEBUFFER, gles2_buffer->fbo);
 }
 
 static bool fx_renderer_is_gles2(const struct fx_renderer *fx_renderer) {

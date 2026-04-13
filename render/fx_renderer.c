@@ -136,3 +136,12 @@ struct wlr_renderer *scenefx_init(struct wlr_scene *wlr_scene, struct wlr_backen
 	struct fx_renderer *fx_renderer = scenefx_init_complete(wlr_scene, backend);
 	return fx_renderer_get_wlr_renderer(fx_renderer);
 }
+
+struct fx_render_pass *fx_renderer_init_render_pass(struct fx_renderer *fx_renderer,
+		struct wlr_render_pass *wlr_render_pass, struct wlr_buffer *wlr_buffer,
+		struct wlr_output *output) {
+	if (fx_renderer == NULL || fx_renderer->wlr_renderer != output->renderer) {
+		return NULL;
+	}
+	return fx_renderer->impl->render_pass_allocate(fx_renderer, wlr_render_pass, wlr_buffer, output);
+}

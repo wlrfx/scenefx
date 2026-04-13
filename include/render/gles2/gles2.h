@@ -34,7 +34,6 @@ void gles2_buffer_get_or_allocate(struct fx_renderer *fx_renderer,
 		struct wlr_allocator *allocator, int width, int height, bool has_alpha,
 		struct gles2_buffer **gles2_buffer, bool *failed);
 void gles2_buffer_destroy(struct gles2_buffer *buffer);
-void gles2_framebuffer_bind(struct gles2_buffer *gles2_buffer);
 
 struct gles2_offscreen_buffers {
 	struct fx_offscreen_buffers fx_offscreen_buffers;

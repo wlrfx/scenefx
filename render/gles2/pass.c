@@ -1198,8 +1198,8 @@ struct fx_render_pass *gles2_render_pass_init(struct fx_renderer *fx_renderer,
 	pass->gles2_renderer = gles2_get_renderer(fx_renderer);
 	pass->gles2_buffer = gles2_buffer_get_or_create(fx_renderer, wlr_buffer, true);
 	if (pass->gles2_buffer == NULL) {
-		free(pass);
-		return NULL;
+		wlr_log(WLR_ERROR, "Failed to get/create gles2 main buffer");
+		goto buffer_get_fail;
 	}
 
 	// Save the same matrix projection that wlr_gles2_render_pass uses
@@ -1212,10 +1212,7 @@ struct fx_render_pass *gles2_render_pass_init(struct fx_renderer *fx_renderer,
 	if (pass->gles2_offscreen_buffers == NULL) {
 		wlr_log(WLR_ERROR, "Failed to get/create effect framebuffers for output: %s",
 				output->name);
-		gles2_buffer_destroy(pass->gles2_buffer);
-		pass->gles2_buffer = NULL;
-		free(pass);
-		return NULL;
+		goto offscreen_buffers_get_create_fail;
 	}
 
 	// Update the buffers if needed
@@ -1237,12 +1234,17 @@ struct fx_render_pass *gles2_render_pass_init(struct fx_renderer *fx_renderer,
 	gles2_framebuffer_bind(pass->gles2_buffer);
 
 	if (failed) {
-		fx_offscreen_buffers_destroy(&pass->gles2_offscreen_buffers->fx_offscreen_buffers);
-		gles2_buffer_destroy(pass->gles2_buffer);
-		pass->gles2_buffer = NULL;
-		free(pass);
 		wlr_log(WLR_ERROR, "Failed to create effect framebuffers");
-		return NULL;
+		goto offscreen_buffer_allocate_fail;
 	}
 	return &pass->fx_render_pass;
+
+offscreen_buffer_allocate_fail:
+	fx_offscreen_buffers_destroy(&pass->gles2_offscreen_buffers->fx_offscreen_buffers);
+offscreen_buffers_get_create_fail:
+	gles2_buffer_destroy(pass->gles2_buffer);
+	pass->gles2_buffer = NULL;
+buffer_get_fail:
+	free(pass);
+	return NULL;
 }

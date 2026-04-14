@@ -1,3 +1,4 @@
 option('examples', type: 'boolean', value: true, description: 'Build example applications')
 option('renderers', type: 'array', choices: ['auto', 'gles2'], value: ['auto'], description: 'Select built-in renderers')
 option('tracy_enable', type: 'boolean', value: false, description: 'Enable profiling')
+option( 'force_fragment_shader_precision_high', type: 'boolean', value: false)

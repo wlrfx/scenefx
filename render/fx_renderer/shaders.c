@@ -101,7 +101,8 @@ void load_gl_proc(void *proc_ptr, const char *name) {
 	*(void **)proc_ptr = proc;
 }
 
-void uniform_corner_radii_set(struct shader_corner_radii *uniform, struct fx_corner_fradii *corners) {
+void uniform_corner_radii_set(const struct shader_corner_radii *uniform,
+		const struct fx_corner_fradii *corners) {
 	glUniform1f(uniform->top_left, corners->top_left);
 	glUniform1f(uniform->top_right, corners->top_right);
 	glUniform1f(uniform->bottom_left, corners->bottom_left);

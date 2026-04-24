@@ -21,3 +21,11 @@ void output_pending_resolution(struct wlr_output *output,
 		*height = output->height;
 	}
 }
+
+const struct wlr_output_image_description *output_pending_image_description(
+		struct wlr_output *output, const struct wlr_output_state *state) {
+	if (state->committed & WLR_OUTPUT_STATE_IMAGE_DESCRIPTION) {
+		return state->image_description;
+	}
+	return output->image_description;
+}

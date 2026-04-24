@@ -45,8 +45,24 @@ static const struct wlr_pixel_format_info pixel_format_info[] = {
 		.bytes_per_block = 1,
 	},
 	{
+		.drm_format = DRM_FORMAT_R16F,
+		.bytes_per_block = 2,
+	},
+	{
+		.drm_format = DRM_FORMAT_R32F,
+		.bytes_per_block = 4,
+	},
+	{
 		.drm_format = DRM_FORMAT_GR88,
 		.bytes_per_block = 2,
+	},
+	{
+		.drm_format = DRM_FORMAT_GR1616F,
+		.bytes_per_block = 4,
+	},
+	{
+		.drm_format = DRM_FORMAT_GR3232F,
+		.bytes_per_block = 8,
 	},
 	{
 		.drm_format = DRM_FORMAT_RGB888,
@@ -55,6 +71,18 @@ static const struct wlr_pixel_format_info pixel_format_info[] = {
 	{
 		.drm_format = DRM_FORMAT_BGR888,
 		.bytes_per_block = 3,
+	},
+	{
+		.drm_format = DRM_FORMAT_BGR161616,
+		.bytes_per_block = 6,
+	},
+	{
+		.drm_format = DRM_FORMAT_BGR161616F,
+		.bytes_per_block = 6,
+	},
+	{
+		.drm_format = DRM_FORMAT_BGR323232F,
+		.bytes_per_block = 12,
 	},
 	{
 		.drm_format = DRM_FORMAT_RGBX4444,
@@ -135,6 +163,10 @@ static const struct wlr_pixel_format_info pixel_format_info[] = {
 		.drm_format = DRM_FORMAT_ABGR16161616F,
 		.opaque_substitute = DRM_FORMAT_XBGR16161616F,
 		.bytes_per_block = 8,
+	},
+	{
+		.drm_format = DRM_FORMAT_ABGR32323232F,
+		.bytes_per_block = 16,
 	},
 	{
 		.drm_format = DRM_FORMAT_XBGR16161616,
@@ -274,4 +306,69 @@ bool pixel_format_has_alpha(uint32_t fmt) {
 		}
 	}
 	return true;
+}
+
+bool pixel_format_is_ycbcr(uint32_t format) {
+	switch (format) {
+	case DRM_FORMAT_AYUV:
+	case DRM_FORMAT_NV12:
+	case DRM_FORMAT_NV15:
+	case DRM_FORMAT_NV16:
+	case DRM_FORMAT_NV20:
+	case DRM_FORMAT_NV21:
+	case DRM_FORMAT_NV24:
+	case DRM_FORMAT_NV30:
+	case DRM_FORMAT_NV42:
+	case DRM_FORMAT_NV61:
+	case DRM_FORMAT_P010:
+	case DRM_FORMAT_P012:
+	case DRM_FORMAT_P016:
+	case DRM_FORMAT_P030:
+	case DRM_FORMAT_P210:
+	case DRM_FORMAT_Q401:
+	case DRM_FORMAT_Q410:
+	case DRM_FORMAT_S010:
+	case DRM_FORMAT_S012:
+	case DRM_FORMAT_S016:
+	case DRM_FORMAT_S210:
+	case DRM_FORMAT_S212:
+	case DRM_FORMAT_S216:
+	case DRM_FORMAT_S410:
+	case DRM_FORMAT_S412:
+	case DRM_FORMAT_S416:
+	case DRM_FORMAT_UYVY:
+	case DRM_FORMAT_VUY101010:
+	case DRM_FORMAT_VUY888:
+	case DRM_FORMAT_VYUY:
+	case DRM_FORMAT_X0L0:
+	case DRM_FORMAT_X0L2:
+	case DRM_FORMAT_XVYU12_16161616:
+	case DRM_FORMAT_XVYU16161616:
+	case DRM_FORMAT_XVYU2101010:
+	case DRM_FORMAT_XYUV8888:
+	case DRM_FORMAT_Y0L0:
+	case DRM_FORMAT_Y0L2:
+	case DRM_FORMAT_Y210:
+	case DRM_FORMAT_Y212:
+	case DRM_FORMAT_Y216:
+	case DRM_FORMAT_Y410:
+	case DRM_FORMAT_Y412:
+	case DRM_FORMAT_Y416:
+	case DRM_FORMAT_YUV410:
+	case DRM_FORMAT_YUV411:
+	case DRM_FORMAT_YUV420:
+	case DRM_FORMAT_YUV420_10BIT:
+	case DRM_FORMAT_YUV420_8BIT:
+	case DRM_FORMAT_YUV422:
+	case DRM_FORMAT_YUV444:
+	case DRM_FORMAT_YUYV:
+	case DRM_FORMAT_YVU410:
+	case DRM_FORMAT_YVU411:
+	case DRM_FORMAT_YVU420:
+	case DRM_FORMAT_YVU422:
+	case DRM_FORMAT_YVU444:
+	case DRM_FORMAT_YVYU:
+		return true;
+	}
+	return false;
 }

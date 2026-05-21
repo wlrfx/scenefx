@@ -1,4 +1,4 @@
 #!/bin/sh -eu
-
-# glslang prints log messages to stdout, remap to stderr
-exec "$@" >&2
+# Validate GLSL shaders via temp-file preprocessing.
+cd "$(dirname "$0")"
+exec python3 validate_shaders.py "$@"

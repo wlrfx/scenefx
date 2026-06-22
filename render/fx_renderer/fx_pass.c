@@ -512,24 +512,13 @@ void fx_render_pass_add_rect(struct fx_gles_render_pass *pass,
 	struct wlr_buffer *wlr_buffer = pass->buffer->buffer;
 	wlr_render_rect_options_get_box(options, wlr_buffer, &box);
 
-	pixman_region32_t clip_region;
-	if (options->clip) {
-		pixman_region32_init(&clip_region);
-		pixman_region32_copy(&clip_region, options->clip);
-	} else {
-		pixman_region32_init_rect(&clip_region, box.x, box.y, box.width, box.height);
-	}
-	const struct wlr_box *clipped_region_box = &fx_options->clipped_region.area;
-	const struct fx_corner_fradii *clipped_region_corners = &fx_options->clipped_region.corners;
-	const bool should_clip = clipped_fregion_is_valid(&fx_options->clipped_region)
-		&& apply_clip_region(&clip_region, clipped_region_box, clipped_region_corners);
+	const bool should_clip = clipped_fregion_is_valid(&fx_options->clipped_region);
 
 	enum wlr_render_blend_mode blend_mode =
 		(color->a == 1.0 && !should_clip) ? WLR_RENDER_BLEND_MODE_NONE : options->blend_mode;
 	const bool use_fast_clear =
 		blend_mode == WLR_RENDER_BLEND_MODE_NONE && // includes check for `should_clip`
 		options->clip == NULL &&
-		pixman_region32_empty(&clip_region) &&
 		box.x == 0 && box.y == 0 &&
 		box.width == wlr_buffer->width &&
 		box.height == wlr_buffer->height;
@@ -540,11 +529,13 @@ void fx_render_pass_add_rect(struct fx_gles_render_pass *pass,
 	TRACY_ZONE_TEXT_f("Use fast clear optimization: %d", use_fast_clear);
 
 	push_fx_debug(renderer);
-
 	if (use_fast_clear) {
 		glClearColor(color->r, color->g, color->b, color->a);
 		glClear(GL_COLOR_BUFFER_BIT);
 	} else {
+		const struct wlr_box *clipped_region_box = &fx_options->clipped_region.area;
+		const struct fx_corner_fradii *clipped_region_corners = &fx_options->clipped_region.corners;
+
 		TRACY_ZONE_TEXT_f("Clip Box (WxH, X, Y): %dx%d, %d, %d",
 				clipped_region_box->width, clipped_region_box->height,
 				clipped_region_box->x, clipped_region_box->y);
@@ -553,6 +544,16 @@ void fx_render_pass_add_rect(struct fx_gles_render_pass *pass,
 				clipped_region_corners->top_right,
 				clipped_region_corners->bottom_left,
 				clipped_region_corners->bottom_right);
+
+		pixman_region32_t clip_region;
+		if (options->clip) {
+			pixman_region32_init(&clip_region);
+			pixman_region32_copy(&clip_region, options->clip);
+		} else {
+			pixman_region32_init_rect(&clip_region, box.x, box.y, box.width, box.height);
+		}
+
+		apply_clip_region(&clip_region, clipped_region_box, clipped_region_corners);
 
 		setup_blending(blend_mode);
 		struct quad_shader *shader = should_clip
@@ -567,9 +568,9 @@ void fx_render_pass_add_rect(struct fx_gles_render_pass *pass,
 			uniform_corner_radii_set(&shader->effects.clip_radius, clipped_region_corners);
 		}
 		render(&box, &clip_region, shader->pos_attrib);
-	}
 
-	pixman_region32_fini(&clip_region);
+		pixman_region32_fini(&clip_region);
+	}
 
 	pop_fx_debug(renderer);
 	TRACY_BOTH_ZONES_END;

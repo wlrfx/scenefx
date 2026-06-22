@@ -526,13 +526,13 @@ void fx_render_pass_add_rect(struct fx_gles_render_pass *pass,
 
 	enum wlr_render_blend_mode blend_mode =
 		(color->a == 1.0 && !should_clip) ? WLR_RENDER_BLEND_MODE_NONE : options->blend_mode;
-	const bool use_fast_clear = blend_mode == WLR_RENDER_BLEND_MODE_NONE &&
-			options->clip == NULL &&
-			!should_clip &&
-			pixman_region32_empty(&clip_region) &&
-			box.x == 0 && box.y == 0 &&
-			box.width == wlr_buffer->width &&
-			box.height == wlr_buffer->height;
+	const bool use_fast_clear =
+		blend_mode == WLR_RENDER_BLEND_MODE_NONE && // includes check for `should_clip`
+		options->clip == NULL &&
+		pixman_region32_empty(&clip_region) &&
+		box.x == 0 && box.y == 0 &&
+		box.width == wlr_buffer->width &&
+		box.height == wlr_buffer->height;
 
 	TRACY_BOTH_ZONES_START(renderer);
 	TRACY_ZONE_TEXT_f("Box (WxH, X, Y): %dx%d, %d, %d", box.width, box.height, box.x, box.y);

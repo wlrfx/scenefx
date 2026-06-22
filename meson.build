@@ -67,7 +67,7 @@ else
 endif
 
 features = {
-	'gles2-renderer': false,
+	'gles2-renderer': true,
 	'color-management': false,
 }
 internal_features = {

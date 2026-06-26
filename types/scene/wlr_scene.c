@@ -7,6 +7,7 @@
 #include <wlr/render/swapchain.h>
 #include <wlr/render/drm_syncobj.h>
 #include <wlr/render/wlr_renderer.h>
+#include <wlr/types/wlr_color_management_v1.h>
 #include <wlr/types/wlr_compositor.h>
 #include <wlr/types/wlr_damage_ring.h>
 #include <wlr/types/wlr_gamma_control_v1.h>
@@ -16,6 +17,7 @@
 #include <wlr/util/region.h>
 #include <wlr/util/transform.h>
 
+#include "render/color.h"
 #include "render/tracy.h"
 #include "scenefx/render/fx_renderer/fx_offscreen_buffers.h"
 #include "scenefx/render/pass.h"
@@ -216,6 +218,8 @@ struct wlr_scene *wlr_scene_create(void) {
 	wl_list_init(&scene->gamma_control_manager_v1_destroy.link);
 	wl_list_init(&scene->gamma_control_manager_v1_set_gamma.link);
 
+	scene->restack_xwayland_surfaces = true;
+
 	const char *debug_damage_options[] = {
 		"none",
 		"rerender",
@@ -245,8 +249,6 @@ struct wlr_scene_tree *wlr_scene_tree_create(struct wlr_scene_tree *parent) {
 	return tree;
 }
 
-static void scene_node_get_size(struct wlr_scene_node *node, int *lx, int *ly);
-
 typedef bool (*scene_node_box_iterator_func_t)(struct wlr_scene_node *node,
 	int sx, int sy, void *data);
 
@@ -266,10 +268,10 @@ static bool _scene_nodes_in_box(struct wlr_scene_node *node, struct wlr_box *box
 			}
 		}
 		break;
-	case WLR_SCENE_NODE_OPTIMIZED_BLUR:;
 	case WLR_SCENE_NODE_RECT:
+	case WLR_SCENE_NODE_BUFFER:
 	case WLR_SCENE_NODE_SHADOW:
-	case WLR_SCENE_NODE_BUFFER:;
+	case WLR_SCENE_NODE_OPTIMIZED_BLUR:
 	case WLR_SCENE_NODE_BLUR:;
 		struct wlr_box node_box = { .x = lx, .y = ly };
 		scene_node_get_size(node, &node_box.width, &node_box.height);
@@ -349,9 +351,6 @@ static void scene_node_opaque_region(struct wlr_scene_node *node, int x, int y,
 			pixman_region32_fini(&clipped_region);
 		}
 		return;
-	} else if (node->type == WLR_SCENE_NODE_SHADOW) {
-		// TODO: test & handle case of blur sigma = 0 and color[3] = 1?
-		return;
 	} else if (node->type == WLR_SCENE_NODE_BUFFER) {
 		struct wlr_scene_buffer *scene_buffer = wlr_scene_buffer_from_node(node);
 
@@ -380,6 +379,9 @@ static void scene_node_opaque_region(struct wlr_scene_node *node, int x, int y,
 		}
 
 		return;
+	} else if (node->type == WLR_SCENE_NODE_SHADOW) {
+		// TODO: test & handle case of blur sigma = 0 and color[3] = 1?
+		return;
 	} else if (node->type == WLR_SCENE_NODE_OPTIMIZED_BLUR || node->type == WLR_SCENE_NODE_BLUR) {
 		// Always transparent
 		return;
@@ -391,17 +393,18 @@ static void scene_node_opaque_region(struct wlr_scene_node *node, int x, int y,
 
 struct scene_update_data {
 	pixman_region32_t *visible;
-	pixman_region32_t *update_region;
+	const pixman_region32_t *update_region;
 	struct wlr_box update_box;
 	struct wl_list *outputs;
 	bool calculate_visibility;
+	bool restack_xwayland_surfaces;
 
 #if WLR_HAS_XWAYLAND
 	struct wlr_xwayland_surface *restack_above;
 #endif
 };
 
-static uint32_t region_area(pixman_region32_t *region) {
+static uint32_t region_area(const pixman_region32_t *region) {
 	uint32_t area = 0;
 
 	int nrects;
@@ -493,7 +496,7 @@ static void scene_output_damage_whole(struct wlr_scene_output *scene_output) {
 	pixman_region32_fini(&damage);
 }
 
-static void scene_damage_outputs(struct wlr_scene *scene, pixman_region32_t *damage) {
+static void scene_damage_outputs(struct wlr_scene *scene, const pixman_region32_t *damage) {
 	if (pixman_region32_empty(damage)) {
 		return;
 	}
@@ -528,46 +531,51 @@ static void update_node_update_outputs(struct wlr_scene_node *node,
 	size_t count = 0;
 	uint64_t active_outputs = 0;
 
-	// let's update the outputs in two steps:
-	//  - the primary outputs
-	//  - the enter/leave signals
-	// This ensures that the enter/leave signals can rely on the primary output
-	// to have a reasonable value. Otherwise, they may get a value that's in
-	// the middle of a calculation.
-	struct wlr_scene_output *scene_output;
-	wl_list_for_each(scene_output, outputs, link) {
-		if (scene_output == ignore) {
-			continue;
-		}
+	if (!pixman_region32_empty(&node->visible)) {
+		uint32_t visible_area = region_area(&node->visible);
 
-		if (!scene_output->output->enabled) {
-			continue;
-		}
-
-		struct wlr_box output_box = {
-			.x = scene_output->x,
-			.y = scene_output->y,
-		};
-		wlr_output_effective_resolution(scene_output->output,
-			&output_box.width, &output_box.height);
-
-		pixman_region32_t intersection;
-		pixman_region32_init(&intersection);
-		pixman_region32_intersect_rect(&intersection, &node->visible,
-			output_box.x, output_box.y, output_box.width, output_box.height);
-
-		if (!pixman_region32_empty(&intersection)) {
-			uint32_t overlap = region_area(&intersection);
-			if (overlap >= largest_overlap) {
-				largest_overlap = overlap;
-				scene_buffer->primary_output = scene_output;
+		// let's update the outputs in two steps:
+		//  - the primary outputs
+		//  - the enter/leave signals
+		// This ensures that the enter/leave signals can rely on the primary output
+		// to have a reasonable value. Otherwise, they may get a value that's in
+		// the middle of a calculation.
+		struct wlr_scene_output *scene_output;
+		wl_list_for_each(scene_output, outputs, link) {
+			if (scene_output == ignore) {
+				continue;
 			}
 
-			active_outputs |= 1ull << scene_output->index;
-			count++;
-		}
+			if (!scene_output->output->enabled) {
+				continue;
+			}
 
-		pixman_region32_fini(&intersection);
+			struct wlr_box output_box = {
+				.x = scene_output->x,
+				.y = scene_output->y,
+			};
+			wlr_output_effective_resolution(scene_output->output,
+				&output_box.width, &output_box.height);
+
+			pixman_region32_t intersection;
+			pixman_region32_init(&intersection);
+			pixman_region32_intersect_rect(&intersection, &node->visible,
+				output_box.x, output_box.y, output_box.width, output_box.height);
+			uint32_t overlap = region_area(&intersection);
+			pixman_region32_fini(&intersection);
+
+			// If the overlap accounts for less than 10% of the visible node area,
+			// ignore this output
+			if (overlap >= 0.1 * visible_area) {
+				if (overlap >= largest_overlap) {
+					largest_overlap = overlap;
+					scene_buffer->primary_output = scene_output;
+				}
+
+				active_outputs |= 1ull << scene_output->index;
+				count++;
+			}
+		}
 	}
 
 	if (old_primary_output != scene_buffer->primary_output) {
@@ -578,6 +586,7 @@ static void update_node_update_outputs(struct wlr_scene_node *node,
 	uint64_t old_active = scene_buffer->active_outputs;
 	scene_buffer->active_outputs = active_outputs;
 
+	struct wlr_scene_output *scene_output;
 	wl_list_for_each(scene_output, outputs, link) {
 		uint64_t mask = 1ull << scene_output->index;
 		bool intersects = active_outputs & mask;
@@ -662,25 +671,6 @@ static void restack_xwayland_surface(struct wlr_scene_node *node,
 
 	data->restack_above = xwayland_surface;
 }
-
-static void restack_xwayland_surface_below(struct wlr_scene_node *node) {
-	if (node->type == WLR_SCENE_NODE_TREE) {
-		struct wlr_scene_tree *scene_tree = wlr_scene_tree_from_node(node);
-		struct wlr_scene_node *child;
-		wl_list_for_each(child, &scene_tree->children, link) {
-			restack_xwayland_surface_below(child);
-		}
-		return;
-	}
-
-	struct wlr_xwayland_surface *xwayland_surface =
-		scene_node_try_get_managed_xwayland_surface(node);
-	if (!xwayland_surface) {
-		return;
-	}
-
-	wlr_xwayland_surface_restack(xwayland_surface, NULL, XCB_STACK_MODE_BELOW);
-}
 #endif
 
 static bool scene_node_update_iterator(struct wlr_scene_node *node,
@@ -716,7 +706,9 @@ static bool scene_node_update_iterator(struct wlr_scene_node *node,
 
 	update_node_update_outputs(node, data->outputs, NULL, NULL);
 #if WLR_HAS_XWAYLAND
-	restack_xwayland_surface(node, &box, data);
+	if (data->restack_xwayland_surfaces) {
+		restack_xwayland_surface(node, &box, data);
+	}
 #endif
 
 	return false;
@@ -761,7 +753,7 @@ static void scene_node_bounds(struct wlr_scene_node *node,
 }
 
 static void scene_update_region(struct wlr_scene *scene,
-		pixman_region32_t *update_region) {
+		const pixman_region32_t *update_region) {
 	pixman_region32_t visible;
 	pixman_region32_init(&visible);
 	pixman_region32_copy(&visible, update_region);
@@ -778,6 +770,7 @@ static void scene_update_region(struct wlr_scene *scene,
 		},
 		.outputs = &scene->outputs,
 		.calculate_visibility = scene->calculate_visibility,
+		.restack_xwayland_surfaces = scene->restack_xwayland_surfaces,
 	};
 
 	// update node visibility and output enter/leave events
@@ -786,16 +779,62 @@ static void scene_update_region(struct wlr_scene *scene,
 	pixman_region32_fini(&visible);
 }
 
+static void scene_node_cleanup_when_disabled(struct wlr_scene_node *node,
+		bool xwayland_restack, struct wl_list *outputs) {
+	if (node->type == WLR_SCENE_NODE_TREE) {
+		struct wlr_scene_tree *scene_tree = wlr_scene_tree_from_node(node);
+		struct wlr_scene_node *child;
+		wl_list_for_each(child, &scene_tree->children, link) {
+			if (!child->enabled) {
+				continue;
+			}
+
+			scene_node_cleanup_when_disabled(child, xwayland_restack, outputs);
+		}
+		return;
+	}
+
+	pixman_region32_clear(&node->visible);
+	update_node_update_outputs(node, outputs, NULL, NULL);
+
+#if WLR_HAS_XWAYLAND
+	if (xwayland_restack) {
+		struct wlr_xwayland_surface *xwayland_surface =
+			scene_node_try_get_managed_xwayland_surface(node);
+		if (!xwayland_surface) {
+			return;
+		}
+
+		wlr_xwayland_surface_restack(xwayland_surface, NULL, XCB_STACK_MODE_BELOW);
+	}
+#endif
+}
+
+/**
+ * Updates the nodes visibility, xwayland restacking, send leave/enter events
+ * and damages the screen. The damage region is used to not only damage the
+ * screen, but to direct the update logic to only update certain parts of the
+ * screen and not the whole thing. If a NULL damage is given, the damage is
+ * assumed to be the previous nodes visibility.
+ *
+ * Currently, the only usage for an explicit damage is for update scenarios where
+ * the scene node might be enabled/disabled. If the scene node is disabled, the
+ * update logic will ignore the node. This is normally desirable as most update
+ * scenarios like updating the color or whatever. However, it's not what we want
+ * when disabling the node. Note that reparenting the node could lead to the node
+ * being reparented to a disabled super tree.
+ */
 static void scene_node_update(struct wlr_scene_node *node,
 		pixman_region32_t *damage) {
 	struct wlr_scene *scene = scene_node_get_root(node);
 
 	int x, y;
 	if (!wlr_scene_node_coords(node, &x, &y)) {
-#if WLR_HAS_XWAYLAND
-		restack_xwayland_surface_below(node);
-#endif
+		// We assume explicit damage on a disabled tree means the node was just
+		// disabled.
 		if (damage) {
+			scene_node_cleanup_when_disabled(node, scene->restack_xwayland_surfaces, &scene->outputs);
+
 			scene_update_region(scene, damage);
 			scene_damage_outputs(scene, damage);
 			pixman_region32_fini(damage);
@@ -1540,9 +1579,9 @@ void wlr_scene_buffer_set_transform(struct wlr_scene_buffer *scene_buffer,
 }
 
 void wlr_scene_buffer_send_frame_done(struct wlr_scene_buffer *scene_buffer,
-		struct timespec *now) {
+		struct wlr_scene_frame_done_event *event) {
 	if (!pixman_region32_empty(&scene_buffer->node.visible)) {
-		wl_signal_emit_mutable(&scene_buffer->events.frame_done, now);
+		wl_signal_emit_mutable(&scene_buffer->events.frame_done, event);
 	}
 }
 
@@ -1564,6 +1603,46 @@ void wlr_scene_buffer_set_filter_mode(struct wlr_scene_buffer *scene_buffer,
 	}
 
 	scene_buffer->filter_mode = filter_mode;
+	scene_node_update(&scene_buffer->node, NULL);
+}
+
+void wlr_scene_buffer_set_transfer_function(struct wlr_scene_buffer *scene_buffer,
+		enum wlr_color_transfer_function transfer_function) {
+	if (scene_buffer->transfer_function == transfer_function) {
+		return;
+	}
+
+	scene_buffer->transfer_function = transfer_function;
+	scene_node_update(&scene_buffer->node, NULL);
+}
+
+void wlr_scene_buffer_set_primaries(struct wlr_scene_buffer *scene_buffer,
+		enum wlr_color_named_primaries primaries) {
+	if (scene_buffer->primaries == primaries) {
+		return;
+	}
+
+	scene_buffer->primaries = primaries;
+	scene_node_update(&scene_buffer->node, NULL);
+}
+
+void wlr_scene_buffer_set_color_encoding(struct wlr_scene_buffer *scene_buffer,
+		enum wlr_color_encoding color_encoding) {
+	if (scene_buffer->color_encoding == color_encoding) {
+		return;
+	}
+
+	scene_buffer->color_encoding = color_encoding;
+	scene_node_update(&scene_buffer->node, NULL);
+}
+
+void wlr_scene_buffer_set_color_range(struct wlr_scene_buffer *scene_buffer,
+		enum wlr_color_range color_range) {
+	if (scene_buffer->color_range == color_range) {
+		return;
+	}
+
+	scene_buffer->color_range = color_range;
 	scene_node_update(&scene_buffer->node, NULL);
 }
 
@@ -1604,29 +1683,17 @@ static struct wlr_texture *scene_buffer_get_texture(
 	return texture;
 }
 
-static void scene_node_get_size(struct wlr_scene_node *node,
-		int *width, int *height) {
+void scene_node_get_size(struct wlr_scene_node *node, int *width, int *height) {
 	*width = 0;
 	*height = 0;
 
 	switch (node->type) {
 	case WLR_SCENE_NODE_TREE:
 		return;
-	case WLR_SCENE_NODE_OPTIMIZED_BLUR:;
-		struct wlr_scene_optimized_blur *scene_blur =
-			wlr_scene_optimized_blur_from_node(node);
-		*width = scene_blur->width;
-		*height = scene_blur->height;
-		break;
 	case WLR_SCENE_NODE_RECT:;
 		struct wlr_scene_rect *scene_rect = wlr_scene_rect_from_node(node);
 		*width = scene_rect->width;
 		*height = scene_rect->height;
-		break;
-	case WLR_SCENE_NODE_SHADOW:;
-		struct wlr_scene_shadow *scene_shadow = wlr_scene_shadow_from_node(node);
-		*width = scene_shadow->width;
-		*height = scene_shadow->height;
 		break;
 	case WLR_SCENE_NODE_BUFFER:;
 		struct wlr_scene_buffer *scene_buffer = wlr_scene_buffer_from_node(node);
@@ -1638,6 +1705,17 @@ static void scene_node_get_size(struct wlr_scene_node *node,
 			*height = scene_buffer->buffer_height;
 			wlr_output_transform_coords(scene_buffer->transform, width, height);
 		}
+		break;
+	case WLR_SCENE_NODE_SHADOW:;
+		struct wlr_scene_shadow *scene_shadow = wlr_scene_shadow_from_node(node);
+		*width = scene_shadow->width;
+		*height = scene_shadow->height;
+		break;
+	case WLR_SCENE_NODE_OPTIMIZED_BLUR:;
+		struct wlr_scene_optimized_blur *scene_blur =
+			wlr_scene_optimized_blur_from_node(node);
+		*width = scene_blur->width;
+		*height = scene_blur->height;
 		break;
 	case WLR_SCENE_NODE_BLUR:;
 		struct wlr_scene_blur *blur = wlr_scene_blur_from_node(node);
@@ -1871,6 +1949,11 @@ struct render_list_entry {
 	int x, y;
 };
 
+static float get_luminance_multiplier(const struct wlr_color_luminances *src_lum,
+		const struct wlr_color_luminances *dst_lum) {
+	return (dst_lum->reference / src_lum->reference) * (src_lum->max / dst_lum->max);
+}
+
 static void scene_entry_render(struct render_list_entry *entry, const struct render_data *data) {
 	struct wlr_scene_node *node = entry->node;
 	struct fx_gles_render_pass *fx_pass = fx_get_render_pass(data->render_pass);
@@ -1943,6 +2026,7 @@ static void scene_entry_render(struct render_list_entry *entry, const struct ren
 			},
 		};
 
+		// TODO: Use the base wlr_render_pass_add_rect as a fast-path in the future
 		if (!fx_corner_radii_is_empty(&rect_corners)) {
 			struct fx_render_rounded_rect_options rounded_rect_options = {
 				.base = rect_options.base,
@@ -1953,68 +2037,6 @@ static void scene_entry_render(struct render_list_entry *entry, const struct ren
 		} else {
 			fx_render_pass_add_rect(fx_pass, &rect_options);
 		}
-		break;
-	case WLR_SCENE_NODE_OPTIMIZED_BLUR:;
-		struct wlr_scene_optimized_blur *scene_blur = wlr_scene_optimized_blur_from_node(node);
-		// Re-render the optimized blur buffer when needed. Retry rendering
-		// until there's a visible blur_node.
-		if (fx_pass->has_blur && is_scene_blur_enabled(&scene->blur_data)
-				&& scene_blur->dirty) {
-			const float opacity = 1.0f;
-			enum wl_output_transform transform =
-				wlr_output_transform_invert(data->transform);
-			transform = wlr_output_transform_compose(transform, data->transform);
-			struct fx_render_blur_pass_options blur_options = {
-				.tex_options = {
-					.base = {
-						.transform = transform,
-						.alpha = &opacity,
-						.blend_mode = WLR_RENDER_BLEND_MODE_NONE,
-						.dst_box = dst_box,
-					},
-					.clip_box = &dst_box,
-					.discard_transparent = false,
-					.clipped_region = {0}
-				},
-				.blur_data = &scene->blur_data,
-				.blur_strength = 1.0f,
-			};
-			bool result = fx_render_pass_add_optimized_blur(fx_pass, &blur_options);
-			if (result) {
-				scene_blur->dirty = false;
-			}
-		}
-		break;
-	case WLR_SCENE_NODE_SHADOW:;
-		struct wlr_scene_shadow *scene_shadow = wlr_scene_shadow_from_node(node);
-
-		struct wlr_box shadow_clipped_region_box = scene_shadow->clipped_region.area;
-		struct fx_corner_radii shadow_clipped_corners = scene_shadow->clipped_region.corners;
-
-		// Node relative -> Root relative
-		shadow_clipped_region_box.x += x;
-		shadow_clipped_region_box.y += y;
-
-		transform_output_box(&shadow_clipped_region_box, data);
-		fx_corner_radii_transform(node_transform, &shadow_clipped_corners);
-
-		struct fx_render_box_shadow_options shadow_options = {
-			.box = dst_box,
-			.clipped_region = {
-				.area = shadow_clipped_region_box,
-				.corners = fx_corner_radii_scale(shadow_clipped_corners, data->scale),
-			},
-			.blur_sigma = scene_shadow->blur_sigma,
-			.corner_radius = scene_shadow->corner_radius * data->scale,
-			.color = {
-				.r = scene_shadow->color[0],
-				.g = scene_shadow->color[1],
-				.b = scene_shadow->color[2],
-				.a = scene_shadow->color[3],
-			},
-			.clip = &render_region,
-		};
-		fx_render_pass_add_box_shadow(fx_pass, &shadow_options);
 		break;
 	case WLR_SCENE_NODE_BUFFER:;
 		struct wlr_scene_buffer *scene_buffer = wlr_scene_buffer_from_node(node);
@@ -2050,6 +2072,18 @@ static void scene_entry_render(struct render_list_entry *entry, const struct ren
 		transform = wlr_output_transform_compose(transform, data->transform);
 		fx_corner_radii_transform(transform, &buffer_corners);
 
+		struct wlr_color_primaries primaries = {0};
+		if (scene_buffer->primaries != 0) {
+			wlr_color_primaries_from_named(&primaries, scene_buffer->primaries);
+		}
+
+		struct wlr_color_luminances src_lum, srgb_lum;
+		wlr_color_transfer_function_get_default_luminance(
+			scene_buffer->transfer_function, &src_lum);
+		wlr_color_transfer_function_get_default_luminance(
+			WLR_COLOR_TRANSFER_FUNCTION_SRGB, &srgb_lum);
+		float luminance_multiplier = get_luminance_multiplier(&src_lum, &srgb_lum);
+
 		struct fx_render_texture_options tex_options = {
 			.base = (struct wlr_render_texture_options){
 				.texture = texture,
@@ -2062,6 +2096,11 @@ static void scene_entry_render(struct render_list_entry *entry, const struct ren
 				.blend_mode = !data->output->scene->calculate_visibility ||
 					!pixman_region32_empty(&opaque) ?
 					WLR_RENDER_BLEND_MODE_PREMULTIPLIED : WLR_RENDER_BLEND_MODE_NONE,
+				.transfer_function = scene_buffer->transfer_function,
+				.primaries = scene_buffer->primaries != 0 ? &primaries : NULL,
+				.color_encoding = scene_buffer->color_encoding,
+				.color_range = scene_buffer->color_range,
+				.luminance_multiplier = &luminance_multiplier,
 				.wait_timeline = scene_buffer->wait_timeline,
 				.wait_point = scene_buffer->wait_point,
 			},
@@ -2070,11 +2109,14 @@ static void scene_entry_render(struct render_list_entry *entry, const struct ren
 			.clipped_region = {0},
 		};
 
+		// TODO: Use the base wlr_render_pass_add_texture as a fast-path in the future
 		fx_render_pass_add_texture(fx_pass, &tex_options);
 
 		struct wlr_scene_output_sample_event sample_event = {
 			.output = data->output,
 			.direct_scanout = false,
+			.release_timeline = data->output->in_timeline,
+			.release_point = data->output->in_point,
 		};
 		wl_signal_emit_mutable(&scene_buffer->events.output_sample, &sample_event);
 
@@ -2084,6 +2126,68 @@ static void scene_entry_render(struct render_list_entry *entry, const struct ren
 					.color = { .r = 0, .g = 0.3, .b = 0, .a = 0.3 },
 					.clip = &opaque,
 			});
+		}
+		break;
+	case WLR_SCENE_NODE_SHADOW:;
+		struct wlr_scene_shadow *scene_shadow = wlr_scene_shadow_from_node(node);
+
+		struct wlr_box shadow_clipped_region_box = scene_shadow->clipped_region.area;
+		struct fx_corner_radii shadow_clipped_corners = scene_shadow->clipped_region.corners;
+
+		// Node relative -> Root relative
+		shadow_clipped_region_box.x += x;
+		shadow_clipped_region_box.y += y;
+
+		transform_output_box(&shadow_clipped_region_box, data);
+		fx_corner_radii_transform(node_transform, &shadow_clipped_corners);
+
+		struct fx_render_box_shadow_options shadow_options = {
+			.box = dst_box,
+			.clipped_region = {
+				.area = shadow_clipped_region_box,
+				.corners = fx_corner_radii_scale(shadow_clipped_corners, data->scale),
+			},
+			.blur_sigma = scene_shadow->blur_sigma,
+			.corner_radius = scene_shadow->corner_radius * data->scale,
+			.color = {
+				.r = scene_shadow->color[0],
+				.g = scene_shadow->color[1],
+				.b = scene_shadow->color[2],
+				.a = scene_shadow->color[3],
+			},
+			.clip = &render_region,
+		};
+		fx_render_pass_add_box_shadow(fx_pass, &shadow_options);
+		break;
+	case WLR_SCENE_NODE_OPTIMIZED_BLUR:;
+		struct wlr_scene_optimized_blur *scene_blur = wlr_scene_optimized_blur_from_node(node);
+		// Re-render the optimized blur buffer when needed. Retry rendering
+		// until there's a visible blur_node.
+		if (fx_pass->has_blur && is_scene_blur_enabled(&scene->blur_data)
+				&& scene_blur->dirty) {
+			const float opacity = 1.0f;
+			enum wl_output_transform transform =
+				wlr_output_transform_invert(data->transform);
+			transform = wlr_output_transform_compose(transform, data->transform);
+			struct fx_render_blur_pass_options blur_options = {
+				.tex_options = {
+					.base = {
+						.transform = transform,
+						.alpha = &opacity,
+						.blend_mode = WLR_RENDER_BLEND_MODE_NONE,
+						.dst_box = dst_box,
+					},
+					.clip_box = &dst_box,
+					.discard_transparent = false,
+					.clipped_region = {0}
+				},
+				.blur_data = &scene->blur_data,
+				.blur_strength = 1.0f,
+			};
+			bool result = fx_render_pass_add_optimized_blur(fx_pass, &blur_options);
+			if (result) {
+				scene_blur->dirty = false;
+			}
 		}
 		break;
 	case WLR_SCENE_NODE_BLUR:;
@@ -2164,6 +2268,8 @@ static void scene_handle_gamma_control_manager_v1_set_gamma(struct wl_listener *
 
 	output->gamma_lut_changed = true;
 	output->gamma_lut = event->control;
+	wlr_color_transform_unref(output->gamma_lut_color_transform);
+	output->gamma_lut_color_transform = wlr_gamma_control_v1_get_color_transform(event->control);
 	wlr_output_schedule_frame(output->output);
 }
 
@@ -2181,6 +2287,8 @@ static void scene_handle_gamma_control_manager_v1_destroy(struct wl_listener *li
 	wl_list_for_each(output, &scene->outputs, link) {
 		output->gamma_lut_changed = false;
 		output->gamma_lut = NULL;
+		wlr_color_transform_unref(output->gamma_lut_color_transform);
+		output->gamma_lut_color_transform = NULL;
 	}
 }
 
@@ -2195,6 +2303,21 @@ void wlr_scene_set_gamma_control_manager_v1(struct wlr_scene *scene,
 	scene->gamma_control_manager_v1_set_gamma.notify =
 		scene_handle_gamma_control_manager_v1_set_gamma;
 	wl_signal_add(&gamma_control->events.set_gamma, &scene->gamma_control_manager_v1_set_gamma);
+}
+
+static void scene_handle_color_manager_v1_destroy(struct wl_listener *listener, void *data) {
+	struct wlr_scene *scene = wl_container_of(listener, scene, color_manager_v1_destroy);
+	wl_list_remove(&scene->color_manager_v1_destroy.link);
+	wl_list_init(&scene->color_manager_v1_destroy.link);
+	scene->color_manager_v1 = NULL;
+}
+
+void wlr_scene_set_color_manager_v1(struct wlr_scene *scene, struct wlr_color_manager_v1 *manager) {
+	assert(scene->color_manager_v1 == NULL);
+	scene->color_manager_v1 = manager;
+
+	scene->color_manager_v1_destroy.notify = scene_handle_color_manager_v1_destroy;
+	wl_signal_add(&manager->events.destroy, &scene->color_manager_v1_destroy);
 }
 
 static void scene_output_handle_destroy(struct wlr_addon *addon) {
@@ -2334,7 +2457,10 @@ struct wlr_scene_output *wlr_scene_output_create(struct wlr_scene *scene,
 	if (drm_fd >= 0 && output->backend->features.timeline &&
 			output->renderer != NULL && output->renderer->features.timeline) {
 		scene_output->in_timeline = wlr_drm_syncobj_timeline_create(drm_fd);
-		if (scene_output->in_timeline == NULL) {
+		scene_output->out_timeline = wlr_drm_syncobj_timeline_create(drm_fd);
+		if (scene_output->in_timeline == NULL || scene_output->out_timeline == NULL) {
+			wlr_drm_syncobj_timeline_unref(scene_output->in_timeline);
+			wlr_drm_syncobj_timeline_unref(scene_output->out_timeline);
 			return NULL;
 		}
 	}
@@ -2389,7 +2515,18 @@ void wlr_scene_output_destroy(struct wlr_scene_output *scene_output) {
 	wl_list_remove(&scene_output->output_commit.link);
 	wl_list_remove(&scene_output->output_damage.link);
 	wl_list_remove(&scene_output->output_needs_frame.link);
-	wlr_drm_syncobj_timeline_unref(scene_output->in_timeline);
+	if (scene_output->in_timeline != NULL) {
+		wlr_drm_syncobj_timeline_signal(scene_output->in_timeline, UINT64_MAX);
+		wlr_drm_syncobj_timeline_unref(scene_output->in_timeline);
+	}
+	if (scene_output->out_timeline != NULL) {
+		wlr_drm_syncobj_timeline_signal(scene_output->out_timeline, UINT64_MAX);
+		wlr_drm_syncobj_timeline_unref(scene_output->out_timeline);
+	}
+	wlr_color_transform_unref(scene_output->gamma_lut_color_transform);
+	wlr_color_transform_unref(scene_output->prev_gamma_lut_color_transform);
+	wlr_color_transform_unref(scene_output->prev_supplied_color_transform);
+	wlr_color_transform_unref(scene_output->combined_color_transform);
 	wl_array_release(&scene_output->render_list);
 	free(scene_output);
 }
@@ -2423,16 +2560,16 @@ static bool scene_node_invisible(struct wlr_scene_node *node) {
 		return true;
 	} else if (node->type == WLR_SCENE_NODE_RECT) {
 		struct wlr_scene_rect *rect = wlr_scene_rect_from_node(node);
-
+		// TODO: Check if clipped region covers whole rect?
 		return rect->color[3] == 0.f;
-	} else if (node->type == WLR_SCENE_NODE_SHADOW) {
-		struct wlr_scene_shadow *shadow = wlr_scene_shadow_from_node(node);
-
-		return shadow->color[3] == 0.f;
 	} else if (node->type == WLR_SCENE_NODE_BUFFER) {
 		struct wlr_scene_buffer *buffer = wlr_scene_buffer_from_node(node);
 
 		return buffer->buffer == NULL && buffer->texture == NULL;
+	} else if (node->type == WLR_SCENE_NODE_SHADOW) {
+		struct wlr_scene_shadow *shadow = wlr_scene_shadow_from_node(node);
+
+		return shadow->color[3] == 0.f;
 	}
 
 	return false;
@@ -2549,10 +2686,39 @@ static void scene_buffer_send_dmabuf_feedback(const struct wlr_scene *scene,
 		return;
 	}
 
+	enum wl_output_transform preferred_buffer_transform = WL_OUTPUT_TRANSFORM_NORMAL;
+	if (options->scanout_primary_output != NULL) {
+		preferred_buffer_transform = options->scanout_primary_output->transform;
+	}
+
+	// TODO: also send wl_surface.preferred_buffer_transform when running with
+	// pure software rendering
+	wlr_surface_set_preferred_buffer_transform(surface->surface, preferred_buffer_transform);
 	wlr_linux_dmabuf_v1_set_surface_feedback(scene->linux_dmabuf_v1,
 		surface->surface, &feedback);
 
 	wlr_linux_dmabuf_feedback_v1_finish(&feedback);
+}
+
+static bool color_management_is_scanout_allowed(const struct wlr_output_image_description *img_desc,
+		const struct wlr_scene_buffer *buffer) {
+	// Disallow scanout if the output has colorimetry information but buffer
+	// doesn't; allow it only if the output also lacks it.
+	if (buffer->transfer_function == 0 && buffer->primaries == 0) {
+		return img_desc == NULL;
+	}
+
+	// If the output has colorimetry information, the buffer must match it for
+	// direct scanout to be allowed.
+	if (img_desc != NULL) {
+		return img_desc->transfer_function == buffer->transfer_function &&
+				img_desc->primaries == buffer->primaries;
+	}
+	// If the output doesn't have colorimetry image description set, we can only
+	// scan out buffers with default colorimetry (gamma2.2 transfer and sRGB
+	// primaries) used in wlroots.
+	return buffer->transfer_function == WLR_COLOR_TRANSFER_FUNCTION_GAMMA22 &&
+			buffer->primaries == WLR_COLOR_NAMED_PRIMARIES_SRGB;
 }
 
 enum scene_direct_scanout_result {
@@ -2611,6 +2777,20 @@ static enum scene_direct_scanout_result scene_entry_try_direct_scanout(
 		return SCANOUT_INELIGIBLE;
 	}
 
+	const struct wlr_output_image_description *img_desc = output_pending_image_description(scene_output->output, state);
+	if (!color_management_is_scanout_allowed(img_desc, buffer)) {
+		return SCANOUT_INELIGIBLE;
+	}
+
+	bool is_color_repr_none = buffer->color_encoding == WLR_COLOR_ENCODING_NONE &&
+			buffer->color_range == WLR_COLOR_RANGE_NONE;
+	bool is_color_repr_identity_full = buffer->color_encoding == WLR_COLOR_ENCODING_IDENTITY &&
+			buffer->color_range == WLR_COLOR_RANGE_FULL;
+
+	if (!(is_color_repr_none || is_color_repr_identity_full)) {
+		return SCANOUT_INELIGIBLE;
+	}
+
 	// We want to ensure optimal buffer selection, but as direct-scanout can be enabled and disabled
 	// on a frame-by-frame basis, we wait for a few frames to send the new format recommendations.
 	// Maybe we should only send feedback in this case if tests fail.
@@ -2652,6 +2832,12 @@ static enum scene_direct_scanout_result scene_entry_try_direct_scanout(
 	if (buffer->wait_timeline != NULL) {
 		wlr_output_state_set_wait_timeline(&pending, buffer->wait_timeline, buffer->wait_point);
 	}
+
+	if (scene_output->out_timeline) {
+		scene_output->out_point++;
+		wlr_output_state_set_signal_timeline(&pending, scene_output->out_timeline, scene_output->out_point);
+	}
+
 	if (!wlr_output_test_state(scene_output->output, &pending)) {
 		wlr_output_state_finish(&pending);
 		return SCANOUT_CANDIDATE;
@@ -2663,6 +2849,8 @@ static enum scene_direct_scanout_result scene_entry_try_direct_scanout(
 	struct wlr_scene_output_sample_event sample_event = {
 		.output = scene_output,
 		.direct_scanout = true,
+		.release_timeline = data->output->out_timeline,
+		.release_point = data->output->out_point,
 	};
 	wl_signal_emit_mutable(&buffer->events.output_sample, &sample_event);
 	return SCANOUT_SUCCESS;
@@ -2781,22 +2969,94 @@ static void scene_output_state_attempt_gamma(struct wlr_scene_output *scene_outp
 		return;
 	}
 
-	if (!wlr_gamma_control_v1_apply(scene_output->gamma_lut, &gamma_pending)) {
-		wlr_output_state_finish(&gamma_pending);
-		return;
-	}
-
+	wlr_output_state_set_color_transform(&gamma_pending, scene_output->gamma_lut_color_transform);
 	scene_output->gamma_lut_changed = false;
+
 	if (!wlr_output_test_state(scene_output->output, &gamma_pending)) {
 		wlr_gamma_control_v1_send_failed_and_destroy(scene_output->gamma_lut);
 
 		scene_output->gamma_lut = NULL;
+		wlr_color_transform_unref(scene_output->gamma_lut_color_transform);
+		scene_output->gamma_lut_color_transform = NULL;
 		wlr_output_state_finish(&gamma_pending);
 		return;
 	}
 
 	wlr_output_state_copy(state, &gamma_pending);
 	wlr_output_state_finish(&gamma_pending);
+}
+
+static bool scene_output_combine_color_transforms(
+		struct wlr_scene_output *scene_output, struct wlr_color_transform *supplied,
+		const struct wlr_output_image_description *img_desc, bool render_gamma_lut) {
+	bool result = false;
+	struct wlr_color_transform *color_matrix = NULL;
+	struct wlr_color_transform *inv_eotf = NULL;
+	struct wlr_color_transform *user_gamma = NULL;
+
+	if (img_desc != NULL) {
+		assert(supplied == NULL);
+		struct wlr_color_primaries primaries_srgb;
+		wlr_color_primaries_from_named(&primaries_srgb, WLR_COLOR_NAMED_PRIMARIES_SRGB);
+		struct wlr_color_primaries primaries;
+		wlr_color_primaries_from_named(&primaries, img_desc->primaries);
+		float matrix[9];
+		wlr_color_primaries_transform_absolute_colorimetric(&primaries_srgb, &primaries, matrix);
+
+		struct wlr_color_luminances srgb_lum, dst_lum;
+		wlr_color_transfer_function_get_default_luminance(
+			WLR_COLOR_TRANSFER_FUNCTION_SRGB, &srgb_lum);
+		wlr_color_transfer_function_get_default_luminance(img_desc->transfer_function, &dst_lum);
+		float luminance_multiplier = get_luminance_multiplier(&srgb_lum, &dst_lum);
+		for (int i = 0; i < 9; ++i) {
+			matrix[i] *= luminance_multiplier;
+		}
+
+		color_matrix = wlr_color_transform_init_matrix(matrix);
+		inv_eotf = wlr_color_transform_init_linear_to_inverse_eotf(img_desc->transfer_function);
+		if (color_matrix == NULL || inv_eotf == NULL) {
+			goto cleanup_transforms;
+		}
+	} else if (supplied != NULL) {
+		inv_eotf = wlr_color_transform_ref(supplied);
+	} else {
+		inv_eotf = wlr_color_transform_init_linear_to_inverse_eotf(
+			WLR_COLOR_TRANSFER_FUNCTION_GAMMA22);
+		if (inv_eotf == NULL) {
+			goto cleanup_transforms;
+		}
+	}
+
+	struct wlr_color_transform *gamma_lut = scene_output->gamma_lut_color_transform;
+	if (gamma_lut != NULL && render_gamma_lut) {
+		user_gamma = wlr_color_transform_ref(gamma_lut);
+	}
+
+	struct wlr_color_transform *combined;
+	struct wlr_color_transform *transforms[] = {
+		color_matrix,
+		inv_eotf,
+		user_gamma,
+	};
+	const size_t transforms_len = sizeof(transforms) / sizeof(transforms[0]);
+	if (!color_transform_compose(&combined, transforms, transforms_len)) {
+		goto cleanup_transforms;
+	}
+
+	wlr_color_transform_unref(scene_output->prev_gamma_lut_color_transform);
+	scene_output->prev_gamma_lut_color_transform = gamma_lut ? wlr_color_transform_ref(gamma_lut) : NULL;
+	wlr_color_transform_unref(scene_output->prev_supplied_color_transform);
+	scene_output->prev_supplied_color_transform = supplied ? wlr_color_transform_ref(supplied) : NULL;
+	wlr_color_transform_unref(scene_output->combined_color_transform);
+	scene_output->combined_color_transform = combined;
+
+	result = true;
+
+cleanup_transforms:
+	wlr_color_transform_unref(color_matrix);
+	wlr_color_transform_unref(inv_eotf);
+	wlr_color_transform_unref(user_gamma);
+	return result;
 }
 
 bool wlr_scene_output_build_state(struct wlr_scene_output *scene_output,
@@ -2821,6 +3081,16 @@ bool wlr_scene_output_build_state(struct wlr_scene_output *scene_output,
 	struct wlr_output *output = scene_output->output;
 	enum wlr_scene_debug_damage_option debug_damage =
 		scene_output->scene->debug_damage_option;
+
+	bool render_gamma_lut = false;
+	if (wlr_output_get_gamma_size(output) == 0 && output->renderer->features.output_color_transform) {
+		if (scene_output->gamma_lut_color_transform != scene_output->prev_gamma_lut_color_transform) {
+			scene_output_damage_whole(scene_output);
+		}
+		if (scene_output->gamma_lut_color_transform != NULL) {
+			render_gamma_lut = true;
+		}
+	}
 
 	struct render_data render_data = {
 		.transform = output->transform,
@@ -2898,7 +3168,7 @@ bool wlr_scene_output_build_state(struct wlr_scene_output *scene_output,
 		pixman_region32_init(&acc_damage);
 		struct highlight_region *damage, *tmp_damage;
 		wl_list_for_each_safe(damage, tmp_damage, regions, link) {
-			// remove overlaping damage regions
+			// remove overlapping damage regions
 			pixman_region32_subtract(&damage->region, &damage->region, &acc_damage);
 			pixman_region32_union(&acc_damage, &acc_damage, &damage->region);
 
@@ -2922,7 +3192,7 @@ bool wlr_scene_output_build_state(struct wlr_scene_output *scene_output,
 	// - There are no color transforms that need to be applied
 	// - Damage highlight debugging is not enabled
 	enum scene_direct_scanout_result scanout_result = SCANOUT_INELIGIBLE;
-	if (options->color_transform == NULL && list_len == 1
+	if (options->color_transform == NULL && !render_gamma_lut && list_len == 1
 			&& debug_damage != WLR_SCENE_DEBUG_DAMAGE_HIGHLIGHT) {
 		scanout_result = scene_entry_try_direct_scanout(&list_data[0], state, &render_data);
 	}
@@ -2986,11 +3256,24 @@ bool wlr_scene_output_build_state(struct wlr_scene_output *scene_output,
 		timer->pre_render_duration = timespec_to_nsec(&duration);
 	}
 
+	if ((render_gamma_lut
+			&& scene_output->gamma_lut_color_transform != scene_output->prev_gamma_lut_color_transform)
+			|| scene_output->prev_supplied_color_transform != options->color_transform
+			|| (state->committed & WLR_OUTPUT_STATE_IMAGE_DESCRIPTION)) {
+		const struct wlr_output_image_description *output_description =
+			output_pending_image_description(output, state);
+		if (!scene_output_combine_color_transforms(scene_output, options->color_transform,
+				output_description, render_gamma_lut)) {
+			wlr_buffer_unlock(buffer);
+			return false;
+		}
+	}
+
 	scene_output->in_point++;
 	struct wlr_render_pass *render_pass = wlr_renderer_begin_buffer_pass(output->renderer, buffer,
 			&(struct wlr_buffer_pass_options){
 		.timer = timer ? timer->render_timer : NULL,
-		.color_transform = options->color_transform,
+		.color_transform = scene_output->combined_color_transform,
 		.signal_timeline = scene_output->in_timeline,
 		.signal_point = scene_output->in_point,
 	});
@@ -3196,9 +3479,14 @@ bool wlr_scene_output_build_state(struct wlr_scene_output *scene_output,
 	if (scene_output->in_timeline != NULL) {
 		wlr_output_state_set_wait_timeline(state, scene_output->in_timeline,
 			scene_output->in_point);
+		scene_output->out_point++;
+		wlr_output_state_set_signal_timeline(state, scene_output->out_timeline,
+			scene_output->out_point);
 	}
 
-	scene_output_state_attempt_gamma(scene_output, state);
+	if (!render_gamma_lut) {
+		scene_output_state_attempt_gamma(scene_output, state);
+	}
 
 	TRACY_MARK_FRAME;
 	return true;
@@ -3228,10 +3516,11 @@ static void scene_node_send_frame_done(struct wlr_scene_node *node,
 	if (node->type == WLR_SCENE_NODE_BUFFER) {
 		struct wlr_scene_buffer *scene_buffer =
 			wlr_scene_buffer_from_node(node);
-
-		if (scene_buffer->primary_output == scene_output) {
-			wlr_scene_buffer_send_frame_done(scene_buffer, now);
-		}
+		struct wlr_scene_frame_done_event event = {
+			.output = scene_output,
+			.when = *now,
+		};
+		wlr_scene_buffer_send_frame_done(scene_buffer, &event);
 	} else if (node->type == WLR_SCENE_NODE_TREE) {
 		struct wlr_scene_tree *scene_tree = wlr_scene_tree_from_node(node);
 		struct wlr_scene_node *child;

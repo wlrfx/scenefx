@@ -29,7 +29,8 @@ struct shader_corner_radii {
 	GLint bottom_right;
 };
 
-void uniform_corner_radii_set(struct shader_corner_radii *uniform, struct fx_corner_fradii *corners);
+void uniform_corner_radii_set(const struct shader_corner_radii *uniform,
+		const struct fx_corner_fradii *corners);
 
 struct quad_shader {
 	GLuint program;

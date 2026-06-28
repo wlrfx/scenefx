@@ -133,10 +133,6 @@ static struct tracy_data *gles2_tracy_gpu_context_new(struct fx_renderer *fx_ren
 	GLint64 gl_gpu_time;
 	gles2_renderer->gl_procs.glGetInteger64vEXT(GL_TIMESTAMP_EXT, &gl_gpu_time);
 
-	// Create the query objects
-	GLint bits;
-	gles2_renderer->gl_procs.glGetQueryivEXT(GL_TIMESTAMP_EXT, GL_QUERY_COUNTER_BITS_EXT, &bits);
-
 	const struct ___tracy_gpu_new_context_data data = {
 		.context = tracy_data->context_id,
 		.gpuTime = gl_gpu_time,

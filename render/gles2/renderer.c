@@ -244,9 +244,6 @@ struct fx_renderer *gles2_renderer_create(struct wlr_renderer *wlr_renderer) {
 		} else {
 			load_gl_proc(&gles2_renderer->gl_procs.glGetInteger64vEXT, "glGetInteger64v");
 		}
-		TRACY_FN(
-			load_gl_proc(&gles2_renderer->gl_procs.glGetQueryivEXT, "glGetQueryivEXT");
-		)
 	}
 
 	push_fx_debug(gles2_renderer);

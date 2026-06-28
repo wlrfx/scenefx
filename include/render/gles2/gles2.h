@@ -92,9 +92,6 @@ struct gles2_renderer {
 		PFNGLGETQUERYOBJECTIVEXTPROC glGetQueryObjectivEXT;
 		PFNGLGETQUERYOBJECTUI64VEXTPROC glGetQueryObjectui64vEXT;
 		PFNGLGETINTEGER64VEXTPROC glGetInteger64vEXT;
-		TRACY_FN(
-			PFNGLGETQUERYIVEXTPROC glGetQueryivEXT;
-		)
 	} gl_procs;
 
 	struct {

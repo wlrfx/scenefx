@@ -45,10 +45,11 @@
               mesa # gbm
               wayland # wayland-server
               wayland-protocols
-              wlroots_0_19
+              wlroots_0_20
               libgbm
               libxcb
               libxcb-wm
+              lcms2
             ];
 
             meta = with pkgs.lib; {

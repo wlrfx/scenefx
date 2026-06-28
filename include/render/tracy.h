@@ -154,7 +154,7 @@ struct tracy_data *tracy_gpu_context_new(struct fx_renderer *fx_renderer);
 	)
 #define TRACY_GPU_ZONE_COLLECT(renderer) \
 	TRACY_FN( \
-		tracy_gpu_context_collect((renderer)->tracy_data) \
+		tracy_gpu_context_collect(renderer) \
 	)
 
 /**

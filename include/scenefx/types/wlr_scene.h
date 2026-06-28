@@ -46,6 +46,8 @@ struct wlr_scene_output_layout;
 
 struct wlr_presentation;
 struct wlr_linux_dmabuf_v1;
+struct wlr_gamma_control_manager_v1;
+struct wlr_color_manager_v1;
 struct wlr_output_state;
 
 typedef bool (*wlr_scene_buffer_point_accepts_input_func_t)(
@@ -57,8 +59,8 @@ typedef void (*wlr_scene_buffer_iterator_func_t)(
 enum wlr_scene_node_type {
 	WLR_SCENE_NODE_TREE,
 	WLR_SCENE_NODE_RECT,
-	WLR_SCENE_NODE_SHADOW,
 	WLR_SCENE_NODE_BUFFER,
+	WLR_SCENE_NODE_SHADOW,
 	WLR_SCENE_NODE_OPTIMIZED_BLUR,
 	WLR_SCENE_NODE_BLUR,
 };
@@ -108,11 +110,15 @@ struct wlr_scene {
 	// May be NULL
 	struct wlr_linux_dmabuf_v1 *linux_dmabuf_v1;
 	struct wlr_gamma_control_manager_v1 *gamma_control_manager_v1;
+	struct wlr_color_manager_v1 *color_manager_v1;
+
+	bool restack_xwayland_surfaces;
 
 	struct {
 		struct wl_listener linux_dmabuf_v1_destroy;
 		struct wl_listener gamma_control_manager_v1_destroy;
 		struct wl_listener gamma_control_manager_v1_set_gamma;
+		struct wl_listener color_manager_v1_destroy;
 
 		enum wlr_scene_debug_damage_option debug_damage_option;
 		bool direct_scanout;
@@ -134,8 +140,6 @@ struct wlr_scene_surface {
 		struct wlr_addon addon;
 
 		struct wl_listener outputs_update;
-		struct wl_listener output_enter;
-		struct wl_listener output_leave;
 		struct wl_listener output_sample;
 		struct wl_listener frame_done;
 		struct wl_listener surface_destroy;
@@ -148,8 +152,8 @@ struct wlr_scene_rect {
 	struct wlr_scene_node node;
 	int width, height;
 	float color[4];
-	struct fx_corner_radii corners;
 
+	struct fx_corner_radii corners;
 	bool accepts_input;
 	struct clipped_region clipped_region;
 };
@@ -196,6 +200,13 @@ struct wlr_scene_outputs_update_event {
 struct wlr_scene_output_sample_event {
 	struct wlr_scene_output *output;
 	bool direct_scanout;
+	struct wlr_drm_syncobj_timeline *release_timeline;
+	uint64_t release_point;
+};
+
+struct wlr_scene_frame_done_event {
+	struct wlr_scene_output *output;
+	struct timespec when;
 };
 
 /** A scene-graph node displaying a buffer */
@@ -210,7 +221,7 @@ struct wlr_scene_buffer {
 		struct wl_signal output_enter; // struct wlr_scene_output
 		struct wl_signal output_leave; // struct wlr_scene_output
 		struct wl_signal output_sample; // struct wlr_scene_output_sample_event
-		struct wl_signal frame_done; // struct timespec
+		struct wl_signal frame_done; // struct wlr_scene_frame_done_event
 	} events;
 
 	// May be NULL
@@ -219,12 +230,9 @@ struct wlr_scene_buffer {
 	/**
 	 * The output that the largest area of this buffer is displayed on.
 	 * This may be NULL if the buffer is not currently displayed on any
-	 * outputs. This is the output that should be used for frame callbacks,
-	 * presentation feedback, etc.
+	 * outputs.
 	 */
 	struct wlr_scene_output *primary_output;
-
-	struct fx_corner_radii corners;
 
 	float opacity;
 	enum wlr_scale_filter_mode filter_mode;
@@ -233,7 +241,10 @@ struct wlr_scene_buffer {
 	enum wl_output_transform transform;
 	pixman_region32_t opaque_region;
 
-	struct linked_node blur;
+	enum wlr_color_transfer_function transfer_function;
+	enum wlr_color_named_primaries primaries;
+	enum wlr_color_encoding color_encoding;
+	enum wlr_color_range color_range;
 
 	struct {
 		uint64_t active_outputs;
@@ -256,6 +267,9 @@ struct wlr_scene_buffer {
 		// as {R, G, B, A} where the max value of each component is UINT32_MAX
 		uint32_t single_pixel_buffer_color[4];
 	} WLR_PRIVATE;
+
+	struct fx_corner_radii corners;
+	struct linked_node blur;
 };
 
 /** A viewport for an output in the scene-graph */
@@ -289,6 +303,11 @@ struct wlr_scene_output {
 
 		bool gamma_lut_changed;
 		struct wlr_gamma_control_v1 *gamma_lut;
+		struct wlr_color_transform *gamma_lut_color_transform;
+
+		struct wlr_color_transform *prev_gamma_lut_color_transform;
+		struct wlr_color_transform *prev_supplied_color_transform;
+		struct wlr_color_transform *combined_color_transform;
 
 		struct wl_listener output_commit;
 		struct wl_listener output_damage;
@@ -300,6 +319,8 @@ struct wlr_scene_output {
 
 		struct wlr_drm_syncobj_timeline *in_timeline;
 		uint64_t in_point;
+		struct wlr_drm_syncobj_timeline *out_timeline;
+		uint64_t out_point;
 	} WLR_PRIVATE;
 };
 
@@ -429,6 +450,12 @@ void wlr_scene_set_linux_dmabuf_v1(struct wlr_scene *scene,
 void wlr_scene_set_gamma_control_manager_v1(struct wlr_scene *scene,
 	struct wlr_gamma_control_manager_v1 *gamma_control);
 
+/**
+ * Handles color_management_v1 feedback for all surfaces in the scene.
+ *
+ * Asserts that a struct wlr_color_manager_v1 hasn't already been set for the scene.
+ */
+void wlr_scene_set_color_manager_v1(struct wlr_scene *scene, struct wlr_color_manager_v1 *manager);
 
 /**
  * Add a node displaying nothing but its children.
@@ -497,6 +524,12 @@ struct wlr_scene_blur *wlr_scene_blur_from_node(struct wlr_scene_node *node);
  */
 struct wlr_scene_surface *wlr_scene_surface_try_from_buffer(
 	struct wlr_scene_buffer *scene_buffer);
+
+/**
+ * Call wlr_surface_send_frame_done() if the surface is visible.
+ */
+void wlr_scene_surface_send_frame_done(struct wlr_scene_surface *scene_surface,
+	const struct timespec *when);
 
 /**
  * Add a node displaying a solid-colored rectangle to the scene-graph.
@@ -782,11 +815,24 @@ void wlr_scene_buffer_set_corner_radius(struct wlr_scene_buffer *scene_buffer,
 */
 void wlr_scene_buffer_set_corner_radii(struct wlr_scene_buffer *scene_buffer,
 	struct fx_corner_radii corner_radii);
+
+void wlr_scene_buffer_set_transfer_function(struct wlr_scene_buffer *scene_buffer,
+	enum wlr_color_transfer_function transfer_function);
+
+void wlr_scene_buffer_set_primaries(struct wlr_scene_buffer *scene_buffer,
+	enum wlr_color_named_primaries primaries);
+
+void wlr_scene_buffer_set_color_encoding(struct wlr_scene_buffer *scene_buffer,
+	enum wlr_color_encoding encoding);
+
+void wlr_scene_buffer_set_color_range(struct wlr_scene_buffer *scene_buffer,
+	enum wlr_color_range range);
+
 /**
  * Calls the buffer's frame_done signal.
  */
 void wlr_scene_buffer_send_frame_done(struct wlr_scene_buffer *scene_buffer,
-	struct timespec *now);
+	struct wlr_scene_frame_done_event *event);
 
 /**
  * Add a viewport for the specified output to the scene-graph.
@@ -807,6 +853,11 @@ void wlr_scene_output_set_position(struct wlr_scene_output *scene_output,
 
 struct wlr_scene_output_state_options {
 	struct wlr_scene_timer *timer;
+
+	/**
+	 * Color transform to apply before the output's color transform. Cannot be
+	 * used when the output has a non-NULL image description set.
+	 */
 	struct wlr_color_transform *color_transform;
 
 	/**

@@ -33,6 +33,7 @@ struct gles2_buffer *gles2_buffer_get_or_create(struct fx_renderer *fx_renderer,
 void gles2_buffer_get_or_allocate(struct fx_renderer *fx_renderer,
 		struct wlr_allocator *allocator, int width, int height, bool has_alpha,
 		struct gles2_buffer **gles2_buffer, bool *failed);
+/** Note: Doesn't drop the wlr_buffer, so should only be used internally. */
 void gles2_buffer_destroy(struct gles2_buffer *buffer);
 
 struct gles2_offscreen_buffers {

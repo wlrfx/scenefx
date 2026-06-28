@@ -1,5 +1,6 @@
 embed = find_program('./embed.sh', native: true)
 
+# TODO: Validate each fragment shader just like upstream
 shaders = [
 	'common.vert',
 	'gradient.frag',

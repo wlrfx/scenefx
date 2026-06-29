@@ -1,17 +1,18 @@
+#include "config.h"
+
 #include <assert.h>
-#include <wlr/config.h>
-#if WLR_HAS_GLES2_RENDERER
-#include <wlr/render/gles2.h>
-#endif
 #include <wlr/util/log.h>
 #include <wlr/render/interface.h>
+#if SCENEFX_HAS_GLES2_RENDERER
+#include <wlr/render/gles2.h>
+#endif
 
 #include "render/fx_renderer.h"
-#if WLR_HAS_GLES2_RENDERER
-#include "render/gles2/gles2.h"
-#endif
 #include "render/tracy.h"
 #include "scenefx/scenefx.h"
+#if SCENEFX_HAS_GLES2_RENDERER
+#include "render/gles2/gles2.h"
+#endif
 
 static void scene_addon_handle_destroy(struct wlr_addon *addon) {
 	struct fx_renderer *fx_renderer = wl_container_of(addon, fx_renderer, scene_addon);
@@ -96,6 +97,11 @@ struct fx_renderer *scenefx_find_fx_renderer(struct wlr_scene *scene,
 }
 
 struct fx_renderer *scenefx_init_complete(struct wlr_scene *wlr_scene, struct wlr_backend *backend) {
+#define HAS_ANY_RENDERERS SCENEFX_HAS_GLES2_RENDERER /* TODO: Add more has renderer checks here */
+#if !HAS_ANY_RENDERERS
+	wlr_log(WLR_ERROR, "Could not initialize SceneFX as it wasn't compiled with any renderers.");
+	return NULL;
+#else
 	if (wlr_scene == NULL) {
 		wlr_log(WLR_ERROR, "Could not initialize scenefx: wlr_scene is NULL");
 		return NULL;
@@ -130,6 +136,7 @@ renderer_created:
 	fx_renderer->scene_addon_attached = true;
 
 	return fx_renderer;
+#endif
 }
 
 struct wlr_renderer *scenefx_init(struct wlr_scene *wlr_scene, struct wlr_backend *backend) {

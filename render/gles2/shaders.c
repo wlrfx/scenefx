@@ -29,7 +29,14 @@ GLuint compile_shader(GLuint type, const GLchar *src) {
 	GLint ok;
 	glGetShaderiv(shader, GL_COMPILE_STATUS, &ok);
 	if (ok == GL_FALSE) {
-		wlr_log(WLR_ERROR, "Failed to compile shader");
+		GLint error_length = 0;
+		glGetShaderiv(shader, GL_INFO_LOG_LENGTH, &error_length);
+
+		char *error_msg = calloc(error_length, sizeof(*error_msg));
+		glGetShaderInfoLog(shader, error_length, &error_length, error_msg);
+		wlr_log(WLR_ERROR, "Failed to compile shader: %s", error_msg);
+		free(error_msg);
+
 		glDeleteShader(shader);
 		shader = 0;
 	}
@@ -62,7 +69,14 @@ GLuint link_program(const GLchar *frag_src) {
 	GLint ok;
 	glGetProgramiv(prog, GL_LINK_STATUS, &ok);
 	if (ok == GL_FALSE) {
-		wlr_log(WLR_ERROR, "Failed to link shader");
+		GLint error_length = 0;
+		glGetProgramiv(prog, GL_INFO_LOG_LENGTH, &error_length);
+
+		char *error_msg = calloc(error_length, sizeof(*error_msg));
+		glGetProgramInfoLog(prog, error_length, &error_length, error_msg);
+		wlr_log(WLR_ERROR, "Failed to link shader: %s", error_msg);
+		free(error_msg);
+
 		glDeleteProgram(prog);
 		goto error;
 	}

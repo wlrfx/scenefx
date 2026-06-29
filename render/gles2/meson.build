@@ -1,9 +1,13 @@
-renderers = get_option('renderers')
-if 'auto' in renderers and get_option('auto_features').enabled()
-	renderers = ['gles2']
-elif 'auto' in renderers and get_option('auto_features').disabled()
-	renderers = []
+glesv2 = dependency('glesv2', required: 'gles2' in renderers)
+
+if not (glesv2.found() and internal_features['egl'])
+	subdir_done()
 endif
+
+glslang = find_program('glslang', 'glslangValidator', native: true, required: false, disabler: true)
+
+features += { 'gles2-renderer': true }
+scenefx_deps += glesv2
 
 scenefx_files += files(
 	'buffer.c',
@@ -14,31 +18,4 @@ scenefx_files += files(
 	'tracy.c',
 )
 
-if 'gles2' in renderers or 'auto' in renderers
-	egl = dependency('egl', required: 'gles2' in renderers)
-	if egl.found()
-		eglext_version = cc.get_define(
-			'EGL_EGLEXT_VERSION',
-			dependencies: egl,
-			prefix: '#include <EGL/eglext.h>',
-		).to_int()
-		if eglext_version < 20210604
-			egl = dependency(
-				'',
-				required: 'gles2' in renderers,
-				not_found_message: 'EGL headers too old',
-			)
-		endif
-	endif
-	gbm = dependency('gbm', required: 'gles2' in renderers)
-	glesv2 = dependency('glesv2', required: 'gles2' in renderers)
-
-	if egl.found() and gbm.found() and glesv2.found()
-		scenefx_deps += [egl, gbm, glesv2]
-		features += {'gles2-renderer': true}
-		internal_features += {'egl': true}
-	endif
-
-	subdir('shaders')
-
-endif
+subdir('shaders')

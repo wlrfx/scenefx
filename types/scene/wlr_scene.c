@@ -2030,10 +2030,7 @@ static void scene_entry_render(struct render_list_entry *entry, const struct ren
 
 		if (data->fx_pass == NULL) {
 			wlr_render_pass_add_rect(data->render_pass, &rect_options.base);
-			break;
-		}
-
-		if (!fx_corner_radii_is_empty(&rect_corners)) {
+		} else if (!fx_corner_radii_is_empty(&rect_corners)) {
 			struct fx_render_rounded_rect_options rounded_rect_options = {
 				.base = rect_options.base,
 				.corners = fx_corner_radii_scale(rect_corners, data->scale),
@@ -2142,7 +2139,6 @@ static void scene_entry_render(struct render_list_entry *entry, const struct ren
 		break;
 	case WLR_SCENE_NODE_SHADOW:;
 		if (data->fx_pass == NULL) {
-			wlr_log(WLR_ERROR, "Cannot render WLR_SCENE_NODE_SHADOW: FX Pass is NULL");
 			break;
 		}
 		struct wlr_scene_shadow *scene_shadow = wlr_scene_shadow_from_node(node);
@@ -2177,7 +2173,6 @@ static void scene_entry_render(struct render_list_entry *entry, const struct ren
 		break;
 	case WLR_SCENE_NODE_OPTIMIZED_BLUR:;
 		if (data->fx_pass == NULL) {
-			wlr_log(WLR_ERROR, "Cannot render WLR_SCENE_NODE_OPTIMIZED_BLUR: FX Pass is NULL");
 			break;
 		}
 		struct wlr_scene_optimized_blur *scene_blur = wlr_scene_optimized_blur_from_node(node);
@@ -2212,7 +2207,6 @@ static void scene_entry_render(struct render_list_entry *entry, const struct ren
 		break;
 	case WLR_SCENE_NODE_BLUR:;
 		if (data->fx_pass == NULL) {
-			wlr_log(WLR_ERROR, "Cannot render WLR_SCENE_NODE_BLUR: FX Pass is NULL");
 			break;
 		}
 		struct wlr_scene_blur *blur = wlr_scene_blur_from_node(node);
@@ -3314,12 +3308,10 @@ bool wlr_scene_output_build_state(struct wlr_scene_output *scene_output,
 	wlr_damage_ring_rotate_buffer(&scene_output->damage_ring, buffer,
 		&render_data.damage);
 
-	struct fx_render_pass *fx_pass = NULL;
 	struct fx_renderer *fx_renderer = scenefx_find_fx_renderer(
 			scene_output->scene, output->renderer);
-	if (fx_renderer != NULL) {
-		fx_pass = fx_renderer_init_render_pass(fx_renderer, render_pass, buffer, output);
-	}
+	struct fx_render_pass *fx_pass = fx_renderer_init_render_pass(
+			fx_renderer, render_pass, buffer, output);
 	render_data.fx_pass = fx_pass;
 
 	bool should_compensate_blur = false;

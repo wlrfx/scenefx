@@ -96,25 +96,20 @@ struct fx_renderer *scenefx_find_fx_renderer(struct wlr_scene *scene,
 	return fx_renderer;
 }
 
-struct fx_renderer *scenefx_init_complete(struct wlr_scene *wlr_scene, struct wlr_backend *backend) {
+struct fx_renderer *scenefx_init_from_wlr_renderer(struct wlr_renderer *wlr_renderer,
+		struct wlr_scene *wlr_scene) {
+	assert(wlr_renderer);
+
 #define HAS_ANY_RENDERERS SCENEFX_HAS_GLES2_RENDERER /* TODO: Add more has renderer checks here */
 #if !HAS_ANY_RENDERERS
-	wlr_log(WLR_ERROR, "Could not initialize SceneFX as it wasn't compiled with any renderers.");
+	wlr_log(WLR_ERROR,
+			"Could not initialize SceneFX as it wasn't compiled with any renderers. "
+			"Falling back to regular wlroots rendering.");
 	return NULL;
 #else
-	if (wlr_scene == NULL) {
-		wlr_log(WLR_ERROR, "Could not initialize scenefx: wlr_scene is NULL");
-		return NULL;
-	}
-
-	struct wlr_renderer *wlr_renderer = wlr_renderer_autocreate(backend);
-	if (wlr_renderer == NULL) {
-		wlr_log(WLR_ERROR, "Could not create wlr_renderer");
-		return NULL;
-	}
-
 	struct fx_renderer *fx_renderer = NULL;
-#if WLR_HAS_GLES2_RENDERER
+
+#if SCENEFX_HAS_GLES2_RENDERER
 	if (wlr_renderer_is_gles2(wlr_renderer)) {
 		fx_renderer = gles2_renderer_create(wlr_renderer);
 		goto renderer_created;
@@ -122,10 +117,15 @@ struct fx_renderer *scenefx_init_complete(struct wlr_scene *wlr_scene, struct wl
 #endif
 	// TODO: Add more renderers
 
+	// No FX Renderer found for the given wlr_renderer type
+	wlr_log(WLR_ERROR, "Could not initialize SceneFX: "
+			"WLR_RENDERER must be set to a supported renderer!");
+	return NULL;
+
 renderer_created:
 	if (fx_renderer == NULL) {
-		wlr_log(WLR_ERROR, "Could not initialize SceneFX. WLR_RENDERER must be set to a supported renderer");
-		wlr_renderer_destroy(wlr_renderer);
+		wlr_log(WLR_ERROR, "Could not initialize SceneFX. "
+				"Falling back to regular wlroots rendering.");
 		return NULL;
 	}
 
@@ -134,14 +134,39 @@ renderer_created:
 	wlr_addon_init(&fx_renderer->scene_addon, &wlr_scene->tree.node.addons,
 			wlr_renderer, &fx_renderer_scene_addon_impl);
 	fx_renderer->scene_addon_attached = true;
-
 	return fx_renderer;
 #endif
 }
 
+static struct wlr_renderer *create_wlr_renderer(struct wlr_scene *wlr_scene,
+		struct wlr_backend *backend) {
+	if (wlr_scene == NULL) {
+		wlr_log(WLR_ERROR, "Could not initialize SceneFX: wlr_scene is NULL");
+		return NULL;
+	}
+
+	struct wlr_renderer *wlr_renderer = wlr_renderer_autocreate(backend);
+	if (wlr_renderer == NULL) {
+		wlr_log(WLR_ERROR, "Could not create wlr_renderer");
+		return NULL;
+	}
+	return wlr_renderer;
+}
+
+struct fx_renderer *scenefx_init_complete(struct wlr_scene *wlr_scene,
+		struct wlr_backend *backend) {
+	struct wlr_renderer *wlr_renderer = create_wlr_renderer(wlr_scene, backend);
+	struct fx_renderer *fx_renderer = scenefx_init_from_wlr_renderer(wlr_renderer, wlr_scene);
+	if (fx_renderer == NULL) {
+		wlr_renderer_destroy(wlr_renderer);
+	}
+	return fx_renderer;
+}
+
 struct wlr_renderer *scenefx_init(struct wlr_scene *wlr_scene, struct wlr_backend *backend) {
-	struct fx_renderer *fx_renderer = scenefx_init_complete(wlr_scene, backend);
-	return fx_renderer_get_wlr_renderer(fx_renderer);
+	struct wlr_renderer *wlr_renderer = create_wlr_renderer(wlr_scene, backend);
+	scenefx_init_from_wlr_renderer(wlr_renderer, wlr_scene);
+	return wlr_renderer;
 }
 
 struct fx_render_pass *fx_renderer_init_render_pass(struct fx_renderer *fx_renderer,

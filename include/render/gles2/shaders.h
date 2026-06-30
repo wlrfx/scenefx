@@ -21,6 +21,15 @@ enum fx_tex_shader_source {
 	SHADER_SOURCE_TEXTURE_EXTERNAL = 3,
 };
 
+// Note: Needs to be the same as in the tex.frag shader
+enum fx_tex_shader_effects {
+	SHADER_TEXTURE_EFFECT_NONE = 0,
+	SHADER_TEXTURE_EFFECT_ROUND_CORNERS = 1 << 0,
+	SHADER_TEXTURE_EFFECT_CLIPPING = 1 << 1,
+	SHADER_TEXTURE_EFFECT_DISCARD_TRANSPARENT = 1 << 2,
+	SHADER_TEXTURE_EFFECT_LAST = 1 << 3,
+};
+
 struct shader_corner_radii {
 	GLint top_left;
 	GLint top_right;
@@ -103,7 +112,7 @@ struct quad_grad_round_shader {
 
 bool link_quad_grad_round_program(struct quad_grad_round_shader *shader, int max_len);
 
-struct tex_shader {
+struct tex_shader_variant {
 	GLuint program;
 	GLint proj;
 	GLint tex_proj;
@@ -111,22 +120,30 @@ struct tex_shader {
 	GLint alpha;
 	GLint pos_attrib;
 
-	GLint discard_transparent;
-
-	// Only used for the effects shader
 	struct {
 		GLint size;
 		GLint position;
 		struct shader_corner_radii radius;
+	} corner_rounding;
 
-		GLint clip_size;
-		GLint clip_position;
-		struct shader_corner_radii clip_radius;
-	} effects;
+	struct {
+		GLint size;
+		GLint position;
+		struct shader_corner_radii radius;
+	} clipping;
 };
 
-bool link_tex_program(struct tex_shader *shader, enum fx_tex_shader_source source,
-		bool effects);
+struct tex_shader {
+	// 8 different combinations of effects
+	struct tex_shader_variant variants[SHADER_TEXTURE_EFFECT_LAST];
+};
+
+bool link_tex_programs(struct tex_shader *shader, enum fx_tex_shader_source source);
+
+void delete_tex_programs(struct tex_shader *shader);
+
+struct tex_shader_variant *get_tex_program(struct tex_shader *shader,
+		enum fx_tex_shader_effects effects);
 
 struct box_shadow_shader {
 	GLuint program;

@@ -1,6 +1,8 @@
 #include <EGL/egl.h>
+#include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <wlr/util/log.h>
 #include <scenefx/types/fx/clipped_region.h>
 
@@ -274,14 +276,17 @@ bool link_quad_grad_round_program(struct quad_grad_round_shader *shader, int max
 	return true;
 }
 
-bool link_tex_program(struct tex_shader *shader, enum fx_tex_shader_source source,
-		bool effects) {
+static bool link_tex_program(struct tex_shader_variant* shader,
+		enum fx_tex_shader_source source, enum fx_tex_shader_effects effects) {
+	const bool needs_corner_rounding = effects & SHADER_TEXTURE_EFFECT_ROUND_CORNERS
+		|| effects & SHADER_TEXTURE_EFFECT_CLIPPING;
+
 	GLchar frag_src_part[4096];
 	GLchar frag_src[8192];
 	snprintf(frag_src_part, sizeof(frag_src_part),
 		tex_frag_src, source, effects);
 	snprintf(frag_src, sizeof(frag_src),
-		"%s\n%s\n", frag_src_part, effects ? corner_alpha_frag_src : "");
+		"%s\n%s\n", frag_src_part, needs_corner_rounding ? corner_alpha_frag_src : "");
 
 	GLuint prog;
 	shader->program = prog = link_program(frag_src);
@@ -295,26 +300,53 @@ bool link_tex_program(struct tex_shader *shader, enum fx_tex_shader_source sourc
 	shader->pos_attrib = glGetAttribLocation(prog, "pos");
 	shader->tex_proj = glGetUniformLocation(prog, "tex_proj");
 
-	shader->discard_transparent = glGetUniformLocation(prog, "discard_transparent");
+	shader->corner_rounding.size = glGetUniformLocation(prog, "size");
+	shader->corner_rounding.position = glGetUniformLocation(prog, "position");
+	shader->corner_rounding.radius.top_left = glGetUniformLocation(prog, "radius_top_left");
+	shader->corner_rounding.radius.top_right = glGetUniformLocation(prog, "radius_top_right");
+	shader->corner_rounding.radius.bottom_left = glGetUniformLocation(prog, "radius_bottom_left");
+	shader->corner_rounding.radius.bottom_right = glGetUniformLocation(prog, "radius_bottom_right");
 
-	if (!effects) {
-		return true;
-	}
-	shader->effects.size = glGetUniformLocation(prog, "size");
-	shader->effects.position = glGetUniformLocation(prog, "position");
-	shader->effects.radius.top_left = glGetUniformLocation(prog, "radius_top_left");
-	shader->effects.radius.top_right = glGetUniformLocation(prog, "radius_top_right");
-	shader->effects.radius.bottom_left = glGetUniformLocation(prog, "radius_bottom_left");
-	shader->effects.radius.bottom_right = glGetUniformLocation(prog, "radius_bottom_right");
-
-	shader->effects.clip_size = glGetUniformLocation(prog, "clip_size");
-	shader->effects.clip_position = glGetUniformLocation(prog, "clip_position");
-	shader->effects.clip_radius.top_left = glGetUniformLocation(prog, "clip_radius_top_left");
-	shader->effects.clip_radius.top_right = glGetUniformLocation(prog, "clip_radius_top_right");
-	shader->effects.clip_radius.bottom_left = glGetUniformLocation(prog, "clip_radius_bottom_left");
-	shader->effects.clip_radius.bottom_right = glGetUniformLocation(prog, "clip_radius_bottom_right");
+	shader->clipping.size = glGetUniformLocation(prog, "clip_size");
+	shader->clipping.position = glGetUniformLocation(prog, "clip_position");
+	shader->clipping.radius.top_left = glGetUniformLocation(prog, "clip_radius_top_left");
+	shader->clipping.radius.top_right = glGetUniformLocation(prog, "clip_radius_top_right");
+	shader->clipping.radius.bottom_left = glGetUniformLocation(prog, "clip_radius_bottom_left");
+	shader->clipping.radius.bottom_right = glGetUniformLocation(prog, "clip_radius_bottom_right");
 
 	return true;
+}
+
+bool link_tex_programs(struct tex_shader *shader, enum fx_tex_shader_source source) {
+	memset(&shader->variants, 0, sizeof(*shader->variants));
+	for (enum fx_tex_shader_effects effects = 0;
+			effects < SHADER_TEXTURE_EFFECT_LAST;
+			effects++) {
+		if (!link_tex_program(&shader->variants[effects], source, effects)) {
+			wlr_log(WLR_ERROR,
+					"Could not link tex shader: Source \"%d\", Effects: \"%d\"",
+					source, effects);
+			return false;
+		}
+	}
+	return true;
+}
+
+void delete_tex_programs(struct tex_shader *shader) {
+	for (enum fx_tex_shader_effects effects = 0;
+			effects < SHADER_TEXTURE_EFFECT_LAST;
+			effects++) {
+		struct tex_shader_variant variant = shader->variants[effects];
+		if (variant.program > 0) {
+			glDeleteProgram(variant.program);
+		}
+	}
+}
+
+struct tex_shader_variant *get_tex_program(struct tex_shader *shader,
+		enum fx_tex_shader_effects effects) {
+	assert(effects < SHADER_TEXTURE_EFFECT_LAST);
+	return &shader->variants[effects];
 }
 
 bool link_box_shadow_program(struct box_shadow_shader *shader) {

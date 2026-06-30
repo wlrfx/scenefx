@@ -111,9 +111,6 @@ struct gles2_renderer {
 		struct tex_shader tex_rgba;
 		struct tex_shader tex_rgbx;
 		struct tex_shader tex_ext;
-		struct tex_shader tex_effects_rgba;
-		struct tex_shader tex_effects_rgbx;
-		struct tex_shader tex_effects_ext;
 
 		struct box_shadow_shader box_shadow;
 		struct blur_shader blur1;

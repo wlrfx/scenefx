@@ -85,7 +85,9 @@ struct fx_render_pass *fx_renderer_init_render_pass(struct fx_renderer *fx_rende
 void fx_render_pass_destroy(struct fx_render_pass *fx_pass);
 
 /**
- * Render a fx texture.
+ * Render a texture.
+ * It's recommended to use wlr_render_pass_add_texture(...) instead if no
+ * effects are used.
  */
 void fx_render_pass_add_texture(struct fx_render_pass *render_pass,
 	const struct fx_render_texture_options *fx_options);

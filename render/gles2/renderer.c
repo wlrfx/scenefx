@@ -6,9 +6,10 @@
 #include <wlr/render/gles2.h>
 #include <wlr/util/log.h>
 
+#include "render/fx_renderer.h"
 #include "render/gles2/egl.h"
 #include "render/gles2/gles2.h"
-#include "render/fx_renderer.h"
+#include "render/gles2/shaders.h"
 
 static inline void free_shaders(struct gles2_renderer *gles2_renderer) {
 	push_fx_debug(gles2_renderer);
@@ -17,12 +18,9 @@ static inline void free_shaders(struct gles2_renderer *gles2_renderer) {
 	glDeleteProgram(gles2_renderer->shaders.quad_round.program);
 	glDeleteProgram(gles2_renderer->shaders.quad_grad.program);
 	glDeleteProgram(gles2_renderer->shaders.quad_grad_round.program);
-	glDeleteProgram(gles2_renderer->shaders.tex_rgba.program);
-	glDeleteProgram(gles2_renderer->shaders.tex_rgbx.program);
-	glDeleteProgram(gles2_renderer->shaders.tex_ext.program);
-	glDeleteProgram(gles2_renderer->shaders.tex_effects_rgba.program);
-	glDeleteProgram(gles2_renderer->shaders.tex_effects_rgbx.program);
-	glDeleteProgram(gles2_renderer->shaders.tex_effects_ext.program);
+	delete_tex_programs(&gles2_renderer->shaders.tex_rgba);
+	delete_tex_programs(&gles2_renderer->shaders.tex_rgbx);
+	delete_tex_programs(&gles2_renderer->shaders.tex_ext);
 	glDeleteProgram(gles2_renderer->shaders.box_shadow.program);
 	glDeleteProgram(gles2_renderer->shaders.blur1.program);
 	glDeleteProgram(gles2_renderer->shaders.blur2.program);
@@ -59,37 +57,20 @@ static bool link_shaders(struct gles2_renderer *gles2_renderer) {
 		goto error;
 	}
 
-	// Basic fragment shaders
-	if (!link_tex_program(&gles2_renderer->shaders.tex_rgba,
-				SHADER_SOURCE_TEXTURE_RGBA, false)) {
-		wlr_log(WLR_ERROR, "Could not link tex_RGBA shader");
+	// tex shaders
+	if (!link_tex_programs(&gles2_renderer->shaders.tex_rgba,
+				SHADER_SOURCE_TEXTURE_RGBA)) {
+		wlr_log(WLR_ERROR, "Could not link tex_RGBA shaders");
 		goto error;
 	}
-	if (!link_tex_program(&gles2_renderer->shaders.tex_rgbx,
-				SHADER_SOURCE_TEXTURE_RGBX, false)) {
-		wlr_log(WLR_ERROR, "Could not link tex_RGBX shader");
+	if (!link_tex_programs(&gles2_renderer->shaders.tex_rgbx,
+				SHADER_SOURCE_TEXTURE_RGBX)) {
+		wlr_log(WLR_ERROR, "Could not link tex_RGBX shaders");
 		goto error;
 	}
-	if (!link_tex_program(&gles2_renderer->shaders.tex_ext,
-				SHADER_SOURCE_TEXTURE_EXTERNAL, false)) {
-		wlr_log(WLR_ERROR, "Could not link tex_EXTERNAL shader");
-		goto error;
-	}
-
-	// Effects fragment shaders
-	if (!link_tex_program(&gles2_renderer->shaders.tex_effects_rgba,
-				SHADER_SOURCE_TEXTURE_RGBA, true)) {
-		wlr_log(WLR_ERROR, "Could not link tex_effects_RGBA shader");
-		goto error;
-	}
-	if (!link_tex_program(&gles2_renderer->shaders.tex_effects_rgbx,
-				SHADER_SOURCE_TEXTURE_RGBX, true)) {
-		wlr_log(WLR_ERROR, "Could not link tex_effects_RGBX shader");
-		goto error;
-	}
-	if (!link_tex_program(&gles2_renderer->shaders.tex_effects_ext,
-				SHADER_SOURCE_TEXTURE_EXTERNAL, true)) {
-		wlr_log(WLR_ERROR, "Could not link tex_effects_EXTERNAL shader");
+	if (!link_tex_programs(&gles2_renderer->shaders.tex_ext,
+				SHADER_SOURCE_TEXTURE_EXTERNAL)) {
+		wlr_log(WLR_ERROR, "Could not link tex_EXTERNAL shaders");
 		goto error;
 	}
 

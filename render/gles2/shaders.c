@@ -4,7 +4,7 @@
 #include <wlr/util/log.h>
 #include <scenefx/types/fx/clipped_region.h>
 
-#include "render/fx_renderer/shaders.h"
+#include "render/gles2/shaders.h"
 
 // shaders
 #include "GLES2/gl2.h"
@@ -29,7 +29,14 @@ GLuint compile_shader(GLuint type, const GLchar *src) {
 	GLint ok;
 	glGetShaderiv(shader, GL_COMPILE_STATUS, &ok);
 	if (ok == GL_FALSE) {
-		wlr_log(WLR_ERROR, "Failed to compile shader");
+		GLint error_length = 0;
+		glGetShaderiv(shader, GL_INFO_LOG_LENGTH, &error_length);
+
+		char *error_msg = calloc(error_length, sizeof(*error_msg));
+		glGetShaderInfoLog(shader, error_length, &error_length, error_msg);
+		wlr_log(WLR_ERROR, "Failed to compile shader: %s", error_msg);
+		free(error_msg);
+
 		glDeleteShader(shader);
 		shader = 0;
 	}
@@ -62,7 +69,14 @@ GLuint link_program(const GLchar *frag_src) {
 	GLint ok;
 	glGetProgramiv(prog, GL_LINK_STATUS, &ok);
 	if (ok == GL_FALSE) {
-		wlr_log(WLR_ERROR, "Failed to link shader");
+		GLint error_length = 0;
+		glGetProgramiv(prog, GL_INFO_LOG_LENGTH, &error_length);
+
+		char *error_msg = calloc(error_length, sizeof(*error_msg));
+		glGetProgramInfoLog(prog, error_length, &error_length, error_msg);
+		wlr_log(WLR_ERROR, "Failed to link shader: %s", error_msg);
+		free(error_msg);
+
 		glDeleteProgram(prog);
 		goto error;
 	}
@@ -101,13 +115,33 @@ void load_gl_proc(void *proc_ptr, const char *name) {
 	*(void **)proc_ptr = proc;
 }
 
-void uniform_corner_radii_set(const struct shader_corner_radii *uniform,
-		const struct fx_corner_fradii *corners) {
-	glUniform1f(uniform->top_left, corners->top_left);
-	glUniform1f(uniform->top_right, corners->top_right);
-	glUniform1f(uniform->bottom_left, corners->bottom_left);
-	glUniform1f(uniform->bottom_right, corners->bottom_right);
+bool check_egl_ext(const char *exts, const char *ext) {
+	size_t extlen = strlen(ext);
+	const char *end = exts + strlen(exts);
+
+	while (exts < end) {
+		if (*exts == ' ') {
+			exts++;
+			continue;
+		}
+		size_t n = strcspn(exts, " ");
+		if (n == extlen && strncmp(ext, exts, n) == 0) {
+			return true;
+		}
+		exts += n;
+	}
+	return false;
 }
+
+void load_egl_proc(void *proc_ptr, const char *name) {
+	void *proc = (void *)eglGetProcAddress(name);
+	if (proc == NULL) {
+		wlr_log(WLR_ERROR, "eglGetProcAddress(%s) failed", name);
+		abort();
+	}
+	*(void **)proc_ptr = proc;
+}
+
 // Shaders
 
 bool link_quad_program(struct quad_shader *shader, bool clip) {

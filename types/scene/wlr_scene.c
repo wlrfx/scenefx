@@ -17,10 +17,11 @@
 #include <wlr/util/region.h>
 #include <wlr/util/transform.h>
 
+#include "render/fx_renderer.h"
 #include "render/color.h"
 #include "render/tracy.h"
-#include "scenefx/render/fx_renderer/fx_offscreen_buffers.h"
 #include "scenefx/render/pass.h"
+#include "scenefx/scenefx.h"
 #include "scenefx/types/fx/blur_data.h"
 #include "scenefx/types/fx/clipped_region.h"
 #include "scenefx/types/wlr_scene.h"
@@ -434,6 +435,8 @@ struct render_data {
 
 	struct wlr_render_pass *render_pass;
 	pixman_region32_t damage;
+
+	struct fx_render_pass *fx_pass;
 };
 
 static void logical_to_buffer_coords(pixman_region32_t *region, const struct render_data *data,
@@ -1956,7 +1959,6 @@ static float get_luminance_multiplier(const struct wlr_color_luminances *src_lum
 
 static void scene_entry_render(struct render_list_entry *entry, const struct render_data *data) {
 	struct wlr_scene_node *node = entry->node;
-	struct fx_gles_render_pass *fx_pass = fx_get_render_pass(data->render_pass);
 
 	pixman_region32_t render_region;
 	pixman_region32_init(&render_region);
@@ -2026,16 +2028,19 @@ static void scene_entry_render(struct render_list_entry *entry, const struct ren
 			},
 		};
 
-		// TODO: Use the base wlr_render_pass_add_rect as a fast-path in the future
-		if (!fx_corner_radii_is_empty(&rect_corners)) {
+		if (data->fx_pass == NULL) {
+			wlr_render_pass_add_rect(data->render_pass, &rect_options.base);
+		} else if (!fx_corner_radii_is_empty(&rect_corners)) {
 			struct fx_render_rounded_rect_options rounded_rect_options = {
 				.base = rect_options.base,
 				.corners = fx_corner_radii_scale(rect_corners, data->scale),
 				.clipped_region = rect_options.clipped_region,
 			};
-			fx_render_pass_add_rounded_rect(fx_pass, &rounded_rect_options);
+			fx_render_pass_add_rounded_rect(data->fx_pass, &rounded_rect_options);
+		} else if (!wlr_box_empty(&rect_clipped_region_box)) {
+			fx_render_pass_add_rect(data->fx_pass, &rect_options);
 		} else {
-			fx_render_pass_add_rect(fx_pass, &rect_options);
+			wlr_render_pass_add_rect(data->render_pass, &rect_options.base);
 		}
 		break;
 	case WLR_SCENE_NODE_BUFFER:;
@@ -2109,8 +2114,12 @@ static void scene_entry_render(struct render_list_entry *entry, const struct ren
 			.clipped_region = {0},
 		};
 
-		// TODO: Use the base wlr_render_pass_add_texture as a fast-path in the future
-		fx_render_pass_add_texture(fx_pass, &tex_options);
+		if (data->fx_pass == NULL || (fx_corner_radii_is_empty(&buffer_corners)
+					&& wlr_box_empty(&tex_options.clipped_region.area))) {
+			wlr_render_pass_add_texture(data->render_pass, &tex_options.base);
+		} else {
+			fx_render_pass_add_texture(data->fx_pass, &tex_options);
+		}
 
 		struct wlr_scene_output_sample_event sample_event = {
 			.output = data->output,
@@ -2129,6 +2138,9 @@ static void scene_entry_render(struct render_list_entry *entry, const struct ren
 		}
 		break;
 	case WLR_SCENE_NODE_SHADOW:;
+		if (data->fx_pass == NULL) {
+			break;
+		}
 		struct wlr_scene_shadow *scene_shadow = wlr_scene_shadow_from_node(node);
 
 		struct wlr_box shadow_clipped_region_box = scene_shadow->clipped_region.area;
@@ -2157,13 +2169,16 @@ static void scene_entry_render(struct render_list_entry *entry, const struct ren
 			},
 			.clip = &render_region,
 		};
-		fx_render_pass_add_box_shadow(fx_pass, &shadow_options);
+		fx_render_pass_add_box_shadow(data->fx_pass, &shadow_options);
 		break;
 	case WLR_SCENE_NODE_OPTIMIZED_BLUR:;
+		if (data->fx_pass == NULL) {
+			break;
+		}
 		struct wlr_scene_optimized_blur *scene_blur = wlr_scene_optimized_blur_from_node(node);
 		// Re-render the optimized blur buffer when needed. Retry rendering
 		// until there's a visible blur_node.
-		if (fx_pass->has_blur && is_scene_blur_enabled(&scene->blur_data)
+		if (data->fx_pass->has_blur && is_scene_blur_enabled(&scene->blur_data)
 				&& scene_blur->dirty) {
 			const float opacity = 1.0f;
 			enum wl_output_transform transform =
@@ -2184,13 +2199,16 @@ static void scene_entry_render(struct render_list_entry *entry, const struct ren
 				.blur_data = &scene->blur_data,
 				.blur_strength = 1.0f,
 			};
-			bool result = fx_render_pass_add_optimized_blur(fx_pass, &blur_options);
+			bool result = fx_render_pass_add_optimized_blur(data->fx_pass, &blur_options);
 			if (result) {
 				scene_blur->dirty = false;
 			}
 		}
 		break;
 	case WLR_SCENE_NODE_BLUR:;
+		if (data->fx_pass == NULL) {
+			break;
+		}
 		struct wlr_scene_blur *blur = wlr_scene_blur_from_node(node);
 
 		struct wlr_texture *tex = NULL;
@@ -2230,7 +2248,7 @@ static void scene_entry_render(struct render_list_entry *entry, const struct ren
 			.ignore_transparent = mask != NULL,
 			.blur_strength = blur->strength,
 		};
-		fx_render_pass_add_blur(fx_pass, &blur_options);
+		fx_render_pass_add_blur(data->fx_pass, &blur_options);
 		break;
 	}
 
@@ -2863,7 +2881,7 @@ bool wlr_scene_output_needs_frame(struct wlr_scene_output *scene_output) {
 }
 
 static bool should_blur_node_extend_damage(struct wlr_scene_node *node,
-		struct fx_gles_render_pass *fx_pass, struct blur_data *blur_data) {
+		struct fx_render_pass *fx_pass, struct blur_data *blur_data) {
 	switch (node->type) {
 	case WLR_SCENE_NODE_BLUR:;
 		struct wlr_scene_blur *blur_node = wlr_scene_blur_from_node(node);
@@ -3290,10 +3308,14 @@ bool wlr_scene_output_build_state(struct wlr_scene_output *scene_output,
 	wlr_damage_ring_rotate_buffer(&scene_output->damage_ring, buffer,
 		&render_data.damage);
 
-	struct fx_gles_render_pass *fx_pass = fx_get_render_pass(render_pass);
+	struct fx_renderer *fx_renderer = scenefx_find_fx_renderer(
+			scene_output->scene, output->renderer);
+	struct fx_render_pass *fx_pass = fx_renderer_init_render_pass(
+			fx_renderer, render_pass, buffer, output);
+	render_data.fx_pass = fx_pass;
+
 	bool should_compensate_blur = false;
-	if (fx_render_pass_init_offscreen_buffers(render_pass, output)
-			&& pixman_region32_not_empty(&render_data.damage)) {
+	if (fx_pass && pixman_region32_not_empty(&render_data.damage)) {
 		// Blur artifact prevention
 		// Note: Supports individual blur node blur_data
 		pixman_region32_t original_damage;
@@ -3363,8 +3385,7 @@ bool wlr_scene_output_build_state(struct wlr_scene_output *scene_output,
 			// content would be included into the new blur. This means that
 			// content like a high z-index toplevel would be included into the
 			// blur of a toplevel with a low z-index.
-			fx_render_pass_read_to_buffer(fx_pass, &fx_pass->blur_padding_region,
-					fx_pass->fx_offscreen_buffers->blur_saved_pixels_buffer, fx_pass->buffer);
+			fx_render_pass_save_blur_region(fx_pass);
 		}
 
 		pixman_region32_fini(&blur_padding_region);
@@ -3454,13 +3475,16 @@ bool wlr_scene_output_build_state(struct wlr_scene_output *scene_output,
 
 	wlr_output_add_software_cursors_to_render_pass(output, render_pass, &render_data.damage);
 
-	if (should_compensate_blur) {
+	if (fx_pass && should_compensate_blur) {
 		// Render the saved pixels over the blur artifacts
-		fx_render_pass_read_to_buffer(fx_pass, &fx_pass->blur_padding_region,
-				fx_pass->buffer, fx_pass->fx_offscreen_buffers->blur_saved_pixels_buffer);
+		fx_render_pass_apply_saved_blur_region(fx_pass);
 	}
 
 	pixman_region32_fini(&render_data.damage);
+
+	if (fx_pass) {
+		fx_render_pass_destroy(fx_pass);
+	}
 
 	if (!wlr_render_pass_submit(render_pass)) {
 		wlr_buffer_unlock(buffer);

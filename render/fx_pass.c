@@ -46,13 +46,6 @@ void fx_render_pass_add_rect_grad(struct fx_render_pass *render_pass,
 	}
 }
 
-void fx_render_pass_add_rounded_rect(struct fx_render_pass *render_pass,
-		const struct fx_render_rounded_rect_options *fx_options) {
-	if (render_pass->impl->add_rounded_rect != NULL) {
-		render_pass->impl->add_rounded_rect(render_pass, fx_options);
-	}
-}
-
 void fx_render_pass_add_rounded_rect_grad(struct fx_render_pass *render_pass,
 		const struct fx_render_rounded_rect_grad_options *fx_options) {
 	if (render_pass->impl->add_rounded_rect_grad != NULL) {

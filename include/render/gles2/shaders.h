@@ -30,6 +30,14 @@ enum fx_tex_shader_effects {
 	SHADER_TEXTURE_EFFECT_LAST = 1 << 3,
 };
 
+// Note: Needs to be the same as in the quad.frag shader
+enum fx_quad_shader_effects {
+	SHADER_QUAD_EFFECT_NONE = 0,
+	SHADER_QUAD_EFFECT_ROUND_CORNERS = 1 << 0,
+	SHADER_QUAD_EFFECT_CLIPPING = 1 << 1,
+	SHADER_QUAD_EFFECT_LAST = 1 << 2,
+};
+
 struct shader_corner_radii {
 	GLint top_left;
 	GLint top_right;
@@ -37,21 +45,36 @@ struct shader_corner_radii {
 	GLint bottom_right;
 };
 
-struct quad_shader {
+struct quad_shader_variant {
 	GLuint program;
 	GLint proj;
 	GLint color;
 	GLint pos_attrib;
 
-	// Only used for the effects shader
 	struct {
-		GLint clip_size;
-		GLint clip_position;
-		struct shader_corner_radii clip_radius;
-	} effects;
+		GLint size;
+		GLint position;
+		struct shader_corner_radii radius;
+	} corner_rounding;
+
+	struct {
+		GLint size;
+		GLint position;
+		struct shader_corner_radii radius;
+	} clipping;
 };
 
-bool link_quad_program(struct quad_shader *shader, bool clip);
+struct quad_shader {
+	// 4 different combinations of effects
+	struct quad_shader_variant variants[SHADER_QUAD_EFFECT_LAST];
+};
+
+bool link_quad_programs(struct quad_shader *shader);
+
+void delete_quad_programs(struct quad_shader *shader);
+
+struct quad_shader_variant *get_quad_program(struct quad_shader *shader,
+		enum fx_quad_shader_effects effects);
 
 struct quad_grad_shader {
 	int max_len;
@@ -70,23 +93,6 @@ struct quad_grad_shader {
 };
 
 bool link_quad_grad_program(struct quad_grad_shader *shader, int max_len);
-
-struct quad_round_shader {
-	GLuint program;
-	GLint proj;
-	GLint color;
-	GLint pos_attrib;
-	GLint size;
-	GLint position;
-
-	struct shader_corner_radii radius;
-
-	GLint clip_size;
-	GLint clip_position;
-	struct shader_corner_radii clip_radius;
-};
-
-bool link_quad_round_program(struct quad_round_shader *shader);
 
 struct quad_grad_round_shader {
 	GLuint program;

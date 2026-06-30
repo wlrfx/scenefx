@@ -410,7 +410,6 @@ static void gles2_render_pass_add_texture(struct fx_render_pass *fx_pass,
 static void gles2_render_pass_add_rect(struct fx_render_pass *fx_pass,
 		const struct fx_render_rect_options *fx_options) {
 	const struct wlr_render_rect_options *options = &fx_options->base;
-
 	struct gles2_render_pass *pass = gles2_get_render_pass(fx_pass);
 	struct gles2_renderer *gles2_renderer = pass->gles2_renderer;
 
@@ -419,12 +418,23 @@ static void gles2_render_pass_add_rect(struct fx_render_pass *fx_pass,
 	struct wlr_buffer *wlr_buffer = pass->gles2_buffer->wlr_buffer;
 	wlr_render_rect_options_get_box(options, wlr_buffer, &box);
 
+	const bool should_round_corners = !fx_corner_fradii_is_empty(&fx_options->corners);
 	const bool should_clip = clipped_fregion_is_valid(&fx_options->clipped_region);
+	// Gather the effects and pick the relevant shader
+	enum fx_quad_shader_effects effects = SHADER_QUAD_EFFECT_NONE;
+	if (should_round_corners) {
+		effects |= SHADER_QUAD_EFFECT_ROUND_CORNERS;
+	}
+	if (should_clip) {
+		effects |= SHADER_QUAD_EFFECT_CLIPPING;
+	}
+
 	const struct wlr_box *clipped_region_box = &fx_options->clipped_region.area;
 	const struct fx_corner_fradii *clipped_region_corners = &fx_options->clipped_region.corners;
 
 	enum wlr_render_blend_mode blend_mode =
-		(color->a == 1.0 && !should_clip) ? WLR_RENDER_BLEND_MODE_NONE : options->blend_mode;
+		(color->a == 1.0 && !should_clip && !should_round_corners)
+		? WLR_RENDER_BLEND_MODE_NONE : options->blend_mode;
 
 	pixman_region32_t clip_region;
 	if (options->clip) {
@@ -439,6 +449,7 @@ static void gles2_render_pass_add_rect(struct fx_render_pass *fx_pass,
 	TRACY_BOTH_ZONES_START(&gles2_renderer->fx_renderer);
 	TRACY_ZONE_TEXT_f("Box (WxH, X, Y): %dx%d, %d, %d", box.width, box.height, box.x, box.y);
 	TRACY_ZONE_TEXT_f("Color RGBA: %f, %f, %f, %f", color->r, color->g, color->b, color->a);
+	TRACY_ZONE_TEXT_f("Effects: %d", effects);
 	TRACY_ZONE_TEXT_f("Clip Box (WxH, X, Y): %dx%d, %d, %d",
 			clipped_region_box->width, clipped_region_box->height,
 			clipped_region_box->x, clipped_region_box->y);
@@ -447,21 +458,30 @@ static void gles2_render_pass_add_rect(struct fx_render_pass *fx_pass,
 			clipped_region_corners->top_right,
 			clipped_region_corners->bottom_left,
 			clipped_region_corners->bottom_right);
+	TRACY_ZONE_TEXT_f("Corners (TL, TR, BL, BR): %f, %f, %f, %f",
+			clipped_region_corners->top_left,
+			clipped_region_corners->top_right,
+			clipped_region_corners->bottom_left,
+			clipped_region_corners->bottom_right);
 
 	push_fx_debug(gles2_renderer);
 
 	setup_blending(blend_mode);
-	struct quad_shader *shader = should_clip
-		? &gles2_renderer->shaders.quad_clip
-		: &gles2_renderer->shaders.quad;
+
+	struct quad_shader_variant *shader = get_quad_program(&gles2_renderer->shaders.quad, effects);
+
 	glUseProgram(shader->program);
 	set_proj_matrix(shader->proj, pass->projection_matrix, &box);
 	glUniform4f(shader->color, color->r, color->g, color->b, color->a);
-	if (should_clip) {
-		glUniform2f(shader->effects.clip_size, clipped_region_box->width, clipped_region_box->height);
-		glUniform2f(shader->effects.clip_position, clipped_region_box->x, clipped_region_box->y);
-		uniform_corner_radii_set(&shader->effects.clip_radius, clipped_region_corners);
-	}
+
+	glUniform2f(shader->corner_rounding.size, box.width, box.height);
+	glUniform2f(shader->corner_rounding.position, box.x, box.y);
+	uniform_corner_radii_set(&shader->corner_rounding.radius, &fx_options->corners);
+
+	glUniform2f(shader->clipping.size, clipped_region_box->width, clipped_region_box->height);
+	glUniform2f(shader->clipping.position, clipped_region_box->x, clipped_region_box->y);
+	uniform_corner_radii_set(&shader->clipping.radius, clipped_region_corners);
+
 	render(&box, &clip_region, shader->pos_attrib);
 
 	pixman_region32_fini(&clip_region);
@@ -523,71 +543,6 @@ static void gles2_render_pass_add_rect_grad(struct fx_render_pass *fx_pass,
 	glUniform2f(shader.origin, fx_options->gradient.origin[0], fx_options->gradient.origin[1]);
 
 	render(&box, options->clip, shader.pos_attrib);
-
-	pop_fx_debug(gles2_renderer);
-	TRACY_BOTH_ZONES_END;
-}
-
-static void gles2_render_pass_add_rounded_rect(struct fx_render_pass *fx_pass,
-		const struct fx_render_rounded_rect_options *fx_options) {
-	const struct wlr_render_rect_options *options = &fx_options->base;
-	struct gles2_render_pass *pass = gles2_get_render_pass(fx_pass);
-
-	struct gles2_renderer *gles2_renderer = pass->gles2_renderer;
-
-	const struct wlr_render_color *color = &options->color;
-	struct wlr_box box;
-	struct wlr_buffer *wlr_buffer = pass->gles2_buffer->wlr_buffer;
-	wlr_render_rect_options_get_box(options, wlr_buffer, &box);
-
-	pixman_region32_t clip_region;
-	if (options->clip) {
-		pixman_region32_init(&clip_region);
-		pixman_region32_copy(&clip_region, options->clip);
-	} else {
-		pixman_region32_init_rect(&clip_region, box.x, box.y, box.width, box.height);
-	}
-	const struct wlr_box *clipped_region_box = &fx_options->clipped_region.area;
-	const struct fx_corner_fradii *clipped_region_corners = &fx_options->clipped_region.corners;
-	apply_clip_region(&clip_region, clipped_region_box, clipped_region_corners);
-
-	TRACY_BOTH_ZONES_START(&gles2_renderer->fx_renderer);
-	TRACY_ZONE_TEXT_f("Box (WxH, X, Y): %dx%d, %d, %d", box.width, box.height, box.x, box.y);
-	TRACY_ZONE_TEXT_f("Clip Box (WxH, X, Y): %dx%d, %d, %d",
-			clipped_region_box->width, clipped_region_box->height,
-			clipped_region_box->x, clipped_region_box->y);
-	TRACY_ZONE_TEXT_f("Clip Box Corners (TL, TR, BL, BR): %f, %f, %f, %f",
-			clipped_region_corners->top_left,
-			clipped_region_corners->top_right,
-			clipped_region_corners->bottom_left,
-			clipped_region_corners->bottom_right);
-	TRACY_ZONE_TEXT_f("Color RGBA: %f, %f, %f, %f", color->r, color->g, color->b, color->a);
-	TRACY_ZONE_TEXT_f("Corners (TL, TR, BL, BR): %f, %f, %f, %f",
-			clipped_region_corners->top_left,
-			clipped_region_corners->top_right,
-			clipped_region_corners->bottom_left,
-			clipped_region_corners->bottom_right);
-	push_fx_debug(gles2_renderer);
-
-	setup_blending(WLR_RENDER_BLEND_MODE_PREMULTIPLIED);
-
-	struct quad_round_shader shader = gles2_renderer->shaders.quad_round;
-	glUseProgram(shader.program);
-
-	set_proj_matrix(shader.proj, pass->projection_matrix, &box);
-	glUniform4f(shader.color, color->r, color->g, color->b, color->a);
-
-	glUniform2f(shader.size, box.width, box.height);
-	glUniform2f(shader.position, box.x, box.y);
-	glUniform2f(shader.clip_size, clipped_region_box->width, clipped_region_box->height);
-	glUniform2f(shader.clip_position, clipped_region_box->x, clipped_region_box->y);
-	uniform_corner_radii_set(&shader.clip_radius, clipped_region_corners);
-
-	struct fx_corner_fradii corners = fx_options->corners;
-	uniform_corner_radii_set(&shader.radius, &corners);
-
-	render(&box, &clip_region, shader.pos_attrib);
-	pixman_region32_fini(&clip_region);
 
 	pop_fx_debug(gles2_renderer);
 	TRACY_BOTH_ZONES_END;
@@ -1159,7 +1114,6 @@ static const struct fx_render_pass_impl render_pass_impl = {
 	.add_texture = gles2_render_pass_add_texture,
 	.add_rect = gles2_render_pass_add_rect,
 	.add_rect_grad = gles2_render_pass_add_rect_grad,
-	.add_rounded_rect = gles2_render_pass_add_rounded_rect,
 	.add_rounded_rect_grad = gles2_render_pass_add_rounded_rect_grad,
 	.add_box_shadow = gles2_render_pass_add_box_shadow,
 	.add_blur = gles2_render_pass_add_blur,

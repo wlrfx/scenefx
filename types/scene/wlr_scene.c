@@ -2022,25 +2022,18 @@ static void scene_entry_render(struct render_list_entry *entry, const struct ren
 				},
 				.clip = &render_region,
 			},
+			.corners = fx_corner_radii_scale(rect_corners, data->scale),
 			.clipped_region = {
 				.area = rect_clipped_region_box,
 				.corners = fx_corner_radii_scale(rect_clipped_corners, data->scale),
 			},
 		};
 
-		if (data->fx_pass == NULL) {
+		if (data->fx_pass == NULL || (fx_corner_radii_is_empty(&rect_corners)
+					&& wlr_box_empty(&rect_options.clipped_region.area))) {
 			wlr_render_pass_add_rect(data->render_pass, &rect_options.base);
-		} else if (!fx_corner_radii_is_empty(&rect_corners)) {
-			struct fx_render_rounded_rect_options rounded_rect_options = {
-				.base = rect_options.base,
-				.corners = fx_corner_radii_scale(rect_corners, data->scale),
-				.clipped_region = rect_options.clipped_region,
-			};
-			fx_render_pass_add_rounded_rect(data->fx_pass, &rounded_rect_options);
-		} else if (!wlr_box_empty(&rect_clipped_region_box)) {
-			fx_render_pass_add_rect(data->fx_pass, &rect_options);
 		} else {
-			wlr_render_pass_add_rect(data->render_pass, &rect_options.base);
+			fx_render_pass_add_rect(data->fx_pass, &rect_options);
 		}
 		break;
 	case WLR_SCENE_NODE_BUFFER:;

@@ -103,9 +103,7 @@ struct gles2_renderer {
 
 	struct {
 		struct quad_shader quad;
-		struct quad_shader quad_clip;
 		struct quad_grad_shader quad_grad;
-		struct quad_round_shader quad_round;
 		struct quad_grad_round_shader quad_grad_round;
 
 		struct tex_shader tex_rgba;

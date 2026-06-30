@@ -32,18 +32,13 @@ struct fx_render_texture_options {
 
 struct fx_render_rect_options {
 	struct wlr_render_rect_options base;
+	struct fx_corner_fradii corners;
 	struct clipped_fregion clipped_region;
 };
 
 struct fx_render_rect_grad_options {
 	struct wlr_render_rect_options base;
 	struct fx_gradient gradient;
-};
-
-struct fx_render_rounded_rect_options {
-	struct wlr_render_rect_options base;
-	struct fx_corner_fradii corners;
-	struct clipped_fregion clipped_region;
 };
 
 struct fx_render_rounded_rect_grad_options {
@@ -94,6 +89,8 @@ void fx_render_pass_add_texture(struct fx_render_pass *render_pass,
 
 /**
  * Render a rectangle.
+ * It's recommended to use wlr_render_pass_add_rect(...) instead if no effects
+ * are used.
  */
 void fx_render_pass_add_rect(struct fx_render_pass *render_pass,
 	const struct fx_render_rect_options *fx_options);
@@ -103,12 +100,6 @@ void fx_render_pass_add_rect(struct fx_render_pass *render_pass,
  */
 void fx_render_pass_add_rect_grad(struct fx_render_pass *render_pass,
 	const struct fx_render_rect_grad_options *fx_options);
-
-/**
- * Render a rounded rectangle.
- */
-void fx_render_pass_add_rounded_rect(struct fx_render_pass *render_pass,
-	const struct fx_render_rounded_rect_options *fx_options);
 
 /**
  * Render a rounded rectangle with a gradient.

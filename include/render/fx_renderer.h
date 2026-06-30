@@ -53,8 +53,6 @@ struct fx_render_pass_impl {
 			const struct fx_render_rect_options *options);
 	void (*add_rect_grad)(struct fx_render_pass *render_pass,
 			const struct fx_render_rect_grad_options *options);
-	void (*add_rounded_rect)(struct fx_render_pass *render_pass,
-			const struct fx_render_rounded_rect_options *options);
 	void (*add_rounded_rect_grad)(struct fx_render_pass *render_pass,
 			const struct fx_render_rounded_rect_grad_options *options);
 	void (*add_box_shadow)(struct fx_render_pass *pass,

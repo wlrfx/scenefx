@@ -13,9 +13,7 @@
 
 static inline void free_shaders(struct gles2_renderer *gles2_renderer) {
 	push_fx_debug(gles2_renderer);
-	glDeleteProgram(gles2_renderer->shaders.quad.program);
-	glDeleteProgram(gles2_renderer->shaders.quad_clip.program);
-	glDeleteProgram(gles2_renderer->shaders.quad_round.program);
+	delete_quad_programs(&gles2_renderer->shaders.quad);
 	glDeleteProgram(gles2_renderer->shaders.quad_grad.program);
 	glDeleteProgram(gles2_renderer->shaders.quad_grad_round.program);
 	delete_tex_programs(&gles2_renderer->shaders.tex_rgba);
@@ -30,14 +28,8 @@ static inline void free_shaders(struct gles2_renderer *gles2_renderer) {
 
 static bool link_shaders(struct gles2_renderer *gles2_renderer) {
 	// quad fragment shader
-	if (!link_quad_program(&gles2_renderer->shaders.quad, false)) {
-		wlr_log(WLR_ERROR, "Could not link quad shader");
-		goto error;
-	}
-
-	// quad clip fragment shader
-	if (!link_quad_program(&gles2_renderer->shaders.quad_clip, true)) {
-		wlr_log(WLR_ERROR, "Could not link quad clip shader");
+	if (!link_quad_programs(&gles2_renderer->shaders.quad)) {
+		wlr_log(WLR_ERROR, "Could not link quad shaders");
 		goto error;
 	}
 
@@ -49,11 +41,6 @@ static bool link_shaders(struct gles2_renderer *gles2_renderer) {
 
 	if (!link_quad_grad_round_program(&gles2_renderer->shaders.quad_grad_round, 16)) {
 		wlr_log(WLR_ERROR, "Could not link quad grad round shader");
-		goto error;
-	}
-
-	if (!link_quad_round_program(&gles2_renderer->shaders.quad_round)) {
-		wlr_log(WLR_ERROR, "Could not link quad round shader");
 		goto error;
 	}
 

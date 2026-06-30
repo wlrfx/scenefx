@@ -1,7 +1,9 @@
 #define EFFECTS %d
+#define EFFECT_ROUND_CORNERS EFFECTS & 1
+#define EFFECT_CLIPPING EFFECTS & 2
 
 #if !defined(EFFECTS)
-#error "Missing shader preamble"
+#error "Missing shader effects preamble"
 #endif
 
 #ifdef GL_FRAGMENT_PRECISION_HIGH
@@ -13,7 +15,16 @@ precision mediump float;
 varying vec4 v_color;
 varying vec2 v_texcoord;
 
-#if EFFECTS
+#if EFFECT_ROUND_CORNERS
+uniform vec2 size;
+uniform vec2 position;
+uniform float radius_top_left;
+uniform float radius_top_right;
+uniform float radius_bottom_left;
+uniform float radius_bottom_right;
+#endif
+
+#if EFFECT_CLIPPING
 uniform vec2 clip_size;
 uniform vec2 clip_position;
 uniform float clip_radius_top_left;
@@ -22,13 +33,30 @@ uniform float clip_radius_bottom_left;
 uniform float clip_radius_bottom_right;
 #endif
 
+#if EFFECT_ROUND_CORNERS || EFFECT_CLIPPING
 float corner_alpha(vec2 size, vec2 position, bool is_cutout,
 		float radius_tl, float radius_tr, float radius_bl, float radius_br);
+#endif
 
 void main() {
-#if EFFECTS
+	gl_FragColor = v_color;
+
+#if EFFECT_ROUND_CORNERS
+	// Corner rounding
+	gl_FragColor *= corner_alpha(
+		size - 1.0,
+		position + 0.5,
+		false,
+		radius_top_left,
+		radius_top_right,
+		radius_bottom_left,
+		radius_bottom_right
+	);
+#endif
+
+#if EFFECT_CLIPPING
 	// Clipping
-	float clip_corner_alpha = corner_alpha(
+	gl_FragColor *= corner_alpha(
 		clip_size - 1.0,
 		clip_position + 0.5,
 		true,
@@ -37,9 +65,5 @@ void main() {
 		clip_radius_bottom_left,
 		clip_radius_bottom_right
 	);
-
-	gl_FragColor = v_color * clip_corner_alpha;
-#else
-	gl_FragColor = v_color;
 #endif
 }

@@ -3385,7 +3385,7 @@ bool wlr_scene_output_build_state(struct wlr_scene_output *scene_output,
 			// content would be included into the new blur. This means that
 			// content like a high z-index toplevel would be included into the
 			// blur of a toplevel with a low z-index.
-			fx_render_pass_save_blur_region(fx_pass, &fx_pass->blur_padding_region);
+			fx_render_pass_save_blur_region(fx_pass);
 		}
 
 		pixman_region32_fini(&blur_padding_region);
@@ -3477,7 +3477,7 @@ bool wlr_scene_output_build_state(struct wlr_scene_output *scene_output,
 
 	if (fx_pass && should_compensate_blur) {
 		// Render the saved pixels over the blur artifacts
-		fx_render_pass_apply_saved_blur_region(fx_pass, &fx_pass->blur_padding_region);
+		fx_render_pass_apply_saved_blur_region(fx_pass);
 	}
 
 	pixman_region32_fini(&render_data.damage);

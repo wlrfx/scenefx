@@ -90,17 +90,15 @@ void fx_render_pass_read_to_buffer(struct fx_render_pass *render_pass,
 	}
 }
 
-void fx_render_pass_save_blur_region(struct fx_render_pass *render_pass,
-		pixman_region32_t *region) {
+void fx_render_pass_save_blur_region(struct fx_render_pass *render_pass) {
 	if (render_pass->impl->save_blur_region != NULL) {
-		render_pass->impl->save_blur_region(render_pass, region);
+		render_pass->impl->save_blur_region(render_pass);
 	}
 }
 
 
-void fx_render_pass_apply_saved_blur_region(struct fx_render_pass *render_pass,
-		pixman_region32_t *region) {
+void fx_render_pass_apply_saved_blur_region(struct fx_render_pass *render_pass) {
 	if (render_pass->impl->apply_saved_blur_region != NULL) {
-		render_pass->impl->apply_saved_blur_region(render_pass, region);
+		render_pass->impl->apply_saved_blur_region(render_pass);
 	}
 }

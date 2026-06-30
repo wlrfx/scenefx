@@ -66,10 +66,8 @@ struct fx_render_pass_impl {
 	void (*read_to_buffer)(struct fx_render_pass *pass,
 			pixman_region32_t *region, struct wlr_buffer *dst_buffer,
 			struct wlr_buffer *src_buffer);
-	void (*save_blur_region)(struct fx_render_pass *pass,
-			pixman_region32_t *region);
-	void (*apply_saved_blur_region)(struct fx_render_pass *pass,
-			pixman_region32_t *region);
+	void (*save_blur_region)(struct fx_render_pass *pass);
+	void (*apply_saved_blur_region)(struct fx_render_pass *pass);
 };
 
 struct fx_render_pass {

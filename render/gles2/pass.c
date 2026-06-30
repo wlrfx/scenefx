@@ -239,16 +239,14 @@ done:
 	pixman_region32_fini(&region);
 }
 
-static void gles2_render_pass_save_blur_region(struct fx_render_pass *fx_pass,
-		pixman_region32_t *region) {
+static void gles2_render_pass_save_blur_region(struct fx_render_pass *fx_pass) {
 	struct gles2_render_pass *pass = gles2_get_render_pass(fx_pass);
 	gles2_render_pass_read_to_buffer(fx_pass, &fx_pass->blur_padding_region,
 			pass->gles2_offscreen_buffers->blur_saved_pixels_buffer->wlr_buffer,
 			pass->gles2_buffer->wlr_buffer);
 }
 
-static void gles2_render_pass_apply_saved_blur_region(struct fx_render_pass *fx_pass,
-		pixman_region32_t *region) {
+static void gles2_render_pass_apply_saved_blur_region(struct fx_render_pass *fx_pass) {
 	struct gles2_render_pass *pass = gles2_get_render_pass(fx_pass);
 	gles2_render_pass_read_to_buffer(fx_pass, &fx_pass->blur_padding_region,
 			pass->gles2_buffer->wlr_buffer,

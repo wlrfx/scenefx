@@ -187,7 +187,7 @@ static bool apply_clip_region(pixman_region32_t *clip_region,
 ///
 
 static void gles2_render_pass_read_to_buffer(struct fx_render_pass *fx_pass,
-		pixman_region32_t *_region, struct wlr_buffer *dst_buffer,
+		const pixman_region32_t *_region, struct wlr_buffer *dst_buffer,
 		struct wlr_buffer *src_buffer) {
 	if (!_region || !pixman_region32_not_empty(_region)) {
 		return;

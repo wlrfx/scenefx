@@ -83,7 +83,7 @@ bool fx_render_pass_add_optimized_blur(struct fx_render_pass *render_pass,
 }
 
 void fx_render_pass_read_to_buffer(struct fx_render_pass *render_pass,
-		pixman_region32_t *region, struct wlr_buffer *dst_buffer,
+		const pixman_region32_t *region, struct wlr_buffer *dst_buffer,
 		struct wlr_buffer *src_buffer) {
 	if (render_pass->impl->read_to_buffer != NULL) {
 		render_pass->impl->read_to_buffer(render_pass, region, dst_buffer, src_buffer);

@@ -136,7 +136,7 @@ bool fx_render_pass_add_optimized_blur(struct fx_render_pass *pass,
  * Render from one buffer to another
  */
 void fx_render_pass_read_to_buffer(struct fx_render_pass *pass,
-		pixman_region32_t *region, struct wlr_buffer *dst_buffer,
+		const pixman_region32_t *region, struct wlr_buffer *dst_buffer,
 		struct wlr_buffer *src_buffer);
 
 void fx_render_pass_save_blur_region(struct fx_render_pass *render_pass);

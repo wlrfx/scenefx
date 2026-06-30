@@ -64,7 +64,7 @@ struct fx_render_pass_impl {
 	bool (*add_optimized_blur)(struct fx_render_pass *pass,
 			const struct fx_render_blur_pass_options *fx_options);
 	void (*read_to_buffer)(struct fx_render_pass *pass,
-			pixman_region32_t *region, struct wlr_buffer *dst_buffer,
+			const pixman_region32_t *region, struct wlr_buffer *dst_buffer,
 			struct wlr_buffer *src_buffer);
 	void (*save_blur_region)(struct fx_render_pass *pass);
 	void (*apply_saved_blur_region)(struct fx_render_pass *pass);

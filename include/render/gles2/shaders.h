@@ -2,11 +2,6 @@
 #define _FX_SHADERS_H
 
 #include <GLES2/gl2.h>
-#include <stdbool.h>
-#include <scenefx/types/fx/clipped_region.h>
-#include "types/fx/clipped_region.h"
-
-struct fx_renderer;
 
 GLuint compile_shader(GLuint type, const GLchar *src);
 
@@ -16,10 +11,31 @@ bool check_gl_ext(const char *exts, const char *ext);
 
 void load_gl_proc(void *proc_ptr, const char *name);
 
+bool check_egl_ext(const char *exts, const char *ext);
+
+void load_egl_proc(void *proc_ptr, const char *name);
+
 enum fx_tex_shader_source {
 	SHADER_SOURCE_TEXTURE_RGBA = 1,
 	SHADER_SOURCE_TEXTURE_RGBX = 2,
 	SHADER_SOURCE_TEXTURE_EXTERNAL = 3,
+};
+
+// Note: Needs to be the same as in the tex.frag shader
+enum fx_tex_shader_effects {
+	SHADER_TEXTURE_EFFECT_NONE = 0,
+	SHADER_TEXTURE_EFFECT_ROUND_CORNERS = 1 << 0,
+	SHADER_TEXTURE_EFFECT_CLIPPING = 1 << 1,
+	SHADER_TEXTURE_EFFECT_DISCARD_TRANSPARENT = 1 << 2,
+	SHADER_TEXTURE_EFFECT_LAST = 1 << 3,
+};
+
+// Note: Needs to be the same as in the quad.frag shader
+enum fx_quad_shader_effects {
+	SHADER_QUAD_EFFECT_NONE = 0,
+	SHADER_QUAD_EFFECT_ROUND_CORNERS = 1 << 0,
+	SHADER_QUAD_EFFECT_CLIPPING = 1 << 1,
+	SHADER_QUAD_EFFECT_LAST = 1 << 2,
 };
 
 struct shader_corner_radii {
@@ -29,24 +45,36 @@ struct shader_corner_radii {
 	GLint bottom_right;
 };
 
-void uniform_corner_radii_set(const struct shader_corner_radii *uniform,
-		const struct fx_corner_fradii *corners);
-
-struct quad_shader {
+struct quad_shader_variant {
 	GLuint program;
 	GLint proj;
 	GLint color;
 	GLint pos_attrib;
 
-	// Only used for the effects shader
 	struct {
-		GLint clip_size;
-		GLint clip_position;
-		struct shader_corner_radii clip_radius;
-	} effects;
+		GLint size;
+		GLint position;
+		struct shader_corner_radii radius;
+	} corner_rounding;
+
+	struct {
+		GLint size;
+		GLint position;
+		struct shader_corner_radii radius;
+	} clipping;
 };
 
-bool link_quad_program(struct quad_shader *shader, bool clip);
+struct quad_shader {
+	// 4 different combinations of effects
+	struct quad_shader_variant variants[SHADER_QUAD_EFFECT_LAST];
+};
+
+bool link_quad_programs(struct quad_shader *shader);
+
+void delete_quad_programs(struct quad_shader *shader);
+
+struct quad_shader_variant *get_quad_program(struct quad_shader *shader,
+		enum fx_quad_shader_effects effects);
 
 struct quad_grad_shader {
 	int max_len;
@@ -65,23 +93,6 @@ struct quad_grad_shader {
 };
 
 bool link_quad_grad_program(struct quad_grad_shader *shader, int max_len);
-
-struct quad_round_shader {
-	GLuint program;
-	GLint proj;
-	GLint color;
-	GLint pos_attrib;
-	GLint size;
-	GLint position;
-
-	struct shader_corner_radii radius;
-
-	GLint clip_size;
-	GLint clip_position;
-	struct shader_corner_radii clip_radius;
-};
-
-bool link_quad_round_program(struct quad_round_shader *shader);
 
 struct quad_grad_round_shader {
 	GLuint program;
@@ -107,7 +118,7 @@ struct quad_grad_round_shader {
 
 bool link_quad_grad_round_program(struct quad_grad_round_shader *shader, int max_len);
 
-struct tex_shader {
+struct tex_shader_variant {
 	GLuint program;
 	GLint proj;
 	GLint tex_proj;
@@ -115,22 +126,30 @@ struct tex_shader {
 	GLint alpha;
 	GLint pos_attrib;
 
-	GLint discard_transparent;
-
-	// Only used for the effects shader
 	struct {
 		GLint size;
 		GLint position;
 		struct shader_corner_radii radius;
+	} corner_rounding;
 
-		GLint clip_size;
-		GLint clip_position;
-		struct shader_corner_radii clip_radius;
-	} effects;
+	struct {
+		GLint size;
+		GLint position;
+		struct shader_corner_radii radius;
+	} clipping;
 };
 
-bool link_tex_program(struct tex_shader *shader, enum fx_tex_shader_source source,
-		bool effects);
+struct tex_shader {
+	// 8 different combinations of effects
+	struct tex_shader_variant variants[SHADER_TEXTURE_EFFECT_LAST];
+};
+
+bool link_tex_programs(struct tex_shader *shader, enum fx_tex_shader_source source);
+
+void delete_tex_programs(struct tex_shader *shader);
+
+struct tex_shader_variant *get_tex_program(struct tex_shader *shader,
+		enum fx_tex_shader_effects effects);
 
 struct box_shadow_shader {
 	GLuint program;

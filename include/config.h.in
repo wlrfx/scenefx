@@ -4,4 +4,7 @@
 /** Whether the GLES2 renderer is compile-time enabled. */
 #mesondefine SCENEFX_HAS_GLES2_RENDERER
 
+/** Whether the Vulkan renderer is compile-time enabled. */
+#mesondefine SCENEFX_HAS_VULKAN_RENDERER
+
 #endif

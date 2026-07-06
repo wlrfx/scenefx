@@ -1,7 +1,9 @@
-#ifndef _FX_SHADERS_H
-#define _FX_SHADERS_H
+#ifndef _RENDERER_GLES2_SHADERS_H
+#define _RENDERER_GLES2_SHADERS_H
 
 #include <GLES2/gl2.h>
+
+#include "render/shaders.h"
 
 GLuint compile_shader(GLuint type, const GLchar *src);
 
@@ -21,24 +23,8 @@ enum fx_tex_shader_source {
 	SHADER_SOURCE_TEXTURE_EXTERNAL = 3,
 };
 
-// Note: Needs to be the same as in the tex.frag shader
-enum fx_tex_shader_effects {
-	SHADER_TEXTURE_EFFECT_NONE = 0,
-	SHADER_TEXTURE_EFFECT_ROUND_CORNERS = 1 << 0,
-	SHADER_TEXTURE_EFFECT_CLIPPING = 1 << 1,
-	SHADER_TEXTURE_EFFECT_DISCARD_TRANSPARENT = 1 << 2,
-	SHADER_TEXTURE_EFFECT_LAST = 1 << 3,
-};
-
-// Note: Needs to be the same as in the quad.frag shader
-enum fx_quad_shader_effects {
-	SHADER_QUAD_EFFECT_NONE = 0,
-	SHADER_QUAD_EFFECT_ROUND_CORNERS = 1 << 0,
-	SHADER_QUAD_EFFECT_CLIPPING = 1 << 1,
-	SHADER_QUAD_EFFECT_LAST = 1 << 2,
-};
-
-struct shader_corner_radii {
+// TODO: Rename -> gles2_shader_corner_radii
+struct gles2_shader_corner_radii {
 	GLint top_left;
 	GLint top_right;
 	GLint bottom_left;
@@ -54,13 +40,13 @@ struct quad_shader_variant {
 	struct {
 		GLint size;
 		GLint position;
-		struct shader_corner_radii radius;
+		struct gles2_shader_corner_radii radius;
 	} corner_rounding;
 
 	struct {
 		GLint size;
 		GLint position;
-		struct shader_corner_radii radius;
+		struct gles2_shader_corner_radii radius;
 	} clipping;
 };
 
@@ -111,7 +97,7 @@ struct quad_grad_round_shader {
 	GLint count;
 	GLint blend;
 
-	struct shader_corner_radii radius;
+	struct gles2_shader_corner_radii radius;
 
 	int max_len;
 };
@@ -129,13 +115,13 @@ struct tex_shader_variant {
 	struct {
 		GLint size;
 		GLint position;
-		struct shader_corner_radii radius;
+		struct gles2_shader_corner_radii radius;
 	} corner_rounding;
 
 	struct {
 		GLint size;
 		GLint position;
-		struct shader_corner_radii radius;
+		struct gles2_shader_corner_radii radius;
 	} clipping;
 };
 
@@ -163,7 +149,7 @@ struct box_shadow_shader {
 
 	GLint clip_position;
 	GLint clip_size;
-	struct shader_corner_radii clip_radius;
+	struct gles2_shader_corner_radii clip_radius;
 };
 
 bool link_box_shadow_program(struct box_shadow_shader *shader);

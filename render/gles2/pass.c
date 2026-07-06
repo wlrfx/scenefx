@@ -27,7 +27,7 @@
 /// FX pass functions
 ///
 
-static void uniform_corner_radii_set(const struct shader_corner_radii *uniform,
+static void uniform_corner_radii_set(const struct gles2_shader_corner_radii *uniform,
 		const struct fx_corner_fradii *corners) {
 	glUniform1f(uniform->top_left, corners->top_left);
 	glUniform1f(uniform->top_right, corners->top_right);

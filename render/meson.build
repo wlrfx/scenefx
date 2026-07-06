@@ -1,6 +1,6 @@
 renderers = get_option('renderers')
 if 'auto' in renderers and get_option('auto_features').enabled()
-	renderers = ['gles2']
+	renderers = ['gles2', 'vulkan']
 elif 'auto' in renderers and get_option('auto_features').disabled()
 	renderers = []
 endif
@@ -37,6 +37,10 @@ if ('gles2' in renderers or 'auto' in renderers) and wlroots_has_gles2
 	endif
 
 	subdir('gles2')
+endif
+
+if ('vulkan' in renderers or 'auto' in renderers) and wlroots_has_vulkan
+	subdir('vulkan')
 endif
 
 lcms2 = dependency('lcms2', required: get_option('color-management'))

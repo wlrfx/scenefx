@@ -155,7 +155,8 @@ static void vk_render_pass_destroy(struct fx_render_pass *fx_pass) {
 
 static void vk_render_pass_add_texture(struct fx_render_pass *fx_pass,
 		const struct fx_render_texture_options *fx_options) {
-	// TODO:
+	// TODO: Fallback to the regular wlr render path
+	wlr_render_pass_add_texture(fx_pass->render_pass, &fx_options->base);
 }
 
 static void vk_render_pass_add_rect(struct fx_render_pass *fx_pass,

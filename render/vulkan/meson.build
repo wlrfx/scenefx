@@ -43,7 +43,7 @@ scenefx_files += files(
 	'renderer.c',
 	'shaders.c',
 	# 'tracy.c',
-	'util.c',
+	'vulkan.c',
 )
 
 scenefx_deps += dep_vulkan

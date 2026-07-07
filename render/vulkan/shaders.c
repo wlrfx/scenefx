@@ -7,7 +7,6 @@
 #include <wlr/util/log.h>
 
 #include "render/vulkan/shaders.h"
-#include "render/vulkan/util.h"
 #include "render/vulkan/vulkan.h"
 
 // shaders

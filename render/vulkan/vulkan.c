@@ -1,4 +1,4 @@
-#include "render/vulkan/util.h"
+#include "render/vulkan/vulkan.h"
 
 const char *vulkan_strerror(VkResult err) {
 #define ERR_STR(r) case VK_ ##r: return #r

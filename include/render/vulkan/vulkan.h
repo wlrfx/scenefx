@@ -129,4 +129,18 @@ struct fx_renderer *vk_renderer_create(struct wlr_renderer *wlr_renderer);
 
 struct vk_renderer *vk_get_renderer(struct fx_renderer *fx_renderer);
 
+const char *vulkan_strerror(VkResult err);
+
+#if __STDC_VERSION__ >= 202311L
+
+#define wlr_vk_error(fmt, res, ...) wlr_log(WLR_ERROR, fmt ": %s (%d)", \
+	vulkan_strerror(res), res __VA_OPT__(,) __VA_ARGS__)
+
+#else
+
+#define wlr_vk_error(fmt, res, ...) wlr_log(WLR_ERROR, fmt ": %s (%d)", \
+	vulkan_strerror(res), res, ##__VA_ARGS__)
+
+#endif
+
 #endif

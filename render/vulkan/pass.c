@@ -213,13 +213,11 @@ static void vk_render_pass_add_rect(struct fx_render_pass *fx_pass,
 			effects |= SHADER_QUAD_EFFECT_CLIPPING;
 		}
 
-		// TODO:
 		float proj[9], matrix[9];
 		wlr_matrix_identity(proj);
 		wlr_matrix_project_box(matrix, &box, WL_OUTPUT_TRANSFORM_NORMAL, proj);
 		wlr_matrix_multiply(matrix, pass->projection, matrix);
 
-		// TODO: Free pipeline and per render format!
 		VkPipelineLayout layout = vk_renderer->shader_info.quad.pipeline_layout;
 		struct vk_pipeline *pipeline = get_vk_quad_pipeline(pass->render_setup->vk_pipelines.quad, effects);
 		if (pipeline == NULL) {

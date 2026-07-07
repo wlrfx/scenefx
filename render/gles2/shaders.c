@@ -12,7 +12,7 @@
 #include "GLES2/gl2.h"
 #include "common_vert_src.h"
 #include "gradient_frag_src.h"
-#include "corner_alpha_frag_src.h"
+#include "corner_alpha_glsl_src.h"
 #include "quad_frag_src.h"
 #include "quad_grad_frag_src.h"
 #include "quad_grad_round_frag_src.h"
@@ -155,7 +155,7 @@ static bool link_quad_program(struct quad_shader_variant *shader,
 	snprintf(quad_src_part, sizeof(quad_src_part),
 		quad_frag_src, effects);
 	snprintf(quad_src, sizeof(quad_src),
-		"%s\n%s\n", quad_src_part, needs_corner_rounding ? corner_alpha_frag_src : "");
+		"%s\n%s\n", quad_src_part, needs_corner_rounding ? corner_alpha_glsl_src : "");
 
 	GLuint prog;
 	shader->program = prog = link_program(quad_src);
@@ -251,7 +251,7 @@ bool link_quad_grad_round_program(struct quad_grad_round_shader *shader, int max
 	snprintf(quad_src_part, sizeof(quad_src_part),
 		quad_grad_round_frag_src, max_len);
 	snprintf(quad_src, sizeof(quad_src),
-		"%s\n%s\n%s", quad_src_part, gradient_frag_src, corner_alpha_frag_src);
+		"%s\n%s\n%s", quad_src_part, gradient_frag_src, corner_alpha_glsl_src);
 
 	GLuint prog;
 	shader->program = prog = link_program(quad_src);
@@ -293,7 +293,7 @@ static bool link_tex_program(struct tex_shader_variant* shader,
 	snprintf(frag_src_part, sizeof(frag_src_part),
 		tex_frag_src, source, effects);
 	snprintf(frag_src, sizeof(frag_src),
-		"%s\n%s\n", frag_src_part, needs_corner_rounding ? corner_alpha_frag_src : "");
+		"%s\n%s\n", frag_src_part, needs_corner_rounding ? corner_alpha_glsl_src : "");
 
 	GLuint prog;
 	shader->program = prog = link_program(frag_src);
@@ -359,7 +359,7 @@ struct tex_shader_variant *get_tex_program(struct tex_shader *shader,
 bool link_box_shadow_program(struct box_shadow_shader *shader) {
 	GLchar shadow_src[8192];
 	snprintf(shadow_src, sizeof(shadow_src), "%s\n%s", box_shadow_frag_src,
-		corner_alpha_frag_src);
+		corner_alpha_glsl_src);
 
 	GLuint prog;
 	shader->program = prog = link_program(shadow_src);

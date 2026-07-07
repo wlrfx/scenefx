@@ -14,6 +14,8 @@ scenefx_files += files(
 	'tracy.c',
 )
 
+subdir('common_shaders')
+
 if ('gles2' in renderers or 'auto' in renderers) and wlroots_has_gles2
 	egl = dependency('egl', required: 'gles2' in renderers)
 	if egl.found()

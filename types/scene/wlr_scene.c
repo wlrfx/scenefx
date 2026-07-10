@@ -2031,7 +2031,24 @@ static void scene_entry_render(struct render_list_entry *entry, const struct ren
 
 		if (data->fx_pass == NULL || (fx_corner_radii_is_empty(&rect_corners)
 					&& wlr_box_empty(&rect_options.clipped_region.area))) {
+			// The base renderer has no clipped_region support: punch the
+			// clipped area out of the clip region so the rect doesn't
+			// cover the nodes it is meant to frame.
+			struct wlr_box *hole = &rect_options.clipped_region.area;
+			pixman_region32_t clip_minus_hole;
+			pixman_region32_init(&clip_minus_hole);
+			if (!wlr_box_empty(hole)) {
+				pixman_region32_copy(&clip_minus_hole, &render_region);
+				pixman_region32_t hole_region;
+				pixman_region32_init_rect(&hole_region, hole->x, hole->y,
+						hole->width, hole->height);
+				pixman_region32_subtract(&clip_minus_hole,
+						&clip_minus_hole, &hole_region);
+				pixman_region32_fini(&hole_region);
+				rect_options.base.clip = &clip_minus_hole;
+			}
 			wlr_render_pass_add_rect(data->render_pass, &rect_options.base);
+			pixman_region32_fini(&clip_minus_hole);
 		} else {
 			fx_render_pass_add_rect(data->fx_pass, &rect_options);
 		}

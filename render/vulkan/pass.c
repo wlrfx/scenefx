@@ -235,6 +235,11 @@ static void vk_render_pass_add_rect(struct fx_render_pass *fx_pass,
 			pixman_region32_init_rect(&clip_region, box.x, box.y, box.width, box.height);
 		}
 		apply_clip_region(&clip_region, clipped_region_box, clipped_region_corners);
+		pixman_region32_intersect(&clip_region, &clip_region, &clip);
+
+		int scissor_rects_len;
+		const pixman_box32_t *scissor_rects =
+			pixman_region32_rectangles(&clip_region, &scissor_rects_len);
 
 		struct vk_vert_pcr_data vert_pcr_data = {
 			.uv_off = { 0, 0 },
@@ -273,9 +278,9 @@ static void vk_render_pass_add_rect(struct fx_render_pass *fx_pass,
 				sizeof(vert_pcr_data),
 				sizeof(quad_pcr_data), &quad_pcr_data);
 
-		for (int i = 0; i < clip_rects_len; i++) {
+		for (int i = 0; i < scissor_rects_len; i++) {
 			VkRect2D rect;
-			convert_pixman_box_to_vk_rect(&clip_rects[i], &rect);
+			convert_pixman_box_to_vk_rect(&scissor_rects[i], &rect);
 			vkCmdSetScissor(cb, 0, 1, &rect);
 			vkCmdDraw(cb, 4, 1, 0, 0);
 		}

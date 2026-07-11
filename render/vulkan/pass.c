@@ -201,112 +201,88 @@ static void vk_render_pass_add_rect(struct fx_render_pass *fx_pass,
 	struct wlr_box box;
 	wlr_render_rect_options_get_box(options, pass->render_buffer->wlr_buffer, &box);
 
-	switch (options->blend_mode) {
-	case WLR_RENDER_BLEND_MODE_PREMULTIPLIED:;
-		const bool should_round_corners = !fx_corner_fradii_is_empty(&fx_options->corners);
-		const bool should_clip = clipped_fregion_is_valid(&fx_options->clipped_region);
-		// Gather the effects and pick the relevant shader
-		enum fx_quad_shader_effects effects = SHADER_QUAD_EFFECT_NONE;
-		if (should_round_corners) {
-			effects |= SHADER_QUAD_EFFECT_ROUND_CORNERS;
-		}
-		if (should_clip) {
-			effects |= SHADER_QUAD_EFFECT_CLIPPING;
-		}
-
-		float proj[9], matrix[9];
-		wlr_matrix_identity(proj);
-		wlr_matrix_project_box(matrix, &box, WL_OUTPUT_TRANSFORM_NORMAL, proj);
-		wlr_matrix_multiply(matrix, pass->projection, matrix);
-
-		VkPipelineLayout layout = vk_renderer->shader_info.quad.pipeline_layout;
-		struct vk_pipeline *pipeline = get_vk_quad_pipeline(pass->render_setup->vk_pipelines.quad, effects);
-		if (pipeline == NULL) {
-			break;
-		}
-
-		const struct wlr_box *clipped_region_box = &fx_options->clipped_region.area;
-		const struct fx_corner_fradii *clipped_region_corners = &fx_options->clipped_region.corners;
-		pixman_region32_t clip_region;
-		if (options->clip) {
-			pixman_region32_init(&clip_region);
-			pixman_region32_copy(&clip_region, options->clip);
-		} else {
-			pixman_region32_init_rect(&clip_region, box.x, box.y, box.width, box.height);
-		}
-		apply_clip_region(&clip_region, clipped_region_box, clipped_region_corners);
-
-		struct vk_vert_pcr_data vert_pcr_data = {
-			.uv_off = { 0, 0 },
-			.uv_size = { 1, 1 },
-		};
-		encode_proj_matrix(matrix, vert_pcr_data.mat4);
-		struct vk_frag_quad_pcr_data quad_pcr_data = {
-			.color = {linear_color[0], linear_color[1], linear_color[2], linear_color[3]},
-			.corner_rounding = {
-				.size = {box.width, box.height},
-				.position = {box.x, box.y},
-				.radius = {
-					.top_left = fx_options->corners.top_left,
-					.top_right = fx_options->corners.top_right,
-					.bottom_left = fx_options->corners.bottom_left,
-					.bottom_right = fx_options->corners.bottom_right,
-				}
-			},
-			.clipping = {
-				.size = {clipped_region_box->width, clipped_region_box->height},
-				.position = {clipped_region_box->x, clipped_region_box->y},
-				.radius = {
-					.top_left = clipped_region_corners->top_left,
-					.top_right = clipped_region_corners->top_right,
-					.bottom_left = clipped_region_corners->bottom_left,
-					.bottom_right = clipped_region_corners->bottom_right,
-				}
-			},
-		};
-
-		bind_pipeline(pass, pipeline);
-		vkCmdPushConstants(cb, layout, VK_SHADER_STAGE_VERTEX_BIT,
-				0,
-				sizeof(vert_pcr_data), &vert_pcr_data);
-		vkCmdPushConstants(cb, layout, VK_SHADER_STAGE_FRAGMENT_BIT,
-				sizeof(vert_pcr_data),
-				sizeof(quad_pcr_data), &quad_pcr_data);
-
-		for (int i = 0; i < clip_rects_len; i++) {
-			VkRect2D rect;
-			convert_pixman_box_to_vk_rect(&clip_rects[i], &rect);
-			vkCmdSetScissor(cb, 0, 1, &rect);
-			vkCmdDraw(cb, 4, 1, 0, 0);
-		}
-
-		// TODO: Performance penalty for constantly setting pipeline?
-		wlr_vk_render_pass_reset_pipeline(fx_pass->render_pass);
-		pass->bound_pipeline = VK_NULL_HANDLE;
-
-		pixman_region32_fini(&clip_region);
-		break;
-	case WLR_RENDER_BLEND_MODE_NONE:;
-		VkClearAttachment clear_att = {
-			.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
-			.colorAttachment = 0,
-			.clearValue.color.float32 = {
-				linear_color[0],
-				linear_color[1],
-				linear_color[2],
-				linear_color[3],
-			},
-		};
-		VkClearRect clear_rect = {
-			.layerCount = 1,
-		};
-		for (int i = 0; i < clip_rects_len; i++) {
-			convert_pixman_box_to_vk_rect(&clip_rects[i], &clear_rect.rect);
-			vkCmdClearAttachments(cb, 1, &clear_att, 1, &clear_rect);
-		}
-		break;
+	const bool should_round_corners = !fx_corner_fradii_is_empty(&fx_options->corners);
+	const bool should_clip = clipped_fregion_is_valid(&fx_options->clipped_region);
+	// Gather the effects and pick the relevant shader
+	enum fx_quad_shader_effects effects = SHADER_QUAD_EFFECT_NONE;
+	if (should_round_corners) {
+		effects |= SHADER_QUAD_EFFECT_ROUND_CORNERS;
+	}
+	if (should_clip) {
+		effects |= SHADER_QUAD_EFFECT_CLIPPING;
 	}
 
+	float proj[9], matrix[9];
+	wlr_matrix_identity(proj);
+	wlr_matrix_project_box(matrix, &box, WL_OUTPUT_TRANSFORM_NORMAL, proj);
+	wlr_matrix_multiply(matrix, pass->projection, matrix);
+
+	VkPipelineLayout layout = vk_renderer->shader_info.quad.pipeline_layout;
+	struct vk_pipeline *pipeline = get_vk_quad_pipeline(pass->render_setup->vk_pipelines.quad, effects);
+	if (pipeline == NULL) {
+		return;
+	}
+
+	const struct wlr_box *clipped_region_box = &fx_options->clipped_region.area;
+	const struct fx_corner_fradii *clipped_region_corners = &fx_options->clipped_region.corners;
+	pixman_region32_t clip_region;
+	if (options->clip) {
+		pixman_region32_init(&clip_region);
+		pixman_region32_copy(&clip_region, options->clip);
+	} else {
+		pixman_region32_init_rect(&clip_region, box.x, box.y, box.width, box.height);
+	}
+	apply_clip_region(&clip_region, clipped_region_box, clipped_region_corners);
+
+	struct vk_vert_pcr_data vert_pcr_data = {
+		.uv_off = { 0, 0 },
+		.uv_size = { 1, 1 },
+	};
+	encode_proj_matrix(matrix, vert_pcr_data.mat4);
+	struct vk_frag_quad_pcr_data quad_pcr_data = {
+		.color = {linear_color[0], linear_color[1], linear_color[2], linear_color[3]},
+		.corner_rounding = {
+			.size = {box.width, box.height},
+			.position = {box.x, box.y},
+			.radius = {
+				.top_left = fx_options->corners.top_left,
+				.top_right = fx_options->corners.top_right,
+				.bottom_left = fx_options->corners.bottom_left,
+				.bottom_right = fx_options->corners.bottom_right,
+			}
+		},
+		.clipping = {
+			.size = {clipped_region_box->width, clipped_region_box->height},
+			.position = {clipped_region_box->x, clipped_region_box->y},
+			.radius = {
+				.top_left = clipped_region_corners->top_left,
+				.top_right = clipped_region_corners->top_right,
+				.bottom_left = clipped_region_corners->bottom_left,
+				.bottom_right = clipped_region_corners->bottom_right,
+			}
+		},
+	};
+
+	bind_pipeline(pass, pipeline);
+	vkCmdPushConstants(cb, layout, VK_SHADER_STAGE_VERTEX_BIT,
+			0,
+			sizeof(vert_pcr_data), &vert_pcr_data);
+	vkCmdPushConstants(cb, layout, VK_SHADER_STAGE_FRAGMENT_BIT,
+			sizeof(vert_pcr_data),
+			sizeof(quad_pcr_data), &quad_pcr_data);
+
+	for (int i = 0; i < clip_rects_len; i++) {
+		VkRect2D rect;
+		convert_pixman_box_to_vk_rect(&clip_rects[i], &rect);
+		vkCmdSetScissor(cb, 0, 1, &rect);
+		vkCmdDraw(cb, 4, 1, 0, 0);
+	}
+
+	// TODO: Performance penalty for constantly setting pipeline?
+	wlr_vk_render_pass_reset_pipeline(fx_pass->render_pass);
+	pass->bound_pipeline = VK_NULL_HANDLE;
+
+	pixman_region32_fini(&clip_region);
 	pixman_region32_fini(&clip);
 }
 

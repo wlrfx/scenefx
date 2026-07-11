@@ -178,11 +178,24 @@ static void vk_render_pass_add_rect(struct fx_render_pass *fx_pass,
 		options->color.a, // no conversion for alpha
 	};
 
-	pixman_region32_t clip;
-	get_clip_region(pass, options->clip, &clip);
+	struct wlr_box box;
+	wlr_render_rect_options_get_box(options, pass->render_buffer->wlr_buffer, &box);
+
+	pixman_region32_t clip_region;
+	get_clip_region(pass, options->clip, &clip_region);
+
+	const struct wlr_box *clipped_region_box = &fx_options->clipped_region.area;
+	const struct fx_corner_fradii *clipped_region_corners = &fx_options->clipped_region.corners;
+	if (options->clip) {
+		pixman_region32_init(&clip_region);
+		pixman_region32_copy(&clip_region, options->clip);
+	} else {
+		pixman_region32_init_rect(&clip_region, box.x, box.y, box.width, box.height);
+	}
+	apply_clip_region(&clip_region, clipped_region_box, clipped_region_corners);
 
 	int clip_rects_len;
-	const pixman_box32_t *clip_rects = pixman_region32_rectangles(&clip, &clip_rects_len);
+	const pixman_box32_t *clip_rects = pixman_region32_rectangles(&clip_region, &clip_rects_len);
 	// Record regions possibly updated for use in second subpass
 	for (int i = 0; i < clip_rects_len; i++) {
 		struct wlr_box clip_box = {
@@ -197,9 +210,6 @@ static void vk_render_pass_add_rect(struct fx_render_pass *fx_pass,
 		}
 		render_pass_mark_box_updated(pass, &intersection);
 	}
-
-	struct wlr_box box;
-	wlr_render_rect_options_get_box(options, pass->render_buffer->wlr_buffer, &box);
 
 	const bool should_round_corners = !fx_corner_fradii_is_empty(&fx_options->corners);
 	const bool should_clip = clipped_fregion_is_valid(&fx_options->clipped_region);
@@ -220,19 +230,9 @@ static void vk_render_pass_add_rect(struct fx_render_pass *fx_pass,
 	VkPipelineLayout layout = vk_renderer->shader_info.quad.pipeline_layout;
 	struct vk_pipeline *pipeline = get_vk_quad_pipeline(pass->render_setup->vk_pipelines.quad, effects);
 	if (pipeline == NULL) {
+		pixman_region32_fini(&clip_region);
 		return;
 	}
-
-	const struct wlr_box *clipped_region_box = &fx_options->clipped_region.area;
-	const struct fx_corner_fradii *clipped_region_corners = &fx_options->clipped_region.corners;
-	pixman_region32_t clip_region;
-	if (options->clip) {
-		pixman_region32_init(&clip_region);
-		pixman_region32_copy(&clip_region, options->clip);
-	} else {
-		pixman_region32_init_rect(&clip_region, box.x, box.y, box.width, box.height);
-	}
-	apply_clip_region(&clip_region, clipped_region_box, clipped_region_corners);
 
 	struct vk_vert_pcr_data vert_pcr_data = {
 		.uv_off = { 0, 0 },
@@ -283,7 +283,6 @@ static void vk_render_pass_add_rect(struct fx_render_pass *fx_pass,
 	pass->bound_pipeline = VK_NULL_HANDLE;
 
 	pixman_region32_fini(&clip_region);
-	pixman_region32_fini(&clip);
 }
 
 static void vk_render_pass_add_rect_grad(struct fx_render_pass *fx_pass,

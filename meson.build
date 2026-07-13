@@ -67,7 +67,7 @@ else
 endif
 
 features = {
-	'gles2-renderer': true,
+	'gles2-renderer': false,
 	'color-management': false,
 }
 internal_features = {
@@ -102,6 +102,7 @@ if not wlroots.found()
 	)
 	wlroots = wlroots_proj.get_variable('wlroots')
 endif
+wlroots_has_gles2 = wlroots.get_variable('have_gles2_renderer') == 'true'
 
 
 drm = dependency('libdrm',

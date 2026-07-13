@@ -67,7 +67,8 @@ else
 endif
 
 features = {
-	'gles2-renderer': true,
+	'gles2-renderer': false,
+	'vulkan-renderer': false,
 	'color-management': false,
 }
 internal_features = {
@@ -89,19 +90,21 @@ wayland_server = dependency('wayland-server',
 
 wlroots_options = [ 'examples=false' ]
 wlroots_version = ['>=0.20.0', '<0.21.0']
-wlroots = dependency('wlroots-0.20',
+wlroots = dependency('wlroots-vkfx-0.20',
 	version: wlroots_version,
 	default_options: wlroots_options,
 	required: false,
 )
 if not wlroots.found()
 	wlroots_proj = subproject(
-		'wlroots',
+		'wlroots-vkfx',
 		default_options: wlroots_options,
 		version: wlroots_version,
 	)
 	wlroots = wlroots_proj.get_variable('wlroots')
 endif
+wlroots_has_gles2 = wlroots.get_variable('have_gles2_renderer') == 'true'
+wlroots_has_vulkan = wlroots.get_variable('have_vulkan_renderer') == 'true'
 
 
 drm = dependency('libdrm',

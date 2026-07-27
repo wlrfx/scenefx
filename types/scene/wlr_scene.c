@@ -2920,6 +2920,12 @@ static bool apply_blur_region(struct wlr_scene_node *node, struct blur_data *blu
 	pixman_region32_t intersection;
 	pixman_region32_init(&intersection);
 	if (pixman_region32_intersect(&intersection, &expanded_damage, &node_visible_region)) {
+		struct wlr_output *output = render_data->output->output;
+		pixman_region32_intersect_rect(&intersection, &intersection,
+			0, 0, output->width, output->height);
+	}
+
+	if (!pixman_region32_empty(&intersection)) {
 		should_compensate_blur = true;
 
 		// Expand the render damage to re-render surrounding blur nodes

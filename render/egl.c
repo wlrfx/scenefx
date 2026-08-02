@@ -412,7 +412,11 @@ static bool egl_init(struct wlr_egl *egl, EGLenum platform,
 	EGLint attribs[7];
 
 	attribs[atti++] = EGL_CONTEXT_CLIENT_VERSION;
+#ifdef FORCE_GL_FRAGMENT_PRECISION_HIGH
+	attribs[atti++] = 3;
+#else
 	attribs[atti++] = 2;
+#endif
 
 	// Request a high priority context if possible
 	// TODO: only do this if we're running as the DRM master

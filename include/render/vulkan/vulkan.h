@@ -108,8 +108,15 @@ struct vk_renderer {
 
 		struct vk_shader_info quad;
 
-		// Descriptor set layout shared by every texture-sampling shader below.
+		// Sampling path owned by scenefx. The blur passes sample our own
+		// offscreen images rather than wlr_textures, so we cannot reuse
+		// wlroots' texture descriptor sets: its layout declares an immutable
+		// sampler, and Vulkan only treats layouts as compatible when they are
+		// identically defined, immutable samplers included.
+		// Dual-Kawase also depends on bilinear taps, hence LINEAR/CLAMP_TO_EDGE.
+		VkSampler tex_sampler;
 		VkDescriptorSetLayout tex_ds_layout;
+		VkDescriptorPool tex_ds_pool;
 
 		struct vk_shader_info blur1;
 		struct vk_shader_info blur2;

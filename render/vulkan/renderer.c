@@ -16,6 +16,12 @@
 static inline void free_shaders(struct vk_renderer *vk_renderer) {
 	vk_shader_info_delete(vk_renderer, &vk_renderer->shader_info.quad);
 
+	vk_shader_info_delete(vk_renderer, &vk_renderer->shader_info.blur1);
+	vk_shader_info_delete(vk_renderer, &vk_renderer->shader_info.blur2);
+	vk_shader_info_delete(vk_renderer, &vk_renderer->shader_info.blur_effects);
+	// Must come after the pipeline layouts above, which reference this layout.
+	vk_tex_ds_layout_destroy(vk_renderer);
+
 	// TODO:
 	// push_fx_debug(vk_renderer);
 	// delete_quad_programs(&vk_renderer->shaders.quad);

@@ -88,11 +88,15 @@ struct vk_pipeline_blur {
 	struct vk_pipeline pipeline;
 };
 
-// Shared by blur1/blur2/blur_effects: a single combined image sampler at
-// binding 0. Structurally identical to the layout wlroots uses for its texture
-// descriptor sets, so descriptor sets obtained via
-// wlr_vk_render_pass_get_texture_ds() are layout-compatible with these pipelines.
+// Sampling path for the blur passes: a single combined image sampler at
+// binding 0 using our own immutable LINEAR/CLAMP_TO_EDGE sampler.
+// NOT interchangeable with wlroots' texture descriptor sets - its layout
+// declares a different immutable sampler, and Vulkan only considers layouts
+// compatible when identically defined.
 VkDescriptorSetLayout vk_get_tex_ds_layout(struct vk_renderer *renderer);
+VkDescriptorSet vk_tex_ds_create(struct vk_renderer *renderer, VkImageView view);
+void vk_tex_ds_destroy(struct vk_renderer *renderer, VkDescriptorSet ds);
+void vk_tex_ds_layout_destroy(struct vk_renderer *renderer);
 
 bool vk_shader_info_create_blur1(struct vk_renderer *renderer);
 bool vk_shader_info_create_blur2(struct vk_renderer *renderer);

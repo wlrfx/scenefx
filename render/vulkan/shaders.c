@@ -257,9 +257,35 @@ bool vk_shader_info_create_quad(struct vk_renderer *renderer) {
 /// Blur
 ///
 
+// Descriptor sets for the blur passes are allocated from this pool, in this
+// layout, and always sample through our own immutable sampler. Note this is
+// deliberately NOT compatible with wlroots' texture descriptor sets - see the
+// comment on tex_sampler in vulkan.h.
+#define VK_TEX_DS_POOL_SIZE 64
+
 VkDescriptorSetLayout vk_get_tex_ds_layout(struct vk_renderer *renderer) {
 	if (renderer->shader_info.tex_ds_layout != VK_NULL_HANDLE) {
 		return renderer->shader_info.tex_ds_layout;
+	}
+
+	VkSamplerCreateInfo sampler_info = {
+		.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO,
+		.magFilter = VK_FILTER_LINEAR,
+		.minFilter = VK_FILTER_LINEAR,
+		.mipmapMode = VK_SAMPLER_MIPMAP_MODE_NEAREST,
+		.addressModeU = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
+		.addressModeV = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
+		.addressModeW = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
+		.maxAnisotropy = 1.f,
+		.minLod = 0.f,
+		.maxLod = 0.25f,
+		.borderColor = VK_BORDER_COLOR_FLOAT_TRANSPARENT_BLACK,
+	};
+	VkResult res = vkCreateSampler(renderer->device, &sampler_info, NULL,
+			&renderer->shader_info.tex_sampler);
+	if (res != VK_SUCCESS) {
+		wlr_vk_error("vkCreateSampler (blur)", res);
+		return VK_NULL_HANDLE;
 	}
 
 	VkDescriptorSetLayoutBinding binding = {
@@ -267,6 +293,7 @@ VkDescriptorSetLayout vk_get_tex_ds_layout(struct vk_renderer *renderer) {
 		.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
 		.descriptorCount = 1,
 		.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT,
+		.pImmutableSamplers = &renderer->shader_info.tex_sampler,
 	};
 	VkDescriptorSetLayoutCreateInfo info = {
 		.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
@@ -274,13 +301,99 @@ VkDescriptorSetLayout vk_get_tex_ds_layout(struct vk_renderer *renderer) {
 		.pBindings = &binding,
 	};
 
-	VkResult res = vkCreateDescriptorSetLayout(renderer->device, &info, NULL,
+	res = vkCreateDescriptorSetLayout(renderer->device, &info, NULL,
 			&renderer->shader_info.tex_ds_layout);
 	if (res != VK_SUCCESS) {
+		vkDestroySampler(renderer->device, renderer->shader_info.tex_sampler, NULL);
+		renderer->shader_info.tex_sampler = VK_NULL_HANDLE;
 		wlr_vk_error("vkCreateDescriptorSetLayout (tex)", res);
 		return VK_NULL_HANDLE;
 	}
+
+	VkDescriptorPoolSize pool_size = {
+		.type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+		.descriptorCount = VK_TEX_DS_POOL_SIZE,
+	};
+	VkDescriptorPoolCreateInfo pool_info = {
+		.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO,
+		.flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT,
+		.maxSets = VK_TEX_DS_POOL_SIZE,
+		.poolSizeCount = 1,
+		.pPoolSizes = &pool_size,
+	};
+	res = vkCreateDescriptorPool(renderer->device, &pool_info, NULL,
+			&renderer->shader_info.tex_ds_pool);
+	if (res != VK_SUCCESS) {
+		vkDestroyDescriptorSetLayout(renderer->device,
+				renderer->shader_info.tex_ds_layout, NULL);
+		renderer->shader_info.tex_ds_layout = VK_NULL_HANDLE;
+		vkDestroySampler(renderer->device, renderer->shader_info.tex_sampler, NULL);
+		renderer->shader_info.tex_sampler = VK_NULL_HANDLE;
+		wlr_vk_error("vkCreateDescriptorPool (tex)", res);
+		return VK_NULL_HANDLE;
+	}
+
 	return renderer->shader_info.tex_ds_layout;
+}
+
+VkDescriptorSet vk_tex_ds_create(struct vk_renderer *renderer, VkImageView view) {
+	VkDescriptorSetLayout layout = vk_get_tex_ds_layout(renderer);
+	if (layout == VK_NULL_HANDLE) {
+		return VK_NULL_HANDLE;
+	}
+
+	VkDescriptorSetAllocateInfo alloc_info = {
+		.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO,
+		.descriptorPool = renderer->shader_info.tex_ds_pool,
+		.descriptorSetCount = 1,
+		.pSetLayouts = &layout,
+	};
+	VkDescriptorSet ds = VK_NULL_HANDLE;
+	VkResult res = vkAllocateDescriptorSets(renderer->device, &alloc_info, &ds);
+	if (res != VK_SUCCESS) {
+		wlr_vk_error("vkAllocateDescriptorSets (tex)", res);
+		return VK_NULL_HANDLE;
+	}
+
+	VkDescriptorImageInfo image_info = {
+		// sampler comes from the layout's immutable sampler
+		.imageView = view,
+		.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+	};
+	VkWriteDescriptorSet write = {
+		.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+		.dstSet = ds,
+		.dstBinding = 0,
+		.descriptorCount = 1,
+		.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+		.pImageInfo = &image_info,
+	};
+	vkUpdateDescriptorSets(renderer->device, 1, &write, 0, NULL);
+
+	return ds;
+}
+
+void vk_tex_ds_destroy(struct vk_renderer *renderer, VkDescriptorSet ds) {
+	if (ds == VK_NULL_HANDLE || renderer->shader_info.tex_ds_pool == VK_NULL_HANDLE) {
+		return;
+	}
+	vkFreeDescriptorSets(renderer->device, renderer->shader_info.tex_ds_pool, 1, &ds);
+}
+
+void vk_tex_ds_layout_destroy(struct vk_renderer *renderer) {
+	if (renderer->shader_info.tex_ds_pool != VK_NULL_HANDLE) {
+		vkDestroyDescriptorPool(renderer->device, renderer->shader_info.tex_ds_pool, NULL);
+		renderer->shader_info.tex_ds_pool = VK_NULL_HANDLE;
+	}
+	if (renderer->shader_info.tex_ds_layout != VK_NULL_HANDLE) {
+		vkDestroyDescriptorSetLayout(renderer->device,
+				renderer->shader_info.tex_ds_layout, NULL);
+		renderer->shader_info.tex_ds_layout = VK_NULL_HANDLE;
+	}
+	if (renderer->shader_info.tex_sampler != VK_NULL_HANDLE) {
+		vkDestroySampler(renderer->device, renderer->shader_info.tex_sampler, NULL);
+		renderer->shader_info.tex_sampler = VK_NULL_HANDLE;
+	}
 }
 
 // Shared by all three blur shaders: one sampler set plus a vertex and a

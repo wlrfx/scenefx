@@ -66,4 +66,41 @@ struct vk_pipeline *get_vk_quad_pipeline(struct vk_pipeline_quad *quad,
 
 bool vk_shader_info_create_quad(struct vk_renderer *renderer);
 
+///
+/// Blur
+///
+
+// Field order matches the shader: the vec2 comes first so it keeps its 8 byte
+// alignment without needing explicit padding.
+struct vk_frag_blur_pcr_data {
+	float halfpixel[2];
+	float radius;
+};
+
+struct vk_frag_blur_effects_pcr_data {
+	float brightness;
+	float contrast;
+	float saturation;
+	float noise;
+};
+
+struct vk_pipeline_blur {
+	struct vk_pipeline pipeline;
+};
+
+// Shared by blur1/blur2/blur_effects: a single combined image sampler at
+// binding 0. Structurally identical to the layout wlroots uses for its texture
+// descriptor sets, so descriptor sets obtained via
+// wlr_vk_render_pass_get_texture_ds() are layout-compatible with these pipelines.
+VkDescriptorSetLayout vk_get_tex_ds_layout(struct vk_renderer *renderer);
+
+bool vk_shader_info_create_blur1(struct vk_renderer *renderer);
+bool vk_shader_info_create_blur2(struct vk_renderer *renderer);
+bool vk_shader_info_create_blur_effects(struct vk_renderer *renderer);
+
+bool create_vk_blur_pipelines(struct vk_renderer *renderer, struct vk_render_setup *setup,
+		struct vk_pipeline_blur **out_blur1, struct vk_pipeline_blur **out_blur2,
+		struct vk_pipeline_blur **out_blur_effects);
+void delete_vk_blur_pipelines(struct vk_renderer *renderer, struct vk_pipeline_blur *blur);
+
 #endif // !_RENDERER_VULKAN_SHADERS_H

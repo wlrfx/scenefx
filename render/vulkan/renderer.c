@@ -47,6 +47,20 @@ static bool link_shaders(struct vk_renderer *renderer) {
 		goto error;
 	}
 
+	// blur fragment shaders (dual-Kawase down/up plus the effects pass)
+	if (!vk_shader_info_create_blur1(renderer)) {
+		wlr_log(WLR_ERROR, "Could not link blur1 shader");
+		goto error;
+	}
+	if (!vk_shader_info_create_blur2(renderer)) {
+		wlr_log(WLR_ERROR, "Could not link blur2 shader");
+		goto error;
+	}
+	if (!vk_shader_info_create_blur_effects(renderer)) {
+		wlr_log(WLR_ERROR, "Could not link blur_effects shader");
+		goto error;
+	}
+
 	// if (!link_quad_programs(&vk_renderer->shaders.quad)) {
 	// 	wlr_log(WLR_ERROR, "Could not link quad shaders");
 	// 	goto error;

@@ -14,6 +14,9 @@ struct vk_pipeline {
 
 struct vk_pipelines {
 	struct vk_pipeline_quad *quad;
+	struct vk_pipeline_blur *blur1;
+	struct vk_pipeline_blur *blur2;
+	struct vk_pipeline_blur *blur_effects;
 };
 
 void vk_pipelines_init(struct vk_renderer *renderer, struct vk_render_setup *setup,

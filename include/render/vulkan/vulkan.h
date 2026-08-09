@@ -107,6 +107,14 @@ struct vk_renderer {
 		VkShaderModule vert;
 
 		struct vk_shader_info quad;
+
+		// Descriptor set layout shared by every texture-sampling shader below.
+		VkDescriptorSetLayout tex_ds_layout;
+
+		struct vk_shader_info blur1;
+		struct vk_shader_info blur2;
+		struct vk_shader_info blur_effects;
+
 		// TODO: more shaders
 		// struct quad_grad_shader quad_grad;
 		// struct quad_grad_round_shader quad_grad_round;
@@ -116,9 +124,6 @@ struct vk_renderer {
 		// struct tex_shader tex_ext;
 		//
 		// struct box_shadow_shader box_shadow;
-		// struct blur_shader blur1;
-		// struct blur_shader blur2;
-		// struct blur_effects_shader blur_effects;
 	} shader_info;
 
 	struct wl_list render_setups; // struct vk_render_setup.link

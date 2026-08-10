@@ -18,7 +18,7 @@
 #include "render/vulkan/vulkan.h"
 // #include "render/tracy.h"
 #include "scenefx/render/pass.h"
-// #include "scenefx/types/fx/blur_data.h"
+#include "scenefx/types/fx/blur_data.h"
 #include "util/matrix.h"
 
 ///
@@ -319,9 +319,265 @@ static void vk_render_pass_add_box_shadow(struct fx_render_pass *fx_pass,
 // 		struct fx_render_blur_pass_options *fx_options) {
 // }
 
+// Records one dual-Kawase step: samples src_ds into dst, over the scissor rects
+// in `region`. Runs inside its own effect render pass, so it must not be called
+// while the scene render pass is active.
+static void render_blur_step(struct vk_render_pass *pass,
+		struct vk_effect_image *dst, VkDescriptorSet src_ds,
+		struct vk_pipeline_blur *blur_pipeline, const pixman_region32_t *region,
+		float radius, bool downsample) {
+	struct vk_renderer *renderer = pass->vk_renderer;
+	VkCommandBuffer cb = pass->command_buffer;
+
+	int rects_len;
+	const pixman_box32_t *rects = pixman_region32_rectangles(region, &rects_len);
+	if (rects_len == 0) {
+		return;
+	}
+
+	// The scene render pass declares initialLayout COLOR_ATTACHMENT_OPTIMAL, so
+	// the target has to be moved there first (it is UNDEFINED before first use,
+	// SHADER_READ_ONLY_OPTIMAL after any previous chain step).
+	vk_effect_image_prepare_target(cb, dst);
+
+	VkRenderPassBeginInfo rp_info = {
+		.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO,
+		.renderArea = (VkRect2D){ .extent = { dst->width, dst->height } },
+		.clearValueCount = 0,
+		.renderPass = renderer->effect_render_pass,
+		.framebuffer = dst->framebuffer,
+	};
+	vkCmdBeginRenderPass(cb, &rp_info, VK_SUBPASS_CONTENTS_INLINE);
+	vkCmdSetViewport(cb, 0, 1, &(VkViewport){
+		.width = dst->width,
+		.height = dst->height,
+		.maxDepth = 1,
+	});
+
+	// common.vert emits a unit quad in [0,1]^2, so this maps it across the whole
+	// target in NDC. The scissor, not the geometry, selects the scaled region.
+	float proj[9] = {
+		2, 0, -1,
+		0, 2, -1,
+		0, 0,  1,
+	};
+	struct vk_vert_pcr_data vert_pcr_data = {
+		.uv_off = { 0, 0 },
+		.uv_size = { 1, 1 },
+	};
+	encode_proj_matrix(proj, vert_pcr_data.mat4);
+
+	// Downsample reads from a texture twice the size of the area being written
+	// (blur1.frag does uv * 2.0); upsample the other way around.
+	float scale = downsample ? 2.0f : 0.5f;
+	struct vk_frag_blur_pcr_data blur_pcr_data = {
+		.halfpixel = {
+			0.5f / (dst->width / scale),
+			0.5f / (dst->height / scale),
+		},
+		.radius = radius,
+	};
+
+	VkPipelineLayout layout = renderer->shader_info.blur1.pipeline_layout;
+	vkCmdBindPipeline(cb, VK_PIPELINE_BIND_POINT_GRAPHICS,
+		blur_pipeline->pipeline.pipeline);
+	vkCmdBindDescriptorSets(cb, VK_PIPELINE_BIND_POINT_GRAPHICS, layout,
+		0, 1, &src_ds, 0, NULL);
+	vkCmdPushConstants(cb, layout, VK_SHADER_STAGE_VERTEX_BIT,
+		0, sizeof(vert_pcr_data), &vert_pcr_data);
+	vkCmdPushConstants(cb, layout, VK_SHADER_STAGE_FRAGMENT_BIT,
+		sizeof(vert_pcr_data), sizeof(blur_pcr_data), &blur_pcr_data);
+
+	for (int i = 0; i < rects_len; i++) {
+		VkRect2D rect;
+		convert_pixman_box_to_vk_rect(&rects[i], &rect);
+		vkCmdSetScissor(cb, 0, 1, &rect);
+		vkCmdDraw(cb, 4, 1, 0, 0);
+	}
+
+	vkCmdEndRenderPass(cb);
+
+	// The scene pass' pipeline cache no longer reflects what is bound.
+	wlr_vk_render_pass_reset_pipeline(pass->fx_render_pass.render_pass);
+	pass->bound_pipeline = VK_NULL_HANDLE;
+}
+
 static void vk_render_pass_add_blur(struct fx_render_pass *fx_pass,
 		const struct fx_render_blur_pass_options *fx_options) {
-	// TODO:
+	struct vk_render_pass *pass = vk_get_render_pass(fx_pass);
+	struct vk_renderer *renderer = pass->vk_renderer;
+
+	struct blur_data blur_data =
+		blur_data_apply_strength(fx_options->blur_data, fx_options->blur_strength);
+	if (fx_options->blur_strength <= 0 || !is_scene_blur_enabled(&blur_data)) {
+		return;
+	}
+
+	struct wlr_buffer *buffer = pass->render_buffer->wlr_buffer;
+
+	// Only the two-pass (blending buffer) pathway can be suspended, which is
+	// also the pathway colour-managed/HDR output always uses. Elsewhere there is
+	// no intermediate image to sample, so blur is skipped rather than corrupting
+	// the frame.
+	VkImageView blend_view =
+		wlr_vk_render_pass_get_blend_image_view(fx_pass->render_pass);
+	if (blend_view == VK_NULL_HANDLE) {
+		return;
+	}
+	// Effect framebuffers must be built against the scene render pass so the
+	// blur pipelines stay compatible with them.
+	VkRenderPass scene_pass = wlr_vk_render_pass_get_render_pass(fx_pass->render_pass);
+	if (!vk_effect_images_ensure(renderer, scene_pass, buffer->width, buffer->height)) {
+		return;
+	}
+	VkDescriptorSet blend_ds = vk_get_blend_ds(renderer, blend_view);
+	if (blend_ds == VK_NULL_HANDLE) {
+		return;
+	}
+
+	struct vk_pipelines *pipelines = &pass->render_setup->vk_pipelines;
+	if (pipelines->blur1 == NULL || pipelines->blur2 == NULL ||
+			pipelines->blur_effects == NULL) {
+		return;
+	}
+
+	// Expand the damage so taps near the edge have valid neighbours, then clamp
+	// it to the buffer.
+	pixman_region32_t damage;
+	pixman_region32_init(&damage);
+	if (fx_options->tex_options.base.clip != NULL) {
+		pixman_region32_copy(&damage, fx_options->tex_options.base.clip);
+	} else {
+		pixman_region32_union_rect(&damage, &damage, 0, 0,
+			buffer->width, buffer->height);
+	}
+	wlr_region_expand(&damage, &damage, blur_data_calc_size(&blur_data));
+	pixman_region32_intersect_rect(&damage, &damage, 0, 0,
+		buffer->width, buffer->height);
+
+	if (!pixman_region32_not_empty(&damage)) {
+		pixman_region32_fini(&damage);
+		return;
+	}
+
+	if (!wlr_vk_render_pass_suspend(fx_pass->render_pass)) {
+		pixman_region32_fini(&damage);
+		return;
+	}
+
+	// The chain runs over the whole buffer rather than just the damaged part.
+	// The effect images are created with loadOp DONT_CARE, so any pixel the
+	// chain skips this frame holds undefined memory — and the composite below
+	// samples the effect image across the entire window, not just the damage.
+	// With a damage-sized chain that reads unwritten pixels as black, which
+	// shows up as black borders/blocks whenever damage is small (mouse moves).
+	//
+	// The GLES2 path can scope this to damage because it repairs the edges via
+	// save_blur_region()/apply_saved_blur_region(); those are still stubs here.
+	pixman_region32_t chain_region;
+	pixman_region32_init_rect(&chain_region, 0, 0, buffer->width, buffer->height);
+
+	pixman_region32_t scaled_damage;
+	pixman_region32_init(&scaled_damage);
+
+	// Ping-pong between the two effect images; the first read is the blend image
+	// holding everything drawn so far.
+	VkDescriptorSet src_ds = blend_ds;
+	size_t dst_index = 0;
+
+	for (int i = 0; i < blur_data.num_passes; i++) {
+		wlr_region_scale(&scaled_damage, &chain_region, 1.0f / (1 << (i + 1)));
+		render_blur_step(pass, &renderer->effect_images[dst_index], src_ds,
+			pipelines->blur1, &scaled_damage, blur_data.radius, true);
+		src_ds = renderer->effect_images[dst_index].ds;
+		dst_index ^= 1;
+	}
+
+	for (int i = blur_data.num_passes - 1; i >= 0; i--) {
+		wlr_region_scale(&scaled_damage, &chain_region, 1.0f / (1 << i));
+		render_blur_step(pass, &renderer->effect_images[dst_index], src_ds,
+			pipelines->blur2, &scaled_damage, blur_data.radius, false);
+		src_ds = renderer->effect_images[dst_index].ds;
+		dst_index ^= 1;
+	}
+
+	pixman_region32_fini(&scaled_damage);
+	pixman_region32_fini(&chain_region);
+
+	// dst_index was advanced past the last write; step back to the image that
+	// actually holds the blurred result.
+	size_t result_index = dst_index ^ 1;
+
+	if (!wlr_vk_render_pass_resume(fx_pass->render_pass)) {
+		pixman_region32_fini(&damage);
+		return;
+	}
+
+	// Composite the blurred image back into the scene with blur_effects, which
+	// samples texture(tex, uv) 1:1 and applies the brightness/contrast/
+	// saturation/noise stage — the same shader GLES2 finishes with.
+	//
+	// blur2 must NOT be used here even with zeroed constants: it is the upsample
+	// shader and does `suv = uv / 2.0`, which magnifies the top-left quarter of
+	// the blurred image over the whole region.
+	VkCommandBuffer cb = pass->command_buffer;
+	float proj[9] = {
+		2, 0, -1,
+		0, 2, -1,
+		0, 0,  1,
+	};
+	struct vk_vert_pcr_data vert_pcr_data = {
+		.uv_off = { 0, 0 },
+		.uv_size = { 1, 1 },
+	};
+	encode_proj_matrix(proj, vert_pcr_data.mat4);
+	struct vk_frag_blur_effects_pcr_data effects_pcr_data = {
+		.brightness = blur_data.brightness,
+		.contrast = blur_data.contrast,
+		.saturation = blur_data.saturation,
+		.noise = blur_data.noise,
+	};
+
+	VkPipelineLayout layout = renderer->shader_info.blur_effects.pipeline_layout;
+	VkDescriptorSet result_ds = renderer->effect_images[result_index].ds;
+	vkCmdBindPipeline(cb, VK_PIPELINE_BIND_POINT_GRAPHICS,
+		pipelines->blur_effects->pipeline.pipeline);
+	vkCmdBindDescriptorSets(cb, VK_PIPELINE_BIND_POINT_GRAPHICS, layout,
+		0, 1, &result_ds, 0, NULL);
+	vkCmdPushConstants(cb, layout, VK_SHADER_STAGE_VERTEX_BIT,
+		0, sizeof(vert_pcr_data), &vert_pcr_data);
+	vkCmdPushConstants(cb, layout, VK_SHADER_STAGE_FRAGMENT_BIT,
+		sizeof(vert_pcr_data), sizeof(effects_pcr_data), &effects_pcr_data);
+
+	// Composite only where the caller asked for blur. `damage` is deliberately
+	// wider (expanded so edge taps have neighbours) and must NOT be used here:
+	// painting the blurred image across the expanded area covers unrelated
+	// content, and because the next frame blurs the blend image again that
+	// feeds back into itself and smears the whole output.
+	pixman_region32_t composite_clip;
+	pixman_region32_init(&composite_clip);
+	if (fx_options->tex_options.base.clip != NULL) {
+		pixman_region32_copy(&composite_clip, fx_options->tex_options.base.clip);
+	} else {
+		pixman_region32_union_rect(&composite_clip, &composite_clip, 0, 0,
+			buffer->width, buffer->height);
+	}
+
+	int rects_len;
+	const pixman_box32_t *rects =
+		pixman_region32_rectangles(&composite_clip, &rects_len);
+	for (int i = 0; i < rects_len; i++) {
+		VkRect2D rect;
+		convert_pixman_box_to_vk_rect(&rects[i], &rect);
+		vkCmdSetScissor(cb, 0, 1, &rect);
+		vkCmdDraw(cb, 4, 1, 0, 0);
+	}
+
+	wlr_vk_render_pass_reset_pipeline(fx_pass->render_pass);
+	pass->bound_pipeline = VK_NULL_HANDLE;
+
+	pixman_region32_fini(&composite_clip);
+	pixman_region32_fini(&damage);
 }
 
 static bool vk_render_pass_add_optimized_blur(struct fx_render_pass *fx_pass,

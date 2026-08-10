@@ -83,6 +83,28 @@ struct fx_render_pass *vk_render_pass_init(struct fx_renderer *fx_renderer,
 		struct wlr_render_pass *render_pass, struct wlr_buffer *wlr_buffer,
 		struct wlr_output *output);
 
+// Two targets are enough: the dual-Kawase chain only ever ping-pongs between a
+// source and a destination.
+#define VK_EFFECT_IMAGE_COUNT 2
+
+/**
+ * Offscreen colour target for the blur chain. Full output size: the dual-Kawase
+ * down/up scaling is expressed by shrinking the scissor rather than the image,
+ * matching the GLES2 implementation (and what blur1.frag's `uv * 2.0` expects).
+ */
+struct vk_effect_image {
+	VkImage image;
+	VkDeviceMemory memory;
+	VkImageView view;
+	VkFramebuffer framebuffer;
+	VkDescriptorSet ds;
+	uint32_t width, height;
+	// Tracked so the barrier before each use knows the source layout. The scene
+	// render pass declares finalLayout SHADER_READ_ONLY_OPTIMAL, so after any
+	// use the image sits there; before first use it is still UNDEFINED.
+	VkImageLayout layout;
+};
+
 struct vk_render_setup {
 	struct wl_list link; // vk_renderer.render_setups
 	VkRenderPass render_pass;
@@ -135,7 +157,31 @@ struct vk_renderer {
 
 	struct wl_list render_setups; // struct vk_render_setup.link
 	struct wl_list buffers; // vk_buffer.link
+
+	// Ping-pong render targets for the blur chain. Their framebuffers are built
+	// against the *scene* render pass rather than a private one: Vulkan only
+	// treats render passes as compatible when they are identical apart from a
+	// short exemption list that does NOT include subpass dependencies, so a
+	// bespoke pass would make the blur pipelines unusable. See effects.c.
+	VkRenderPass effect_render_pass;
+	struct vk_effect_image effect_images[VK_EFFECT_IMAGE_COUNT];
+
+	// Cached sampler descriptor set for the wlroots blend image, rebuilt only
+	// when the underlying image view changes.
+	VkDescriptorSet blend_ds;
+	VkImageView blend_ds_view;
 };
+
+bool vk_effect_images_ensure(struct vk_renderer *renderer,
+	VkRenderPass render_pass, uint32_t width, uint32_t height);
+void vk_effect_images_finish(struct vk_renderer *renderer);
+/** Barrier the effect image into COLOR_ATTACHMENT_OPTIMAL ready to be drawn to. */
+void vk_effect_image_prepare_target(VkCommandBuffer cb, struct vk_effect_image *img);
+VkDescriptorSet vk_get_blend_ds(struct vk_renderer *renderer, VkImageView view);
+
+/** Index of a memory type satisfying props, or -1. */
+int vk_find_mem_type(struct vk_renderer *renderer,
+	VkMemoryPropertyFlags props, uint32_t type_bits);
 
 struct fx_renderer *vk_renderer_create(struct wlr_renderer *wlr_renderer);
 

@@ -184,6 +184,10 @@ static void renderer_destroy(struct fx_renderer *fx_renderer) {
 		vk_render_setup_destroy(vk_renderer, render_setup);
 	}
 
+	// Blur targets must go before the descriptor pool and layout in
+	// free_shaders(), since their descriptor sets are allocated from it.
+	vk_effect_images_finish(vk_renderer);
+
 	free_shaders(vk_renderer);
 
 	free(vk_renderer);

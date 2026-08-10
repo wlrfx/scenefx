@@ -243,3 +243,76 @@ void vk_effect_image_prepare_target(VkCommandBuffer cb, struct vk_effect_image *
 	// once the upcoming pass ends the image will be samplable again.
 	img->layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 }
+
+void vk_saved_pixels_finish(struct vk_renderer *renderer) {
+	if (renderer->saved_pixels.image == VK_NULL_HANDLE) {
+		return;
+	}
+	vkDeviceWaitIdle(renderer->device);
+	vkDestroyImage(renderer->device, renderer->saved_pixels.image, NULL);
+	vkFreeMemory(renderer->device, renderer->saved_pixels.memory, NULL);
+	renderer->saved_pixels.image = VK_NULL_HANDLE;
+	renderer->saved_pixels.memory = VK_NULL_HANDLE;
+	renderer->saved_pixels.initialised = false;
+}
+
+bool vk_saved_pixels_ensure(struct vk_renderer *renderer,
+		uint32_t width, uint32_t height) {
+	if (renderer->saved_pixels.image != VK_NULL_HANDLE &&
+			renderer->saved_pixels.width == width &&
+			renderer->saved_pixels.height == height) {
+		return true;
+	}
+	vk_saved_pixels_finish(renderer);
+
+	VkDevice dev = renderer->device;
+	// Transfer only: this image is never sampled or drawn to, it just holds a
+	// copy of the blend image's padding ring between save and apply.
+	VkImageCreateInfo img_info = {
+		.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,
+		.imageType = VK_IMAGE_TYPE_2D,
+		.format = EFFECT_IMAGE_FORMAT,
+		.mipLevels = 1,
+		.arrayLayers = 1,
+		.samples = VK_SAMPLE_COUNT_1_BIT,
+		.sharingMode = VK_SHARING_MODE_EXCLUSIVE,
+		.tiling = VK_IMAGE_TILING_OPTIMAL,
+		.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED,
+		.extent = (VkExtent3D){ width, height, 1 },
+		.usage = VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT,
+	};
+	if (vkCreateImage(dev, &img_info, NULL, &renderer->saved_pixels.image) != VK_SUCCESS) {
+		wlr_log(WLR_ERROR, "vkCreateImage failed for blur saved pixels");
+		return false;
+	}
+
+	VkMemoryRequirements mem_reqs;
+	vkGetImageMemoryRequirements(dev, renderer->saved_pixels.image, &mem_reqs);
+	int mem_type = vk_find_mem_type(renderer, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+		mem_reqs.memoryTypeBits);
+	if (mem_type < 0) {
+		goto error;
+	}
+
+	VkMemoryAllocateInfo mem_info = {
+		.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,
+		.allocationSize = mem_reqs.size,
+		.memoryTypeIndex = mem_type,
+	};
+	if (vkAllocateMemory(dev, &mem_info, NULL, &renderer->saved_pixels.memory) != VK_SUCCESS) {
+		goto error;
+	}
+	if (vkBindImageMemory(dev, renderer->saved_pixels.image,
+			renderer->saved_pixels.memory, 0) != VK_SUCCESS) {
+		goto error;
+	}
+
+	renderer->saved_pixels.width = width;
+	renderer->saved_pixels.height = height;
+	renderer->saved_pixels.initialised = false;
+	return true;
+
+error:
+	vk_saved_pixels_finish(renderer);
+	return false;
+}

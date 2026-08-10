@@ -166,6 +166,16 @@ struct vk_renderer {
 	VkRenderPass effect_render_pass;
 	struct vk_effect_image effect_images[VK_EFFECT_IMAGE_COUNT];
 
+	// Holds a copy of the frame's pixels in the blur padding ring, taken before
+	// the frame renders and pasted back afterwards. Transfer-only: no
+	// framebuffer or descriptor set, since nothing ever draws with it.
+	struct {
+		VkImage image;
+		VkDeviceMemory memory;
+		uint32_t width, height;
+		bool initialised;
+	} saved_pixels;
+
 	// Cached sampler descriptor set for the wlroots blend image, rebuilt only
 	// when the underlying image view changes.
 	VkDescriptorSet blend_ds;
@@ -177,6 +187,11 @@ bool vk_effect_images_ensure(struct vk_renderer *renderer,
 void vk_effect_images_finish(struct vk_renderer *renderer);
 /** Barrier the effect image into COLOR_ATTACHMENT_OPTIMAL ready to be drawn to. */
 void vk_effect_image_prepare_target(VkCommandBuffer cb, struct vk_effect_image *img);
+
+/** (Re)create the blur-padding snapshot image at the given size. */
+bool vk_saved_pixels_ensure(struct vk_renderer *renderer,
+	uint32_t width, uint32_t height);
+void vk_saved_pixels_finish(struct vk_renderer *renderer);
 VkDescriptorSet vk_get_blend_ds(struct vk_renderer *renderer, VkImageView view);
 
 /** Index of a memory type satisfying props, or -1. */

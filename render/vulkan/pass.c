@@ -126,26 +126,176 @@ static bool apply_clip_region(pixman_region32_t *clip_region,
 /// FX Render Pass implementation
 ///
 
+// Copies the blur padding ring between the blend image and our snapshot image.
+//
+// scenefx expands the frame's damage to include a ring around each blur node
+// (wlr_scene.c), snapshots those pixels before the frame renders, and pastes
+// them back afterwards. Without it, content that sits above a blur node leaks
+// into that node's blur on the next frame, because the blend image still holds
+// the previous frame's composited result wherever nothing was redrawn.
+//
+// vkCmdCopyImage cannot be recorded inside a render pass, so the scene pass is
+// suspended around the transfer and resumed afterwards.
+static void blur_padding_copy(struct fx_render_pass *fx_pass,
+		const pixman_region32_t *region, bool save) {
+	if (region == NULL || !pixman_region32_not_empty(region)) {
+		return;
+	}
+
+	struct vk_render_pass *pass = vk_get_render_pass(fx_pass);
+	struct vk_renderer *renderer = pass->vk_renderer;
+	struct wlr_buffer *buffer = pass->render_buffer->wlr_buffer;
+
+	VkImage blend = wlr_vk_render_pass_get_blend_image(fx_pass->render_pass);
+	if (blend == VK_NULL_HANDLE) {
+		return;
+	}
+	if (!vk_saved_pixels_ensure(renderer, buffer->width, buffer->height)) {
+		return;
+	}
+	// Nothing has been saved yet, so there is nothing to paste back.
+	if (!save && !renderer->saved_pixels.initialised) {
+		return;
+	}
+
+	int rects_len;
+	const pixman_box32_t *rects = pixman_region32_rectangles(region, &rects_len);
+	if (rects_len == 0) {
+		return;
+	}
+
+	if (!wlr_vk_render_pass_suspend(fx_pass->render_pass)) {
+		return;
+	}
+
+	VkCommandBuffer cb = pass->command_buffer;
+	VkImage src = save ? blend : renderer->saved_pixels.image;
+	VkImage dst = save ? renderer->saved_pixels.image : blend;
+
+	// The blend image sits in SHADER_READ_ONLY_OPTIMAL after the suspend; the
+	// snapshot image is UNDEFINED until first written, then TRANSFER_SRC.
+	// After any previous save the snapshot parks in TRANSFER_SRC; before the
+	// first one its contents are undefined.
+	VkImageLayout saved_old = renderer->saved_pixels.initialised ?
+		VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL : VK_IMAGE_LAYOUT_UNDEFINED;
+
+	VkImageSubresourceRange range = {
+		.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+		.levelCount = 1,
+		.layerCount = 1,
+	};
+	VkImageMemoryBarrier to_transfer[] = {
+		{
+			.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
+			.oldLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+			.newLayout = save ? VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL :
+				VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+			.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+			.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+			.image = blend,
+			.subresourceRange = range,
+			.srcAccessMask = VK_ACCESS_SHADER_READ_BIT,
+			.dstAccessMask = save ? VK_ACCESS_TRANSFER_READ_BIT : VK_ACCESS_TRANSFER_WRITE_BIT,
+		},
+		{
+			.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
+			.oldLayout = saved_old,
+			.newLayout = save ? VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL :
+				VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+			.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+			.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+			.image = renderer->saved_pixels.image,
+			.subresourceRange = range,
+			.srcAccessMask = 0,
+			.dstAccessMask = save ? VK_ACCESS_TRANSFER_WRITE_BIT : VK_ACCESS_TRANSFER_READ_BIT,
+		},
+	};
+	vkCmdPipelineBarrier(cb,
+		VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT | VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
+		VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0, NULL, 0, NULL, 2, to_transfer);
+
+	for (int i = 0; i < rects_len; i++) {
+		// Clamp to the image: scenefx bounds blur_padding_region by the output
+		// size, which is not always the render buffer size, and a copy that
+		// runs past the edge is invalid usage (and loses the device).
+		int32_t x1 = rects[i].x1 < 0 ? 0 : rects[i].x1;
+		int32_t y1 = rects[i].y1 < 0 ? 0 : rects[i].y1;
+		int32_t x2 = rects[i].x2 > (int32_t)renderer->saved_pixels.width ?
+			(int32_t)renderer->saved_pixels.width : rects[i].x2;
+		int32_t y2 = rects[i].y2 > (int32_t)renderer->saved_pixels.height ?
+			(int32_t)renderer->saved_pixels.height : rects[i].y2;
+
+		int32_t x = x1, y = y1;
+		int32_t w = x2 - x1;
+		int32_t h = y2 - y1;
+		if (w <= 0 || h <= 0) {
+			continue;
+		}
+		VkImageCopy copy = {
+			.srcSubresource = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1 },
+			.dstSubresource = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1 },
+			.srcOffset = { x, y, 0 },
+			.dstOffset = { x, y, 0 },
+			.extent = { w, h, 1 },
+		};
+		vkCmdCopyImage(cb,
+			src, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+			dst, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &copy);
+	}
+
+	// Blend goes back to being sampleable, which is the layout resume() expects
+	// to transition from; the snapshot parks in TRANSFER_SRC for the next apply.
+	VkImageMemoryBarrier from_transfer[] = {
+		{
+			.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
+			.oldLayout = save ? VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL :
+				VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+			.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+			.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+			.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+			.image = blend,
+			.subresourceRange = range,
+			.srcAccessMask = save ? VK_ACCESS_TRANSFER_READ_BIT : VK_ACCESS_TRANSFER_WRITE_BIT,
+			.dstAccessMask = VK_ACCESS_SHADER_READ_BIT,
+		},
+		{
+			.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
+			.oldLayout = save ? VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL :
+				VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+			.newLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+			.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+			.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+			.image = renderer->saved_pixels.image,
+			.subresourceRange = range,
+			.srcAccessMask = save ? VK_ACCESS_TRANSFER_WRITE_BIT : VK_ACCESS_TRANSFER_READ_BIT,
+			.dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT,
+		},
+	};
+	vkCmdPipelineBarrier(cb, VK_PIPELINE_STAGE_TRANSFER_BIT,
+		VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT | VK_PIPELINE_STAGE_TRANSFER_BIT,
+		0, 0, NULL, 0, NULL, 2, from_transfer);
+
+	if (save) {
+		renderer->saved_pixels.initialised = true;
+	}
+
+	wlr_vk_render_pass_resume(fx_pass->render_pass);
+}
+
 static void vk_render_pass_read_to_buffer(struct fx_render_pass *fx_pass,
 		const pixman_region32_t *_region, struct wlr_buffer *dst_buffer,
 		struct wlr_buffer *src_buffer) {
-	// TODO:
+	// Unused by the Vulkan path: the blur padding snapshot is kept in a
+	// renderer-owned VkImage rather than a wlr_buffer, so save/apply below copy
+	// directly instead of going through this wlr_buffer-oriented entry point.
 }
 
 static void vk_render_pass_save_blur_region(struct fx_render_pass *fx_pass) {
-	// TODO:
-	// struct vk_render_pass *pass = vk_get_render_pass(fx_pass);
-	// vk_render_pass_read_to_buffer(fx_pass, &fx_pass->blur_padding_region,
-	// 		pass->vk_offscreen_buffers->blur_saved_pixels_buffer->wlr_buffer,
-	// 		pass->render_buffer->wlr_buffer);
+	blur_padding_copy(fx_pass, &fx_pass->blur_padding_region, true);
 }
 
 static void vk_render_pass_apply_saved_blur_region(struct fx_render_pass *fx_pass) {
-	// TODO:
-	// struct vk_render_pass *pass = vk_get_render_pass(fx_pass);
-	// vk_render_pass_read_to_buffer(fx_pass, &fx_pass->blur_padding_region,
-	// 		pass->render_buffer->wlr_buffer,
-	// 		pass->vk_offscreen_buffers->blur_saved_pixels_buffer->wlr_buffer);
+	blur_padding_copy(fx_pass, &fx_pass->blur_padding_region, false);
 }
 
 static void vk_render_pass_destroy(struct fx_render_pass *fx_pass) {
@@ -465,17 +615,6 @@ static void vk_render_pass_add_blur(struct fx_render_pass *fx_pass,
 		return;
 	}
 
-	// The chain runs over the whole buffer rather than just the damaged part.
-	// The effect images are created with loadOp DONT_CARE, so any pixel the
-	// chain skips this frame holds undefined memory — and the composite below
-	// samples the effect image across the entire window, not just the damage.
-	// With a damage-sized chain that reads unwritten pixels as black, which
-	// shows up as black borders/blocks whenever damage is small (mouse moves).
-	//
-	// The GLES2 path can scope this to damage because it repairs the edges via
-	// save_blur_region()/apply_saved_blur_region(); those are still stubs here.
-	pixman_region32_t chain_region;
-	pixman_region32_init_rect(&chain_region, 0, 0, buffer->width, buffer->height);
 
 	pixman_region32_t scaled_damage;
 	pixman_region32_init(&scaled_damage);
@@ -486,7 +625,7 @@ static void vk_render_pass_add_blur(struct fx_render_pass *fx_pass,
 	size_t dst_index = 0;
 
 	for (int i = 0; i < blur_data.num_passes; i++) {
-		wlr_region_scale(&scaled_damage, &chain_region, 1.0f / (1 << (i + 1)));
+		wlr_region_scale(&scaled_damage, &damage, 1.0f / (1 << (i + 1)));
 		render_blur_step(pass, &renderer->effect_images[dst_index], src_ds,
 			pipelines->blur1, &scaled_damage, blur_data.radius, true);
 		src_ds = renderer->effect_images[dst_index].ds;
@@ -494,7 +633,7 @@ static void vk_render_pass_add_blur(struct fx_render_pass *fx_pass,
 	}
 
 	for (int i = blur_data.num_passes - 1; i >= 0; i--) {
-		wlr_region_scale(&scaled_damage, &chain_region, 1.0f / (1 << i));
+		wlr_region_scale(&scaled_damage, &damage, 1.0f / (1 << i));
 		render_blur_step(pass, &renderer->effect_images[dst_index], src_ds,
 			pipelines->blur2, &scaled_damage, blur_data.radius, false);
 		src_ds = renderer->effect_images[dst_index].ds;
@@ -502,7 +641,6 @@ static void vk_render_pass_add_blur(struct fx_render_pass *fx_pass,
 	}
 
 	pixman_region32_fini(&scaled_damage);
-	pixman_region32_fini(&chain_region);
 
 	// dst_index was advanced past the last write; step back to the image that
 	// actually holds the blurred result.

@@ -112,10 +112,7 @@ struct fx_renderer_impl {
 	const struct fx_renderer_tracy_impl *tracy;
 };
 
-/**
- * wlroots OpenGL ES 2 renderer wrapper.
- */
-
+// wlroots OpenGL ES 2 renderer wrapper
 struct fx_renderer {
 	struct wlr_renderer *wlr_renderer;
 

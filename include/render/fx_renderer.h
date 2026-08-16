@@ -23,7 +23,7 @@ struct fx_offscreen_buffers_impl {
 	void (*destroy)(struct fx_offscreen_buffers *offscreen_buffers);
 };
 
-/** Used to add effect buffers per output instead of every output sharing them */
+// Used to add effect buffers per output instead of every output sharing them
 struct fx_offscreen_buffers {
 	struct fx_renderer *fx_renderer;
 	struct wlr_output *wlr_output;

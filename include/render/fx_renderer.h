@@ -12,7 +12,7 @@
 struct fx_offscreen_buffers;
 struct fx_renderer;
 
-/** Find the best supported DRM format */
+// Find the best supported DRM format
 const struct wlr_drm_format *find_wlr_drm_format(struct wlr_renderer *wlr_renderer, bool alpha);
 
 ///

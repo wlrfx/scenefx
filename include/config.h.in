@@ -1,7 +1,6 @@
 #ifndef SCENEFX_CONFIG_H
 #define SCENEFX_CONFIG_H
 
-/** Whether the GLES2 renderer is compile-time enabled. */
 #mesondefine SCENEFX_HAS_GLES2_RENDERER
 
 #endif

@@ -20,16 +20,6 @@ struct fx_renderer;
 struct wlr_renderer *scenefx_init(struct wlr_scene *wlr_scene, struct wlr_backend *backend);
 
 /**
- * Initialize the SceneFX FX Renderer and creates a new wlr_renderer.
- * It's preferred to use `scenefx_init(...)` instead if full control over the FX
- * Renderer isn't needed.
- *
- * Returns `NULL` if the FX Renderer initialization fails.
- */
-struct fx_renderer *scenefx_init_complete(struct wlr_scene *wlr_scene,
-		struct wlr_backend *backend);
-
-/**
  * Initializes the SceneFX FX Renderer from an existing wlr_renderer.
  *
  * Returns `NULL` if the FX Renderer initialization fails.

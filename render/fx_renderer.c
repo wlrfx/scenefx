@@ -152,16 +152,6 @@ static struct wlr_renderer *create_wlr_renderer(struct wlr_scene *wlr_scene,
 	return wlr_renderer;
 }
 
-struct fx_renderer *scenefx_init_complete(struct wlr_scene *wlr_scene,
-		struct wlr_backend *backend) {
-	struct wlr_renderer *wlr_renderer = create_wlr_renderer(wlr_scene, backend);
-	struct fx_renderer *fx_renderer = scenefx_init_from_wlr_renderer(wlr_renderer, wlr_scene);
-	if (fx_renderer == NULL) {
-		wlr_renderer_destroy(wlr_renderer);
-	}
-	return fx_renderer;
-}
-
 struct wlr_renderer *scenefx_init(struct wlr_scene *wlr_scene, struct wlr_backend *backend) {
 	struct wlr_renderer *wlr_renderer = create_wlr_renderer(wlr_scene, backend);
 	scenefx_init_from_wlr_renderer(wlr_renderer, wlr_scene);

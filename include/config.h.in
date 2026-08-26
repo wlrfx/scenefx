@@ -1,6 +1,0 @@
-#ifndef SCENEFX_CONFIG_H
-#define SCENEFX_CONFIG_H
-
-#mesondefine SCENEFX_HAS_GLES2_RENDERER
-
-#endif

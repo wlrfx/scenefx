@@ -1,16 +1,15 @@
-#include "config.h"
-
 #include <assert.h>
+#include <wlr/config.h>
 #include <wlr/util/log.h>
 #include <wlr/render/interface.h>
-#if SCENEFX_HAS_GLES2_RENDERER
+#if WLR_HAS_GLES2_RENDERER
 #include <wlr/render/gles2.h>
 #endif
 
 #include "render/fx_renderer.h"
 #include "render/tracy.h"
 #include "scenefx/scenefx.h"
-#if SCENEFX_HAS_GLES2_RENDERER
+#if WLR_HAS_GLES2_RENDERER
 #include "render/gles2/gles2.h"
 #endif
 
@@ -100,7 +99,7 @@ struct fx_renderer *scenefx_init_from_wlr_renderer(struct wlr_renderer *wlr_rend
 		struct wlr_scene *wlr_scene) {
 	assert(wlr_renderer);
 
-#define HAS_ANY_RENDERERS SCENEFX_HAS_GLES2_RENDERER /* TODO: Add more has renderer checks here */
+#define HAS_ANY_RENDERERS WLR_HAS_GLES2_RENDERER /* TODO: Add more has renderer checks here */
 #if !HAS_ANY_RENDERERS
 	wlr_log(WLR_ERROR,
 			"Could not initialize SceneFX as it wasn't compiled with any renderers. "
@@ -109,7 +108,7 @@ struct fx_renderer *scenefx_init_from_wlr_renderer(struct wlr_renderer *wlr_rend
 #else
 	struct fx_renderer *fx_renderer = NULL;
 
-#if SCENEFX_HAS_GLES2_RENDERER
+#if WLR_HAS_GLES2_RENDERER
 	if (wlr_renderer_is_gles2(wlr_renderer)) {
 		fx_renderer = gles2_renderer_create(wlr_renderer);
 		goto renderer_created;

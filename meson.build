@@ -102,8 +102,10 @@ if not wlroots.found()
 	)
 	wlroots = wlroots_proj.get_variable('wlroots')
 endif
-wlroots_has_gles2 = wlroots.get_variable('have_gles2_renderer') == 'true'
 
+renderers = {
+	'gles2': wlroots.get_variable('have_gles2_renderer') == 'true',
+}
 
 drm = dependency('libdrm',
 	version: '>=2.4.129',

@@ -1,10 +1,3 @@
-renderers = get_option('renderers')
-if 'auto' in renderers and get_option('auto_features').enabled()
-	renderers = ['gles2']
-elif 'auto' in renderers and get_option('auto_features').disabled()
-	renderers = []
-endif
-
 scenefx_files += files(
 	'color.c',
 	'fx_offscreen_buffers.c',
@@ -14,7 +7,7 @@ scenefx_files += files(
 	'tracy.c',
 )
 
-if ('gles2' in renderers or 'auto' in renderers) and wlroots_has_gles2
+if renderers['gles2']
 	egl = dependency('egl', required: 'gles2' in renderers)
 	if egl.found()
 		eglext_version = cc.get_define(

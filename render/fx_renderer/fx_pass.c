@@ -372,8 +372,8 @@ void fx_render_pass_add_texture(struct fx_gles_render_pass *pass,
 		break;
 	case GL_TEXTURE_EXTERNAL_OES:
 		// EGL_EXT_image_dma_buf_import_modifiers requires
-		// GL_OES_EGL_image_external
-		assert(renderer->exts.OES_egl_image_external);
+		// GL_OES_EGL_image_external_essl3
+		assert(renderer->exts.OES_egl_image_external_essl3);
 		shader = use_effects
 			? &renderer->shaders.tex_effects_ext
 			: &renderer->shaders.tex_ext;

@@ -1209,6 +1209,9 @@ void wlr_scene_blur_set_clipped_region(struct wlr_scene_blur *blur,
 
 void wlr_scene_set_blur_data(struct wlr_scene *scene, int num_passes,
 		int radius, float noise, float brightness, float contrast, float saturation) {
+	num_passes = blur_data_clamp_num_passes(num_passes);
+	radius = blur_data_clamp_radius(radius);
+
 	struct blur_data *buff_data = &scene->blur_data;
 	if (buff_data->num_passes == num_passes
 			&& buff_data->radius == radius
@@ -1231,6 +1234,8 @@ void wlr_scene_set_blur_data(struct wlr_scene *scene, int num_passes,
 }
 
 void wlr_scene_set_blur_num_passes(struct wlr_scene *scene, int num_passes) {
+	num_passes = blur_data_clamp_num_passes(num_passes);
+
 	struct blur_data *buff_data = &scene->blur_data;
 	if (buff_data->num_passes == num_passes) {
 		return;
@@ -1241,6 +1246,8 @@ void wlr_scene_set_blur_num_passes(struct wlr_scene *scene, int num_passes) {
 }
 
 void wlr_scene_set_blur_radius(struct wlr_scene *scene, int radius) {
+	radius = blur_data_clamp_radius(radius);
+
 	struct blur_data *buff_data = &scene->blur_data;
 	if (buff_data->radius == radius) {
 		return;
@@ -1322,8 +1329,9 @@ void wlr_scene_optimized_blur_set_size(struct wlr_scene_optimized_blur *blur_nod
 }
 
 void wlr_scene_optimized_blur_mark_dirty(struct wlr_scene_optimized_blur *blur_node) {
-	// Skip re-rendering the optimized blur if the blur node is disabled
-	if (blur_node && !blur_node->node.enabled) {
+	// Skip re-rendering the optimized blur if there's no blur node or it's
+	// disabled
+	if (!blur_node || !blur_node->node.enabled) {
 		return;
 	}
 

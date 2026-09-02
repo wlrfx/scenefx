@@ -1,31 +1,12 @@
 #ifndef SCENE_FX_RENDER_PASS_H
 #define SCENE_FX_RENDER_PASS_H
 
-#include <stdbool.h>
 #include <wlr/render/pass.h>
-#include <wlr/render/interface.h>
-#include <wlr/render/swapchain.h>
+#include <wlr/types/wlr_output.h>
 
-#include "render/egl.h"
 #include "types/fx/clipped_region.h"
 
-struct fx_gles_render_pass {
-	struct wlr_render_pass base;
-	struct fx_framebuffer *buffer;
-	float projection_matrix[9];
-	struct wlr_egl_context prev_ctx;
-	struct fx_render_timer *timer;
-	struct wlr_drm_syncobj_timeline *signal_timeline;
-	uint64_t signal_point;
-
-	// The region where there's blur
-	pixman_region32_t blur_padding_region;
-	bool has_blur;
-	// Contains output-specific framebuffers.
-	// NULL when no advanced effects like blur is being used in the current pass.
-	// Call `fx_render_pass_init_offscreen_buffers` to use advanced effects.
-	struct fx_offscreen_buffers *fx_offscreen_buffers;
-};
+struct fx_renderer;
 
 struct fx_gradient {
 	float degree;
@@ -84,7 +65,7 @@ struct fx_render_box_shadow_options {
 
 struct fx_render_blur_pass_options {
 	struct fx_render_texture_options tex_options;
-	struct fx_framebuffer *current_buffer;
+	struct wlr_buffer *current_buffer;
 	struct blur_data *blur_data;
 	bool use_optimized_blur;
 	bool ignore_transparent;
@@ -93,68 +74,73 @@ struct fx_render_blur_pass_options {
 	struct clipped_fregion clipped_region;
 };
 
-struct fx_gles_render_pass *fx_get_render_pass(struct wlr_render_pass *render_pass);
-
 /**
  * Initializes the render pass offscreen buffers required for advanced effects
  * like blur.
  */
-bool fx_render_pass_init_offscreen_buffers(struct wlr_render_pass *render_pass,
+struct fx_render_pass *fx_renderer_init_render_pass(struct fx_renderer *fx_renderer,
+		struct wlr_render_pass *wlr_render_pass, struct wlr_buffer *wlr_buffer,
 		struct wlr_output *output);
+
+void fx_render_pass_destroy(struct fx_render_pass *fx_pass);
 
 /**
  * Render a fx texture.
  */
-void fx_render_pass_add_texture(struct fx_gles_render_pass *render_pass,
-	const struct fx_render_texture_options *options);
+void fx_render_pass_add_texture(struct fx_render_pass *render_pass,
+	const struct fx_render_texture_options *fx_options);
 
 /**
  * Render a rectangle.
  */
-void fx_render_pass_add_rect(struct fx_gles_render_pass *render_pass,
-	const struct fx_render_rect_options *options);
+void fx_render_pass_add_rect(struct fx_render_pass *render_pass,
+	const struct fx_render_rect_options *fx_options);
 
 /**
  * Render a rectangle with a gradient.
  */
-void fx_render_pass_add_rect_grad(struct fx_gles_render_pass *render_pass,
-	const struct fx_render_rect_grad_options *options);
+void fx_render_pass_add_rect_grad(struct fx_render_pass *render_pass,
+	const struct fx_render_rect_grad_options *fx_options);
 
 /**
  * Render a rounded rectangle.
  */
-void fx_render_pass_add_rounded_rect(struct fx_gles_render_pass *render_pass,
-	const struct fx_render_rounded_rect_options *options);
+void fx_render_pass_add_rounded_rect(struct fx_render_pass *render_pass,
+	const struct fx_render_rounded_rect_options *fx_options);
 
 /**
  * Render a rounded rectangle with a gradient.
  */
-void fx_render_pass_add_rounded_rect_grad(struct fx_gles_render_pass *render_pass,
-	const struct fx_render_rounded_rect_grad_options *options);
+void fx_render_pass_add_rounded_rect_grad(struct fx_render_pass *render_pass,
+	const struct fx_render_rounded_rect_grad_options *fx_options);
 
 /**
  * Render a box shadow.
  */
-void fx_render_pass_add_box_shadow(struct fx_gles_render_pass *pass,
-		const struct fx_render_box_shadow_options *options);
+void fx_render_pass_add_box_shadow(struct fx_render_pass *pass,
+		const struct fx_render_box_shadow_options *fx_options);
 
 /**
  * Render blur.
  */
-void fx_render_pass_add_blur(struct fx_gles_render_pass *pass,
-		struct fx_render_blur_pass_options *fx_options);
+void fx_render_pass_add_blur(struct fx_render_pass *pass,
+		const struct fx_render_blur_pass_options *fx_options);
 
 /**
  * Render optimized blur.
  */
-bool fx_render_pass_add_optimized_blur(struct fx_gles_render_pass *pass,
-		struct fx_render_blur_pass_options *fx_options);
+bool fx_render_pass_add_optimized_blur(struct fx_render_pass *pass,
+		const struct fx_render_blur_pass_options *fx_options);
 
 /**
  * Render from one buffer to another
  */
-void fx_render_pass_read_to_buffer(struct fx_gles_render_pass *pass,
-		pixman_region32_t *region, struct fx_framebuffer *dst_buffer,
-		struct fx_framebuffer *src_buffer);
+void fx_render_pass_read_to_buffer(struct fx_render_pass *pass,
+		const pixman_region32_t *region, struct wlr_buffer *dst_buffer,
+		struct wlr_buffer *src_buffer);
+
+void fx_render_pass_save_blur_region(struct fx_render_pass *render_pass);
+
+void fx_render_pass_apply_saved_blur_region(struct fx_render_pass *render_pass);
 
 #endif

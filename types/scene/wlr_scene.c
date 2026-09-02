@@ -3314,11 +3314,17 @@ bool wlr_scene_output_build_state(struct wlr_scene_output *scene_output,
 		pixman_region32_init(&original_damage);
 		pixman_region32_copy(&original_damage, &render_data.damage);
 
-		// Only compensate for blur artifacts when the damage doesn't span
+		// Only compensate for blur artifacts when the damage doesn't cover
 		// the whole output
+		const pixman_box32_t output_box = {
+			.x1 = 0,
+			.y1 = 0,
+			.x2 = buffer->width,
+			.y2 = buffer->height,
+		};
 		const bool full_damage =
-			original_damage.extents.x2 - original_damage.extents.x1 >= output->width
-			&& original_damage.extents.y2 - original_damage.extents.y1 >= output->height;
+			pixman_region32_contains_rectangle(&original_damage, &output_box) ==
+			PIXMAN_REGION_IN;
 
 		// The extra region we copy and paste onto the framebuffer after render
 		// for artifact removal

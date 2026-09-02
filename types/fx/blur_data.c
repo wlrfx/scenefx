@@ -23,9 +23,6 @@ bool blur_data_should_parameters_blur_effects(struct blur_data *blur_data) {
 }
 
 int blur_data_calc_size(struct blur_data *blur_data) {
-	// Converting an out-of-range double to int is undefined behavior, not
-	// defined wraparound, so clamp num_passes/radius here too rather than
-	// trusting the setter-level clamp to always run first.
 	int num_passes = blur_data_clamp_num_passes(blur_data->num_passes);
 	float radius = blur_data_clamp_radius(blur_data->radius);
 	return pow(2, num_passes + 1) * radius;

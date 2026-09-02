@@ -1329,8 +1329,7 @@ void wlr_scene_optimized_blur_set_size(struct wlr_scene_optimized_blur *blur_nod
 }
 
 void wlr_scene_optimized_blur_mark_dirty(struct wlr_scene_optimized_blur *blur_node) {
-	// Skip re-rendering the optimized blur if there's no blur node or it's
-	// disabled
+	// Skip re-rendering the optimized blur if the blur node is disabled
 	if (!blur_node || !blur_node->node.enabled) {
 		return;
 	}

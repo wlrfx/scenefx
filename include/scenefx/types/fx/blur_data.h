@@ -13,14 +13,10 @@ struct blur_data {
 	float saturation;
 };
 
-// Sane, documented bounds for blur_data.num_passes/radius. blur_data_calc_size()
-// feeds pow(2, num_passes + 1) into an int cast, so num_passes needs to stay
-// low enough that the result can't leave int range.
+// num_passes needs to stay low enough that blur_data_calc_size() can't leave int range
 #define BLUR_DATA_MAX_NUM_PASSES 10
 #define BLUR_DATA_MAX_RADIUS 100
 
-// Clamp num_passes/radius to [0, BLUR_DATA_MAX_*], same pattern as
-// corner_radius_clamp() in clipped_region.h.
 static __always_inline int blur_data_clamp_num_passes(int num_passes) {
 	if (num_passes < 0) {
 		return 0;

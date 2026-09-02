@@ -993,7 +993,8 @@ static struct fx_framebuffer *get_main_buffer_blur(struct fx_gles_render_pass *p
 	if (fx_options->blur_strength <= 0 || !is_scene_blur_enabled(&blur_data)) {
 		return NULL;
 	}
-	fx_options->blur_data = &blur_data;
+	// avoid dangling pointer to this stack frame
+	*fx_options->blur_data = blur_data;
 	fx_options->tex_options.base.transform = WL_OUTPUT_TRANSFORM_NORMAL;
 
 	pixman_region32_t damage;

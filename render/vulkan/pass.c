@@ -279,7 +279,11 @@ static void blur_padding_copy(struct fx_render_pass *fx_pass,
 		renderer->saved_pixels.initialised = true;
 	}
 
-	wlr_vk_render_pass_resume(fx_pass->render_pass);
+	if (!wlr_vk_render_pass_resume(fx_pass->render_pass)) {
+		wlr_log(WLR_ERROR, "Failed to resume the scene render pass after the "
+			"blur padding %s; subsequent commands are recorded outside it",
+			save ? "save" : "restore");
+	}
 }
 
 static void vk_render_pass_read_to_buffer(struct fx_render_pass *fx_pass,
@@ -528,7 +532,7 @@ static void render_blur_step(struct vk_render_pass *pass,
 		.radius = radius,
 	};
 
-	VkPipelineLayout layout = renderer->shader_info.blur1.pipeline_layout;
+	VkPipelineLayout layout = blur_pipeline->pipeline_layout;
 	vkCmdBindPipeline(cb, VK_PIPELINE_BIND_POINT_GRAPHICS,
 		blur_pipeline->pipeline.pipeline);
 	vkCmdBindDescriptorSets(cb, VK_PIPELINE_BIND_POINT_GRAPHICS, layout,
@@ -676,7 +680,7 @@ static void vk_render_pass_add_blur(struct fx_render_pass *fx_pass,
 		.noise = blur_data.noise,
 	};
 
-	VkPipelineLayout layout = renderer->shader_info.blur_effects.pipeline_layout;
+	VkPipelineLayout layout = pipelines->blur_effects->pipeline_layout;
 	VkDescriptorSet result_ds = renderer->effect_images[result_index].ds;
 	vkCmdBindPipeline(cb, VK_PIPELINE_BIND_POINT_GRAPHICS,
 		pipelines->blur_effects->pipeline.pipeline);

@@ -426,7 +426,9 @@ static bool create_blur_shader_info(struct vk_renderer *renderer,
 			.stageFlags = VK_SHADER_STAGE_VERTEX_BIT,
 		},
 		{
-			.offset = pc_ranges[0].size,
+			// Must not be written as pc_ranges[0].size: reading the array
+			// while it is still being initialised is unspecified.
+			.offset = sizeof(struct vk_vert_pcr_data),
 			.size = frag_pcr_size,
 			.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT,
 		},
@@ -580,6 +582,7 @@ static struct vk_pipeline_blur *create_one_blur_pipeline(struct vk_renderer *ren
 		free(blur);
 		return NULL;
 	}
+	blur->pipeline_layout = shader->pipeline_layout;
 	return blur;
 }
 

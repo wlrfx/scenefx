@@ -86,6 +86,10 @@ struct vk_frag_blur_effects_pcr_data {
 
 struct vk_pipeline_blur {
 	struct vk_pipeline pipeline;
+	// Layout of the shader this pipeline was created from. The blur layouts
+	// are currently identical, so binding through any of them happens to
+	// work, but that is not something to rely on.
+	VkPipelineLayout pipeline_layout;
 };
 
 // Sampling path for the blur passes: a single combined image sampler at

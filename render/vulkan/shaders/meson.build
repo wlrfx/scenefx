@@ -1,6 +1,9 @@
 vulkan_shaders_src = [
 	'common.vert',
 	'quad.frag',
+	'blur1.frag',
+	'blur2.frag',
+	'blur_effects.frag',
 ]
 
 vulkan_shaders = []

@@ -16,6 +16,12 @@
 static inline void free_shaders(struct vk_renderer *vk_renderer) {
 	vk_shader_info_delete(vk_renderer, &vk_renderer->shader_info.quad);
 
+	vk_shader_info_delete(vk_renderer, &vk_renderer->shader_info.blur1);
+	vk_shader_info_delete(vk_renderer, &vk_renderer->shader_info.blur2);
+	vk_shader_info_delete(vk_renderer, &vk_renderer->shader_info.blur_effects);
+	// Must come after the pipeline layouts above, which reference this layout.
+	vk_tex_ds_layout_destroy(vk_renderer);
+
 	// TODO:
 	// push_fx_debug(vk_renderer);
 	// delete_quad_programs(&vk_renderer->shaders.quad);
@@ -44,6 +50,20 @@ static bool link_shaders(struct vk_renderer *renderer) {
 
 	if (!vk_shader_info_create_quad(renderer)) {
 		wlr_log(WLR_ERROR, "Could not link quad shaders");
+		goto error;
+	}
+
+	// blur fragment shaders (dual-Kawase down/up plus the effects pass)
+	if (!vk_shader_info_create_blur1(renderer)) {
+		wlr_log(WLR_ERROR, "Could not link blur1 shader");
+		goto error;
+	}
+	if (!vk_shader_info_create_blur2(renderer)) {
+		wlr_log(WLR_ERROR, "Could not link blur2 shader");
+		goto error;
+	}
+	if (!vk_shader_info_create_blur_effects(renderer)) {
+		wlr_log(WLR_ERROR, "Could not link blur_effects shader");
 		goto error;
 	}
 
@@ -163,6 +183,11 @@ static void renderer_destroy(struct fx_renderer *fx_renderer) {
 	wl_list_for_each_safe(render_setup, render_setup_tmp, &vk_renderer->render_setups, link) {
 		vk_render_setup_destroy(vk_renderer, render_setup);
 	}
+
+	// Blur targets must go before the descriptor pool and layout in
+	// free_shaders(), since their descriptor sets are allocated from it.
+	vk_effect_images_finish(vk_renderer);
+	vk_saved_pixels_finish(vk_renderer);
 
 	free_shaders(vk_renderer);
 

@@ -16,6 +16,7 @@ Plenty of popular wayland compositors are using SceneFX to render eyecandy, incl
 ## Installation
 <a href="https://repology.org/project/scenefx/versions"><img src="https://repology.org/badge/vertical-allrepos/scenefx.svg"/></a>
 
+Scenefx is also available in <a href="https://copr.fedorainfracloud.org/coprs/damiand/scenefx/">copr</a> repositories. Enable via `dnf copr enable damiand/scenefx` and install via `dnf install scenefx scenefx-devel`
 
 ## Compiling From Source
 Install dependencies:

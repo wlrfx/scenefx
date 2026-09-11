@@ -1147,12 +1147,37 @@ int main(int argc, char *argv[]) {
 
 	/* Create all of the basic scene layers */
 	server.layers.bottom_layer = wlr_scene_tree_create(&server.scene->tree);
+
 	/* Add a bottom rect to demonstrate optimized blur */
-	float bottom_rect_color[4] = { 1, 1, 1, 1 };
-	wlr_scene_rect_create(server.layers.bottom_layer, 200, 200, bottom_rect_color);
+	float bottom_rect_color[] = { 
+		1.0f, 1.0f, 1.0f, 1.0f, // White
+		0.0f, 1.0f, 0.0f, 1.0f, // Green
+	    0.0f, 0.0f, 1.0f, 1.0f, // Blue
+	};
+	struct wlr_scene_rect *bottom_rect = wlr_scene_rect_create(server.layers.bottom_layer,
+			200, 200, bottom_rect_color);
+	wlr_scene_rect_set_gradient(
+		bottom_rect,
+		(struct gradient) {
+			.kind = GRADIENT_CONIC,
+			.angle = 45.0,
+			.range = (struct wlr_box) {
+				.x = 0,
+				.y = 0,
+				.width = 200,
+				.height = 200,
+			},
+			.origin = { 0.25, 0.25 },
+			.blend = true,
+			.colors_size = 3,
+			.colors = bottom_rect_color,
+		}
+	);
+
 	/* Set the size later */
 	server.layers.blur_layer = wlr_scene_optimized_blur_create(&server.scene->tree, 0, 0);
 	server.layers.toplevel_layer = wlr_scene_tree_create(&server.scene->tree);
+
 	/* Add a top rect that won't get blurred by optimized */
 	float top_rect_color[4] = { 1, 0, 0, 1 };
 	struct wlr_scene_rect *rect = wlr_scene_rect_create(server.layers.toplevel_layer,

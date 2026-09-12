@@ -100,3 +100,5 @@ The links below are helpful when learning how to use tracy:
 
 ---
 [Join our Discord](https://discord.gg/qsSx397rkh)
+
+[Check out the wiki](https://wlrfx.github.io/wiki/data/scenefx/index.html)

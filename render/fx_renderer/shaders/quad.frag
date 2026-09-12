@@ -46,7 +46,9 @@ vec4 gradient(int kind, vec4 colors[MAX_GRADIENT_COLORS], int count, vec2 uv,
 	vec2 origin, float angle, bool blend);
 #endif
 
-float corner_alpha(vec2 size, vec2 position, bool is_cutout,
+uniform float rounding_power;
+
+float corner_alpha(vec2 size, vec2 position, bool is_cutout, float rounding_power,
 		float radius_tl, float radius_tr, float radius_bl, float radius_br);
 
 void main() {
@@ -58,6 +60,7 @@ void main() {
 			clip_size - 1.0,
 			clip_position + 0.5,
 			true,
+			rounding_power,
 			clip_radius_top_left,
 			clip_radius_top_right,
 			clip_radius_bottom_left,
@@ -70,7 +73,7 @@ void main() {
 		out_color = color;
 	} else if(fill_type == FILL_GRADIENT) {
 #if EFFECTS_GRADIENT
-		// UVs of the rect may be calculated as 
+		// UVs of the rect may be calculated as
 	    //	 vec2 uv = (gl_FragCoord.xy - position) / size;
 		// But we instead remap UVs so that they adhere to the sizing of
 		// gradient_box+gradient_size.

@@ -335,12 +335,19 @@ static bool apply_clip_region(pixman_region32_t *clip_region,
 		float right = fmax(corners->top_right, corners->bottom_right);
 
 		pixman_region32_t user_clip_region;
+		// TODO: A factor of 0.5 makes the inner clip square tightly fitting for
+		//       rounding power equal 1. For higher rounding powers a smaller
+		//       factor would produce a better fitting clip square. The factor
+		//       could be calculated as
+		//         f = 1 / 2^(1 / p)
+		//       where p is the rounding power.
+		float const factor = 0.5;
 		pixman_region32_init_rect(
 			&user_clip_region,
-			clipped_region_box->x + (left * 0.3),
-			clipped_region_box->y + (top * 0.3),
-			fmax(clipped_region_box->width - (left + right) * 0.3, 0),
-			fmax(clipped_region_box->height - (top + bottom) * 0.3, 0)
+			clipped_region_box->x + (left * factor),
+			clipped_region_box->y + (top * factor),
+			fmax(clipped_region_box->width - (left + right) * factor, 0),
+			fmax(clipped_region_box->height - (top + bottom) * factor, 0)
 		);
 		pixman_region32_subtract(clip_region, clip_region, &user_clip_region);
 		pixman_region32_fini(&user_clip_region);
@@ -599,6 +606,7 @@ void fx_render_pass_add_rect(struct fx_gles_render_pass *pass,
 		glUniform2f(shader.position, box.x, box.y);
 		glUniform1i(shader.effects_clip, should_clip);
 		glUniform1i(shader.fill_type, fx_options->fill_type);
+		glUniform1f(shader.rounding_power, fx_options->rounding_power > 0.0f ? fx_options->rounding_power : 2.0f);
 
 		switch(fx_options->fill_type) {
 			case FILL_SOLID_COLOR:
@@ -708,6 +716,7 @@ void fx_render_pass_add_rounded_rect(struct fx_gles_render_pass *pass,
 	set_proj_matrix(shader.proj, pass->projection_matrix, &box);
 	glUniform1i(shader.effects_clip, 1);
 	glUniform1i(shader.fill_type, fx_options->fill_type);
+	glUniform1f(shader.rounding_power, fx_options->rounding_power > 0.0f ? fx_options->rounding_power : 2.0f);
 
 	switch(fx_options->fill_type) {
 		case FILL_SOLID_COLOR:

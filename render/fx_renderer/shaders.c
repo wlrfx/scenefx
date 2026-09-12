@@ -135,7 +135,7 @@ bool link_quad_program(struct quad_shader *shader, int32_t max_gradient_colors) 
 		});	
 	// TODO: Automatic adjustment of buffer size. Effectively string
 	//       concatenation.
-	GLchar quad_src[3 * 4096];
+	GLchar quad_src[4 * 4096];
 	snprintf(quad_src, sizeof(quad_src),
 		"%s\n%s\n%s\n%s", shader_defines, quad_frag_src, gradient_frag_src, corner_alpha_frag_src);
 	free(shader_defines);
@@ -174,6 +174,8 @@ bool link_quad_program(struct quad_shader *shader, int32_t max_gradient_colors) 
 	shader->effects.clip_radius.bottom_left = glGetUniformLocation(prog, "clip_radius_bottom_left");
 	shader->effects.clip_radius.bottom_right = glGetUniformLocation(prog, "clip_radius_bottom_right");
 
+	shader->rounding_power = glGetUniformLocation(prog, "rounding_power");
+
 	return true;
 }
 
@@ -183,7 +185,7 @@ bool link_quad_round_program(struct quad_round_shader *shader, int32_t max_gradi
 		});	
 	// TODO: Automatic adjustment of buffer size. Effectively string
 	//       concatenation.
-	GLchar quad_src[3 * 4096];
+	GLchar quad_src[4 * 4096];
 	snprintf(quad_src, sizeof(quad_src),
 		"%s\n%s\n%s\n%s", shader_defines, quad_round_frag_src, gradient_frag_src, corner_alpha_frag_src);
 	free(shader_defines);
@@ -225,6 +227,8 @@ bool link_quad_round_program(struct quad_round_shader *shader, int32_t max_gradi
 	shader->clip_radius.top_right = glGetUniformLocation(prog, "clip_radius_top_right");
 	shader->clip_radius.bottom_left = glGetUniformLocation(prog, "clip_radius_bottom_left");
 	shader->clip_radius.bottom_right = glGetUniformLocation(prog, "clip_radius_bottom_right");
+
+	shader->rounding_power = glGetUniformLocation(prog, "rounding_power");
 
 	return true;
 }

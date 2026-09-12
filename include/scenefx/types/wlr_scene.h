@@ -168,6 +168,7 @@ struct wlr_scene_rect {
 
 	bool accepts_input;
 	struct clipped_region clipped_region;
+	float rounding_power;
 };
 
 /** A scene-graph node displaying a shadow */
@@ -565,6 +566,12 @@ void wlr_scene_rect_set_corner_radius(struct wlr_scene_rect *rect, int corner_ra
  * Change the rounded corners of an existing rectangle node.
  */
 void wlr_scene_rect_set_corner_radii(struct wlr_scene_rect *rect, struct fx_corner_radii);
+
+/**
+ * Sets the corner rounding power of an existing rectangle node (default 2.0).
+ * 1.0 = triangular corners, 2.0 = round corners, >2.0 = superellipse.
+ */
+void wlr_scene_rect_set_rounding_power(struct wlr_scene_rect *rect, float rounding_power);
 
 /**
  * Sets the region where to clip the rect.

@@ -53,6 +53,8 @@ struct quad_shader {
 	GLint gradient_colors_size;
 	GLint gradient_blend;
 
+	GLint rounding_power;
+
 	// Only used for the effects shader
 	struct {
 		GLint clip_size;
@@ -83,6 +85,8 @@ struct quad_round_shader {
 	GLint gradient_origin;
 	GLint gradient_colors_size;
 	GLint gradient_blend;
+
+	GLint rounding_power;
 
 	struct shader_corner_radii radius;
 

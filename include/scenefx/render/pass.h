@@ -8,6 +8,8 @@
 
 #include "render/egl.h"
 #include "types/fx/clipped_region.h"
+#include "scenefx/types/fx/gradient.h"
+#include "scenefx/types/wlr_scene.h"
 
 struct fx_gles_render_pass {
 	struct wlr_render_pass base;
@@ -27,20 +29,6 @@ struct fx_gles_render_pass {
 	struct fx_offscreen_buffers *fx_offscreen_buffers;
 };
 
-struct fx_gradient {
-	float degree;
-	/* The full area the gradient fit too, for borders use the window size */
-	struct wlr_box range;
-	/* The center of the gradient, {0.5, 0.5} for normal*/
-	float origin[2];
-	/* 1 = Linear, 2 = Conic */
-	int linear;
-	/* Whether or not to blend the colors */
-	int blend;
-	int count;
-	float *colors;
-};
-
 struct fx_render_texture_options {
 	struct wlr_render_texture_options base;
 	const struct wlr_box *clip_box; // Used to clip csd. Ignored if NULL
@@ -52,23 +40,18 @@ struct fx_render_texture_options {
 struct fx_render_rect_options {
 	struct wlr_render_rect_options base;
 	struct clipped_fregion clipped_region;
-};
-
-struct fx_render_rect_grad_options {
-	struct wlr_render_rect_options base;
-	struct fx_gradient gradient;
+	enum wlr_scene_rect_fill_type fill_type;
+	struct gradient gradient;
+	float rounding_power;
 };
 
 struct fx_render_rounded_rect_options {
 	struct wlr_render_rect_options base;
 	struct fx_corner_fradii corners;
 	struct clipped_fregion clipped_region;
-};
-
-struct fx_render_rounded_rect_grad_options {
-	struct wlr_render_rect_options base;
-	struct fx_gradient gradient;
-	struct fx_corner_fradii corners;
+	enum wlr_scene_rect_fill_type fill_type;
+	struct gradient gradient;
+	float rounding_power;
 };
 
 struct fx_render_box_shadow_options {
@@ -115,22 +98,10 @@ void fx_render_pass_add_rect(struct fx_gles_render_pass *render_pass,
 	const struct fx_render_rect_options *options);
 
 /**
- * Render a rectangle with a gradient.
- */
-void fx_render_pass_add_rect_grad(struct fx_gles_render_pass *render_pass,
-	const struct fx_render_rect_grad_options *options);
-
-/**
  * Render a rounded rectangle.
  */
 void fx_render_pass_add_rounded_rect(struct fx_gles_render_pass *render_pass,
 	const struct fx_render_rounded_rect_options *options);
-
-/**
- * Render a rounded rectangle with a gradient.
- */
-void fx_render_pass_add_rounded_rect_grad(struct fx_gles_render_pass *render_pass,
-	const struct fx_render_rounded_rect_grad_options *options);
 
 /**
  * Render a box shadow.

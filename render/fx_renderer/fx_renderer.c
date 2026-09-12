@@ -512,9 +512,9 @@ struct wlr_renderer *fx_renderer_create_egl(struct wlr_egl *egl) {
 			"glDebugMessageControlKHR");
 	}
 
-	// TODO: the rest of the gl checks
-	if (check_gl_ext(exts_str, "GL_OES_EGL_image_external")) {
-		renderer->exts.OES_egl_image_external = true;
+	// The GLES 3.0 version of `GL_OES_EGL_image_external`
+	if (check_gl_ext(exts_str, "GL_OES_EGL_image_external_essl3")) {
+		renderer->exts.OES_egl_image_external_essl3 = true;
 		load_gl_proc(&renderer->procs.glEGLImageTargetTexture2DOES,
 			"glEGLImageTargetTexture2DOES");
 	}

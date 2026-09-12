@@ -158,7 +158,7 @@ struct fx_renderer {
 	struct {
 		bool EXT_read_format_bgra;
 		bool KHR_debug;
-		bool OES_egl_image_external;
+		bool OES_egl_image_external_essl3;
 		bool OES_egl_image;
 		bool EXT_texture_type_2_10_10_10_REV;
 		bool OES_texture_half_float_linear;

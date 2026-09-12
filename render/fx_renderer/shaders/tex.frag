@@ -1,3 +1,5 @@
+#version 320 es
+
 #define SOURCE %d
 #define EFFECTS %d
 
@@ -10,16 +12,12 @@
 #endif
 
 #if SOURCE == SOURCE_TEXTURE_EXTERNAL
-#extension GL_OES_EGL_image_external : require
+#extension GL_OES_EGL_image_external_essl3 : require
 #endif
 
-#ifdef GL_FRAGMENT_PRECISION_HIGH
 precision highp float;
-#else
-precision mediump float;
-#endif
 
-varying vec2 v_texcoord;
+in vec2 v_texcoord;
 
 #if SOURCE == SOURCE_TEXTURE_EXTERNAL
 uniform samplerExternalOES tex;
@@ -47,11 +45,13 @@ uniform float clip_radius_bottom_right;
 
 uniform bool discard_transparent;
 
+out vec4 fragColor;
+
 vec4 sample_texture() {
 #if SOURCE == SOURCE_TEXTURE_RGBA || SOURCE == SOURCE_TEXTURE_EXTERNAL
-	return texture2D(tex, v_texcoord);
+	return texture(tex, v_texcoord);
 #elif SOURCE == SOURCE_TEXTURE_RGBX
-	return vec4(texture2D(tex, v_texcoord).rgb, 1.0);
+	return vec4(texture(tex, v_texcoord).rgb, 1.0);
 #endif
 }
 
@@ -83,12 +83,12 @@ void main() {
 		clip_radius_bottom_right
 	);
 
-	gl_FragColor = sample_texture() * alpha * quad_corner_alpha * clip_corner_alpha;
+	fragColor = sample_texture() * alpha * quad_corner_alpha * clip_corner_alpha;
 #else
-	gl_FragColor = sample_texture() * alpha;
+	fragColor = sample_texture() * alpha;
 #endif
 
-	if (discard_transparent && gl_FragColor.a == 0.0) {
+	if (discard_transparent && fragColor.a == 0.0) {
 		discard;
 	}
 }

@@ -40,7 +40,6 @@ struct quad_shader {
 	GLint size;
 	GLint position;
 
-	GLint effects_clip;
 	GLint fill_type;
 
 	int gradient_max_colors;
@@ -53,49 +52,22 @@ struct quad_shader {
 	GLint gradient_colors_size;
 	GLint gradient_blend;
 
-	GLint rounding_power;
-
-	// Only used for the effects shader
 	struct {
-		GLint clip_size;
-		GLint clip_position;
-		struct shader_corner_radii clip_radius;
+		struct {
+			GLint enabled;
+			GLint size;
+			GLint position;
+			struct shader_corner_radii radius;
+		} clip;
+		struct {
+			GLint enabled;
+			GLint power;
+			struct shader_corner_radii radius;
+		} rounding;
 	} effects;
 };
 
 bool link_quad_program(struct quad_shader *shader, int32_t max_gradient_colors);
-
-struct quad_round_shader {
-	GLuint program;
-	GLint proj;
-	GLint color;
-	GLint pos_attrib;
-	GLint size;
-	GLint position;
-
-	GLint effects_clip;
-	GLint fill_type;
-
-	int gradient_max_colors;
-	GLint gradient_colors;
-	GLint gradient_size;
-	GLint gradient_angle;
-	GLint gradient_box;
-	GLint gradient_kind;
-	GLint gradient_origin;
-	GLint gradient_colors_size;
-	GLint gradient_blend;
-
-	GLint rounding_power;
-
-	struct shader_corner_radii radius;
-
-	GLint clip_size;
-	GLint clip_position;
-	struct shader_corner_radii clip_radius;
-};
-
-bool link_quad_round_program(struct quad_round_shader *shader, int32_t max_gradient_colors);
 
 struct tex_shader {
 	GLuint program;

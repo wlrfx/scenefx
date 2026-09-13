@@ -37,21 +37,21 @@ struct fx_render_texture_options {
 	struct clipped_fregion clipped_region;
 };
 
-struct fx_render_rect_options {
-	struct wlr_render_rect_options base;
-	struct clipped_fregion clipped_region;
-	enum wlr_scene_rect_fill_type fill_type;
-	struct gradient gradient;
-	float rounding_power;
+struct fx_rounding_options {
+	struct fx_corner_fradii radius;
+	// The rounding power of corners. Defaults to 2.0 if not set to a positive
+	// value.
+	float power;
 };
 
-struct fx_render_rounded_rect_options {
+struct fx_render_rect_options {
 	struct wlr_render_rect_options base;
-	struct fx_corner_fradii corners;
-	struct clipped_fregion clipped_region;
+	// Corner rounding options. Set to NULL to disable.
+	struct fx_rounding_options const* rounding;
+	// Clip region. Set to NULL to disable.
+	struct clipped_fregion const* clipped_region;
 	enum wlr_scene_rect_fill_type fill_type;
 	struct gradient gradient;
-	float rounding_power;
 };
 
 struct fx_render_box_shadow_options {
@@ -96,12 +96,6 @@ void fx_render_pass_add_texture(struct fx_gles_render_pass *render_pass,
  */
 void fx_render_pass_add_rect(struct fx_gles_render_pass *render_pass,
 	const struct fx_render_rect_options *options);
-
-/**
- * Render a rounded rectangle.
- */
-void fx_render_pass_add_rounded_rect(struct fx_gles_render_pass *render_pass,
-	const struct fx_render_rounded_rect_options *options);
 
 /**
  * Render a box shadow.

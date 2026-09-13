@@ -15,7 +15,6 @@
 #include "gradient_frag_src.h"
 #include "corner_alpha_frag_src.h"
 #include "quad_frag_src.h"
-#include "quad_round_frag_src.h"
 #include "tex_frag_src.h"
 #include "box_shadow_frag_src.h"
 #include "blur1_frag_src.h"
@@ -155,7 +154,21 @@ bool link_quad_program(struct quad_shader *shader, int32_t max_gradient_colors) 
 	shader->size = glGetUniformLocation(prog, "size");
 	shader->position = glGetUniformLocation(prog, "position");
 
-	shader->effects_clip = glGetUniformLocation(prog, "effects_clip");
+	shader->effects.clip.enabled = glGetUniformLocation(prog, "effects_clip");
+	shader->effects.clip.size = glGetUniformLocation(prog, "clip_size");
+	shader->effects.clip.position = glGetUniformLocation(prog, "clip_position");
+	shader->effects.clip.radius.top_left = glGetUniformLocation(prog, "clip_radius_top_left");
+	shader->effects.clip.radius.top_right = glGetUniformLocation(prog, "clip_radius_top_right");
+	shader->effects.clip.radius.bottom_left = glGetUniformLocation(prog, "clip_radius_bottom_left");
+	shader->effects.clip.radius.bottom_right = glGetUniformLocation(prog, "clip_radius_bottom_right");
+
+	shader->effects.rounding.enabled = glGetUniformLocation(prog, "effects_rounding");
+	shader->effects.rounding.radius.top_left = glGetUniformLocation(prog, "radius_top_left");
+	shader->effects.rounding.radius.top_right = glGetUniformLocation(prog, "radius_top_right");
+	shader->effects.rounding.radius.bottom_left = glGetUniformLocation(prog, "radius_bottom_left");
+	shader->effects.rounding.radius.bottom_right = glGetUniformLocation(prog, "radius_bottom_right");
+	shader->effects.rounding.power = glGetUniformLocation(prog, "rounding_power");
+
 	shader->fill_type = glGetUniformLocation(prog, "fill_type");
 
 	shader->gradient_kind = glGetUniformLocation(prog, "gradient_kind");
@@ -166,69 +179,6 @@ bool link_quad_program(struct quad_shader *shader, int32_t max_gradient_colors) 
 	shader->gradient_blend = glGetUniformLocation(prog, "gradient_blend");
 	shader->gradient_box = glGetUniformLocation(prog, "gradient_box");
 	shader->gradient_origin = glGetUniformLocation(prog, "gradient_origin");
-
-	shader->effects.clip_size = glGetUniformLocation(prog, "clip_size");
-	shader->effects.clip_position = glGetUniformLocation(prog, "clip_position");
-	shader->effects.clip_radius.top_left = glGetUniformLocation(prog, "clip_radius_top_left");
-	shader->effects.clip_radius.top_right = glGetUniformLocation(prog, "clip_radius_top_right");
-	shader->effects.clip_radius.bottom_left = glGetUniformLocation(prog, "clip_radius_bottom_left");
-	shader->effects.clip_radius.bottom_right = glGetUniformLocation(prog, "clip_radius_bottom_right");
-
-	shader->rounding_power = glGetUniformLocation(prog, "rounding_power");
-
-	return true;
-}
-
-bool link_quad_round_program(struct quad_round_shader *shader, int32_t max_gradient_colors) {
-	GLchar* shader_defines = print_quad_shader_defines((struct quad_shader_defines){
-			.max_gradient_colors = max_gradient_colors,
-		});	
-	// TODO: Automatic adjustment of buffer size. Effectively string
-	//       concatenation.
-	GLchar quad_src[4 * 4096];
-	snprintf(quad_src, sizeof(quad_src),
-		"%s\n%s\n%s\n%s", shader_defines, quad_round_frag_src, gradient_frag_src, corner_alpha_frag_src);
-	free(shader_defines);
-
-	GLuint prog;
-	shader->program = prog = link_program(quad_src);
-	if (!shader->program) {
-		return false;
-	}
-
-	shader->gradient_max_colors = max_gradient_colors;
-
-	shader->proj = glGetUniformLocation(prog, "proj");
-	shader->color = glGetUniformLocation(prog, "color");
-	shader->pos_attrib = glGetAttribLocation(prog, "pos");
-	shader->size = glGetUniformLocation(prog, "size");
-	shader->position = glGetUniformLocation(prog, "position");
-
-	shader->effects_clip = glGetUniformLocation(prog, "effects_clip");
-	shader->fill_type = glGetUniformLocation(prog, "fill_type");
-
-	shader->gradient_kind = glGetUniformLocation(prog, "gradient_kind");
-	shader->gradient_colors = glGetUniformLocation(prog, "gradient_colors");
-	shader->gradient_colors_size = glGetUniformLocation(prog, "gradient_colors_size");
-	shader->gradient_size = glGetUniformLocation(prog, "gradient_size");
-	shader->gradient_angle = glGetUniformLocation(prog, "gradient_angle");
-	shader->gradient_blend = glGetUniformLocation(prog, "gradient_blend");
-	shader->gradient_box = glGetUniformLocation(prog, "gradient_box");
-	shader->gradient_origin = glGetUniformLocation(prog, "gradient_origin");
-
-	shader->radius.top_left = glGetUniformLocation(prog, "radius_top_left");
-	shader->radius.top_right = glGetUniformLocation(prog, "radius_top_right");
-	shader->radius.bottom_left = glGetUniformLocation(prog, "radius_bottom_left");
-	shader->radius.bottom_right = glGetUniformLocation(prog, "radius_bottom_right");
-
-	shader->clip_size = glGetUniformLocation(prog, "clip_size");
-	shader->clip_position = glGetUniformLocation(prog, "clip_position");
-	shader->clip_radius.top_left = glGetUniformLocation(prog, "clip_radius_top_left");
-	shader->clip_radius.top_right = glGetUniformLocation(prog, "clip_radius_top_right");
-	shader->clip_radius.bottom_left = glGetUniformLocation(prog, "clip_radius_bottom_left");
-	shader->clip_radius.bottom_right = glGetUniformLocation(prog, "clip_radius_bottom_right");
-
-	shader->rounding_power = glGetUniformLocation(prog, "rounding_power");
 
 	return true;
 }

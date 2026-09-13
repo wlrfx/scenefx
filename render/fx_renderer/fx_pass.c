@@ -41,10 +41,9 @@ struct fx_render_rect_options fx_render_rect_options_default(
 		const struct wlr_render_rect_options *base) {
 	struct fx_render_rect_options options = {
 		.base = *base,
-		.clipped_region = {
-			.area = { .0, .0, .0, .0 },
-			.corners = {0},
-		},
+		.clipped_region = NULL,
+		.rounding = NULL,
+		.fill_type = FILL_SOLID_COLOR,
 	};
 	return options;
 }
@@ -327,12 +326,16 @@ static void setup_blending(enum wlr_render_blend_mode mode) {
 }
 
 static bool apply_clip_region(pixman_region32_t *clip_region,
-		const struct wlr_box *clipped_region_box, const struct fx_corner_fradii *corners) {
-	if (!wlr_box_empty(clipped_region_box)) {
-		float top = fmax(corners->top_left, corners->top_right);
-		float bottom = fmax(corners->bottom_left, corners->bottom_right);
-		float left = fmax(corners->top_left, corners->bottom_left);
-		float right = fmax(corners->top_right, corners->bottom_right);
+		struct clipped_fregion const *const region) {
+	if(region == NULL) {
+		return false;
+	}
+
+	if (!wlr_box_empty(&region->area)) {
+		float top = fmax(region->corners.top_left, region->corners.top_right);
+		float bottom = fmax(region->corners.bottom_left, region->corners.bottom_right);
+		float left = fmax(region->corners.top_left, region->corners.bottom_left);
+		float right = fmax(region->corners.top_right, region->corners.bottom_right);
 
 		pixman_region32_t user_clip_region;
 		// TODO: A factor of 0.5 makes the inner clip square tightly fitting for
@@ -344,10 +347,10 @@ static bool apply_clip_region(pixman_region32_t *clip_region,
 		float const factor = 0.5;
 		pixman_region32_init_rect(
 			&user_clip_region,
-			clipped_region_box->x + (left * factor),
-			clipped_region_box->y + (top * factor),
-			fmax(clipped_region_box->width - (left + right) * factor, 0),
-			fmax(clipped_region_box->height - (top + bottom) * factor, 0)
+			region->area.x + (left * factor),
+			region->area.y + (top * factor),
+			fmax(region->area.width - (left + right) * factor, 0),
+			fmax(region->area.height - (top + bottom) * factor, 0)
 		);
 		pixman_region32_subtract(clip_region, clip_region, &user_clip_region);
 		pixman_region32_fini(&user_clip_region);
@@ -463,7 +466,7 @@ void fx_render_pass_add_texture(struct fx_gles_render_pass *pass,
 	}
 	const struct wlr_box clipped_region_box = fx_options->clipped_region.area;
 	struct fx_corner_fradii clipped_region_corners = fx_options->clipped_region.corners;
-	apply_clip_region(&clip_region, &clipped_region_box, &clipped_region_corners);
+	apply_clip_region(&clip_region, &fx_options->clipped_region);
 
 	glUseProgram(shader->program);
 
@@ -521,7 +524,7 @@ void fx_render_pass_add_rect(struct fx_gles_render_pass *pass,
 	struct wlr_buffer *wlr_buffer = pass->buffer->buffer;
 	wlr_render_rect_options_get_box(options, wlr_buffer, &box);
 
-	const bool should_clip = clipped_fregion_is_valid(&fx_options->clipped_region);
+	const bool should_clip = fx_options->clipped_region != NULL && clipped_fregion_is_valid(fx_options->clipped_region);
 
 	enum wlr_render_blend_mode blend_mode =
 		(color->a == 1.0 && !should_clip) ? WLR_RENDER_BLEND_MODE_NONE : options->blend_mode;
@@ -531,6 +534,7 @@ void fx_render_pass_add_rect(struct fx_gles_render_pass *pass,
 		box.x == 0 && box.y == 0 &&
 		box.width == wlr_buffer->width &&
 		box.height == wlr_buffer->height &&
+		fx_options->rounding == NULL &&
 		fx_options->fill_type == FILL_SOLID_COLOR;
 
 	TRACY_BOTH_ZONES_START(renderer);
@@ -543,17 +547,26 @@ void fx_render_pass_add_rect(struct fx_gles_render_pass *pass,
 		glClearColor(color->r, color->g, color->b, color->a);
 		glClear(GL_COLOR_BUFFER_BIT);
 	} else {
-		const struct wlr_box *clipped_region_box = &fx_options->clipped_region.area;
-		const struct fx_corner_fradii *clipped_region_corners = &fx_options->clipped_region.corners;
+		struct clipped_fregion const* const clip_options = fx_options->clipped_region;
+		struct fx_rounding_options const* const rounding_options = fx_options->rounding;
 
-		TRACY_ZONE_TEXT_f("Clip Box (WxH, X, Y): %dx%d, %d, %d",
-				clipped_region_box->width, clipped_region_box->height,
-				clipped_region_box->x, clipped_region_box->y);
-		TRACY_ZONE_TEXT_f("Clip Box Corners (TL, TR, BL, BR): %f, %f, %f, %f",
-				clipped_region_corners->top_left,
-				clipped_region_corners->top_right,
-				clipped_region_corners->bottom_left,
-				clipped_region_corners->bottom_right);
+		if(clip_options != NULL) {
+			TRACY_ZONE_TEXT_f("Clip Box (WxH, X, Y): %dx%d, %d, %d",
+				clip_options->area.width, clip_options->area.height,
+				clip_options->area.x, clip_options->area.y);
+			TRACY_ZONE_TEXT_f("Clip Box Rounding (TL, TR, BL, BR): %f, %f, %f, %f",
+				clip_options->corners.top_left,
+				clip_options->corners.top_right,
+				clip_options->corners.bottom_left,
+				clip_options->corners.bottom_right);
+		}
+		if(rounding_options != NULL) {
+			TRACY_ZONE_TEXT_f("Rounding (TL, TR, BL, BR): %f, %f, %f, %f",
+				rounding_options->radius.top_left,
+				rounding_options->radius.top_right,
+				rounding_options->radius.bottom_left,
+				rounding_options->radius.bottom_right);
+		}
 		switch(fx_options->fill_type) {
 			case FILL_SOLID_COLOR:
 				TRACY_ZONE_TEXT_f("Color RGBA: %f, %f, %f, %f", color->r, color->g, color->b, color->a);
@@ -584,7 +597,7 @@ void fx_render_pass_add_rect(struct fx_gles_render_pass *pass,
 			pixman_region32_init_rect(&clip_region, box.x, box.y, box.width, box.height);
 		}
 
-		apply_clip_region(&clip_region, clipped_region_box, clipped_region_corners);
+		apply_clip_region(&clip_region, clip_options);
 
 		bool const recompile = renderer->shaders.quad.gradient_max_colors <= fx_options->gradient.colors_size;
 		if (recompile) {
@@ -604,9 +617,7 @@ void fx_render_pass_add_rect(struct fx_gles_render_pass *pass,
 
 		glUniform2f(shader.size, box.width, box.height);
 		glUniform2f(shader.position, box.x, box.y);
-		glUniform1i(shader.effects_clip, should_clip);
 		glUniform1i(shader.fill_type, fx_options->fill_type);
-		glUniform1f(shader.rounding_power, fx_options->rounding_power > 0.0f ? fx_options->rounding_power : 2.0f);
 
 		switch(fx_options->fill_type) {
 			case FILL_SOLID_COLOR:
@@ -624,127 +635,28 @@ void fx_render_pass_add_rect(struct fx_gles_render_pass *pass,
 				break;
 		}
 
+		if(rounding_options != NULL) {
+			glUniform1i(shader.effects.rounding.enabled, true);
+			glUniform1f(shader.effects.rounding.power, rounding_options->power > 0.0f ? rounding_options->power : 2.0f);
+			struct fx_corner_fradii corners = rounding_options->radius;
+			uniform_corner_radii_set(&shader.effects.rounding.radius, &corners);
+		} else {
+			glUniform1i(shader.effects.rounding.enabled, false);
+		}
+
 		if (should_clip) {
-			glUniform2f(shader.effects.clip_size, clipped_region_box->width, clipped_region_box->height);
-			glUniform2f(shader.effects.clip_position, clipped_region_box->x, clipped_region_box->y);
-			uniform_corner_radii_set(&shader.effects.clip_radius, clipped_region_corners);
+			glUniform1i(shader.effects.clip.enabled, true);
+			glUniform2f(shader.effects.clip.size, clip_options->area.width, clip_options->area.height);
+			glUniform2f(shader.effects.clip.position, clip_options->area.x, clip_options->area.y);
+			uniform_corner_radii_set(&shader.effects.clip.radius, &clip_options->corners);
+		} else {
+			glUniform1i(shader.effects.clip.enabled, false);
 		}
 
 		render(&box, &clip_region, shader.pos_attrib);
 
 		pixman_region32_fini(&clip_region);
 	}
-
-	pop_fx_debug(renderer);
-	TRACY_BOTH_ZONES_END;
-}
-
-void fx_render_pass_add_rounded_rect(struct fx_gles_render_pass *pass,
-		const struct fx_render_rounded_rect_options *fx_options) {
-	const struct wlr_render_rect_options *options = &fx_options->base;
-
-	struct fx_renderer *renderer = pass->buffer->renderer;
-
-	const struct wlr_render_color *color = &options->color;
-	struct wlr_box box;
-	struct wlr_buffer *wlr_buffer = pass->buffer->buffer;
-	wlr_render_rect_options_get_box(options, wlr_buffer, &box);
-
-	bool const recompile = renderer->shaders.quad_round.gradient_max_colors <= fx_options->gradient.colors_size;
-	if (recompile) {
-		glDeleteProgram(renderer->shaders.quad_round.program);
-		if (!link_quad_round_program(&renderer->shaders.quad_round, fx_options->gradient.colors_size + 1)) {
-			wlr_log(WLR_ERROR, "Could not link 'quad_round' shader after updating gradient.colors_size to %d. Aborting renderer", fx_options->gradient.colors_size + 1);
-			abort();
-		}
-	}
-
-	pixman_region32_t clip_region;
-	if (options->clip) {
-		pixman_region32_init(&clip_region);
-		pixman_region32_copy(&clip_region, options->clip);
-	} else {
-		pixman_region32_init_rect(&clip_region, box.x, box.y, box.width, box.height);
-	}
-	const struct wlr_box *clipped_region_box = &fx_options->clipped_region.area;
-	const struct fx_corner_fradii *clipped_region_corners = &fx_options->clipped_region.corners;
-	apply_clip_region(&clip_region, clipped_region_box, clipped_region_corners);
-
-	TRACY_BOTH_ZONES_START(renderer);
-	TRACY_ZONE_TEXT_f("Box (WxH, X, Y): %dx%d, %d, %d", box.width, box.height, box.x, box.y);
-	TRACY_ZONE_TEXT_f("Clip Box (WxH, X, Y): %dx%d, %d, %d",
-			clipped_region_box->width, clipped_region_box->height,
-			clipped_region_box->x, clipped_region_box->y);
-	TRACY_ZONE_TEXT_f("Clip Box Corners (TL, TR, BL, BR): %f, %f, %f, %f",
-			clipped_region_corners->top_left,
-			clipped_region_corners->top_right,
-			clipped_region_corners->bottom_left,
-			clipped_region_corners->bottom_right);
-	TRACY_ZONE_TEXT_f("Corners (TL, TR, BL, BR): %f, %f, %f, %f",
-			clipped_region_corners->top_left,
-			clipped_region_corners->top_right,
-			clipped_region_corners->bottom_left,
-			clipped_region_corners->bottom_right);
-	switch(fx_options->fill_type) {
-		case FILL_SOLID_COLOR:
-			TRACY_ZONE_TEXT_f("Color RGBA: %f, %f, %f, %f", color->r, color->g, color->b, color->a);
-			break;
-		case FILL_GRADIENT:
-			TRACY_ZONE_TEXT_f("Gradient:");
-			TRACY_ZONE_TEXT_f("\tKind: %s",
-					fx_options->gradient.kind == GRADIENT_LINEAR ? "Linear"
-					: fx_options->gradient.kind == GRADIENT_RADIAL ? "Radial"
-					: fx_options->gradient.kind == GRADIENT_CONIC ? "Conic"
-					: "Unknown");
-			TRACY_ZONE_TEXT_f("\tNum Colors: %d", fx_options->gradient.colors_size);
-			TRACY_ZONE_TEXT_f("\tBlend: %d", fx_options->gradient.blend);
-			TRACY_ZONE_TEXT_f("\tAngle: %f", fx_options->gradient.angle);
-			TRACY_ZONE_TEXT_f("\tOrigin: %fx%f",
-					fx_options->gradient.origin[0], fx_options->gradient.origin[1]);
-			TRACY_ZONE_TEXT_f("\tRange (WxH, X, Y): %dx%d, %d, %d",
-					fx_options->gradient.range.width, fx_options->gradient.range.height,
-					fx_options->gradient.range.x, fx_options->gradient.range.y);
-			break;
-	}
-	push_fx_debug(renderer);
-
-	setup_blending(WLR_RENDER_BLEND_MODE_PREMULTIPLIED);
-
-	struct quad_round_shader shader = renderer->shaders.quad_round;
-	glUseProgram(shader.program);
-
-	set_proj_matrix(shader.proj, pass->projection_matrix, &box);
-	glUniform1i(shader.effects_clip, 1);
-	glUniform1i(shader.fill_type, fx_options->fill_type);
-	glUniform1f(shader.rounding_power, fx_options->rounding_power > 0.0f ? fx_options->rounding_power : 2.0f);
-
-	switch(fx_options->fill_type) {
-		case FILL_SOLID_COLOR:
-			glUniform4f(shader.color, color->r, color->g, color->b, color->a);
-			break;
-		case FILL_GRADIENT:
-			glUniform1i(shader.gradient_kind, fx_options->gradient.kind);
-			glUniform4fv(shader.gradient_colors, fx_options->gradient.colors_size, (GLfloat*)fx_options->gradient.colors);
-			glUniform1i(shader.gradient_colors_size, fx_options->gradient.colors_size);
-			glUniform1f(shader.gradient_angle, fx_options->gradient.angle);
-			glUniform1i(shader.gradient_blend, fx_options->gradient.blend);
-			glUniform2f(shader.gradient_box, fx_options->gradient.range.x, fx_options->gradient.range.y);
-			glUniform2f(shader.gradient_size, fx_options->gradient.range.width, fx_options->gradient.range.height);
-			glUniform2f(shader.gradient_origin, fx_options->gradient.origin[0], fx_options->gradient.origin[1]);
-			break;
-	}
-
-	glUniform2f(shader.size, box.width, box.height);
-	glUniform2f(shader.position, box.x, box.y);
-	glUniform2f(shader.clip_size, clipped_region_box->width, clipped_region_box->height);
-	glUniform2f(shader.clip_position, clipped_region_box->x, clipped_region_box->y);
-	uniform_corner_radii_set(&shader.clip_radius, clipped_region_corners);
-
-	struct fx_corner_fradii corners = fx_options->corners;
-	uniform_corner_radii_set(&shader.radius, &corners);
-
-	render(&box, &clip_region, renderer->shaders.quad_round.pos_attrib);
-	pixman_region32_fini(&clip_region);
 
 	pop_fx_debug(renderer);
 	TRACY_BOTH_ZONES_END;
@@ -766,7 +678,7 @@ void fx_render_pass_add_box_shadow(struct fx_gles_render_pass *pass,
 	}
 	const struct wlr_box clipped_region_box = options->clipped_region.area;
 	struct fx_corner_fradii clipped_region_corners = options->clipped_region.corners;
-	apply_clip_region(&clip_region, &clipped_region_box, &clipped_region_corners);
+	apply_clip_region(&clip_region, &options->clipped_region);
 
 	TRACY_BOTH_ZONES_START(renderer);
 	TRACY_ZONE_TEXT_f("Box (WxH, X, Y): %dx%d, %d, %d", box.width, box.height, box.x, box.y);

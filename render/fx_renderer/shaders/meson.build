@@ -6,7 +6,6 @@ shaders = [
 	'gradient.frag',
 	'corner_alpha.frag',
 	'quad.frag',
-	'quad_round.frag',
 	'tex.frag',
 	'box_shadow.frag',
 	'blur1.frag',

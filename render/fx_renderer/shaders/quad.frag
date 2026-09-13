@@ -20,6 +20,13 @@ varying vec2 v_texcoord;
 uniform vec2 size;
 uniform vec2 position;
 
+uniform bool effects_rounding;
+uniform float radius_top_left;
+uniform float radius_top_right;
+uniform float radius_bottom_left;
+uniform float radius_bottom_right;
+uniform float rounding_power;
+
 uniform bool effects_clip;
 uniform vec2 clip_size;
 uniform vec2 clip_position;
@@ -46,13 +53,25 @@ vec4 gradient(int kind, vec4 colors[MAX_GRADIENT_COLORS], int count, vec2 uv,
 	vec2 origin, float angle, bool blend);
 #endif
 
-uniform float rounding_power;
 
 float corner_alpha(vec2 size, vec2 position, bool is_cutout, float rounding_power,
 		float radius_tl, float radius_tr, float radius_bl, float radius_br);
 
 void main() {
 	float alpha = 1.0;
+
+	if(effects_rounding) {
+		alpha *= corner_alpha(
+			size - 1.0,
+			position + 0.5,
+			false,
+			rounding_power,
+			radius_top_left,
+			radius_top_right,
+			radius_bottom_left,
+			radius_bottom_right
+		);
+	}
 
 	if(effects_clip) {
 		// Clipping

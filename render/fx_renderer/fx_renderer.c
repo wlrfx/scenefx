@@ -84,7 +84,6 @@ static int fx_get_drm_fd(struct wlr_renderer *wlr_renderer) {
 static inline void free_shaders(struct fx_renderer *renderer) {
 	push_fx_debug(renderer);
 	glDeleteProgram(renderer->shaders.quad.program);
-	glDeleteProgram(renderer->shaders.quad_round.program);
 	glDeleteProgram(renderer->shaders.tex_rgba.program);
 	glDeleteProgram(renderer->shaders.tex_rgbx.program);
 	glDeleteProgram(renderer->shaders.tex_ext.program);
@@ -355,11 +354,6 @@ static bool link_shaders(struct fx_renderer *renderer) {
 	// quad fragment shader
 	if (!link_quad_program(&renderer->shaders.quad, 16)) {
 		wlr_log(WLR_ERROR, "Could not link quad shader");
-		goto error;
-	}
-
-	if (!link_quad_round_program(&renderer->shaders.quad_round, 16)) {
-		wlr_log(WLR_ERROR, "Could not link quad round shader");
 		goto error;
 	}
 

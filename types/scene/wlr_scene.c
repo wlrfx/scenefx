@@ -2051,35 +2051,34 @@ static void scene_entry_render(struct render_list_entry *entry, const struct ren
 			rect_color.a = scene_rect->color[3];
 		}
 
+		struct clipped_fregion clipped_region = {
+				.area = rect_clipped_region_box,
+				.corners = fx_corner_radii_scale(rect_clipped_corners, data->scale),
+		};
+
+		struct fx_rounding_options rounding = {
+			.radius = fx_corner_radii_scale(rect_corners, data->scale),
+			.power = scene_rect->rounding_power,
+		};
+
 		struct fx_render_rect_options rect_options = {
 			.base = {
 				.box = dst_box,
 				.color = rect_color,
 				.clip = &render_region,
 			},
-			.clipped_region = {
-				.area = rect_clipped_region_box,
-				.corners = fx_corner_radii_scale(rect_clipped_corners, data->scale),
-			},
+			.clipped_region = &clipped_region,
+			.rounding = NULL,
 			.fill_type = scene_rect->fill_type,
 			.gradient = scene_rect->gradient,
-			.rounding_power = scene_rect->rounding_power,
 		};
 
+		if(!fx_corner_radii_is_empty(&rect_corners)) { 
+			rect_options.rounding = &rounding;
+		} 
+
 		// TODO: Use the base wlr_render_pass_add_rect as a fast-path in the future
-		if (!fx_corner_radii_is_empty(&rect_corners)) {
-			struct fx_render_rounded_rect_options rounded_rect_options = {
-				.base = rect_options.base,
-				.corners = fx_corner_radii_scale(rect_corners, data->scale),
-				.clipped_region = rect_options.clipped_region,
-				.fill_type = scene_rect->fill_type,
-				.gradient = scene_rect->gradient,
-				.rounding_power = scene_rect->rounding_power,
-			};
-			fx_render_pass_add_rounded_rect(fx_pass, &rounded_rect_options);
-		} else {
-			fx_render_pass_add_rect(fx_pass, &rect_options);
-		}
+		fx_render_pass_add_rect(fx_pass, &rect_options);
 		break;
 	case WLR_SCENE_NODE_BUFFER:;
 		struct wlr_scene_buffer *scene_buffer = wlr_scene_buffer_from_node(node);

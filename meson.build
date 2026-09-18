@@ -181,6 +181,8 @@ scenefx_inc = include_directories('include')
 
 lib_scenefx = library(
 	versioned_name, scenefx_files,
+	version: version,
+	soversion: version_major,
 	dependencies: scenefx_deps,
 	include_directories:  [ scenefx_inc ],
 	install: true,

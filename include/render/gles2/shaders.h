@@ -2,11 +2,6 @@
 #define _FX_SHADERS_H
 
 #include <GLES2/gl2.h>
-#include <stdbool.h>
-#include <scenefx/types/fx/clipped_region.h>
-#include "types/fx/clipped_region.h"
-
-struct fx_renderer;
 
 GLuint compile_shader(GLuint type, const GLchar *src);
 
@@ -15,6 +10,10 @@ GLuint link_program(const GLchar *frag_src);
 bool check_gl_ext(const char *exts, const char *ext);
 
 void load_gl_proc(void *proc_ptr, const char *name);
+
+bool check_egl_ext(const char *exts, const char *ext);
+
+void load_egl_proc(void *proc_ptr, const char *name);
 
 enum fx_tex_shader_source {
 	SHADER_SOURCE_TEXTURE_RGBA = 1,
@@ -28,9 +27,6 @@ struct shader_corner_radii {
 	GLint bottom_left;
 	GLint bottom_right;
 };
-
-void uniform_corner_radii_set(const struct shader_corner_radii *uniform,
-		const struct fx_corner_fradii *corners);
 
 struct quad_shader {
 	GLuint program;

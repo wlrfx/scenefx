@@ -180,7 +180,10 @@ subdir('include')
 scenefx_inc = include_directories('include')
 
 lib_scenefx = library(
-	versioned_name, scenefx_files,
+	meson.project_name(), scenefx_files,
+	version: version,
+	# Until 1.0, each minor release has its own ABI.
+	soversion: '@0@.@1@'.format(version_major, version_minor),
 	dependencies: scenefx_deps,
 	include_directories:  [ scenefx_inc ],
 	install: true,
@@ -206,6 +209,7 @@ pkgconfig = import('pkgconfig')
 pkgconfig.generate(
 	lib_scenefx,
 	name: versioned_name,
+	filebase: versioned_name,
 	version: meson.project_version(),
 	description: 'Wlroots effects library',
 	subdirs: versioned_name,

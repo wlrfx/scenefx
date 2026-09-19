@@ -773,6 +773,24 @@ void fx_render_pass_add_box_shadow(struct fx_gles_render_pass *pass,
 
 	struct wlr_box box = options->box;
 	assert(box.width > 0 && box.height > 0);
+	if (options->blur_sigma <= 0.0f) {
+		fx_render_pass_add_rounded_rect(pass,
+				&(struct fx_render_rounded_rect_options){
+			.base = {
+				.box = box,
+				.color = options->color,
+				.clip = options->clip,
+			},
+			.corners = {
+				.top_left = options->corner_radius,
+				.top_right = options->corner_radius,
+				.bottom_right = options->corner_radius,
+				.bottom_left = options->corner_radius,
+			},
+			.clipped_region = options->clipped_region,
+		});
+		return;
+	}
 
 	pixman_region32_t clip_region;
 	if (options->clip) {
@@ -801,8 +819,7 @@ void fx_render_pass_add_box_shadow(struct fx_gles_render_pass *pass,
 	TRACY_ZONE_TEXT_f("\tBlur Sigma: %f", options->blur_sigma);
 	push_fx_debug(renderer);
 
-	// blending will practically always be needed (unless we have a madman
-	// who uses opaque shadows with zero sigma), so just enable it
+	// Blurred edges require blending, so just enable it
 	setup_blending(WLR_RENDER_BLEND_MODE_PREMULTIPLIED);
 	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 

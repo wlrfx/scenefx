@@ -37,6 +37,21 @@ struct quad_shader {
 	GLint proj;
 	GLint color;
 	GLint pos_attrib;
+	GLint size;
+	GLint position;
+
+	GLint effects_clip;
+	GLint fill_type;
+
+	int gradient_max_colors;
+	GLint gradient_colors;
+	GLint gradient_size;
+	GLint gradient_angle;
+	GLint gradient_box;
+	GLint gradient_kind;
+	GLint gradient_origin;
+	GLint gradient_colors_size;
+	GLint gradient_blend;
 
 	// Only used for the effects shader
 	struct {
@@ -46,25 +61,7 @@ struct quad_shader {
 	} effects;
 };
 
-bool link_quad_program(struct quad_shader *shader, bool clip);
-
-struct quad_grad_shader {
-	int max_len;
-
-	GLuint program;
-	GLint proj;
-	GLint colors;
-	GLint size;
-	GLint degree;
-	GLint grad_box;
-	GLint pos_attrib;
-	GLint linear;
-	GLint origin;
-	GLint count;
-	GLint blend;
-};
-
-bool link_quad_grad_program(struct quad_grad_shader *shader, int max_len);
+bool link_quad_program(struct quad_shader *shader, int32_t max_gradient_colors);
 
 struct quad_round_shader {
 	GLuint program;
@@ -74,6 +71,19 @@ struct quad_round_shader {
 	GLint size;
 	GLint position;
 
+	GLint effects_clip;
+	GLint fill_type;
+
+	int gradient_max_colors;
+	GLint gradient_colors;
+	GLint gradient_size;
+	GLint gradient_angle;
+	GLint gradient_box;
+	GLint gradient_kind;
+	GLint gradient_origin;
+	GLint gradient_colors_size;
+	GLint gradient_blend;
+
 	struct shader_corner_radii radius;
 
 	GLint clip_size;
@@ -81,31 +91,7 @@ struct quad_round_shader {
 	struct shader_corner_radii clip_radius;
 };
 
-bool link_quad_round_program(struct quad_round_shader *shader);
-
-struct quad_grad_round_shader {
-	GLuint program;
-	GLint proj;
-	GLint color;
-	GLint pos_attrib;
-	GLint size;
-	GLint position;
-
-	GLint colors;
-	GLint grad_size;
-	GLint degree;
-	GLint grad_box;
-	GLint linear;
-	GLint origin;
-	GLint count;
-	GLint blend;
-
-	struct shader_corner_radii radius;
-
-	int max_len;
-};
-
-bool link_quad_grad_round_program(struct quad_grad_round_shader *shader, int max_len);
+bool link_quad_round_program(struct quad_round_shader *shader, int32_t max_gradient_colors);
 
 struct tex_shader {
 	GLuint program;

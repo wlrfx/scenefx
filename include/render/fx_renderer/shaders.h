@@ -157,6 +157,8 @@ struct blur_shader {
 	GLint pos_attrib;
 	GLint radius;
 	GLint halfpixel;
+	GLint uv_min;
+	GLint uv_max;
 };
 
 bool link_blur1_program(struct blur_shader *shader);

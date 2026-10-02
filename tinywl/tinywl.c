@@ -1158,8 +1158,8 @@ int main(int argc, char *argv[]) {
 			200, 200, bottom_rect_color);
 	wlr_scene_rect_set_gradient(
 		bottom_rect,
-		(struct gradient) {
-			.kind = GRADIENT_CONIC,
+		(struct fx_gradient) {
+			.kind = FX_GRADIENT_CONIC,
 			.angle = 45.0,
 			.range = (struct wlr_box) {
 				.x = 0,

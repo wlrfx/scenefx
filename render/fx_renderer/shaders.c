@@ -124,8 +124,8 @@ static GLchar* print_quad_shader_defines(struct quad_shader_defines const define
 			"#define GRADIENT_LINEAR %d\n#define GRADIENT_RADIAL %d\n"
 			"#define GRADIENT_CONIC %d\n#define MAX_GRADIENT_COLORS %d\n"
 			"#define ERROR_COLOR vec4(252.0 / 255.0,15.0 / 255.0, 192.0 / 255.0, 1.0)",
-			FILL_SOLID_COLOR, FILL_GRADIENT, GRADIENT_LINEAR, GRADIENT_RADIAL,
-			GRADIENT_CONIC, defines.max_gradient_colors);
+			FILL_SOLID_COLOR, FILL_GRADIENT, FX_GRADIENT_LINEAR, 
+			FX_GRADIENT_RADIAL, FX_GRADIENT_CONIC, defines.max_gradient_colors);
 	return buffer;
 }
 
@@ -139,7 +139,6 @@ bool link_quad_program(struct quad_shader *shader, int32_t max_gradient_colors) 
 	snprintf(quad_src, sizeof(quad_src),
 		"%s\n%s\n%s\n%s", shader_defines, quad_frag_src, gradient_frag_src, corner_alpha_frag_src);
 	free(shader_defines);
-	printf("%s\n", quad_src);
 
 	GLuint prog;
 	shader->program = prog = link_program(quad_src);

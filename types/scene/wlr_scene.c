@@ -40,6 +40,70 @@
 #define DMABUF_FEEDBACK_DEBOUNCE_FRAMES  30
 #define HIGHLIGHT_DAMAGE_FADEOUT_TIME   250
 
+bool wlr_scene_rect_fill_is_opaque(struct wlr_scene_rect_fill const* const fill) {
+	switch(fill->type) {
+	case FILL_SOLID_COLOR: {
+		return fill->solid_color[3] == 1.0;	
+	} break;
+
+	case FILL_GRADIENT: {
+		struct fx_gradient const* const gradient = &fill->gradient;
+		for(int32_t i = 0; i < gradient->colors_size; i += 1) {
+			if(gradient->colors[4 * i + 3] != 1.0) {
+				return false;	
+			}
+		}
+		return true;
+	} break;
+	}
+	// Unreachable.
+	abort();
+}
+
+bool wlr_scene_rect_fill_is_invisible(struct wlr_scene_rect_fill const* fill) {
+	switch(fill->type) {
+	case FILL_SOLID_COLOR: {
+		return fill->solid_color[3] == 0.0;	
+	} break;
+
+	case FILL_GRADIENT: {
+		struct fx_gradient const* const gradient = &fill->gradient;
+		for(int32_t i = 0; i < gradient->colors_size; i += 1) {
+			if(gradient->colors[4 * i + 3] != 0.0) {
+				return false;	
+			}
+		}
+		return true;
+	} break;
+	}
+	// Unreachable.
+	abort();
+}
+
+bool wlr_scene_rect_fill_is_black(struct wlr_scene_rect_fill const* fill) {
+	switch(fill->type) {
+	case FILL_SOLID_COLOR: {
+		float const* const color = fill->solid_color;
+		return color[0] == 0.0 && color[1] == 0.0 && color[2] == 0.0;	
+	} break;
+
+	case FILL_GRADIENT: {
+		struct fx_gradient const* const gradient = &fill->gradient;
+		for(int32_t i = 0; i < gradient->colors_size; i += 1) {
+			float const* const color = gradient->colors + (4 * i);
+            bool const black = color[0] == 0.0 && color[1] == 0.0 && 
+				               color[2] == 0.0;
+			if(!black) {
+				return false;	
+			}
+		}
+		return true;
+	} break;
+	}
+	// Unreachable.
+	abort();
+}
+
 struct wlr_scene_tree *wlr_scene_tree_from_node(struct wlr_scene_node *node) {
 	assert(node->type == WLR_SCENE_NODE_TREE);
 	struct wlr_scene_tree *tree = wl_container_of(node, tree, node);
@@ -327,7 +391,7 @@ static void scene_node_opaque_region(struct wlr_scene_node *node, int x, int y,
 
 	if (node->type == WLR_SCENE_NODE_RECT) {
 		struct wlr_scene_rect *scene_rect = wlr_scene_rect_from_node(node);
-		if (scene_rect->color[3] != 1) {
+		if (wlr_scene_rect_fill_is_opaque(&scene_rect->fill)) {
 			return;
 		}
 
@@ -884,7 +948,8 @@ struct wlr_scene_rect *wlr_scene_rect_create(struct wlr_scene_tree *parent,
 
 	scene_rect->width = width;
 	scene_rect->height = height;
-	memcpy(scene_rect->color, color, sizeof(scene_rect->color));
+	scene_rect->fill.type = FILL_SOLID_COLOR;
+	memcpy(scene_rect->fill.solid_color, color, sizeof(scene_rect->fill.solid_color));
 	scene_rect->corners = (struct fx_corner_radii){0};
 	scene_rect->accepts_input = true;
 	scene_rect->clipped_region = clipped_region_get_default();
@@ -907,26 +972,32 @@ void wlr_scene_rect_set_size(struct wlr_scene_rect *rect, int width, int height)
 }
 
 void wlr_scene_rect_set_color(struct wlr_scene_rect *rect, const float color[static 4]) {
-	bool const fill_type_changed = rect->fill_type != FILL_SOLID_COLOR;
-	bool const color_changed = memcmp(rect->color, color, sizeof(rect->color)) != 0;
-	if (!fill_type_changed && !color_changed) {
-		return;
+	bool const fill_type_unchanged = rect->fill.type == FILL_SOLID_COLOR;
+	if (fill_type_unchanged) {
+		bool const color_unchanged = 
+			memcmp(rect->fill.solid_color, color, sizeof(rect->fill.solid_color)) == 0;
+		if(color_unchanged) {
+			return;
+		}
 	}
 
-	rect->fill_type = FILL_SOLID_COLOR;
-	memcpy(rect->color, color, sizeof(rect->color));
+	rect->fill.type = FILL_SOLID_COLOR;
+	memcpy(rect->fill.solid_color, color, sizeof(rect->fill.solid_color));
 	scene_node_update(&rect->node, NULL);
 }
 
-void wlr_scene_rect_set_gradient(struct wlr_scene_rect *rect, const struct gradient gradient) {
-	bool const fill_type_changed = rect->fill_type != FILL_GRADIENT;
-	bool const gradient_changed = gradient_compare_equal(&rect->gradient, &gradient);
-	if (!fill_type_changed && !gradient_changed) {
-		return;
+void wlr_scene_rect_set_gradient(struct wlr_scene_rect *rect, const struct fx_gradient gradient) {
+	bool const fill_type_unchanged = rect->fill.type == FILL_GRADIENT;
+	if (fill_type_unchanged) {
+		bool const gradient_unchanged = 
+			fx_gradient_compare_equal(&rect->fill.gradient, &gradient);
+		if(gradient_unchanged) {
+			return;
+		}
 	}
 
-	rect->fill_type = FILL_GRADIENT;
-	rect->gradient = gradient;
+	rect->fill.type = FILL_GRADIENT;
+	rect->fill.gradient = gradient;
 	scene_node_update(&rect->node, NULL);
 }
 
@@ -2034,11 +2105,11 @@ static void scene_entry_render(struct render_list_entry *entry, const struct ren
 		fx_corner_radii_transform(node_transform, &rect_clipped_corners);
 
 		struct wlr_render_color rect_color = { 0.0, 0.0, 0.0, 1.0 };
-		if (scene_rect->fill_type == FILL_SOLID_COLOR) {
-			rect_color.r = scene_rect->color[0];
-			rect_color.g = scene_rect->color[1];
-			rect_color.b = scene_rect->color[2];
-			rect_color.a = scene_rect->color[3];
+		if (scene_rect->fill.type == FILL_SOLID_COLOR) {
+			rect_color.r = scene_rect->fill.solid_color[0];
+			rect_color.g = scene_rect->fill.solid_color[1];
+			rect_color.b = scene_rect->fill.solid_color[2];
+			rect_color.a = scene_rect->fill.solid_color[3];
 		}
 
 		struct fx_render_rect_options rect_options = {
@@ -2051,8 +2122,8 @@ static void scene_entry_render(struct render_list_entry *entry, const struct ren
 				.area = rect_clipped_region_box,
 				.corners = fx_corner_radii_scale(rect_clipped_corners, data->scale),
 			},
-			.fill_type = scene_rect->fill_type,
-			.gradient = scene_rect->gradient,
+			.fill_type = scene_rect->fill.type,
+			.gradient = scene_rect->fill.gradient,
 		};
 
 		// TODO: Use the base wlr_render_pass_add_rect as a fast-path in the future
@@ -2061,8 +2132,8 @@ static void scene_entry_render(struct render_list_entry *entry, const struct ren
 				.base = rect_options.base,
 				.corners = fx_corner_radii_scale(rect_corners, data->scale),
 				.clipped_region = rect_options.clipped_region,
-				.fill_type = scene_rect->fill_type,
-				.gradient = scene_rect->gradient,
+				.fill_type = scene_rect->fill.type,
+				.gradient = scene_rect->fill.gradient,
 			};
 			fx_render_pass_add_rounded_rect(fx_pass, &rounded_rect_options);
 		} else {
@@ -2592,11 +2663,7 @@ static bool scene_node_invisible(struct wlr_scene_node *node) {
 	} else if (node->type == WLR_SCENE_NODE_RECT) {
 		struct wlr_scene_rect *rect = wlr_scene_rect_from_node(node);
 		// TODO: Check if clipped region covers whole rect?
-		if(rect->fill_type == FILL_SOLID_COLOR) {
-			return rect->color[3] == 0.f;
-		}
-		// TODO: Gradient visibility check?
-		return false;
+		return wlr_scene_rect_fill_is_invisible(&rect->fill);
 	} else if (node->type == WLR_SCENE_NODE_BUFFER) {
 		struct wlr_scene_buffer *buffer = wlr_scene_buffer_from_node(node);
 
@@ -2629,10 +2696,8 @@ static bool scene_buffer_is_black_opaque(struct wlr_scene_buffer *scene_buffer) 
 }
 
 static bool scene_rect_is_black_opaque(struct wlr_scene_rect *scene_rect) {
-	return scene_rect->color[0] == 0.f &&
-		scene_rect->color[1] == 0.f &&
-		scene_rect->color[2] == 0.f &&
-		scene_rect->color[3] == 1.f &&
+	return wlr_scene_rect_fill_is_opaque(&scene_rect->fill) &&
+		wlr_scene_rect_fill_is_black(&scene_rect->fill) &&
 		fx_corner_radii_is_empty(&scene_rect->corners) &&
 		fx_corner_radii_is_empty(&scene_rect->clipped_region.corners) &&
 		wlr_box_empty(&scene_rect->clipped_region.area);

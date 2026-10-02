@@ -554,9 +554,9 @@ void fx_render_pass_add_rect(struct fx_gles_render_pass *pass,
 			case FILL_GRADIENT:
 				TRACY_ZONE_TEXT_f("Gradient:");
 				TRACY_ZONE_TEXT_f("\tKind: %s",
-						fx_options->gradient.kind == GRADIENT_LINEAR ? "Linear"
-						: fx_options->gradient.kind == GRADIENT_RADIAL ? "Radial"
-						: fx_options->gradient.kind == GRADIENT_CONIC ? "Conic"
+						fx_options->gradient.kind == FX_GRADIENT_LINEAR ? "Linear"
+						: fx_options->gradient.kind == FX_GRADIENT_RADIAL ? "Radial"
+						: fx_options->gradient.kind == FX_GRADIENT_CONIC ? "Conic"
 						: "Unknown");
 				TRACY_ZONE_TEXT_f("\tNum Colors: %d", fx_options->gradient.colors_size);
 				TRACY_ZONE_TEXT_f("\tBlend: %d", fx_options->gradient.blend);
@@ -684,9 +684,9 @@ void fx_render_pass_add_rounded_rect(struct fx_gles_render_pass *pass,
 		case FILL_GRADIENT:
 			TRACY_ZONE_TEXT_f("Gradient:");
 			TRACY_ZONE_TEXT_f("\tKind: %s",
-					fx_options->gradient.kind == GRADIENT_LINEAR ? "Linear"
-					: fx_options->gradient.kind == GRADIENT_RADIAL ? "Radial"
-					: fx_options->gradient.kind == GRADIENT_CONIC ? "Conic"
+					fx_options->gradient.kind == FX_GRADIENT_LINEAR ? "Linear"
+					: fx_options->gradient.kind == FX_GRADIENT_RADIAL ? "Radial"
+					: fx_options->gradient.kind == FX_GRADIENT_CONIC ? "Conic"
 					: "Unknown");
 			TRACY_ZONE_TEXT_f("\tNum Colors: %d", fx_options->gradient.colors_size);
 			TRACY_ZONE_TEXT_f("\tBlend: %d", fx_options->gradient.blend);

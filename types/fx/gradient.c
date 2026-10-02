@@ -2,8 +2,8 @@
 
 #include <string.h>
 
-bool gradient_compare_equal(struct gradient const *lhs,
-		struct gradient const *rhs) {
+bool fx_gradient_compare_equal(struct fx_gradient const *lhs,
+		struct fx_gradient const *rhs) {
 	if (lhs->kind != rhs->kind) {
 		return false;
 	}
@@ -20,22 +20,23 @@ bool gradient_compare_equal(struct gradient const *lhs,
 		return false;
 	}
 
-	if (memcmp(lhs->colors, rhs->colors, sizeof(float) * lhs->colors_size) != 0) {
+	int32_t const color_components = 4 * sizeof(float) * lhs->colors_size;
+	if (memcmp(lhs->colors, rhs->colors, color_components) != 0) {
 		return false;
 	}
 
 	switch (lhs->kind) {
-		case GRADIENT_LINEAR: {
+		case FX_GRADIENT_LINEAR: {
 			if (lhs->angle != rhs->angle) {
 				return false;
 			}
 		} break;
-		case GRADIENT_RADIAL: {
+		case FX_GRADIENT_RADIAL: {
 			if (lhs->origin[0] != rhs->origin[0] || lhs->origin[1] != rhs->origin[1]) {
 				return false;
 			}
 		} break;
-		case GRADIENT_CONIC: {
+		case FX_GRADIENT_CONIC: {
 			if (lhs->angle != rhs->angle || lhs->origin[0] != rhs->origin[0] ||
 					lhs->origin[1] != rhs->origin[1]) {
 				return false;

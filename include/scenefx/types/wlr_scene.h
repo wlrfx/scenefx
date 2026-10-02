@@ -100,6 +100,18 @@ enum wlr_scene_rect_fill_type {
 	FILL_GRADIENT = 1,
 };
 
+struct wlr_scene_rect_fill {
+	union {
+		float solid_color[4];
+		struct fx_gradient gradient;
+	};
+	enum wlr_scene_rect_fill_type type;
+};
+
+bool wlr_scene_rect_fill_is_opaque(struct wlr_scene_rect_fill const* fill);
+bool wlr_scene_rect_fill_is_invisible(struct wlr_scene_rect_fill const* fill);
+bool wlr_scene_rect_fill_is_black(struct wlr_scene_rect_fill const* fill);
+
 /** A sub-tree in the scene-graph. */
 struct wlr_scene_tree {
 	struct wlr_scene_node node;
@@ -153,18 +165,14 @@ struct wlr_scene_surface {
 	} WLR_PRIVATE;
 };
 
-/** A scene-graph node displaying a solid-colored rectangle */
+/** A scene-graph node displaying a colored rectangle */
 struct wlr_scene_rect {
 	struct wlr_scene_node node;
 	int width, height;
 
 	struct fx_corner_radii corners;
 
-	union {
-		float color[4];
-		struct gradient gradient;
-	};
-	enum wlr_scene_rect_fill_type fill_type;
+	struct wlr_scene_rect_fill fill;
 
 	bool accepts_input;
 	struct clipped_region clipped_region;
@@ -586,8 +594,12 @@ void wlr_scene_rect_set_color(struct wlr_scene_rect *rect, const float color[sta
 
 /**
  * Change the gradient of an existing rectangle node.
+ *
+ * The memory pointed to by the `colors` member of `gradient` is not copied and
+ * must be managed and kept alive by the caller. The data must not be modified
+ * while the gradient is in use.
  */
-void wlr_scene_rect_set_gradient(struct wlr_scene_rect *rect, const struct gradient gradient);
+void wlr_scene_rect_set_gradient(struct wlr_scene_rect *rect, const struct fx_gradient gradient);
 
 /**
  * Add a node displaying a shadow to the scene-graph.

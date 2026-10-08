@@ -2,18 +2,21 @@
 
 wlroots is the de-facto library for building wayland compositors, and its scene api is a great stride in simplifying wayland compositor development. The problem with the scene api (for compositors looking for eye candy), however, is that it forces you to use the wlr renderer, which is powerful yet simple. SceneFX is a project that takes the scene api and replaces the wlr renderer with our own fx renderer, capable of rendering surfaces with eye-candy effects including blur, shadows, and rounded corners, while maintaining the benefits of simplicity gained from using the scene api.
 
-**Please note: while SceneFX is in use by SwayFX version 0.4, it is not yet ready for usage by other compositors. Please refer to the [1.0 milestone](https://github.com/wlrfx/scenefx/milestone/2) to track the remaining tasks for our stable 1.0 release**
+**Please note: while SceneFX is in use by SwayFX version 0.5, it is not yet ready for usage by other compositors. Please refer to the [1.0 milestone](https://github.com/wlrfx/scenefx/milestone/2) to track the remaining tasks for our stable 1.0 release**
 
 ## Compositors Using SceneFX
 Plenty of popular wayland compositors are using SceneFX to render eyecandy, including:
 - [SwayFX](https://github.com/WillPower3309/swayfx)
-- [MangoWC](https://github.com/DreamMaoMao/mangowc)
+- [Mango](https://github.com/mangowm/mango)
+- [Umbriel](https://github.com/noctalia-dev/umbriel)
+- [nauka](https://github.com/shadowash8/nauka)
 - [mwc](https://github.com/nikoloc/mwc)
 - dwl [with a patch](https://codeberg.org/dwl/dwl-patches/src/branch/main/stale-patches/scenefx)
 
 ## Installation
 <a href="https://repology.org/project/scenefx/versions"><img src="https://repology.org/badge/vertical-allrepos/scenefx.svg"/></a>
 
+Scenefx is also available in <a href="https://copr.fedorainfracloud.org/coprs/damiand/scenefx/">copr</a> repositories. Enable via `dnf copr enable damiand/scenefx` and install via `dnf install scenefx scenefx-devel`
 
 ## Compiling From Source
 Install dependencies:
@@ -104,3 +107,5 @@ The links below are helpful when learning how to use tracy:
 
 ---
 [Join our Discord](https://discord.gg/qsSx397rkh)
+
+[Check out the wiki](https://wlrfx.github.io/wiki/data/scenefx/index.html)

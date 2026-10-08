@@ -847,9 +847,12 @@ void fx_render_pass_add_box_shadow(struct fx_gles_render_pass *pass,
 	TRACY_BOTH_ZONES_END;
 }
 
-// Renders the blur for each damaged rect and swaps the buffer
+// Renders the blur for each damaged rect and swaps the buffer.
+// src_level is the downscale level of the current buffer's content, which only
+// occupies the top-left (1 / 2^src_level) part of the buffer.
 static void render_blur_segments(struct fx_gles_render_pass *pass,
-		struct fx_render_blur_pass_options *fx_options, struct blur_shader* shader) {
+		struct fx_render_blur_pass_options *fx_options, struct blur_shader* shader,
+		int src_level) {
 	struct fx_render_texture_options *tex_options = &fx_options->tex_options;
 	struct wlr_render_texture_options *options = &tex_options->base;
 	struct fx_renderer *renderer = pass->buffer->renderer;
@@ -911,6 +914,18 @@ static void render_blur_segments(struct fx_gles_render_pass *pass,
 				0.5f / (options->texture->width * 2.0f),
 				0.5f / (options->texture->height * 2.0f));
 	}
+
+	// Clamp samples to the texel centers of the valid source area, so that the
+	// screen edges get extended instead of blending with stale buffer contents.
+	// Matches the rounding of wlr_region_scale, which rounds the damage outwards.
+	float tex_width = options->texture->width;
+	float tex_height = options->texture->height;
+	float level_width = ceilf(tex_width / (1 << src_level));
+	float level_height = ceilf(tex_height / (1 << src_level));
+	glUniform2f(shader->uv_min, 0.5f / tex_width, 0.5f / tex_height);
+	glUniform2f(shader->uv_max,
+			(level_width - 0.5f) / tex_width,
+			(level_height - 0.5f) / tex_height);
 
 	set_proj_matrix(shader->proj, pass->projection_matrix, &dst_box);
 	set_tex_matrix(shader->tex_proj, options->transform, &src_fbox);
@@ -1072,14 +1087,14 @@ static struct fx_framebuffer *get_main_buffer_blur(struct fx_gles_render_pass *p
 	// Downscale
 	for (int i = 0; i < blur_data.num_passes; ++i) {
 		wlr_region_scale(&scaled_damage, &damage, 1.0f / (1 << (i + 1)));
-		render_blur_segments(pass, fx_options, &renderer->shaders.blur1);
+		render_blur_segments(pass, fx_options, &renderer->shaders.blur1, i);
 	}
 
 	// Upscale
 	for (int i = blur_data.num_passes - 1; i >= 0; --i) {
 		// when upsampling we make the region twice as big
 		wlr_region_scale(&scaled_damage, &damage, 1.0f / (1 << i));
-		render_blur_segments(pass, fx_options, &renderer->shaders.blur2);
+		render_blur_segments(pass, fx_options, &renderer->shaders.blur2, i + 1);
 	}
 
 	pixman_region32_fini(&scaled_damage);

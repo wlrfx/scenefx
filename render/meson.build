@@ -1,10 +1,36 @@
 scenefx_files += files(
 	'color.c',
-	'egl.c',
+	'fx_offscreen_buffers.c',
+	'fx_pass.c',
+	'fx_renderer.c',
 	'pixel_format.c',
+	'tracy.c',
 )
 
-subdir('fx_renderer')
+if renderers['gles2']
+	egl = dependency('egl', required: 'gles2' in renderers)
+	if egl.found()
+		eglext_version = cc.get_define(
+			'EGL_EGLEXT_VERSION',
+			dependencies: egl,
+			prefix: '#include <EGL/eglext.h>',
+		).to_int()
+		if eglext_version < 20210604
+			egl = dependency(
+				'',
+				required: 'gles2' in renderers,
+				not_found_message: 'EGL headers too old',
+			)
+		endif
+	endif
+	gbm = dependency('gbm', required: 'gles2' in renderers)
+	if egl.found() and gbm.found()
+		scenefx_deps += [egl, gbm]
+		internal_features += {'egl': true}
+	endif
+
+	subdir('gles2')
+endif
 
 lcms2 = dependency('lcms2', required: get_option('color-management'))
 if lcms2.found()

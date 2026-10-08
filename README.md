@@ -12,6 +12,7 @@ Plenty of popular wayland compositors are using SceneFX to render eyecandy, incl
 - [nauka](https://github.com/shadowash8/nauka)
 - [mwc](https://github.com/nikoloc/mwc)
 - dwl [with a patch](https://codeberg.org/dwl/dwl-patches/src/branch/main/stale-patches/scenefx)
+- labwc [with a patch](https://github.com/grigio/labwc/tree/ext-background-effect) ([upstream PR labwc#3751](https://github.com/labwc/labwc/pull/3751#issuecomment-6046975930), distributed as [labwc-blur](https://github.com/grigio/labwc/releases))
 
 ## Installation
 <a href="https://repology.org/project/scenefx/versions"><img src="https://repology.org/badge/vertical-allrepos/scenefx.svg"/></a>

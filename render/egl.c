@@ -439,6 +439,12 @@ static bool egl_init(struct wlr_egl *egl, EGLenum platform,
 		wlr_log(WLR_DEBUG, "Created EGL context using OpenGL ES 2.0");
 	} else {
 		wlr_log(WLR_ERROR, "Failed to create EGL context using OpenGL ES 2.0");
+		// Mirror the egl_init_display() failure branch above: the display
+		// is already fully initialized at this point, so it needs the same
+		// teardown on this failure path or it leaks.
+		if (egl->exts.KHR_display_reference) {
+			eglTerminate(egl->display);
+		}
 		return false;
 	}
 
@@ -639,6 +645,12 @@ struct wlr_egl *wlr_egl_create_with_context(EGLDisplay display,
 	}
 
 	if (!egl_init_display(egl, display, true)) {
+		// Same shape as egl_init()'s call site: egl_init_display() failing
+		// here still means eglInitialize() already succeeded, so the
+		// display needs tearing down or it leaks.
+		if (egl->exts.KHR_display_reference) {
+			eglTerminate(egl->display);
+		}
 		free(egl);
 		return NULL;
 	}

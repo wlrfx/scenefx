@@ -1,9 +1,17 @@
 #include "util/array.h"
 #include <assert.h>
+#include <stdint.h>
 #include <string.h>
 
 void array_remove_at(struct wl_array *arr, size_t offset, size_t size) {
-	assert(arr->size >= offset + size);
+	// offset + size can overflow, and callers can be built without asserts
+	// (NDEBUG), so this needs to be a real check rather than assert-only:
+	// letting a bad range through turns the memmove length below into a
+	// huge underflowed value.
+	if (offset > arr->size || size > arr->size - offset) {
+		assert(0 && "array_remove_at: out-of-bounds range");
+		return;
+	}
 
 	char *data = arr->data;
 	memmove(&data[offset], &data[offset + size], arr->size - offset - size);
@@ -22,7 +30,13 @@ bool array_realloc(struct wl_array *arr, size_t size) {
 		alloc = 16;
 	}
 
+	// Checked doubling: bail before a doubling that would overflow alloc
+	// instead of wrapping it to a too-small value and under-allocating
+	// below.
 	while (alloc < size) {
+		if (alloc > SIZE_MAX / 2) {
+			return false;
+		}
 		alloc *= 2;
 	}
 

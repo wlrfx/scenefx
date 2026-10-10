@@ -1,8 +1,6 @@
 # scenefx
 
-wlroots is the de-facto library for building wayland compositors, and its scene api is a great stride in simplifying wayland compositor development. The problem with the scene api (for compositors looking for eye candy), however, is that it forces you to use the wlr renderer, which is powerful yet simple. SceneFX is a project that takes the scene api and replaces the wlr renderer with our own fx renderer, capable of rendering surfaces with eye-candy effects including blur, shadows, and rounded corners, while maintaining the benefits of simplicity gained from using the scene api.
-
-**Please note: while SceneFX is in use by SwayFX version 0.5, it is not yet ready for usage by other compositors. Please refer to the [1.0 milestone](https://github.com/wlrfx/scenefx/milestone/2) to track the remaining tasks for our stable 1.0 release**
+wlroots is the de-facto library for building wayland compositors, and its scene api has vastly simplified compositor development. However, for developers wanting modern aesthetic flair, the Scene API forces the use of the standard wlr_renderer, which is intentionally kept minimal and simple. SceneFX bridges this gap by serving as a drop-in replacement for the Scene API. It swaps out the default renderer for our custom FX renderer, allowing compositors to easily render eye-candy effects like blur, shadows, and rounded corners while maintaining the simplicity of the upstream Scene API.
 
 ## Compositors Using SceneFX
 Plenty of popular wayland compositors are using SceneFX to render eyecandy, including:

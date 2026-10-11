@@ -34,10 +34,11 @@ vec2 erf(vec2 x) {
 }
 
 // return the blurred mask along the x dimension
-float roundedBoxShadowX(float x, float y, float sigma, float corner, vec2 halfSize) {
+float roundedBoxShadowX(float x, float y, float sigma, float extent, float corner, vec2 halfSize) {
     float delta = min(halfSize.y - corner - abs(y), 0.0);
     float curved = halfSize.x - corner + sqrt(max(0.0, corner * corner - delta * delta));
-    vec2 integral = 0.5 + 0.5 * erf((x + vec2(-curved, curved)) * (sqrt(0.5) / sigma));
+    vec2 edges = clamp(x + vec2(-curved, curved), -extent, extent);
+    vec2 integral = 0.5 + 0.5 * erf(edges * (sqrt(0.5) / sigma));
     return integral.y - integral.x;
 }
 
@@ -49,21 +50,25 @@ float roundedBoxShadow(vec2 lower, vec2 upper, vec2 point, float sigma, float co
     point -= center;
 
     // The signal is only non-zero in a limited range, so don't waste samples
+    float extent = sigma * 2.0;
     float low = point.y - halfSize.y;
     float high = point.y + halfSize.y;
-    float start = clamp(-3.0 * sigma, low, high);
-    float end = clamp(3.0 * sigma, low, high);
+    float start = clamp(-extent, low, high);
+    float end = clamp(extent, low, high);
 
     // Accumulate samples (we can get away with surprisingly few samples)
     float step = (end - start) / 4.0;
     float y = start + step * 0.5;
     float value = 0.0;
     for (int i = 0; i < 4; i++) {
-        value += roundedBoxShadowX(point.x, point.y - y, sigma, corner_radius, halfSize) * gaussian(y, sigma) * step;
+        value += roundedBoxShadowX(point.x, point.y - y, sigma, extent, corner_radius, halfSize) * gaussian(y, sigma) * step;
         y += step;
     }
 
-    return value;
+    // Normalize the truncated gaussian
+    const float x_whole = 0.954644; // erf(2*sqrt(0.5))
+    const float y_sum = 0.963166;
+    return value / (x_whole * y_sum);
 }
 
 float corner_alpha(vec2 size, vec2 position, bool is_cutout,

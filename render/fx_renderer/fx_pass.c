@@ -476,6 +476,8 @@ void fx_render_pass_add_texture(struct fx_gles_render_pass *pass,
 	glUniform1f(shader->alpha, alpha);
 
 	glUniform1f(shader->discard_transparent, fx_options->discard_transparent);
+	glUniform1f(shader->ignore_alpha_threshold,
+		fx_options->ignore_alpha_threshold);
 
 	if (use_effects) {
 		struct fx_corner_fradii corners = fx_options->corners;
@@ -1172,6 +1174,7 @@ void fx_render_pass_add_blur(struct fx_gles_render_pass *pass,
 
 		struct fx_render_texture_options tex_options = fx_options->tex_options;
 		tex_options.discard_transparent = true;
+		tex_options.ignore_alpha_threshold = fx_options->ignore_alpha_threshold;
 		tex_options.clipped_region = fx_options->clipped_region;
 		fx_render_pass_add_texture(pass, &tex_options);
 

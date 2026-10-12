@@ -262,6 +262,8 @@ bool link_tex_program(struct tex_shader *shader, enum fx_tex_shader_source sourc
 	shader->tex_proj = glGetUniformLocation(prog, "tex_proj");
 
 	shader->discard_transparent = glGetUniformLocation(prog, "discard_transparent");
+	shader->ignore_alpha_threshold =
+		glGetUniformLocation(prog, "ignore_alpha_threshold");
 
 	if (!effects) {
 		return true;

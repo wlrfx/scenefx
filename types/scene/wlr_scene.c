@@ -1101,6 +1101,7 @@ struct wlr_scene_blur *wlr_scene_blur_create(struct wlr_scene_tree *parent,
 
 	blur->alpha = 1.0f;
 	blur->strength = 1.0f;
+	blur->ignore_alpha_threshold = 0.0f;
 	blur->clipped_region = (struct clipped_region){0};
 	blur->corners = corner_radii_all(0);
 	blur->should_only_blur_bottom_layer = false;
@@ -1184,6 +1185,22 @@ void wlr_scene_blur_set_alpha(struct wlr_scene_blur *blur, float alpha) {
 	}
 
 	blur->alpha = alpha;
+	scene_node_update(&blur->node, NULL);
+}
+
+void wlr_scene_blur_set_ignore_alpha_threshold(struct wlr_scene_blur *blur,
+		float ignore_alpha_threshold) {
+	if (ignore_alpha_threshold < 0.0f) {
+		ignore_alpha_threshold = 0.0f;
+	} else if (ignore_alpha_threshold > 1.0f) {
+		ignore_alpha_threshold = 1.0f;
+	}
+
+	if (blur->ignore_alpha_threshold == ignore_alpha_threshold) {
+		return;
+	}
+
+	blur->ignore_alpha_threshold = ignore_alpha_threshold;
 	scene_node_update(&blur->node, NULL);
 }
 
@@ -2236,6 +2253,7 @@ static void scene_entry_render(struct render_list_entry *entry, const struct ren
 			.use_optimized_blur = blur->should_only_blur_bottom_layer,
 			.blur_data = &scene->blur_data,
 			.ignore_transparent = mask != NULL,
+			.ignore_alpha_threshold = blur->ignore_alpha_threshold,
 			.blur_strength = blur->strength,
 		};
 		fx_render_pass_add_blur(fx_pass, &blur_options);

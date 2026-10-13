@@ -182,6 +182,10 @@ struct wlr_scene_blur {
 	bool should_only_blur_bottom_layer;
 
 	struct linked_node transparency_mask_source;
+
+	/* Pixels whose alpha is at or below this value are not blurred. Only
+	 * used when a transparency mask source is set. Default is 0.0f. */
+	float ignore_alpha_threshold;
 };
 
 /** A scene-graph node telling SceneFX to render the optimized blur */
@@ -660,6 +664,22 @@ struct wlr_scene_buffer *wlr_scene_blur_get_transparency_mask_source(
  * fade-out effect.
  */
 void wlr_scene_blur_set_alpha(struct wlr_scene_blur *blur, float alpha);
+
+/**
+ * Sets the threshold below which the blur ignores a pixel. Pixels whose
+ * surface alpha is at or below the value are skipped and left unblurred.
+ * The valid range is 0.0f -> 1.0f and values outside of it are clamped.
+ * Default is 0.0f, which only skips fully transparent pixels.
+ *
+ * This only takes effect when a transparency mask source has been set with
+ * wlr_scene_blur_set_transparency_mask_source(). Without a mask the blur mask
+ * pass is not used and this value is ignored.
+ *
+ * Note that the comparison is inclusive, so a value of 1.0f skips every
+ * pixel, including fully opaque ones, which disables the blur entirely.
+ */
+void wlr_scene_blur_set_ignore_alpha_threshold(struct wlr_scene_blur *blur,
+		float ignore_alpha_threshold);
 
 /**
  * Sets the blur strength from 1.0f -> 0.0f. This adjusts how strong the blur is

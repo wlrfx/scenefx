@@ -47,6 +47,10 @@ struct fx_render_texture_options {
 	struct fx_corner_fradii corners;
 	bool discard_transparent;
 	struct clipped_fregion clipped_region;
+
+	/* Pixels whose alpha is at or below this value are discarded when
+	 * discard_transparent is set, and are ignored otherwise. */
+	float ignore_alpha_threshold;
 };
 
 struct fx_render_rect_options {
@@ -91,6 +95,10 @@ struct fx_render_blur_pass_options {
 	float blur_strength;
 	struct fx_corner_fradii corners;
 	struct clipped_fregion clipped_region;
+
+	/* Pixels whose alpha is at or below this value are not blurred. Only used
+	 * when ignore_transparent is true (a transparency mask source is set). */
+	float ignore_alpha_threshold;
 };
 
 struct fx_gles_render_pass *fx_get_render_pass(struct wlr_render_pass *render_pass);

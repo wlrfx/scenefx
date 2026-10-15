@@ -2,3 +2,4 @@ option('examples', type: 'boolean', value: true, description: 'Build example app
 option('renderers', type: 'array', choices: ['auto', 'gles2'], value: ['auto'], description: 'Select built-in renderers')
 option('color-management', type: 'feature', value: 'auto', description: 'Enable support for color management')
 option('tracy_enable', type: 'boolean', value: false, description: 'Enable profiling')
+option( 'force_fragment_shader_precision_high', type: 'boolean', value: false)

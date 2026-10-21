@@ -282,6 +282,9 @@ struct gles2_renderer *gles2_get_renderer(struct fx_renderer *fx_renderer) {
 
 struct gles2_offscreen_buffers *gles2_get_offscreen_buffers(
 		struct fx_offscreen_buffers *offscreen_buffers) {
+	if (offscreen_buffers == NULL) {
+		return NULL;
+	}
 	assert(fx_renderer_is_gles2(offscreen_buffers->fx_renderer));
 	assert(fx_offscreen_buffers_is_gles2(offscreen_buffers));
 	struct gles2_offscreen_buffers *offscreen

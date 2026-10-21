@@ -198,16 +198,21 @@ static void gles2_render_pass_read_to_buffer(struct fx_render_pass *fx_pass,
 	TRACY_BOTH_ZONES_START(fx_renderer);
 
 	struct gles2_buffer *dst_gles2_buffer = gles2_buffer_get_or_create(fx_renderer, dst_buffer, false);
-
-	pixman_region32_t region;
-	pixman_region32_init(&region);
-	pixman_region32_copy(&region, _region);
+	if (dst_gles2_buffer == NULL) {
+		wlr_log(WLR_ERROR, "Could not get dst gles2_buffer from wlr_buffer");
+		goto done;
+	}
 
 	struct wlr_texture *src_tex =
 		wlr_texture_from_buffer(fx_renderer->wlr_renderer, src_buffer);
 	if (src_tex == NULL) {
+		wlr_log(WLR_ERROR, "Could not get wlr_texture from the source wlr_buffer");
 		goto done;
 	}
+
+	pixman_region32_t region;
+	pixman_region32_init(&region);
+	pixman_region32_copy(&region, _region);
 
 	// Draw onto the dst_buffer
 	glBindFramebuffer(GL_FRAMEBUFFER, dst_gles2_buffer->fbo);
@@ -234,10 +239,10 @@ static void gles2_render_pass_read_to_buffer(struct fx_render_pass *fx_pass,
 	// Bind back to the main WLR buffer
 	glBindFramebuffer(GL_FRAMEBUFFER, pass->gles2_buffer->fbo);
 
+	pixman_region32_fini(&region);
+
 done:
 	TRACY_BOTH_ZONES_END;
-
-	pixman_region32_fini(&region);
 }
 
 static void gles2_render_pass_save_blur_region(struct fx_render_pass *fx_pass) {

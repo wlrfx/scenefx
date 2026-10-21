@@ -1,3 +1,5 @@
+glslang = find_program('glslang', 'glslangValidator', native: true, required: false, disabler: true)
+check = find_program('./check.sh', native: true)
 embed = find_program('./embed.sh', native: true)
 
 # TODO: Validate each fragment shader just like upstream
@@ -28,4 +30,13 @@ foreach name : shaders
 		capture: true,
 	)
 endforeach
+
+if glslang.found()
+	test(
+		'validate-shaders',
+		check,
+		args: [],
+		suite: 'shaders',
+	)
+endif
 

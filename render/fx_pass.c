@@ -19,10 +19,9 @@ void fx_render_pass_init(struct fx_render_pass *render_pass,
 void fx_render_pass_destroy(struct fx_render_pass *render_pass) {
 	TRACY_GPU_ZONE_COLLECT(render_pass->fx_renderer);
 
-	render_pass->impl->destroy(render_pass);
-
 	pixman_region32_fini(&render_pass->blur_padding_region);
-	render_pass->has_blur = false;
+
+	render_pass->impl->destroy(render_pass);
 }
 
 void fx_render_pass_add_texture(struct fx_render_pass *render_pass,

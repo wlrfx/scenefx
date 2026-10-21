@@ -7,28 +7,7 @@ scenefx_files += files(
 	'tracy.c',
 )
 
-if renderers['gles2']
-	egl = dependency('egl', required: 'gles2' in renderers)
-	if egl.found()
-		eglext_version = cc.get_define(
-			'EGL_EGLEXT_VERSION',
-			dependencies: egl,
-			prefix: '#include <EGL/eglext.h>',
-		).to_int()
-		if eglext_version < 20210604
-			egl = dependency(
-				'',
-				required: 'gles2' in renderers,
-				not_found_message: 'EGL headers too old',
-			)
-		endif
-	endif
-	gbm = dependency('gbm', required: 'gles2' in renderers)
-	if egl.found() and gbm.found()
-		scenefx_deps += [egl, gbm]
-		internal_features += {'egl': true}
-	endif
-
+if wlroots.get_variable('have_gles2_renderer') == 'true'
 	subdir('gles2')
 endif
 

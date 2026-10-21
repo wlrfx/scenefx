@@ -4,7 +4,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <time.h>
-#include <scenefx/render/fx_renderer/fx_renderer.h>
+#include <scenefx/scenefx.h>
 #include <scenefx/types/fx/clipped_region.h>
 #include <scenefx/types/wlr_scene.h>
 #include <unistd.h>
@@ -1096,7 +1096,7 @@ int main(int argc, char *argv[]) {
 	 * can also specify a renderer using the WLR_RENDERER env var.
 	 * The renderer is responsible for defining the various pixel formats it
 	 * supports for shared memory, this configures that for clients. */
-	server.renderer = fx_renderer_create(server.backend);
+	server.renderer = scenefx_renderer_init(server.backend);
 	if (server.renderer == NULL) {
 		wlr_log(WLR_ERROR, "failed to create wlr_renderer");
 		return 1;

@@ -1,10 +1,15 @@
 scenefx_files += files(
 	'color.c',
-	'egl.c',
+	'fx_offscreen_buffers.c',
+	'fx_pass.c',
+	'fx_renderer.c',
 	'pixel_format.c',
+	'tracy.c',
 )
 
-subdir('fx_renderer')
+if wlroots.get_variable('have_gles2_renderer') == 'true'
+	subdir('gles2')
+endif
 
 lcms2 = dependency('lcms2', required: get_option('color-management'))
 if lcms2.found()

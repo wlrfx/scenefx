@@ -1,3 +1,5 @@
+subdir('scenefx')
+
 exclude_files = ['meson.build']
 
 install_subdir('scenefx',

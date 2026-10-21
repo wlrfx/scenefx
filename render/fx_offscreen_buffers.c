@@ -33,7 +33,7 @@ void fx_offscreen_buffers_init(struct fx_offscreen_buffers *offscreen_buffers,
 		.fx_renderer = fx_renderer,
 		.wlr_output = output,
 	};
-	wlr_addon_init(&offscreen_buffers->addon, &output->addons, output, &offscreen_buffers_addon_impl);
+	wlr_addon_init(&offscreen_buffers->addon, &output->addons, fx_renderer, &offscreen_buffers_addon_impl);
 	wl_list_insert(&fx_renderer->offscreen_buffers, &offscreen_buffers->link);
 }
 
@@ -44,7 +44,7 @@ struct fx_offscreen_buffers *fx_offscreen_buffers_try_get(struct fx_renderer *fx
 		return NULL;
 	}
 
-	struct wlr_addon *addon = wlr_addon_find(&output->addons, output,
+	struct wlr_addon *addon = wlr_addon_find(&output->addons, fx_renderer,
 			&offscreen_buffers_addon_impl);
 	if (!addon) {
 		goto create_new;

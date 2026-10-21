@@ -3,8 +3,6 @@
 
 #include <wlr/render/wlr_renderer.h>
 
-#include "types/wlr_scene.h"
-
 struct fx_renderer;
 
 /**
@@ -25,5 +23,12 @@ struct wlr_renderer *scenefx_renderer_init(struct wlr_backend *backend);
  * Returns `NULL` if the FX Renderer initialization fails.
  */
 struct fx_renderer *scenefx_renderer_init_from_wlr(struct wlr_renderer *wlr_renderer);
+
+/**
+ * Try getting the attached FX Renderer from a wlr_renderer.
+ *
+ * Returns `NULL` if an attached FX Renderer wasn't found.
+ */
+struct fx_renderer *fx_renderer_try_from_wlr(struct wlr_renderer *wlr_renderer);
 
 #endif

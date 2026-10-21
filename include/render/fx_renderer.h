@@ -114,10 +114,9 @@ struct fx_renderer_impl {
 
 // wlroots OpenGL ES 2 renderer wrapper
 struct fx_renderer {
-	struct wlr_renderer *wlr_renderer;
+	struct wl_list link; // fx_renderers
 
-	struct wlr_addon scene_addon;
-	bool scene_addon_attached;
+	struct wlr_renderer *wlr_renderer;
 
 	const struct fx_renderer_impl *impl;
 
@@ -131,5 +130,12 @@ struct fx_renderer {
 
 void fx_renderer_init(struct fx_renderer *fx_renderer,
 		const struct fx_renderer_impl *impl, struct wlr_renderer *wlr_renderer);
+
+/**
+ * Try getting the attached FX Renderer from a wlr_renderer.
+ *
+ * Returns `NULL` if an attached FX Renderer wasn't found.
+ */
+struct fx_renderer *fx_renderer_try_from_wlr(struct wlr_renderer *wlr_renderer);
 
 #endif

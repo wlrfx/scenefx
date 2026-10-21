@@ -177,7 +177,7 @@ int main(int argc, char *argv[]) {
 	server.backend = wlr_backend_autocreate(wl_display_get_event_loop(server.display), NULL);
 	server.scene = wlr_scene_create();
 
-	server.renderer = scenefx_init(server.scene, server.backend);
+	server.renderer = scenefx_renderer_init(server.backend);
 	wlr_renderer_init_wl_display(server.renderer, server.display);
 
 	server.allocator = wlr_allocator_autocreate(server.backend,

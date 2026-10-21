@@ -42,8 +42,8 @@ sudo ninja -C build/ install
 
 ## Usage
 
-Just replace your calls to `wlr_renderer_autocreate()` with `scenefx_init()`
-providing your wlr_scene and wlr_backend structs and replace all
+Just replace your calls to `wlr_renderer_autocreate(...)` with `scenefx_renderer_init(...)`
+providing your wlr_backend struct and replace all
 `wlr/types/wlr_scene.h` includes with `scenefx/types/wlr_scene.h`.
 
 ## Troubleshooting

@@ -17,21 +17,13 @@ struct fx_renderer;
  * `wlr_renderer_autocreate(...)`. Returns a valid `non-NULL` wlr_renderer
  * even if the FX Renderer initialization fails.
  */
-struct wlr_renderer *scenefx_init(struct wlr_scene *wlr_scene, struct wlr_backend *backend);
+struct wlr_renderer *scenefx_renderer_init(struct wlr_backend *backend);
 
 /**
  * Initializes the SceneFX FX Renderer from an existing wlr_renderer.
  *
  * Returns `NULL` if the FX Renderer initialization fails.
  */
-struct fx_renderer *scenefx_init_from_wlr_renderer(struct wlr_renderer *wlr_renderer,
-		struct wlr_scene *wlr_scene);
-
-/** Get the internal wlr_renderer from an FX Renderer */
-struct wlr_renderer *fx_renderer_get_wlr_renderer(struct fx_renderer *fx_renderer);
-
-/** Try getting the FX Renderer from the wlr_scene addons list. */
-struct fx_renderer *scenefx_find_fx_renderer(struct wlr_scene *scene,
-		struct wlr_renderer *wlr_renderer);
+struct fx_renderer *scenefx_renderer_init_from_wlr(struct wlr_renderer *wlr_renderer);
 
 #endif

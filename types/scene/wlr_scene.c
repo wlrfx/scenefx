@@ -3340,8 +3340,7 @@ bool wlr_scene_output_build_state(struct wlr_scene_output *scene_output,
 	wlr_damage_ring_rotate_buffer(&scene_output->damage_ring, buffer,
 		&render_data.damage);
 
-	struct fx_renderer *fx_renderer = scenefx_find_fx_renderer(
-			scene_output->scene, output->renderer);
+	struct fx_renderer *fx_renderer = fx_renderer_try_from_wlr(output->renderer);
 	struct fx_render_pass *fx_pass = fx_renderer_init_render_pass(
 			fx_renderer, render_pass, buffer, output);
 	render_data.fx_pass = fx_pass;

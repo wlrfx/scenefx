@@ -74,6 +74,7 @@ struct fx_render_pass *gles2_render_pass_init(struct fx_renderer *fx_renderer,
 		struct wlr_render_pass *render_pass, struct wlr_buffer *wlr_buffer,
 		struct wlr_output *output);
 
+// wlroots OpenGL ES 2 renderer wrapper
 struct gles2_renderer {
 	struct fx_renderer fx_renderer;
 

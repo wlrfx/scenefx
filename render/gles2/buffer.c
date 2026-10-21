@@ -126,9 +126,7 @@ void gles2_buffer_get_or_allocate(struct fx_renderer *fx_renderer,
 		*gles2_buffer = NULL;
 	}
 
-	struct wlr_renderer *wlr_renderer = fx_renderer->wlr_renderer;
-
-	const struct wlr_drm_format *format = find_wlr_drm_format(wlr_renderer, has_alpha);
+	const struct wlr_drm_format *format = find_wlr_drm_format(fx_renderer, has_alpha);
 	if (format == NULL) {
 		wlr_log(WLR_ERROR, "Failed to get a supported texture format while allocating buffer");
 		*failed = true;

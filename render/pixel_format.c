@@ -45,18 +45,33 @@ static const size_t formats_alpha_size =
 static const size_t formats_opaque_size =
 	sizeof(formats_opaque) / sizeof(formats_opaque[0]);
 
-const struct wlr_drm_format *find_wlr_drm_format(struct wlr_renderer *wlr_renderer, bool alpha) {
-	const struct wlr_drm_format_set *texture_formats = wlr_renderer_get_texture_formats(
-			wlr_renderer, wlr_renderer->render_buffer_caps);
-
+static const struct wlr_drm_format *find_format_from_set(
+		const struct wlr_drm_format_set *supported_formats, bool alpha) {
 	const uint32_t *formats = alpha ? formats_alpha : formats_opaque;
 	const size_t formats_size = alpha ? formats_alpha_size : formats_opaque_size;
 
 	for (size_t i = 0; i < formats_size; ++i) {
-		const struct wlr_drm_format *format = wlr_drm_format_set_get(texture_formats, formats[i]);
+		const struct wlr_drm_format *format = wlr_drm_format_set_get(supported_formats, formats[i]);
 		if (format != NULL) {
 			return format;
 		}
 	}
 	return NULL;
+}
+
+const struct wlr_drm_format *find_wlr_drm_format(struct fx_renderer *fx_renderer, bool alpha) {
+	struct wlr_renderer *wlr_renderer = fx_renderer->wlr_renderer;
+
+	// Find the format that supports both sampling and rendering
+	if (fx_renderer->supported_drm_formats != NULL) {
+		const struct wlr_drm_format *format = find_format_from_set(fx_renderer->supported_drm_formats, alpha);
+		if (format != NULL) {
+			return format;
+		}
+	}
+
+	// Fallback to the supported sampling formats
+	const struct wlr_drm_format_set *supported_formats =
+		wlr_renderer_get_texture_formats(wlr_renderer, wlr_renderer->render_buffer_caps);
+	return find_format_from_set(supported_formats, alpha);
 }

@@ -1,6 +1,7 @@
 #include "scenefx/config.h"
 
 #include <assert.h>
+#include <stdlib.h>
 #include <wlr/util/log.h>
 #include <wlr/render/interface.h>
 #if SCENEFX_HAS_GLES2_RENDERER
@@ -37,7 +38,38 @@ static void handle_renderer_destroy(struct wl_listener *listener, void *data) {
 		fx_offscreen_buffers_destroy(offscreen_buffers);
 	}
 
+	wlr_drm_format_set_finish(fx_renderer->supported_drm_formats);
+	free(fx_renderer->supported_drm_formats);
+
 	fx_renderer->impl->renderer_destroy(fx_renderer);
+}
+
+/** Get the set of supported sampling and rendering DRM formats */
+static struct wlr_drm_format_set *get_supported_drm_formats(struct wlr_renderer *wlr_renderer) {
+	if (wlr_renderer->impl->get_render_formats == NULL) {
+		return NULL;
+	}
+
+	const struct wlr_drm_format_set *render_formats =
+		wlr_renderer->impl->get_render_formats(wlr_renderer);
+	const struct wlr_drm_format_set *texture_formats =
+		wlr_renderer_get_texture_formats(wlr_renderer, wlr_renderer->render_buffer_caps);
+	if (texture_formats == NULL || render_formats == NULL) {
+		return NULL;
+	}
+
+	struct wlr_drm_format_set *formats = calloc(1, sizeof(*formats));
+
+	// Find the format that supports both sampling and rendering
+	bool result = wlr_drm_format_set_intersect(formats, texture_formats, render_formats);
+	if (!result) {
+		wlr_log(WLR_DEBUG, "Could not find suitable DRM format. "
+				"Falling back to the sampling formats");
+		free(formats);
+		formats = NULL;
+	}
+
+	return formats;
 }
 
 void fx_renderer_init(struct fx_renderer *fx_renderer,
@@ -51,6 +83,7 @@ void fx_renderer_init(struct fx_renderer *fx_renderer,
 		.impl = impl,
 		.wlr_renderer = wlr_renderer,
 		.tracy_data = NULL,
+		.supported_drm_formats = get_supported_drm_formats(wlr_renderer),
 	};
 
 #ifdef TRACY_ENABLE

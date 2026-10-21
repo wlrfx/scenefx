@@ -13,7 +13,7 @@ struct fx_offscreen_buffers;
 struct fx_renderer;
 
 // Find the best supported DRM format
-const struct wlr_drm_format *find_wlr_drm_format(struct wlr_renderer *wlr_renderer, bool alpha);
+const struct wlr_drm_format *find_wlr_drm_format(struct fx_renderer *fx_renderer, bool alpha);
 
 ///
 /// fx_offscreen_buffers
@@ -111,7 +111,7 @@ struct fx_renderer_impl {
 	const struct fx_renderer_tracy_impl *tracy;
 };
 
-// wlroots OpenGL ES 2 renderer wrapper
+// wlroots wlr_renderer wrapper
 struct fx_renderer {
 	struct wl_list link; // fx_renderers
 
@@ -125,6 +125,11 @@ struct fx_renderer {
 	struct wl_list offscreen_buffers; // fx_offscreen_buffers.link
 
 	struct wl_listener renderer_destroy;
+
+	// The supported DRM formats that support both sampling and rendering.
+	// Is NULL if no supported formats are found. Please fallback to
+	// `wlr_renderer_get_texture_formats(...)` in that case
+	struct wlr_drm_format_set *supported_drm_formats;
 };
 
 void fx_renderer_init(struct fx_renderer *fx_renderer,

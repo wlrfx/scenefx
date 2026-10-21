@@ -2022,58 +2022,61 @@ static void scene_entry_render(struct render_list_entry *entry, const struct ren
 		break;
 	case WLR_SCENE_NODE_RECT:;
 		struct wlr_scene_rect *scene_rect = wlr_scene_rect_from_node(node);
-		struct fx_corner_radii rect_corners = scene_rect->corners;
+		const struct wlr_render_rect_options base_rect_options = {
+			.box = dst_box,
+			.color = {
+				.r = scene_rect->color[0],
+				.g = scene_rect->color[1],
+				.b = scene_rect->color[2],
+				.a = scene_rect->color[3],
+			},
+			.clip = &render_region,
+		};
 
+		// Fallback to the default wlr rendering implementation
+		if (data->fx_pass == NULL) {
+			wlr_render_pass_add_rect(data->render_pass, &base_rect_options);
+			break;
+		}
+
+		struct fx_corner_radii rect_corners = scene_rect->corners;
 		fx_corner_radii_transform(node_transform, &rect_corners);
 
 		struct wlr_box rect_clipped_region_box = scene_rect->clipped_region.area;
-		struct fx_corner_radii rect_clipped_corners = scene_rect->clipped_region.corners;
-
 		// Node relative -> Root relative
 		rect_clipped_region_box.x += x;
 		rect_clipped_region_box.y += y;
-
 		transform_output_box(&rect_clipped_region_box, data);
+
+		struct fx_corner_radii rect_clipped_corners = scene_rect->clipped_region.corners;
 		fx_corner_radii_transform(node_transform, &rect_clipped_corners);
 
-		struct fx_render_rect_options rect_options = {
-			.base = {
-				.box = dst_box,
-				.color = {
-					.r = scene_rect->color[0],
-					.g = scene_rect->color[1],
-					.b = scene_rect->color[2],
-					.a = scene_rect->color[3],
-				},
-				.clip = &render_region,
-			},
-			.clipped_region = {
-				.area = rect_clipped_region_box,
-				.corners = fx_corner_radii_scale(rect_clipped_corners, data->scale),
-			},
+		const struct clipped_fregion clipped_region = {
+			.area = rect_clipped_region_box,
+			.corners = fx_corner_radii_scale(rect_clipped_corners, data->scale),
 		};
 
-		if (data->fx_pass == NULL) {
-			wlr_render_pass_add_rect(data->render_pass, &rect_options.base);
-		} else if (!fx_corner_radii_is_empty(&rect_corners)) {
-			struct fx_render_rounded_rect_options rounded_rect_options = {
-				.base = rect_options.base,
+		if (!fx_corner_radii_is_empty(&rect_corners)) {
+			fx_render_pass_add_rounded_rect(data->fx_pass, &(struct fx_render_rounded_rect_options) {
+				.base = base_rect_options,
 				.corners = fx_corner_radii_scale(rect_corners, data->scale),
-				.clipped_region = rect_options.clipped_region,
-			};
-			fx_render_pass_add_rounded_rect(data->fx_pass, &rounded_rect_options);
+				.clipped_region = clipped_region,
+			});
 		} else if (!wlr_box_empty(&rect_clipped_region_box)) {
-			fx_render_pass_add_rect(data->fx_pass, &rect_options);
+			fx_render_pass_add_rect(data->fx_pass, &(struct fx_render_rect_options) {
+				.base = base_rect_options,
+				.clipped_region = clipped_region,
+			});
 		} else {
-			wlr_render_pass_add_rect(data->render_pass, &rect_options.base);
+			// Fallback to the default wlr rendering implementation
+			wlr_render_pass_add_rect(data->render_pass, &base_rect_options);
 		}
 		break;
 	case WLR_SCENE_NODE_BUFFER:;
 		struct wlr_scene_buffer *scene_buffer = wlr_scene_buffer_from_node(node);
-		struct fx_corner_radii buffer_corners = scene_buffer->corners;
 
 		if (scene_buffer->is_single_pixel_buffer) {
-			// TODO: Render blur/rounded corners/etc here:
+			// TODO: Render rounded corners and clipped_region here:
 
 			// Render the buffer as a rect, this is likely to be more efficient
 			wlr_render_pass_add_rect(data->render_pass, &(struct wlr_render_rect_options){
@@ -2100,6 +2103,8 @@ static void scene_entry_render(struct render_list_entry *entry, const struct ren
 		enum wl_output_transform transform =
 			wlr_output_transform_invert(scene_buffer->transform);
 		transform = wlr_output_transform_compose(transform, data->transform);
+
+		struct fx_corner_radii buffer_corners = scene_buffer->corners;
 		fx_corner_radii_transform(transform, &buffer_corners);
 
 		struct wlr_color_primaries primaries = {0};
@@ -2114,17 +2119,17 @@ static void scene_entry_render(struct render_list_entry *entry, const struct ren
 			WLR_COLOR_TRANSFER_FUNCTION_SRGB, &srgb_lum);
 		float luminance_multiplier = get_luminance_multiplier(&src_lum, &srgb_lum);
 
-		struct fx_render_texture_options tex_options = {
+		const struct fx_render_texture_options tex_options = {
 			.base = (struct wlr_render_texture_options){
 				.texture = texture,
 				.src_box = scene_buffer->src_box,
 				.dst_box = dst_box,
 				.transform = transform,
-				.clip = &render_region, // Render with the smaller region, clipping CSD
+				.clip = &render_region,
 				.alpha = &scene_buffer->opacity,
 				.filter_mode = scene_buffer->filter_mode,
 				.blend_mode = !data->output->scene->calculate_visibility ||
-					!pixman_region32_empty(&opaque) ?
+						!pixman_region32_empty(&opaque) ?
 					WLR_RENDER_BLEND_MODE_PREMULTIPLIED : WLR_RENDER_BLEND_MODE_NONE,
 				.transfer_function = scene_buffer->transfer_function,
 				.primaries = scene_buffer->primaries != 0 ? &primaries : NULL,
@@ -2141,6 +2146,7 @@ static void scene_entry_render(struct render_list_entry *entry, const struct ren
 
 		if (data->fx_pass == NULL || (fx_corner_radii_is_empty(&buffer_corners)
 					&& wlr_box_empty(&tex_options.clipped_region.area))) {
+			// Fallback to the default wlr rendering implementation
 			wlr_render_pass_add_texture(data->render_pass, &tex_options.base);
 		} else {
 			fx_render_pass_add_texture(data->fx_pass, &tex_options);

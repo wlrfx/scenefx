@@ -84,7 +84,11 @@ struct fx_renderer *scenefx_renderer_init_from_wlr(struct wlr_renderer *wlr_rend
 			"Falling back to regular wlroots rendering.");
 	return NULL;
 #else
-	struct fx_renderer *fx_renderer = NULL;
+	struct fx_renderer *fx_renderer = fx_renderer_try_from_wlr(wlr_renderer);
+	// Make sure that there's not an existing FX Renderer for the given wlr_renderer
+	if (fx_renderer != NULL) {
+		return fx_renderer;
+	}
 
 #if WLR_HAS_GLES2_RENDERER
 	if (wlr_renderer_is_gles2(wlr_renderer)) {

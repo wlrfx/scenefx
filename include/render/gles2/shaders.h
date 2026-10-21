@@ -112,6 +112,7 @@ struct tex_shader {
 	GLint pos_attrib;
 
 	GLint discard_transparent;
+	GLint ignore_alpha_threshold;
 
 	// Only used for the effects shader
 	struct {

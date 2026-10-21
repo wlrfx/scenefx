@@ -46,6 +46,7 @@ uniform float clip_radius_bottom_right;
 #endif
 
 uniform bool discard_transparent;
+uniform float ignore_alpha_threshold;
 
 vec4 sample_texture() {
 #if SOURCE == SOURCE_TEXTURE_RGBA || SOURCE == SOURCE_TEXTURE_EXTERNAL
@@ -61,6 +62,8 @@ float corner_alpha(vec2 size, vec2 position, bool is_cutout,
 #endif
 
 void main() {
+	vec4 color = sample_texture();
+
 #if EFFECTS
 	float quad_corner_alpha = corner_alpha(
 		size - 0.5,
@@ -83,12 +86,12 @@ void main() {
 		clip_radius_bottom_right
 	);
 
-	gl_FragColor = sample_texture() * alpha * quad_corner_alpha * clip_corner_alpha;
+	gl_FragColor = color * alpha * quad_corner_alpha * clip_corner_alpha;
 #else
-	gl_FragColor = sample_texture() * alpha;
+	gl_FragColor = color * alpha;
 #endif
 
-	if (discard_transparent && gl_FragColor.a == 0.0) {
+	if (discard_transparent && color.a <= ignore_alpha_threshold) {
 		discard;
 	}
 }

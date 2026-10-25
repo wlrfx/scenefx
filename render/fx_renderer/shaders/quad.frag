@@ -1,7 +1,7 @@
 #define EFFECTS %d
 
 #if !defined(EFFECTS)
-#error "Missing shader preamble"
+#error Missing shader preamble
 #endif
 
 #ifdef GL_FRAGMENT_PRECISION_HIGH

@@ -6,7 +6,7 @@
 #define SOURCE_TEXTURE_EXTERNAL 3
 
 #if !defined(SOURCE) || !defined(EFFECTS)
-#error "Missing shader preamble"
+#error Missing shader preamble
 #endif
 
 #if SOURCE == SOURCE_TEXTURE_EXTERNAL

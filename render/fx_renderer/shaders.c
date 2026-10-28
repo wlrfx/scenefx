@@ -23,7 +23,20 @@
 
 GLuint compile_shader(GLuint type, const GLchar *src) {
 	GLuint shader = glCreateShader(type);
-	glShaderSource(shader, 1, &src, NULL);
+
+	const char *prefix = "";
+#ifdef FORCE_GL_FRAGMENT_PRECISION_HIGH
+	if (type == GL_FRAGMENT_SHADER) {
+		prefix =
+			"#ifndef GL_FRAGMENT_PRECISION_HIGH\n"
+			"#define GL_FRAGMENT_PRECISION_HIGH 1\n"
+			"#endif\n";
+	}
+#endif
+
+	const GLchar *sources[] = { prefix, src };
+
+	glShaderSource(shader, 2, sources, NULL);
 	glCompileShader(shader);
 
 	GLint ok;

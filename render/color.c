@@ -42,7 +42,9 @@ struct wlr_color_transform *wlr_color_transform_init_linear_to_inverse_eotf(
 
 struct wlr_color_transform *wlr_color_transform_init_lut_3x1d(size_t dim,
 		const uint16_t *r, const uint16_t *g, const uint16_t *b) {
-	uint16_t *lut_3x1d = malloc(3 * dim * sizeof(lut_3x1d[0]));
+	// calloc() gets the standard's built-in nmemb * size overflow check for
+	// free; a raw malloc() with manual multiplication here does not.
+	uint16_t *lut_3x1d = calloc(3 * dim, sizeof(lut_3x1d[0]));
 	if (lut_3x1d == NULL) {
 		return NULL;
 	}

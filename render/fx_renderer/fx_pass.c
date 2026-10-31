@@ -582,12 +582,17 @@ void fx_render_pass_add_rect(struct fx_gles_render_pass *pass,
 
 		apply_clip_region(&clip_region, clipped_region_box, clipped_region_corners);
 
-		bool const recompile = renderer->shaders.quad.gradient_max_colors <= fx_options->gradient.colors_size;
-		if (recompile) {
-			glDeleteProgram(renderer->shaders.quad.program);
-			if (!link_quad_program(&renderer->shaders.quad, fx_options->gradient.colors_size + 1)) {
-				wlr_log(WLR_ERROR, "Could not link 'quad' shader after updating gradient.colors_size to %d. Aborting renderer", fx_options->gradient.colors_size + 1);
-				abort();
+		// We must recompile the shader when the number of gradient colors
+		// exceeds the maximum number of colors in the shader.
+		if(fx_options->fill_type == FILL_GRADIENT) {
+			bool const recompile = 
+				renderer->shaders.quad.gradient_max_colors <= fx_options->gradient.colors_size;
+			if (recompile) {
+				glDeleteProgram(renderer->shaders.quad.program);
+				if (!link_quad_program(&renderer->shaders.quad, fx_options->gradient.colors_size + 1)) {
+					wlr_log(WLR_ERROR, "Could not link 'quad' shader after updating gradient.colors_size to %d. Aborting renderer", fx_options->gradient.colors_size + 1);
+					abort();
+				}
 			}
 		}
 
@@ -645,12 +650,16 @@ void fx_render_pass_add_rounded_rect(struct fx_gles_render_pass *pass,
 	struct wlr_buffer *wlr_buffer = pass->buffer->buffer;
 	wlr_render_rect_options_get_box(options, wlr_buffer, &box);
 
-	bool const recompile = renderer->shaders.quad_round.gradient_max_colors <= fx_options->gradient.colors_size;
-	if (recompile) {
-		glDeleteProgram(renderer->shaders.quad_round.program);
-		if (!link_quad_round_program(&renderer->shaders.quad_round, fx_options->gradient.colors_size + 1)) {
-			wlr_log(WLR_ERROR, "Could not link 'quad_round' shader after updating gradient.colors_size to %d. Aborting renderer", fx_options->gradient.colors_size + 1);
-			abort();
+	// We must recompile the shader when the number of gradient colors
+	// exceeds the maximum number of colors in the shader.
+	if(fx_options->fill_type == FILL_GRADIENT) {
+		bool const recompile = renderer->shaders.quad_round.gradient_max_colors <= fx_options->gradient.colors_size;
+		if (recompile) {
+			glDeleteProgram(renderer->shaders.quad_round.program);
+			if (!link_quad_round_program(&renderer->shaders.quad_round, fx_options->gradient.colors_size + 1)) {
+				wlr_log(WLR_ERROR, "Could not link 'quad_round' shader after updating gradient.colors_size to %d. Aborting renderer", fx_options->gradient.colors_size + 1);
+				abort();
+			}
 		}
 	}
 

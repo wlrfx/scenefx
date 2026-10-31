@@ -1,5 +1,16 @@
 #if EFFECTS_GRADIENT
 
+// clamp(genIType) is not provided in GLES prior to version 3.0.
+#if defined(GL_ES) && __VERSION__ < 300
+int clamp(int value, int min_value, int max_value) {
+	return value < min_value
+		? min_value
+		: (value > max_value
+				? max_value
+				: value);
+}
+#endif
+
 vec4 compute_gradient_color_from_blend_factor(
 	vec4 colors[MAX_GRADIENT_COLORS], int count, float factor, bool blend)
 {
@@ -18,7 +29,7 @@ vec4 compute_gradient_color_from_blend_factor(
 	return color;
 }
 
-vec4 compute_gradient_linear(vec4 colors[MAX_GRADIENT_COLORS], int count, 
+vec4 compute_gradient_linear(vec4 colors[MAX_GRADIENT_COLORS], int count,
 		vec2 uv, float angle, bool blend)
 {
 	if(count <= 1) {
@@ -29,7 +40,7 @@ vec4 compute_gradient_linear(vec4 colors[MAX_GRADIENT_COLORS], int count,
 	//
 	// The math is quite simple. We construct the unit vector n denoting the
 	// axis of the gradient from angle. We then project all four corners
-	// relative to the midpoint of the square onto n forming a set 
+	// relative to the midpoint of the square onto n forming a set
 	// S = { A, -A, B, -B } where
 	//   A = 0.5 * sin(angle) + 0.5 * cos(angle)
 	//   B = 0.5 * sin(angle) - 0.5 * cos(angle)
@@ -40,7 +51,7 @@ vec4 compute_gradient_linear(vec4 colors[MAX_GRADIENT_COLORS], int count,
 	// For our purposes, the minimum and maximum happen to yield identical
 	// results since the sign is irrelevant for length - if B is farthest away,
 	// then -B is farthest away in the opposite direction. Thus we effectively
-	// are looking for 
+	// are looking for
 	//   2 * max(|A|, |B|) = 2 * max(|s + c|, |s - c|)
 	// where s is the sine term and c is the cosine term.
 	//
@@ -53,8 +64,8 @@ vec4 compute_gradient_linear(vec4 colors[MAX_GRADIENT_COLORS], int count,
 	// and calculate the distance of projections of fragments onto n from it.
 
 	vec2 n = vec2(-sin(angle), cos(angle));
-	float axis_length = abs(n.x) + abs(n.y);	
-	vec2 endpoint = vec2(0.5, 0.5) + n * 0.5 * axis_length;	
+	float axis_length = abs(n.x) + abs(n.y);
+	vec2 endpoint = vec2(0.5, 0.5) + n * 0.5 * axis_length;
 	float factor = dot(uv - vec2(0.5, 0.5), n) / axis_length + 0.5;
 	// We want to reverse the colors to match CSS's order.
 	factor = clamp(1.0 - factor, 0.0, 1.0);

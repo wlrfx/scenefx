@@ -391,7 +391,7 @@ static void scene_node_opaque_region(struct wlr_scene_node *node, int x, int y,
 
 	if (node->type == WLR_SCENE_NODE_RECT) {
 		struct wlr_scene_rect *scene_rect = wlr_scene_rect_from_node(node);
-		if (wlr_scene_rect_fill_is_opaque(&scene_rect->fill)) {
+		if (!wlr_scene_rect_fill_is_opaque(&scene_rect->fill)) {
 			return;
 		}
 

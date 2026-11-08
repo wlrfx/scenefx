@@ -1,26 +1,23 @@
 #if EFFECTS_GRADIENT
 
-// clamp(genIType) is not provided in GLES prior to version 3.0.
-#if defined(GL_ES) && __VERSION__ < 300
-int clamp(int value, int min_value, int max_value) {
+int clamp_int(int value, int min_value, int max_value) {
 	return value < min_value
 		? min_value
 		: (value > max_value
 				? max_value
 				: value);
 }
-#endif
 
 vec4 compute_gradient_color_from_blend_factor(
 	vec4 colors[MAX_GRADIENT_COLORS], int count, float factor, bool blend)
 {
 	if(!blend) {
-		int inx = clamp(int(float(count) * factor), 0, count - 1);
+		int inx = clamp_int(int(float(count) * factor), 0, count - 1);
 		return colors[inx];
 	}
 
 	float smooth_inx = clamp(factor * float(count - 1), 0.0, float(count - 1));
-    int inx = clamp(int(smooth_inx), 0, count - 1);
+    int inx = clamp_int(int(smooth_inx), 0, count - 1);
 	if(inx == count - 1) {
 		return colors[count - 1];
 	}

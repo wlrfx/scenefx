@@ -334,11 +334,18 @@ static bool apply_clip_region(pixman_region32_t *clip_region,
 		float left = fmax(corners->top_left, corners->bottom_left);
 		float right = fmax(corners->top_right, corners->bottom_right);
 
+		// TODO: A factor of 0.5 makes the inner clip square tightly fitting for
+		//       rounding power equal 1. For higher rounding powers a smaller
+		//       factor would produce a better fitting clip square. The factor
+		//       could be calculated as
+		//         f = 1 / 2^(1 / p)
+		//       where p is the rounding power.
+		float const factor = 0.5;
 		// Round inwards: truncating would overlap the top-left rounded corners
-		int x1 = ceil(clipped_region_box->x + left * 0.3);
-		int y1 = ceil(clipped_region_box->y + top * 0.3);
-		int x2 = floor(clipped_region_box->x + clipped_region_box->width - right * 0.3);
-		int y2 = floor(clipped_region_box->y + clipped_region_box->height - bottom * 0.3);
+		int x1 = ceil(clipped_region_box->x + left * factor);
+		int y1 = ceil(clipped_region_box->y + top * factor);
+		int x2 = floor(clipped_region_box->x + clipped_region_box->width - right * factor);
+		int y2 = floor(clipped_region_box->y + clipped_region_box->height - bottom * factor);
 
 		pixman_region32_t user_clip_region;
 		pixman_region32_init_rect(&user_clip_region, x1, y1,
@@ -607,6 +614,7 @@ void fx_render_pass_add_rect(struct fx_gles_render_pass *pass,
 		glUniform2f(shader.position, box.x, box.y);
 		glUniform1i(shader.effects_clip, should_clip);
 		glUniform1i(shader.fill_type, fx_options->fill_type);
+		glUniform1f(shader.rounding_power, fx_options->rounding_power > 0.0f ? fx_options->rounding_power : 2.0f);
 
 		switch(fx_options->fill_type) {
 			case FILL_SOLID_COLOR:
@@ -720,6 +728,7 @@ void fx_render_pass_add_rounded_rect(struct fx_gles_render_pass *pass,
 	set_proj_matrix(shader.proj, pass->projection_matrix, &box);
 	glUniform1i(shader.effects_clip, 1);
 	glUniform1i(shader.fill_type, fx_options->fill_type);
+	glUniform1f(shader.rounding_power, fx_options->rounding_power > 0.0f ? fx_options->rounding_power : 2.0f);
 
 	switch(fx_options->fill_type) {
 		case FILL_SOLID_COLOR:

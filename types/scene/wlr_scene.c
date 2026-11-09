@@ -951,6 +951,7 @@ struct wlr_scene_rect *wlr_scene_rect_create(struct wlr_scene_tree *parent,
 	scene_rect->fill.type = FILL_SOLID_COLOR;
 	memcpy(scene_rect->fill.solid_color, color, sizeof(scene_rect->fill.solid_color));
 	scene_rect->corners = (struct fx_corner_radii){0};
+	scene_rect->rounding_power = 2.0f;
 	scene_rect->accepts_input = true;
 	scene_rect->clipped_region = clipped_region_get_default();
 
@@ -1079,6 +1080,15 @@ void wlr_scene_rect_set_corner_radii(struct wlr_scene_rect *rect, struct fx_corn
 	}
 
 	rect->corners = corners;
+	scene_node_update(&rect->node, NULL);
+}
+
+void wlr_scene_rect_set_rounding_power(struct wlr_scene_rect *rect, float rounding_power) {
+	if (rect->rounding_power == rounding_power) {
+		return;
+	}
+
+	rect->rounding_power = rounding_power;
 	scene_node_update(&rect->node, NULL);
 }
 
@@ -2141,6 +2151,7 @@ static void scene_entry_render(struct render_list_entry *entry, const struct ren
 			},
 			.fill_type = scene_rect->fill.type,
 			.gradient = scene_rect->fill.gradient,
+			.rounding_power = scene_rect->rounding_power,
 		};
 
 		// TODO: Use the base wlr_render_pass_add_rect as a fast-path in the future
@@ -2151,6 +2162,7 @@ static void scene_entry_render(struct render_list_entry *entry, const struct ren
 				.clipped_region = rect_options.clipped_region,
 				.fill_type = scene_rect->fill.type,
 				.gradient = scene_rect->fill.gradient,
+				.rounding_power = scene_rect->rounding_power,
 			};
 			fx_render_pass_add_rounded_rect(fx_pass, &rounded_rect_options);
 		} else {

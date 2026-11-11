@@ -270,6 +270,10 @@ static void server_new_keyboard(struct tinywl_server *server,
 	struct wlr_keyboard *wlr_keyboard = wlr_keyboard_from_input_device(device);
 
 	struct tinywl_keyboard *keyboard = calloc(1, sizeof(*keyboard));
+	if (keyboard == NULL) {
+		wlr_log(WLR_ERROR, "failed to allocate keyboard");
+		return;
+	}
 	keyboard->server = server;
 	keyboard->wlr_keyboard = wlr_keyboard;
 
@@ -756,6 +760,10 @@ static void server_new_output(struct wl_listener *listener, void *data) {
 
 	/* Allocates and configures our state for this output */
 	struct tinywl_output *output = calloc(1, sizeof(*output));
+	if (output == NULL) {
+		wlr_log(WLR_ERROR, "failed to allocate output");
+		return;
+	}
 	output->wlr_output = wlr_output;
 	output->server = server;
 
@@ -955,6 +963,10 @@ static void server_new_xdg_toplevel(struct wl_listener *listener, void *data) {
 
 	/* Allocate a tinywl_toplevel for this surface */
 	struct tinywl_toplevel *toplevel = calloc(1, sizeof(*toplevel));
+	if (toplevel == NULL) {
+		wlr_log(WLR_ERROR, "failed to allocate toplevel");
+		return;
+	}
 	toplevel->server = server;
 	toplevel->xdg_toplevel = xdg_toplevel;
 	toplevel->scene_tree = wlr_scene_tree_create(toplevel->server->layers.toplevel_layer);
@@ -1039,6 +1051,10 @@ static void server_new_xdg_popup(struct wl_listener *listener, void *data) {
 	struct wlr_xdg_popup *xdg_popup = data;
 
 	struct tinywl_popup *popup = calloc(1, sizeof(*popup));
+	if (popup == NULL) {
+		wlr_log(WLR_ERROR, "failed to allocate popup");
+		return;
+	}
 	popup->xdg_popup = xdg_popup;
 
 	/* We must add xdg popups to the scene graph so they get rendered. The

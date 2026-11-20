@@ -807,7 +807,6 @@ void fx_render_pass_add_box_shadow(struct fx_gles_render_pass *pass,
 
 	// Blurred edges require blending, so just enable it
 	setup_blending(WLR_RENDER_BLEND_MODE_PREMULTIPLIED);
-	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
 	glUseProgram(renderer->shaders.box_shadow.program);
 
@@ -826,8 +825,6 @@ void fx_render_pass_add_box_shadow(struct fx_gles_render_pass *pass,
 
 	render(&box, &clip_region, renderer->shaders.box_shadow.pos_attrib);
 	pixman_region32_fini(&clip_region);
-
-	glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
 
 	pop_fx_debug(renderer);
 	TRACY_BOTH_ZONES_END;

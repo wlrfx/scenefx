@@ -30,7 +30,21 @@ GLuint fx_framebuffer_get_fbo(struct fx_framebuffer *buffer) {
 
 	push_fx_debug(buffer->renderer);
 
-	if (!buffer->rbo) {
+	if (buffer->renderer_owned) {
+		// Render into the texture that blur passes sample, so both use one GL
+		// object instead of separate renderbuffer and texture EGLImage siblings.
+		if (!buffer->tex) {
+			GLint prev_tex;
+			glGetIntegerv(GL_TEXTURE_BINDING_2D, &prev_tex);
+			glGenTextures(1, &buffer->tex);
+			glBindTexture(GL_TEXTURE_2D, buffer->tex);
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+			buffer->renderer->procs.glEGLImageTargetTexture2DOES(GL_TEXTURE_2D,
+					buffer->image);
+			glBindTexture(GL_TEXTURE_2D, prev_tex);
+		}
+	} else if (!buffer->rbo) {
 		glGenRenderbuffers(1, &buffer->rbo);
 		glBindRenderbuffer(GL_RENDERBUFFER, buffer->rbo);
 		buffer->renderer->procs.glEGLImageTargetRenderbufferStorageOES(GL_RENDERBUFFER,
@@ -40,8 +54,13 @@ GLuint fx_framebuffer_get_fbo(struct fx_framebuffer *buffer) {
 
 	glGenFramebuffers(1, &buffer->fbo);
 	glBindFramebuffer(GL_FRAMEBUFFER, buffer->fbo);
-	glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0,
-			GL_RENDERBUFFER, buffer->rbo);
+	if (buffer->renderer_owned) {
+		glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0,
+				GL_TEXTURE_2D, buffer->tex, 0);
+	} else {
+		glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0,
+				GL_RENDERBUFFER, buffer->rbo);
+	}
 	GLenum fb_status = glCheckFramebufferStatus(GL_FRAMEBUFFER);
 
 	// Init stencil buffer
@@ -114,6 +133,7 @@ void fx_framebuffer_get_or_create_custom(struct fx_renderer *renderer,
 		*failed = true;
 		return;
 	}
+	(*fx_framebuffer)->renderer_owned = true;
 	fx_framebuffer_get_fbo(*fx_framebuffer);
 }
 

@@ -40,6 +40,9 @@ struct fx_framebuffer {
 	struct fx_renderer *renderer;
 	struct wl_list link; // fx_renderer.buffers
 	bool external_only;
+	// Allocated by this renderer for its own effects. Its framebuffer renders
+	// into tex, so sampling never needs the EGLImage respecified.
+	bool renderer_owned;
 
 	EGLImageKHR image;
 	GLuint rbo;

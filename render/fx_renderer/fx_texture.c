@@ -383,8 +383,9 @@ static struct wlr_texture *fx_texture_from_dmabuf(
 		glGenTextures(1, &buffer->tex);
 		invalid = true;
 	} else {
-		// External changes are immediately made visible by the GL implementation
-		invalid = !buffer->external_only;
+		// External changes are immediately made visible by the GL implementation,
+		// and a renderer-owned framebuffer renders into this texture itself
+		invalid = !buffer->external_only && !buffer->renderer_owned;
 	}
 
 	if (invalid) {

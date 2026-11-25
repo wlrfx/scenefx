@@ -1191,6 +1191,9 @@ int main(int argc, char *argv[]) {
 				.height = 100,
 			},
 	});
+	struct fx_corner_radii corner_radii = { 30, 30, 0, 0 };
+	wlr_scene_rect_set_corner_radii(rect, corner_radii);
+	wlr_scene_rect_set_rounding_power(rect, 1.0);
 	wlr_scene_node_set_position(&rect->node, 200, 200);
 
 	/* Set up xdg-shell version 3. The xdg-shell is a Wayland protocol which is

@@ -46,6 +46,7 @@ struct fx_render_rect_options {
 	struct clipped_fregion clipped_region;
 	enum wlr_scene_rect_fill_type fill_type;
 	struct fx_gradient gradient;
+	float rounding_power;
 };
 
 struct fx_render_rounded_rect_options {
@@ -54,6 +55,7 @@ struct fx_render_rounded_rect_options {
 	struct clipped_fregion clipped_region;
 	enum wlr_scene_rect_fill_type fill_type;
 	struct fx_gradient gradient;
+	float rounding_power;
 };
 
 struct fx_render_box_shadow_options {

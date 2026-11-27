@@ -23,7 +23,9 @@ bool blur_data_should_parameters_blur_effects(struct blur_data *blur_data) {
 }
 
 int blur_data_calc_size(struct blur_data *blur_data) {
-	return pow(2, blur_data->num_passes + 1) * blur_data->radius;
+	int num_passes = blur_data_clamp_num_passes(blur_data->num_passes);
+	float radius = blur_data_clamp_radius(blur_data->radius);
+	return pow(2, num_passes + 1) * radius;
 }
 
 static float lerp(float a, float b, float f) {
